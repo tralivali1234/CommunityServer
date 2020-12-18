@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -36,6 +27,8 @@ using ASC.Projects.Engine;
 using ASC.Web.Studio.Utility;
 using System.Linq;
 using ASC.Core.Users;
+using ASC.Web.Projects.Core;
+using Autofac;
 
 namespace ASC.Feed.Aggregator.Modules.Projects
 {
@@ -80,11 +73,16 @@ namespace ASC.Feed.Aggregator.Modules.Projects
 
         public override bool VisibleFor(Feed feed, object data, Guid userId)
         {
-            return base.VisibleFor(feed, data, userId) && ProjectSecurity.CanGoToFeed((ParticipantFull)data, userId);
+            using (var scope = DIHelper.Resolve())
+            {
+                return base.VisibleFor(feed, data, userId) && scope.Resolve<ProjectSecurity>().CanGoToFeed((ParticipantFull)data, userId);
+            }
         }
 
         public override IEnumerable<Tuple<Feed, object>> GetFeeds(FeedFilter filter)
         {
+            var filterTimeInterval = TimeSpan.FromTicks(filter.Time.To.Ticks - filter.Time.From.Ticks).TotalMinutes;
+
             var q = new SqlQuery("projects_project_participant" + " pp")
                 .Select("pp.participant_id", "pp.created", "pp.updated")
                 .InnerJoin("projects_projects" + " p",
@@ -94,7 +92,7 @@ namespace ASC.Feed.Aggregator.Modules.Projects
                 .Where("pp.removed", 0)
                 .Where("pp.tenant", filter.Tenant)
                 .Where(Exp.Between("pp.created", filter.Time.From, filter.Time.To) &
-                       !Exp.Between("p.create_on - pp.created", -10, 10));
+                       !Exp.Between("TIMESTAMPDIFF(MINUTE,p.create_on, pp.created)", -filterTimeInterval, filterTimeInterval));
 
             using (var db = new DbManager(DbId))
             {
@@ -121,7 +119,7 @@ namespace ASC.Feed.Aggregator.Modules.Projects
                             Private = Convert.ToBoolean(r[9]),
                             CreateBy = new Guid(Convert.ToString(r[10])),
                             CreateOn = Convert.ToDateTime(r[11]),
-                            LastModifiedBy = new Guid(Convert.ToString(r[12])),
+                            LastModifiedBy = ToGuid(r[12]),
                             LastModifiedOn = Convert.ToDateTime(r[13])
                         }
                 };
@@ -129,7 +127,7 @@ namespace ASC.Feed.Aggregator.Modules.Projects
 
         private Feed ToFeed(ParticipantFull participant)
         {
-            var projectUrl = "/products/projects/tasks.aspx?prjID=" + participant.Project.ID;
+            var projectUrl = "/Products/Projects/Tasks.aspx?prjID=" + participant.Project.ID;
             var feed = new Feed(participant.ID, participant.Created)
                 {
                     Item = item,

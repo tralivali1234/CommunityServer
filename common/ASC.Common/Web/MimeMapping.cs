@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -43,6 +34,7 @@ namespace ASC.Common.Web
             AddMimeMapping(".3dmf", "x-world/x-3dmf");
             AddMimeMapping(".a", "application/octet-stream");
             AddMimeMapping(".aab", "application/x-authorware-bin");
+            AddMimeMapping(".aac", "audio/x-aac");
             AddMimeMapping(".aam", "application/x-authorware-map");
             AddMimeMapping(".aas", "application/x-authorware-seg");
             AddMimeMapping(".abc", "text/vnd.abc");
@@ -61,7 +53,6 @@ namespace ASC.Common.Web
             AddMimeMapping(".ani", "application/x-navi-animation");
             AddMimeMapping(".aos", "application/x-nokia-9000-communicator-add-on-software");
             AddMimeMapping(".application", "application/x-ms-application");
-            AddMimeSynonym("application/x-zip-compressed", "application/zip");
             AddMimeMapping(".aps", "application/mime");
             AddMimeMapping(".arc", "application/octet-stream");
             AddMimeMapping(".arj", "application/arj");
@@ -156,9 +147,11 @@ namespace ASC.Common.Web
             AddMimeMapping(".dl", "video/dl");
             AddMimeMapping(".dl", "video/x-dl");
             AddMimeMapping(".doc", "application/msword");
+            AddMimeMapping(".docm", "application/vnd.ms-word.document.macroEnabled.12");
             AddMimeMapping(".doct", "application/doct");
             AddMimeMapping(".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
             AddMimeMapping(".dot", "application/msword");
+            AddMimeMapping(".dotm", "application/vnd.ms-word.template.macroEnabled.12");
             AddMimeMapping(".dotx", "application/vnd.openxmlformats-officedocument.wordprocessingml.template");
             AddMimeMapping(".dp", "application/commonground");
             AddMimeMapping(".drw", "application/drafting");
@@ -188,6 +181,7 @@ namespace ASC.Common.Web
             AddMimeMapping(".exe", "application/octet-stream");
             AddMimeMapping(".f", "text/plain");
             AddMimeMapping(".f", "text/x-fortran");
+            AddMimeMapping(".f4v", "video/x-f4v");
             AddMimeMapping(".f77", "text/x-fortran");
             AddMimeMapping(".f90", "text/plain");
             AddMimeMapping(".f90", "text/x-fortran");
@@ -195,12 +189,16 @@ namespace ASC.Common.Web
             AddMimeMapping(".fdf", "application/vnd.fdf");
             AddMimeMapping(".fif", "application/fractals");
             AddMimeMapping(".fif", "image/fif");
+            AddMimeMapping(".flac", "audio/flac");
             AddMimeMapping(".fli", "video/fli");
             AddMimeMapping(".fli", "video/x-fli");
             AddMimeMapping(".flo", "image/florian");
             AddMimeMapping(".flr", "x-world/x-vrml");
             AddMimeMapping(".flx", "text/vnd.fmi.flexstor");
             AddMimeMapping(".fmf", "video/x-atomic3d-feature");
+            AddMimeMapping(".fodp", "application/vnd.oasis.opendocument.presentation");
+            AddMimeMapping(".fods", "application/vnd.oasis.opendocument.spreadsheet");
+            AddMimeMapping(".fodt", "application/vnd.oasis.opendocument.text");
             AddMimeMapping(".for", "text/plain");
             AddMimeMapping(".for", "text/x-fortran");
             AddMimeMapping(".fpx", "image/vnd.fpx");
@@ -210,6 +208,7 @@ namespace ASC.Common.Web
             AddMimeMapping(".g", "text/plain");
             AddMimeMapping(".g3", "image/g3fax");
             AddMimeMapping(".gdoc", "application/vnd.google-apps.document");
+            AddMimeMapping(".gdraw", "application/vnd.google-apps.drawing");
             AddMimeMapping(".gif", "image/gif");
             AddMimeMapping(".gl", "video/gl");
             AddMimeMapping(".gl", "video/x-gl");
@@ -331,6 +330,11 @@ namespace ASC.Common.Web
             AddMimeMapping(".m2a", "audio/mpeg");
             AddMimeMapping(".m2v", "video/mpeg");
             AddMimeMapping(".m3u", "audio/x-mpequrl");
+            AddMimeMapping(".m4a", "audio/m4a");
+            AddMimeMapping(".m4a", "audio/x-m4a");
+            AddMimeMapping(".m4v", "video/mp4");
+            AddMimeMapping(".m4v", "video/mpeg4");
+            AddMimeMapping(".m4v", "video/x-m4v");
             AddMimeMapping(".man", "application/x-troff-man");
             AddMimeMapping(".manifest", "application/x-ms-manifest");
             AddMimeMapping(".map", "application/x-navimap");
@@ -382,6 +386,7 @@ namespace ASC.Common.Web
             AddMimeMapping(".mp3", "audio/x-mpeg-3");
             AddMimeMapping(".mp3", "video/mpeg");
             AddMimeMapping(".mp3", "video/x-mpeg");
+            AddMimeMapping(".mp4", "video/mp4");
             AddMimeMapping(".mpa", "audio/mpeg");
             AddMimeMapping(".mpa", "video/mpeg");
             AddMimeMapping(".mpc", "application/x-project");
@@ -416,9 +421,16 @@ namespace ASC.Common.Web
             AddMimeMapping(".odp", "application/vnd.oasis.opendocument.presentation");
             AddMimeMapping(".ods", "application/vnd.oasis.opendocument.spreadsheet");
             AddMimeMapping(".odt", "application/vnd.oasis.opendocument.text");
+            AddMimeMapping(".oga", "audio/ogg");
+            AddMimeMapping(".ogg", "video/ogg");
+            AddMimeMapping(".ogg", "audio/ogg");
+            AddMimeMapping(".ogv", "video/ogg");
             AddMimeMapping(".omc", "application/x-omc");
             AddMimeMapping(".omcd", "application/x-omcdatamaker");
             AddMimeMapping(".omcr", "application/x-omcregerator");
+            AddMimeMapping(".otp", "application/vnd.oasis.opendocument.presentation-template");
+            AddMimeMapping(".ots", "application/vnd.oasis.opendocument.spreadsheet-template");
+            AddMimeMapping(".ott", "application/vnd.oasis.opendocument.text-template");
             AddMimeMapping(".p", "text/x-pascal");
             AddMimeMapping(".p10", "application/pkcs10");
             AddMimeMapping(".p10", "application/x-pkcs10");
@@ -468,17 +480,20 @@ namespace ASC.Common.Web
             AddMimeMapping(".pnm", "image/x-portable-anymap");
             AddMimeMapping(".pot", "application/mspowerpoint");
             AddMimeMapping(".pot", "application/vnd.ms-powerpoint");
+            AddMimeMapping(".potm", "application/vnd.ms-powerpoint.presentation.macroEnabled.12");
             AddMimeMapping(".potx", "application/vnd.openxmlformats-officedocument.presentationml.template");
             AddMimeMapping(".pov", "model/x-pov");
             AddMimeMapping(".ppa", "application/vnd.ms-powerpoint");
             AddMimeMapping(".ppm", "image/x-portable-pixmap");
             AddMimeMapping(".pps", "application/mspowerpoint");
             AddMimeMapping(".pps", "application/vnd.ms-powerpoint");
+            AddMimeMapping(".ppsm", "application/vnd.openxmlformats-officedocument.presentationml.slideshow");
             AddMimeMapping(".ppsx", "application/vnd.openxmlformats-officedocument.presentationml.slideshow");
             AddMimeMapping(".ppt", "application/vnd.ms-powerpoint");
             AddMimeMapping(".ppt", "application/mspowerpoint");
             AddMimeMapping(".ppt", "application/powerpoint");
             AddMimeMapping(".ppt", "application/x-mspowerpoint");
+            AddMimeMapping(".pptm", "application/vnd.ms-powerpoint.presentation.macroEnabled.12");
             AddMimeMapping(".pptt", "application/pptt");
             AddMimeMapping(".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
             AddMimeMapping(".ppz", "application/mspowerpoint");
@@ -676,6 +691,8 @@ namespace ASC.Common.Web
             AddMimeMapping(".wcm", "application/vnd.ms-works");
             AddMimeMapping(".wdb", "application/vnd.ms-works");
             AddMimeMapping(".web", "application/vnd.xara");
+            AddMimeMapping(".webm", "video/webm");
+            AddMimeMapping(".webp", "image/webp");
             AddMimeMapping(".wiz", "application/msword");
             AddMimeMapping(".wk1", "application/x-123");
             AddMimeMapping(".wks", "application/vnd.ms-works");
@@ -739,11 +756,14 @@ namespace ASC.Common.Web
             AddMimeMapping(".xls", "application/excel");
             AddMimeMapping(".xls", "application/x-excel");
             AddMimeMapping(".xls", "application/x-msexcel");
+            AddMimeMapping(".xlsb", "application/vnd.ms-excel.sheet.binary.macroEnabled.12");
+            AddMimeMapping(".xlsm", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             AddMimeMapping(".xlst", "application/xlst");
             AddMimeMapping(".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             AddMimeMapping(".xlt", "application/excel");
             AddMimeMapping(".xlt", "application/x-excel");
             AddMimeMapping(".xlt", "application/vnd.ms-excel");
+            AddMimeMapping(".xltm", "application/vnd.ms-excel.template.macroEnabled.12");
             AddMimeMapping(".xltx", "application/vnd.openxmlformats-officedocument.spreadsheetml.template");
             AddMimeMapping(".xlv", "application/excel");
             AddMimeMapping(".xlv", "application/x-excel");
@@ -771,6 +791,7 @@ namespace ASC.Common.Web
             AddMimeMapping(".zip", "application/zip");
             AddMimeMapping(".zip", "application/x-compressed");
             AddMimeMapping(".zip", "application/x-zip-compressed");
+            AddMimeSynonym("application/x-zip-compressed", "application/zip");
             AddMimeMapping(".zip", "multipart/x-zip");
             AddMimeMapping(".zoo", "application/octet-stream");
             AddMimeMapping(".zsh", "text/x-script.zsh");

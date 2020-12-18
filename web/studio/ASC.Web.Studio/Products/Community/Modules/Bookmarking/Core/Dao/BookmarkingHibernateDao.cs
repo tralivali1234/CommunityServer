@@ -1,29 +1,24 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using ASC.Bookmarking.Common;
 using ASC.Bookmarking.Common.Util;
 using ASC.Bookmarking.Pojo;
@@ -32,20 +27,17 @@ using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
 using ASC.Core;
 using ASC.Core.Users;
-using ASC.FullTextIndex;
 using ASC.Web.Studio.Utility;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using ASC.ElasticSearch;
+using ASC.Web.Community.Search;
 
 namespace ASC.Bookmarking.Dao
 {
     public class BookmarkingHibernateDao : BookmarkingSessionObject<BookmarkingHibernateDao>
     {
-        private static DbManager DbManager
+        private static IDbManager DbManager
         {
-            get { return DbManager.FromHttpContext(BookmarkingBusinessConstants.BookmarkingDbID); }
+            get { return ASC.Common.Data.DbManager.FromHttpContext(BookmarkingBusinessConstants.BookmarkingDbID); }
         }
 
         private static int Tenant
@@ -310,6 +302,7 @@ namespace ASC.Bookmarking.Dao
 
         internal void UpdateBookmark(Bookmark bookmark, IList<Tag> tags)
         {
+            UserBookmark userBookmark = null;
             var tx = DbManager.BeginTransaction();
             try
             {
@@ -326,7 +319,7 @@ namespace ASC.Bookmarking.Dao
                             .Where(Exp.Eq("BookmarkID", bookmark.ID)
                                     & Exp.Eq("Tenant", Tenant)));
 
-                var userBookmark = GetCurrentUserBookmark(bookmark);
+                userBookmark = GetCurrentUserBookmark(bookmark);
                 long userBookmarkId = 0;
                 if (userBookmark != null)
                 {
@@ -341,11 +334,26 @@ namespace ASC.Bookmarking.Dao
                             .Values(userBookmarkId, GetCurrentUserId(), nowDate, bookmark.Name, bookmark.Description, bookmark.ID, 1, Tenant)
                             .Identity(0, 0L, true));
 
+                userBookmark = new UserBookmark
+                {
+                    UserBookmarkID = userBookmarkId,
+                    BookmarkID = bookmark.ID,
+                    UserID = GetCurrentUserId(),
+                    DateAdded = nowDate,
+                    Name = bookmark.Name,
+                    Description = bookmark.Description,
+                    Raiting = 1
+                };
+
                 DbManager.ExecuteNonQuery(
                             new SqlDelete("bookmarking_userbookmarktag")
                             .Where(Exp.Eq("UserBookmarkID", userBookmarkId)
                                     & Exp.Eq("Tenant", Tenant)));
 
+                if (bookmark.Tags == null)
+                {
+                    bookmark.Tags = new List<Tag>();
+                }
                 foreach (var tag in tags)
                 {
                     tag.TagID = DbManager.ExecuteScalar<long>(
@@ -365,6 +373,7 @@ namespace ASC.Bookmarking.Dao
                                     .Identity(0, 0L, true))
                         };
 
+                    
 
                     var ubt = new UserBookmarkTag { UserBookmarkID = userBookmarkId, TagID = tag.TagID };
 
@@ -373,6 +382,11 @@ namespace ASC.Bookmarking.Dao
                             .InColumns("UserBookmarkID", "TagID", "Tenant")
                             .Values(ubt.UserBookmarkID, tag.TagID, Tenant)
                             .Identity(0, 0L, true));
+
+                    if (bookmark.Tags.All(r => r.TagID == tag.TagID))
+                    {
+                        bookmark.Tags.Add(tag);
+                    }
                 }
 
                 tx.Commit();
@@ -380,6 +394,11 @@ namespace ASC.Bookmarking.Dao
             catch (Exception)
             {
                 tx.Rollback();
+            }
+
+            if (userBookmark != null)
+            {
+                FactoryIndexer<BookmarksUserWrapper>.IndexAsync(BookmarksUserWrapper.Create(userBookmark, bookmark));
             }
         }
 
@@ -864,11 +883,10 @@ group by TagID order by t.Name asc limit @l")
 
                 if (!searchStringList.Any()) return new List<Bookmark>();
 
-                if (FullTextSearch.SupportModule(FullTextSearch.BookmarksModule))
+                IReadOnlyCollection<BookmarksUserWrapper> bookmarks;
+                if (FactoryIndexer<BookmarksUserWrapper>.TrySelect(r => r.MatchAll(string.Join(" ", searchStringList.ToArray())), out bookmarks))
                 {
-                    var ids = FullTextSearch.Search(FullTextSearch.BookmarksModule.Match(string.Join(" ", searchStringList.ToArray())));
-
-                    return GetBookmarksByIDs(ids);
+                    return GetBookmarksByIDs(bookmarks.Select(r => r.BookmarkID).ToList());
                 }
 
                 var sb = new StringBuilder();

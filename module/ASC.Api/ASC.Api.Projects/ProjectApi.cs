@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,50 +19,61 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
+using ASC.Api.Attributes;
 using ASC.Api.Documents;
 using ASC.Api.Impl;
 using ASC.Api.Interfaces;
 using ASC.Api.Projects.Calendars;
-using ASC.Core;
+using ASC.Api.Utils;
 using ASC.Projects.Core.Domain;
 using ASC.Projects.Engine;
 using ASC.Web.Core.Calendars;
+using ASC.Web.Projects;
+using ASC.Web.Projects.Core;
+using Autofac;
 
 namespace ASC.Api.Projects
 {
     ///<summary>
-    /// Projects access
+    ///Projects access
     ///</summary>
     public partial class ProjectApi : ProjectApiBase, IApiEntryPoint
     {
         private readonly DocumentsApi documentsApi;
 
         ///<summary>
-        /// Api name entry
+        ///Api name entry
         ///</summary>
         public string Name
         {
             get { return "project"; }
         }
 
-        public TaskFilter CreateFilter()
+        public TaskFilter CreateFilter(EntityType entityType)
         {
             var filter = new TaskFilter
-                   {
-                       SortBy = _context.SortBy,
-                       SortOrder = !_context.SortDescending,
-                       SearchText = _context.FilterValue,
-                       Offset = _context.StartIndex,
-                       Max = _context.Count
-                   };
+            {
+                SortOrder = !Context.SortDescending,
+                SearchText = Context.FilterValue,
+                Offset = Context.StartIndex,
+                Max = Context.Count
+            };
 
-            _context.SetDataFiltered().SetDataPaginated().SetDataSorted();
+            if (!string.IsNullOrEmpty(Context.SortBy))
+            {
+                var type = entityType.ToString();
+                var sortColumns = filter.SortColumns.ContainsKey(type) ? filter.SortColumns[type] : null;
+                if (sortColumns != null && sortColumns.Any())
+                    filter.SortBy = sortColumns.ContainsKey(Context.SortBy) ? Context.SortBy : sortColumns.First().Key;
+            }
+
+            Context.SetDataFiltered().SetDataPaginated().SetDataSorted();
 
             return filter;
         }
 
         ///<summary>
-        /// Constructor
+        ///Constructor
         ///</summary>
         ///<param name="context"></param>
         ///<param name="documentsApi">Docs api</param>
@@ -79,22 +81,22 @@ namespace ASC.Api.Projects
         {
             this.documentsApi = documentsApi;
 
-            _context = context;
+            Context = context;
         }
 
         private void SetTotalCount(int count)
         {
-            _context.SetTotalCount(count);
+            Context.SetTotalCount(count);
         }
 
         private long StartIndex
         {
-            get { return _context.StartIndex; }
+            get { return Context.StartIndex; }
         }
 
         private long Count
         {
-            get { return _context.Count; }
+            get { return Context.Count; }
         }
 
         private static HttpRequest Request
@@ -105,66 +107,192 @@ namespace ASC.Api.Projects
 
         internal static List<BaseCalendar> GetUserCalendars(Guid userId)
         {
-            var tenantId = CoreContext.TenantManager.GetCurrentTenant().TenantId;
-            var engineFactory = new EngineFactory(DbId, tenantId);
-
-            var cals = new List<BaseCalendar>();
-            var engine = engineFactory.ProjectEngine;
-            var projects = engine.GetByParticipant(userId);
-
-            if (projects != null)
+            using (var scope = DIHelper.Resolve())
             {
-                var team = engine.GetTeam(projects.Select(r => r.ID).ToList());
+                var engineFactory = scope.Resolve<EngineFactory>();
 
-                foreach (var project in projects)
+                var cals = new List<BaseCalendar>();
+                var engine = engineFactory.ProjectEngine;
+                var projects = engine.GetByParticipant(userId);
+
+                if (projects != null)
                 {
-                    var p = project;
+                    var team = engine.GetTeam(projects.Select(r => r.ID).ToList());
 
-                    var sharingOptions = new SharingOptions();
-                    foreach (var participant in team.Where(r => r.ProjectID == p.ID))
+                    foreach (var project in projects)
                     {
-                        sharingOptions.PublicItems.Add(new SharingOptions.PublicItem {Id = participant.ID, IsGroup = false});
-                    }
+                        var p = project;
 
-                    var index = project.ID % CalendarColors.BaseColors.Count;
-                    cals.Add(new ProjectCalendar(
-                                 engineFactory,
-                                 project,
-                                 CalendarColors.BaseColors[index].BackgroudColor,
-                                 CalendarColors.BaseColors[index].TextColor,
-                                 sharingOptions, false));
+                        var sharingOptions = new SharingOptions();
+                        foreach (var participant in team.Where(r => r.ProjectID == p.ID))
+                        {
+                            sharingOptions.PublicItems.Add(new SharingOptions.PublicItem
+                            {
+                                Id = participant.ID,
+                                IsGroup = false
+                            });
+                        }
+
+                        var index = project.ID % CalendarColors.BaseColors.Count;
+                        cals.Add(new ProjectCalendar(
+                            project,
+                            CalendarColors.BaseColors[index].BackgroudColor,
+                            CalendarColors.BaseColors[index].TextColor,
+                            sharingOptions, false));
+                    }
                 }
+
+                var folowingProjects = engine.GetFollowing(userId);
+                if (folowingProjects != null)
+                {
+                    var team = engine.GetTeam(folowingProjects.Select(r => r.ID).ToList());
+
+                    foreach (var project in folowingProjects)
+                    {
+                        var p = project;
+
+                        if (projects != null && projects.Any(proj => proj.ID == p.ID)) continue;
+
+                        var sharingOptions = new SharingOptions();
+                        sharingOptions.PublicItems.Add(new SharingOptions.PublicItem { Id = userId, IsGroup = false });
+                        foreach (var participant in team.Where(r => r.ProjectID == p.ID))
+                        {
+                            sharingOptions.PublicItems.Add(new SharingOptions.PublicItem
+                            {
+                                Id = participant.ID,
+                                IsGroup = false
+                            });
+                        }
+
+                        var index = p.ID % CalendarColors.BaseColors.Count;
+                        cals.Add(new ProjectCalendar(
+                            p,
+                            CalendarColors.BaseColors[index].BackgroudColor,
+                            CalendarColors.BaseColors[index].TextColor,
+                            sharingOptions, true));
+                    }
+                }
+
+                return cals;
+            }
+        }
+
+        [Update(@"settings")]
+        public ProjectsCommonSettings UpdateSettings(bool? everebodyCanCreate,
+            bool? hideEntitiesInPausedProjects,
+            StartModuleType? startModule,
+            object folderId)
+        {
+            if (everebodyCanCreate.HasValue || hideEntitiesInPausedProjects.HasValue)
+            {
+                if (!ProjectSecurity.CurrentUserAdministrator) ProjectSecurity.CreateSecurityException();
+
+                var settings = ProjectsCommonSettings.Load();
+
+                if (everebodyCanCreate.HasValue)
+                {
+                    settings.EverebodyCanCreate = everebodyCanCreate.Value;
+                }
+
+                if (hideEntitiesInPausedProjects.HasValue)
+                {
+                    settings.HideEntitiesInPausedProjects = hideEntitiesInPausedProjects.Value;
+                }
+
+                settings.Save();
+                return settings;
             }
 
-            var folowingProjects = engine.GetFollowing(userId);
-            if (folowingProjects != null)
+            if (startModule.HasValue || folderId != null)
             {
-                var team = engine.GetTeam(folowingProjects.Select(r => r.ID).ToList());
-
-                foreach (var project in folowingProjects)
+                if (!ProjectSecurity.IsProjectsEnabled(CurrentUserId)) ProjectSecurity.CreateSecurityException();
+                var settings = ProjectsCommonSettings.LoadForCurrentUser();
+                if (startModule.HasValue)
                 {
-                    var p = project;
-
-                    if (projects != null && projects.Any(proj => proj.ID == p.ID)) continue;
-
-                    var sharingOptions = new SharingOptions();
-                    sharingOptions.PublicItems.Add(new SharingOptions.PublicItem {Id = userId, IsGroup = false});
-                    foreach (var participant in team.Where(r => r.ProjectID == p.ID))
-                    {
-                        sharingOptions.PublicItems.Add(new SharingOptions.PublicItem {Id = participant.ID, IsGroup = false});
-                    }
-
-                    var index = p.ID % CalendarColors.BaseColors.Count;
-                    cals.Add(new ProjectCalendar(
-                                 engineFactory,
-                                 p,
-                                 CalendarColors.BaseColors[index].BackgroudColor,
-                                 CalendarColors.BaseColors[index].TextColor,
-                                 sharingOptions, true));
+                    settings.StartModuleType = startModule.Value;
                 }
+
+                if (folderId != null)
+                {
+                    settings.FolderId = folderId;
+                }
+
+                settings.SaveForCurrentUser();
+                return settings;
             }
 
-            return cals;
+            return null;
+        }
+
+        [Read(@"settings")]
+        public ProjectsCommonSettings GetSettings()
+        {
+            var commonSettings = ProjectsCommonSettings.Load();
+            var userSettings = ProjectsCommonSettings.LoadForCurrentUser();
+
+            return new ProjectsCommonSettings
+            {
+                EverebodyCanCreate = commonSettings.EverebodyCanCreate,
+                HideEntitiesInPausedProjects = commonSettings.HideEntitiesInPausedProjects,
+                StartModuleType = userSettings.StartModuleType,
+                FolderId = userSettings.FolderId,
+            };
+        }
+
+
+        [Create(@"status")]
+        public CustomTaskStatus CreateStatus(CustomTaskStatus status)
+        {
+            return EngineFactory.StatusEngine.Create(status);
+        }
+
+        [Update(@"status")]
+        public CustomTaskStatus UpdateStatus(CustomTaskStatus newStatus)
+        {
+            if (newStatus.IsDefault && !EngineFactory.StatusEngine.Get().Any(r => r.IsDefault && r.StatusType == newStatus.StatusType))
+            {
+                return CreateStatus(newStatus);
+            }
+
+            var status = EngineFactory.StatusEngine.Get().FirstOrDefault(r => r.Id == newStatus.Id).NotFoundIfNull();
+
+            status.Title = Update.IfNotEmptyAndNotEquals(status.Title, newStatus.Title);
+            status.Description = Update.IfNotEmptyAndNotEquals(status.Description, newStatus.Description);
+            status.Color = Update.IfNotEmptyAndNotEquals(status.Color, newStatus.Color);
+            status.Image = Update.IfNotEmptyAndNotEquals(status.Image, newStatus.Image);
+            status.ImageType = Update.IfNotEmptyAndNotEquals(status.ImageType, newStatus.ImageType);
+            status.Order = Update.IfNotEmptyAndNotEquals(status.Order, newStatus.Order);
+            status.StatusType = Update.IfNotEmptyAndNotEquals(status.StatusType, newStatus.StatusType);
+            status.Available = Update.IfNotEmptyAndNotEquals(status.Available, newStatus.Available);
+
+            EngineFactory.StatusEngine.Update(status);
+
+            return status;
+        }
+
+        [Update(@"statuses")]
+        public List<CustomTaskStatus> UpdateStatuses(List<CustomTaskStatus> statuses)
+        {
+            foreach (var status in statuses)
+            {
+                UpdateStatus(status);
+            }
+
+            return statuses;
+        }
+
+        [Read(@"status")]
+        public List<CustomTaskStatus> GetStatuses()
+        {
+            return EngineFactory.StatusEngine.GetWithDefaults();
+        }
+
+        [Delete(@"status/{id}")]
+        public CustomTaskStatus DeleteStatus(int id)
+        {
+            var status = EngineFactory.StatusEngine.Get().FirstOrDefault(r => r.Id == id).NotFoundIfNull();
+            EngineFactory.StatusEngine.Delete(status.Id);
+            return status;
         }
     }
 }

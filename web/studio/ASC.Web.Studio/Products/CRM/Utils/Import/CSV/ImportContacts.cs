@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -45,16 +36,16 @@ namespace ASC.Web.CRM.Classes
     {
         private Int32 DaoIterationStep = 200;
 
-        private void ImportContactsData()
+        private void ImportContactsData(DaoFactory _daoFactory)
         {
             var index = 0;
 
             var personFakeIdCompanyNameHash = new Dictionary<int, String>();
 
-            var contactDao = _daoFactory.GetContactDao();
-            var contactInfoDao = _daoFactory.GetContactInfoDao();
-            var customFieldDao = _daoFactory.GetCustomFieldDao();
-            var tagDao = _daoFactory.GetTagDao();
+            var contactDao = _daoFactory.ContactDao;
+            var contactInfoDao = _daoFactory.ContactInfoDao;
+            var customFieldDao = _daoFactory.CustomFieldDao;
+            var tagDao = _daoFactory.TagDao;
 
             var findedContacts = new Dictionary<int, Contact>();
             var findedTags = new Dictionary<int, List<String>>();
@@ -74,7 +65,7 @@ namespace ASC.Web.CRM.Classes
 
                     #region Common data
 
-                    if (!_CommonData(currentIndex, ref contact, ref personFakeIdCompanyNameHash))
+                    if (!_CommonData(currentIndex, _daoFactory, ref contact, ref personFakeIdCompanyNameHash))
                         continue;
 
                     findedContacts.Add(contact.ID, contact);
@@ -136,7 +127,7 @@ namespace ASC.Web.CRM.Classes
 
             #region Processing duplicate rule
 
-            _DuplicateRecordRuleProcess(ref findedContacts, ref personFakeIdCompanyNameHash, ref findedContactInfos, ref findedCustomField, ref findedTags);
+            _DuplicateRecordRuleProcess(_daoFactory, ref findedContacts, ref personFakeIdCompanyNameHash, ref findedContactInfos, ref findedCustomField, ref findedTags);
 
             _log.Info("ImportContactsData. _DuplicateRecordRuleProcess. End");
 
@@ -399,7 +390,7 @@ namespace ASC.Web.CRM.Classes
             Complete();
         }
 
-        private bool _CommonData(int currentIndex, ref Contact contact, ref Dictionary<int, String> personFakeIdCompanyNameHash)
+        private bool _CommonData(int currentIndex, DaoFactory _daoFactory, ref Contact contact, ref Dictionary<int, String> personFakeIdCompanyNameHash)
         {
             var firstName = GetPropertyValue("firstName");
             var lastName = GetPropertyValue("lastName");
@@ -410,7 +401,7 @@ namespace ASC.Web.CRM.Classes
 
             Percentage += 1.0 * 100 / (ImportFromCSV.MaxRoxCount * 3);
 
-            var listItemDao = _daoFactory.GetListItemDao();
+            var listItemDao = _daoFactory.ListItemDao;
 
 
             if (!String.IsNullOrEmpty(firstName) || !String.IsNullOrEmpty(lastName))
@@ -521,9 +512,21 @@ namespace ASC.Web.CRM.Classes
             var contactInfoType =
                 (ContactInfoType)Enum.Parse(typeof(ContactInfoType), nameParts[0]);
 
+            if (contactInfoType == ContactInfoType.Email)
+            {
+                var validEmails = propertyValue
+                    .Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
+                    .Where(email => email.TestEmailRegex()).ToArray();
+
+                if(!validEmails.Any())
+                    return;
+
+                propertyValue = string.Join(",", validEmails);
+            }
+
             var category = Convert.ToInt32(nameParts[1]);
 
-            bool isPrimary = false;
+            var isPrimary = false;
 
             if ((contactInfoType == ContactInfoType.Email ||
                 contactInfoType == ContactInfoType.Phone ||
@@ -568,26 +571,33 @@ namespace ASC.Web.CRM.Classes
                 return;
             }
 
-            findedContactInfos.Add(new ContactInfo
+            var items = propertyValue.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var item in items)
             {
-                Category = category,
-                InfoType = contactInfoType,
-                Data = propertyValue,
-                ContactID = contact.ID,
-                IsPrimary = isPrimary
-            });
+                findedContactInfos.Add(new ContactInfo
+                    {
+                        Category = category,
+                        InfoType = contactInfoType,
+                        Data = item,
+                        ContactID = contact.ID,
+                        IsPrimary = isPrimary
+                    });
+
+                isPrimary = false;
+            }
         }
         
         #endregion
 
-        private void _DuplicateRecordRuleProcess(
+        private void _DuplicateRecordRuleProcess(DaoFactory _daoFactory,
             ref Dictionary<int, Contact> findedContacts,
             ref Dictionary<int, String> personFakeIdCompanyNameHash,
             ref List<ContactInfo> findedContactInfos,
             ref List<CustomField> findedCustomField,
             ref Dictionary<int, List<String>> findedTags)
         {
-            var contactDao = _daoFactory.GetContactDao();
+            var contactDao = _daoFactory.ContactDao;
 
             _log.Info("_DuplicateRecordRuleProcess. Start");
 

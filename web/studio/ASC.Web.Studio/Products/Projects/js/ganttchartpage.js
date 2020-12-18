@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -49,6 +40,7 @@ ASC.Projects.GantChartPage = (function () {
         loadTasks = false,
         loadMilestones = false,
         loadGanttIndex = false,
+        loadStatuses = false,
 
         taskForDiagram = [],
         milestonesForDiagram = [],
@@ -98,6 +90,7 @@ ASC.Projects.GantChartPage = (function () {
         saveLinkButton,
         taskSelectContainer,
         statusListContainer,
+        statusListTaskContainer,
         parentTaskName, dependentTaskSelector, linkTypeSelector,
         taskContextMenu, milestoneContextMenu,
         setResponsibleMenu,
@@ -106,51 +99,56 @@ ASC.Projects.GantChartPage = (function () {
         undoBtn, redoBtn,
         createNewMenu, blockPanel = null;
 
+    var resources = ASC.Projects.Resources;
+    var projectsJsResource = resources.ProjectsJSResource;
+    var projectsFilterResource = resources.ProjectsFilterResource;
+    var common = ASC.Projects.Common;
+
     var initLocalizeStrings = function () {
-        localizeStrings.statusOpenTask = ASC.Projects.Resources.ProjectsFilterResource.StatusOpenTask;
-        localizeStrings.statusOpenMilestone = ASC.Projects.Resources.ProjectsFilterResource.StatusOpenMilestone;
-        localizeStrings.statusClosedMilestone = ASC.Projects.Resources.ProjectsFilterResource.StatusClosedMilestone;
-        localizeStrings.statusClosedTask = ASC.Projects.Resources.ProjectsFilterResource.StatusClosedTask;
-        localizeStrings.newTask = ASC.Projects.Resources.ProjectsJSResource.GanttNewTask;
-        localizeStrings.newMilestone = ASC.Projects.Resources.ProjectsJSResource.GanttNewMilestone;
-        localizeStrings.taskWithoutMilestones = ASC.Projects.Resources.ProjectsJSResource.GanttTaskWithoutMilestones;
-        localizeStrings.responsibles = ASC.Projects.Resources.ProjectsJSResource.GanttResponsibles;
+        localizeStrings.statusOpenTask = projectsFilterResource.StatusOpenTask;
+        localizeStrings.statusOpenMilestone = projectsFilterResource.StatusOpenMilestone;
+        localizeStrings.statusClosedMilestone = projectsFilterResource.StatusClosedMilestone;
+        localizeStrings.statusClosedTask = projectsFilterResource.StatusClosedTask;
+        localizeStrings.newTask = projectsJsResource.GanttNewTask;
+        localizeStrings.newMilestone = projectsJsResource.GanttNewMilestone;
+        localizeStrings.taskWithoutMilestones = projectsJsResource.GanttTaskWithoutMilestones;
+        localizeStrings.responsibles = projectsJsResource.GanttResponsibles;
         localizeStrings.responsibles.format = jq.format;
-        localizeStrings.noResponsible = ASC.Projects.Resources.ProjectsFilterResource.NoResponsible;
-        localizeStrings.taskOverdueText = ASC.Projects.Resources.ProjectsJSResource.GanttTaskOverdue;
-        localizeStrings.overdue = ASC.Projects.Resources.ProjectsFilterResource.Overdue;
-        localizeStrings.taskDescSubtask = ASC.Projects.Resources.ProjectsJSResource.GanttSubtaskTaskDesc;
-        localizeStrings.taskDescSubtasks = ASC.Projects.Resources.ProjectsJSResource.GanttSubtasksTaskDesc;
-        localizeStrings.details = ASC.Projects.Resources.ProjectsJSResource.GanttTaskDetails;
-        localizeStrings.milestones = ASC.Projects.Resources.ProjectsJSResource.GanttMilestonesPrjDesc;
-        localizeStrings.activeTasks = ASC.Projects.Resources.ProjectsJSResource.GanttActiveTasksPrjDesc;
-        localizeStrings.tasks = ASC.Projects.Resources.ProjectsJSResource.GanttTasksMilDesc;
-        localizeStrings.week = ASC.Projects.Resources.ProjectsJSResource.GanttWeekShort;
-        localizeStrings.year = ASC.Projects.Resources.ProjectsJSResource.GanttYear;
-        localizeStrings.toTasksList = ASC.Projects.Resources.ProjectsJSResource.ToTaskList;
-        localizeStrings.day = ASC.Projects.Resources.ProjectsJSResource.DelayDay;
-        localizeStrings.days = ASC.Projects.Resources.ProjectsJSResource.DelayDays;
-        localizeStrings.dayShort = ASC.Projects.Resources.ProjectsJSResource.GanttDayShort;
-        localizeStrings.expand = ASC.Projects.Resources.ProjectsJSResource.GanttExpand;
-        localizeStrings.collapse = ASC.Projects.Resources.ProjectsJSResource.GanttCollapse;
-        localizeStrings.responsibles2 = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelResponsibles;
-        localizeStrings.beginDate = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelBeginDate;
-        localizeStrings.endDate = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelEndDate;
-        localizeStrings.status = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelStatus;
-        localizeStrings.priotity = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelPriority;
-        localizeStrings.highPriority = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelHighPriority;
-        localizeStrings.openStatus = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelOpenStatus;
-        localizeStrings.closeStatus = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelCloseStatus;
-        localizeStrings.addDate = ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelAddDate;
+        localizeStrings.noResponsible = projectsFilterResource.NoResponsible;
+        localizeStrings.taskOverdueText = projectsJsResource.GanttTaskOverdue;
+        localizeStrings.overdue = projectsFilterResource.Overdue;
+        localizeStrings.taskDescSubtask = projectsJsResource.GanttSubtaskTaskDesc;
+        localizeStrings.taskDescSubtasks = projectsJsResource.GanttSubtasksTaskDesc;
+        localizeStrings.details = projectsJsResource.GanttTaskDetails;
+        localizeStrings.milestones = projectsJsResource.GanttMilestonesPrjDesc;
+        localizeStrings.activeTasks = projectsJsResource.GanttActiveTasksPrjDesc;
+        localizeStrings.tasks = projectsJsResource.GanttTasksMilDesc;
+        localizeStrings.week = projectsJsResource.GanttWeekShort;
+        localizeStrings.year = projectsJsResource.GanttYear;
+        localizeStrings.toTasksList = projectsJsResource.ToTaskList;
+        localizeStrings.day = projectsJsResource.DelayDay;
+        localizeStrings.days = projectsJsResource.DelayDays;
+        localizeStrings.dayShort = projectsJsResource.GanttDayShort;
+        localizeStrings.expand = projectsJsResource.GanttExpand;
+        localizeStrings.collapse = projectsJsResource.GanttCollapse;
+        localizeStrings.responsibles2 = projectsJsResource.GanttLeftPanelResponsibles;
+        localizeStrings.beginDate = projectsJsResource.GanttLeftPanelBeginDate;
+        localizeStrings.endDate = projectsJsResource.GanttLeftPanelEndDate;
+        localizeStrings.status = projectsJsResource.GanttLeftPanelStatus;
+        localizeStrings.priotity = projectsJsResource.GanttLeftPanelPriority;
+        localizeStrings.highPriority = projectsJsResource.GanttLeftPanelHighPriority;
+        localizeStrings.openStatus = projectsJsResource.GanttLeftPanelOpenStatus;
+        localizeStrings.closeStatus = projectsJsResource.GanttLeftPanelCloseStatus;
+        localizeStrings.addDate = projectsJsResource.GanttLeftPanelAddDate;
     };
     var initCellChecker = function () {
         var fields = {          // replase on resources strings
             menuItems: [
-                { id: "Responsibility", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelResponsibles },
-                { id: "BeginDate", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelBeginDate },
-                { id: "EndDate", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelEndDate },
-                { id: "Status", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelStatus },
-                { id: "Priority", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelPriority }
+                { id: "Responsibility", title: projectsJsResource.GanttLeftPanelResponsibles },
+                { id: "BeginDate", title: projectsJsResource.GanttLeftPanelBeginDate },
+                { id: "EndDate", title: projectsJsResource.GanttLeftPanelEndDate },
+                { id: "Status", title: projectsJsResource.GanttLeftPanelStatus },
+                { id: "Priority", title: projectsJsResource.GanttLeftPanelPriority }
             ]
         };
 
@@ -162,7 +160,7 @@ ASC.Projects.GantChartPage = (function () {
 
         ganttCellChecker.find(".panel-content").empty().append(jq.tmpl("projects_linedListWithCheckbox", fields));
 
-        ganttCellChecker.append("<span id='showChoosedFields' class='button small'>" + ASC.Projects.Resources.ProjectsJSResource.ApplyBtn + "</span>");
+        ganttCellChecker.append("<span id='showChoosedFields' class='button small'>" + projectsJsResource.ApplyBtn + "</span>");
 
         ganttCellChecker.css('padding', '4px 4px 0');
         ganttCellChecker.find('.dropdown-item').each(function () { jq(this).css('border', 'none'); });
@@ -173,12 +171,15 @@ ASC.Projects.GantChartPage = (function () {
         });
     };
     var initProjectsFilter = function () {
+        setProjectsFilterFromStorage();
+
         if (null === filterControl) {
             filterControl = jq("#gantt-filter-projects");
             if (filterControl) {
                 jq("#gantt-filter-projects").projectadvancedSelector({
                     itemsChoose: sortedProjectsForFilter,
-                    inPopup: true
+                    inPopup: true,
+                    itemsSelectedIds: currentFilteredProjectsIds
                 });
 
                 jq("#gantt-filter-projects").on("showList", getProjectsDataByFilter);
@@ -186,8 +187,6 @@ ASC.Projects.GantChartPage = (function () {
         } else {
             jq("#gantt-filter-projects").projectadvancedSelector("reset");
         }
-
-        setProjectsFilterFromStorage();
     };
 
     var saveCheckedProjectToStorage = function () {
@@ -235,7 +234,7 @@ ASC.Projects.GantChartPage = (function () {
 
         if (showOnlyActiveProjects) {
 
-            var isSiteAdmin = ASC.Projects.Common.currentUserIsModuleAdmin();
+            var isSiteAdmin = common.currentUserIsModuleAdmin();
 
             for (i = currentFilteredProjectsIds.length - 1; i >= 0; --i) {
                 project = allProjectsHash[currentFilteredProjectsIds[i]];
@@ -273,7 +272,6 @@ ASC.Projects.GantChartPage = (function () {
         }
 
         if (prjCount > 0) {
-            jq("#gantt-filter-projects").projectadvancedSelector("select", currentFilteredProjectsIds);
             getProjectData(listProjectsOnReceive.shift());
 
             if (haveEditProjects) {
@@ -342,7 +340,7 @@ ASC.Projects.GantChartPage = (function () {
 
     var initResponsibleSelector = function (team, inputType) {
         var i = 0,
-            teamWithoutVisitors = ASC.Projects.Common.removeBlockedUsersFromTeam(ASC.Projects.Common.excludeVisitors(team)),
+            teamWithoutVisitors = common.removeBlockedUsersFromTeam(common.excludeVisitors(team)),
             teamInd = teamWithoutVisitors ? teamWithoutVisitors.length : 0,
             list = setResponsibleMenu.find(".dropdown-content");
 
@@ -372,6 +370,7 @@ ASC.Projects.GantChartPage = (function () {
         saveLinkButton = jq("#addNewLinkPopup .save");
         taskSelectContainer = jq("#addNewLinkPopup .task-select");
         statusListContainer = jq("#statusListContainer");
+        statusListTaskContainer = jq("#statusListTaskContainer");
         taskContextMenu = jq("#taskContextMenu");
         milestoneContextMenu = jq("#milestoneContextMenu");
         taskContextMenuStatus = jq("#taskStatus");
@@ -405,7 +404,7 @@ ASC.Projects.GantChartPage = (function () {
 
         window.onbeforeunload = function (evt) {
             if (!jq("#mainActionButtons").hasClass("disable")) return;
-            var message = ASC.Projects.Resources.ProjectsJSResource.GanttOnBeforeUnloadMessage;
+            var message = projectsJsResource.GanttOnBeforeUnloadMessage;
             if (typeof evt == "undefined") {
                 evt = window.event;
             }
@@ -609,19 +608,11 @@ ASC.Projects.GantChartPage = (function () {
         });
 
         // change status
-        statusListContainer.on("click", ".open", function () {
+        statusListContainer.on("click", ".status", function () {
             enableChartEvents();
             statusListContainer.hide();
             if (!jq(this).hasClass("underline")) {
                 chart.modelController().finalizeStatus(taskStatus.open);
-            }
-        });
-
-        statusListContainer.on("click", ".closed", function () {
-            enableChartEvents();
-            statusListContainer.hide();
-            if (!jq(this).hasClass("underline")) {
-                chart.modelController().finalizeStatus(taskStatus.closed);
             }
         });
 
@@ -648,7 +639,8 @@ ASC.Projects.GantChartPage = (function () {
                 }
                 event.stopPropagation();
             } else {
-                chart.modelController().finalizeOperation(action);
+                var status = Number(action);
+                chart.modelController().finalizeOperation(typeof (status) === "number" && status === status ? status : action);
                 jq(".gantt-context-menu").hide();
             }
         });
@@ -834,12 +826,10 @@ ASC.Projects.GantChartPage = (function () {
     };
     var blockCreateMenu = function (block) {
         if (!block) {
-            jq('.mode-button-container').removeClass('disable');
             jq('#mainActionButtons').removeClass('disable');
             jq("#menuCreateNewButton").removeClass('disable');
             jq('#createNewButton').css({ 'visibility': 'visible' });
         } else {
-            jq('.mode-button-container').addClass('disable');
             jq('#mainActionButtons').addClass('disable');
             jq('#menuCreateNewButton').addClass('disable');
             jq('#createNewButton').css({ 'visibility': 'hidden' });
@@ -876,7 +866,7 @@ ASC.Projects.GantChartPage = (function () {
     // chart initialization
 
     var init = function (reload) {
-
+        ASC.Projects.GantChart(window);
         refreshData = true;
 
         taskForDiagram = [];
@@ -911,8 +901,12 @@ ASC.Projects.GantChartPage = (function () {
 
         blockCreateMenu(true);
 
+        Teamlab.bind(Teamlab.events.addPrjMilestone, function (params, milestone) {
+            addMilestoneToChart(milestone, true, true);
+        });
+
         Teamlab.getPrjProjects({ reload: reload }, {
-            filter: { sortBy: '', sortOrder: '', status: '', fields: 'id,title,security,isPrivate,status,responsible' },
+            filter: { sortBy: '', sortOrder: '', status: '', fields: 'id,title,security,isPrivate,status,responsibleId' },
             success: function (param, projects) {
                 ASC.Projects.Master.Projects = projects;
                 initLoadEvents(param.reload);
@@ -958,7 +952,7 @@ ASC.Projects.GantChartPage = (function () {
         if (!reload) {
             jq(document).bind("loadTasks", function (event, data) {
                 loadTasks = true;
-                jq(document).trigger("loadData", [{ prjId: data.prjId }]);
+                jq(document).trigger("loadData", { prjId: data.prjId });
             });
 
             jq(document).bind("loadMilestones", function (event, data) {
@@ -970,14 +964,16 @@ ASC.Projects.GantChartPage = (function () {
                 loadGanttIndex = true;
                 jq(document).trigger("loadData", { prjId: data.prjId });
             });
+            jq(document).bind("loadStatuses", function (event, data) {
+                loadStatuses = true;
+                jq(document).trigger("loadData", { prjId: data.prjId });
+            });
 
             jq(document).bind("loadData", function (event, data) {
-                if (loadMilestones && loadTasks && loadGanttIndex) {
+                if (loadMilestones && loadTasks && loadGanttIndex && loadStatuses) {
 
                     if (!data) return;
                     allProjectsHash[data.prjId].dataLoaded = true;
-
-                    var i = 0, indexes = null, cur = null, setPos = true;
 
                     buildGanttChartStorageForProject(data.prjId);
 
@@ -1084,19 +1080,20 @@ ASC.Projects.GantChartPage = (function () {
 
     var checkUserRights = function () {
         if (firstLoad) return false;
-        
+
+        var defaultPageURL = "Projects.aspx";
         var prjId = jq.getURLParam("prjID");
         if (prjId) {
             Teamlab.getPrjTeam({}, prjId, {
                 success: function (params, team) {
                     ASC.Projects.Master.TeamWithBlockedUsers = team;
-                    ASC.Projects.Master.Team = ASC.Projects.Common.removeBlockedUsersFromTeam(ASC.Projects.Master.TeamWithBlockedUsers);
-                    var userInTeam = ASC.Projects.Common.userInProjectTeam(Teamlab.profile.id);
+                    ASC.Projects.Master.Team = common.removeBlockedUsersFromTeam(ASC.Projects.Master.TeamWithBlockedUsers);
+                    var userInTeam = common.userInProjectTeam(Teamlab.profile.id);
                     if (currentProject.isPrivate && !userInTeam) {
-                        document.location = ASC.Projects.Common.defaultPageURL;
+                        document.location = defaultPageURL;
                     }
                     if (userInTeam && (!userInTeam.canReadTasks || !userInTeam.canReadMilestones)) {
-                        document.location = ASC.Projects.Common.defaultPageURL;
+                        document.location = defaultPageURL;
                     }
                 }
             });
@@ -1110,7 +1107,7 @@ ASC.Projects.GantChartPage = (function () {
         loadMilestones = false;
         loadGanttIndex = false;
 
-        var filter = ASC.Projects.Common.filterParamsForListTasks;
+        var filter = common.filterParamsForListTasks;
         delete filter.status;
 
         filter.projectId = projectId;
@@ -1152,6 +1149,11 @@ ASC.Projects.GantChartPage = (function () {
             }
         });
 
+        if (!loadStatuses) {
+            ASC.Projects.Common.initCustomStatuses(function () {
+                jq(document).trigger("loadStatuses", [{ prjId: projectId }]);
+            });
+        }
         if (!currentProjectId || currentProjectId != projectId) {
             Teamlab.getPrjTeam({ prjId: projectId }, projectId, {
                 success: function (params, team) {
@@ -1429,9 +1431,9 @@ ASC.Projects.GantChartPage = (function () {
             createdDate = project.created ? new Date(project.created) : new Date(), // нужна ли эта дата вообще?
             ganttIndex = project.ganttIndex;
 
-        var respUser = ASC.Projects.Common.getUserById(project.responsibleId);
+        var respUser = window.UserManager.getUser(project.responsibleId) || window.UserManager.getRemovedProfile(project.responsibleId);
 
-        if ('User not found' === respUser) {
+        if (!respUser) {
             if (undefined !== project.responsible && undefined !== project.responsible.displayName) {
                 respName = project.responsible;
             }
@@ -1440,12 +1442,8 @@ ASC.Projects.GantChartPage = (function () {
             respName = project.responsible;
         }
 
-        // NOTE: проект может редактировать админ портала, админ проекта, обычный пользователь пока только просматривать проекты
-        //       посетитель может только просматривать публичные проекты и приватные если он в них включен
-        // TODO: сделать возможность редактирования для пользователя (входит в команду проекта) тех задач и вех что им созданы
-
         var canEdit = false;
-        if (ASC.Projects.Common.currentUserIsModuleAdmin() || project.responsible.id == Teamlab.profile.id) {
+        if (common.currentUserIsModuleAdmin() || project.responsible.id == Teamlab.profile.id) {
             canEdit = true;
         }
         if (Teamlab.profile.isVisitor) {
@@ -1483,7 +1481,7 @@ ASC.Projects.GantChartPage = (function () {
     var getFullResponsiblesWrapper = function (respIds) {
         var i, length = respIds.length, fullUsers = [];
         for (i = 0; i < length; ++i) {
-            fullUsers.push(ASC.Projects.Common.getUserById(respIds[i]));
+            fullUsers.push(window.UserManager.getUser(respIds[i]) || window.UserManager.getRemovedProfile(respIds[i]));
         }
         return fullUsers;
     };
@@ -1496,6 +1494,8 @@ ASC.Projects.GantChartPage = (function () {
             created = resetDateHours(task.crtdate),
             startDate = task.startDate,
             priority = task.priority,
+            customTaskStatus = task.customTaskStatus,
+            createdBy = task.createdBy,
             status = task.status,
             ownerId = task.projectOwner,
             subtasks = task.subtasksCount ? task.subtasksCount : 0,
@@ -1563,7 +1563,7 @@ ASC.Projects.GantChartPage = (function () {
         else if ('object' == typeof (task.projectOwner) && !isNaN(task.projectOwner.id))
             ownerId = task.projectOwner.id;
 
-        chart.modelController().addTask(id, ownerId, title, performer, description, begin, end, status, milestone, priority, subtasks, responsibles, taskLinks, undo, beginFail);
+        chart.modelController().addTask(id, ownerId, title, performer, description, begin, end, status, customTaskStatus, milestone, priority, subtasks, responsibles, taskLinks, undo, beginFail, createdBy);
 
         if (update) {
 
@@ -1612,30 +1612,48 @@ ASC.Projects.GantChartPage = (function () {
     };
 
     var readTeamLabTasks = function (project) {
-        if (0 !== project.status)   // только открытые или readonly проекты могут иметь задачи на отображение
+        if (0 !== project.status)
             return;
 
         var task;      // loop iterator
         taskForDiagram = project.tasks.slice(0);
         project.taskCount = taskForDiagram.length;
-        project.allTaskHash = {};
+        if (!project.allTaskHash) {
+            project.allTaskHash = {};
+        }
 
-        while (task = taskForDiagram.pop()) {
-            project.allTaskHash[task.id] = task;
-            project.allTaskHash[task.id].visible = true;
+        for (var i = 0; i < project.taskCount; i++) {
+            task = taskForDiagram[i];
+            if (project.allTaskHash[task.id]) {
+                task = project.allTaskHash[task.id];
+            } else {
+                project.allTaskHash[task.id] = task;
+                project.allTaskHash[task.id].visible = true;
+            }
             addTaskToChart(task);
         }
     };
     var readTeamLabMilestones = function (project) {
-        if (0 !== project.status)   // только открытые или readonly проекты могут иметь вехи на отображение
+        if (0 !== project.status)
             return;
 
         var milestone;      // loop iterator
-        project.milestonesHash = {};
+
+        if (!project.milestonesHash) {
+            project.milestonesHash = {};
+        }
+
         milestonesForDiagram = project.milestones.slice(0);
         project.milestoneCount = milestonesForDiagram.length;
-        while (milestone = milestonesForDiagram.pop()) {
-            project.milestonesHash[milestone.id] = milestone;
+        for (var i=0; i< project.milestoneCount; i++) {
+            milestone = milestonesForDiagram[i];
+
+            if (project.milestonesHash[milestone.id]) {
+                milestone = project.milestonesHash[milestone.id];
+            } else {
+                project.milestonesHash[milestone.id] = milestone;
+            }
+
             addMilestoneToChart(milestone);
         }
     };
@@ -1701,7 +1719,7 @@ ASC.Projects.GantChartPage = (function () {
             jq("#noteAboutLinks").addClass("display-none");
         }
         PopupKeyUpActionProvider.CloseDialogAction = closeDialogAction;
-        StudioBlockUIManager.blockUI(jq("#questionWindowTaskRemove"), 400, 200, 0);
+        StudioBlockUIManager.blockUI(jq("#questionWindowTaskRemove"), 400);
         PopupKeyUpActionProvider.EnterAction = "jq('#questionWindowTaskRemove .remove').click();";
 
         jq("#questionWindowTaskRemove .remove").data("taskid", task.id());
@@ -1709,36 +1727,36 @@ ASC.Projects.GantChartPage = (function () {
     var showMilestoneQuestionPopup = function (milestoneId) {
         disableChartEvents();
         PopupKeyUpActionProvider.CloseDialogAction = closeDialogAction;
-        StudioBlockUIManager.blockUI(jq("#questionWindowDeleteMilestone"), 400, 200, 0);
+        StudioBlockUIManager.blockUI(jq("#questionWindowDeleteMilestone"), 400);
         PopupKeyUpActionProvider.EnterAction = "jq('#questionWindowDeleteMilestone .remove').click();";
         jq("#questionWindowDeleteMilestone").attr("milestoneId", milestoneId);
     };
     var showTaskWithSubtasksQuestionPopup = function (taskId) {
         disableChartEvents();
         PopupKeyUpActionProvider.CloseDialogAction = closeDialogAction;
-        StudioBlockUIManager.blockUI(jq("#questionWindowTaskWithSubtasks"), "auto", 200, 0);
+        StudioBlockUIManager.blockUI(jq("#questionWindowTaskWithSubtasks"), "auto");
         PopupKeyUpActionProvider.EnterAction = "jq('#questionWindowTaskWithSubtasks .end').click();";
         jq("#questionWindowTaskWithSubtasks .end").data("taskid", taskId);
     };
     var showMilestoneWithTasksQuestionPopup = function () {
         disableChartEvents();
         PopupKeyUpActionProvider.CloseDialogAction = closeDialogAction;
-        StudioBlockUIManager.blockUI(jq("#questionWindowMilestoneTasks"), 400, 200, 0);
+        StudioBlockUIManager.blockUI(jq("#questionWindowMilestoneTasks"), 400);
         PopupKeyUpActionProvider.EnterAction = "jq('#questionWindowMilestoneTasks .cancel').click();";
     };
     var showMoveTaskOutMilestonePopup = function () {
         disableChartEvents();
         PopupKeyUpActionProvider.CloseDialogAction = closeDialogAction;
-        StudioBlockUIManager.blockUI(jq("#moveTaskOutMilestone"), "auto", 200, 0);
+        StudioBlockUIManager.blockUI(jq("#moveTaskOutMilestone"), "auto");
         PopupKeyUpActionProvider.EnterAction = "jq('#moveTaskOutMilestone .cancel').click();";
     };
     var showCreateNewLinkPopup = function (task) {
         if (setTaskSelect(task)) {
             disableChartEvents();
             PopupKeyUpActionProvider.CloseDialogAction = closeDialogAction;
-            StudioBlockUIManager.blockUI(jq("#addNewLinkPopup"), 400, 200, 0);
+            StudioBlockUIManager.blockUI(jq("#addNewLinkPopup"), 400);
         } else {
-            ASC.Projects.Common.displayInfoPanel(ASC.Projects.Resources.ProjectsJSResource.GanttNotAvailableTaskLink, true);
+            common.displayInfoPanel(projectsJsResource.GanttNotAvailableTaskLink, true);
         }
     };
 
@@ -1829,12 +1847,12 @@ ASC.Projects.GantChartPage = (function () {
         var parentDeadline = parentTask.deadline ? parentTask.deadline : undefined;
         var dependentDeadline = dependentTask.deadline ? dependentTask.deadline : undefined;
 
-        var possibleLinkTypes = ASC.Projects.Common.getPossibleTypeLink(parentStart, parentDeadline, dependentStart, dependentDeadline, {});
+        var possibleLinkTypes = common.getPossibleTypeLink(parentStart, parentDeadline, dependentStart, dependentDeadline, {});
 
-        if (possibleLinkTypes[2] == ASC.Projects.Common.linkTypeEnum.start_end) {
-            linkTypeSelector.text(ASC.Projects.Resources.ProjectsJSResource.RelatedLinkTypeSE).data("value", ASC.Projects.Common.linkTypeEnum.start_end);
+        if (possibleLinkTypes[2] == common.linkTypeEnum.start_end) {
+            linkTypeSelector.text(projectsJsResource.RelatedLinkTypeSE).data("value", common.linkTypeEnum.start_end);
         } else {
-            linkTypeSelector.text(ASC.Projects.Resources.ProjectsJSResource.RelatedLinkTypeES).data("value", ASC.Projects.Common.linkTypeEnum.end_start);
+            linkTypeSelector.text(projectsJsResource.RelatedLinkTypeES).data("value", common.linkTypeEnum.end_start);
         }
     };
     var enableSaveLinkButton = function () {
@@ -1908,9 +1926,9 @@ ASC.Projects.GantChartPage = (function () {
     var onTaskError = function () {
         unblockChartInterface();
     };
-    var updateTask = function (task) {
+    var updateTask = function (task, params) {
         blockChartInterface();
-        var params = {};
+        params = params || {};
         if (task.updRespFlag) {
             params.updRespFlag = true;
         }
@@ -1930,6 +1948,16 @@ ASC.Projects.GantChartPage = (function () {
         }
     };
     var onUpdateTask = function (params, task) {
+
+        if (params.status) {
+            enableChartEvents();
+            statusListTaskContainer.hide();
+            statusListTaskContainer.data("id", "");
+            if (!jq(this).hasClass("underline")) {
+                chart.modelController().finalizeStatus(task.status);
+            }
+        }
+
         var visible = allProjectsHash[task.projectId].allTaskHash[task.id].visible;
         allProjectsHash[task.projectId].allTaskHash[task.id] = task;
         allProjectsHash[task.projectId].allTaskHash[task.id].visible = visible;
@@ -2039,7 +2067,7 @@ ASC.Projects.GantChartPage = (function () {
     };
     var removeMilestone = function (milestoneId) {
         blockChartInterface();
-        Teamlab.removePrjMilestone({}, milestoneId, { success: onRemoveMilestone, error: onMilestoneError });
+        Teamlab.removePrjMilestone(milestoneId, { success: onRemoveMilestone, error: onMilestoneError });
     };
     var onRemoveMilestone = function (params, milestone) {
         delete milestonesHash[milestone.id];
@@ -2071,7 +2099,7 @@ ASC.Projects.GantChartPage = (function () {
         refreshData = true;
 
         refreshChartData();
-        StudioBlockUIManager.blockUI(jq("#createNewLinkError"), 480, 300, 0, "fixed");
+        ASC.Projects.Base.showCommonPopup("createNewLinkError", enableChartEvents, enableChartEvents);
         unblockChartInterface();
     };
     var onRemoveTaskLink = function (params /*, data*/) {
@@ -2166,6 +2194,7 @@ ASC.Projects.GantChartPage = (function () {
             kLinkBeginEnd = 2,
 
             kHanderShowTaskPopUpWindow = '500',
+            kHanderShowTaskPopUpCustomWindow = '501',
             kHanderShowEditPopUpMenuWindow = '502',
             kHanderShowRespPopUpMenuWindow = '503',
             kHanderShowEditElemPopUpMenuWindow = '504',
@@ -2302,7 +2331,8 @@ ASC.Projects.GantChartPage = (function () {
             element.milestone = m;
             var task = convertToTeamlabTask(element, true);
             task.status = element.status();
-            updateTask(task);
+            task.statusId = element.customTaskStatus();
+            updateTask(task, { status: true});
         });
         chart.addHandler(kHandlerChangeMilestoneStatus, function (p, m, element) {
             var data = {};
@@ -2364,7 +2394,7 @@ ASC.Projects.GantChartPage = (function () {
         chart.addHandler(kHandlerBeforeDeleteMilestone, function (p, m, element) {
             showMilestoneQuestionPopup(m);
         });
-        chart.addHandler(kHandlerBeforeChangeTaskStatus, function (p, m, t, element) {
+        chart.addHandler(kHandlerBeforeChangeTaskStatus, function (p, m, t, element, cs) {
             if (element.subtasks().length && element.status() != 2) {
                 for (var i = 0; i < element.subtasks().length; i++) {
                     if (element.subtasks()[i].status == 1) {
@@ -2373,7 +2403,7 @@ ASC.Projects.GantChartPage = (function () {
                     }
                 }
             }
-            chart.modelController().finalize();
+            chart.modelController().finalize(cs);
         });
         chart.addHandler(kHandlerBeforeChangeMilestoneStatus, function (p, m, element) {
             var tasks = element.tasks();
@@ -2390,6 +2420,10 @@ ASC.Projects.GantChartPage = (function () {
         chart.addHandler(kHanderShowTaskPopUpWindow, function (element, coords) {
             var element = element || {};
             showStatusListContainer(element, coords);
+        });
+        chart.addHandler(kHanderShowTaskPopUpCustomWindow, function (element, coords) {
+            var element = element || {};
+            showStatusListTaskContainer(element, coords);
         });
         chart.addHandler(kHanderShowEditPopUpMenuWindow, function (coords, element, isTask, project) {
             if (readMode) return;
@@ -2592,11 +2626,11 @@ ASC.Projects.GantChartPage = (function () {
         var rebuildCellChecker = function (cells) {
             var fields = {          // replase on resources strings
                 menuItems: [
-                    { id: "Responsibility", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelResponsibles },
-                    { id: "BeginDate", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelBeginDate },
-                    { id: "EndDate", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelEndDate },
-                    { id: "Status", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelStatus },
-                    { id: "Priority", title: ASC.Projects.Resources.ProjectsJSResource.GanttLeftPanelPriority }
+                    { id: "Responsibility", title: projectsJsResource.GanttLeftPanelResponsibles },
+                    { id: "BeginDate", title: projectsJsResource.GanttLeftPanelBeginDate },
+                    { id: "EndDate", title: projectsJsResource.GanttLeftPanelEndDate },
+                    { id: "Status", title: projectsJsResource.GanttLeftPanelStatus },
+                    { id: "Priority", title: projectsJsResource.GanttLeftPanelPriority }
                 ]
             };
 
@@ -2762,8 +2796,38 @@ ASC.Projects.GantChartPage = (function () {
             statusListContainer.data("id", "");
             return true;
         }
+
         statusListContainer.data("id", element.id());
         showContextMenu(statusListContainer, coords.left - 10, coords.top - 1);
+    };
+
+    var showStatusListTaskContainer = function (element, coords) {
+        if (statusListTaskContainer.data("id") == element.id()) {
+            statusListTaskContainer.data("id", "");
+            return true;
+        }
+        if (element.isTask) {
+            var master = ASC.Projects.Master;
+            var statuses = master.customStatuses.filter(function (item) {
+                return typeof item.available !== "undefined" && item.available === false;
+            });
+
+            var currentUserId = Teamlab.profile.id;
+            for (var i = 0; i < statuses.length; i++) {
+                var id = statuses[i].id;
+                var $li = statusListContainer.find("li[dataid=" + id + "]");
+                if (element.createdBy === currentUserId ||
+                    element.project.responsibles().id === currentUserId ||
+                    master.isModuleAdmin) {
+                    $li.show();
+                } else {
+                    $li.hide();
+                }
+            }
+        }
+
+        statusListTaskContainer.data("id", element.id());
+        showContextMenu(statusListTaskContainer, coords.left - 10, coords.top - 1);
     };
     var showTaskContextMenu = function (element, coords) {
         if (taskContextMenu.is(":visible") && taskContextMenu.data("id") == element.id()) {
@@ -2940,9 +3004,9 @@ ASC.Projects.GantChartPage = (function () {
         //
         //        var userId = teamMemberFilter.val();
         //        if (userId != "-1") {
-        //            var responsible = ASC.Projects.Resources.ProjectsFilterResource.NoResponsible;
-        //            if (userId != ASC.Projects.Common.emptyGuid) {
-        //                var user = ASC.Projects.Common.userInProjectTeam(userId);
+        //            var responsible = projectsFilterResource.NoResponsible;
+        //            if (userId != common.emptyGuid) {
+        //                var user = common.userInProjectTeam(userId);
         //                responsible = user.displayName;
         //            }
         //            windowContent += responsible;
@@ -2983,7 +3047,7 @@ ASC.Projects.GantChartPage = (function () {
 
                 document.body.appendChild(dateControl);
 
-                jq("#datepicker-chart").mask("dd.MM.yyyy");
+                jq("#datepicker-chart").mask(ASC.Resources.Master.DatePatternJQ);
                 jq("#datepicker-chart").datepicker({
                     onSelect: function () {
                         chart.modelController().finalizeOperation('timechanage', {
@@ -3015,12 +3079,6 @@ ASC.Projects.GantChartPage = (function () {
     return {
         init: init,
         enableChartEvents: enableChartEvents,
-        disableChartEvents: disableChartEvents,
-        addTaskToChart: addTaskToChart,
-        addMilestoneToChart: addMilestoneToChart
+        disableChartEvents: disableChartEvents
     };
 })(jQuery);
-
-jq(document).ready(function () {
-    ASC.Projects.GantChartPage.init();
-});

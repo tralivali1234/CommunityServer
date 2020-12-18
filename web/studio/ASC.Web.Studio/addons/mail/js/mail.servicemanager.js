@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -45,14 +36,6 @@ if (typeof window.serviceManager === 'undefined') {
             }
         }
 
-        function bind(event, handler) {
-            return window.Teamlab.bind(event, handler);
-        }
-
-        function unbind() {
-            return window.Teamlab.unbind.apply(this, arguments);
-        }
-
         function hideCallback() {
             window.LoadingBanner.hideLoading();
         }
@@ -72,8 +55,7 @@ if (typeof window.serviceManager === 'undefined') {
                 var loadingMessage = arguments.length > paramsCount ? arguments[arguments.length - 1] : undefined;
                 var options;
                 if (loadingMessage) {
-                    window.LoadingBanner.strLoading = loadingMessage;
-                    window.LoadingBanner.displayMailLoading(true, true);
+                    window.LoadingBanner.displayMailLoading(loadingMessage);
                     options = arguments[arguments.length - 2] || {};
                     options.success = options.hasOwnProperty('success') && typeof options.success === 'function' ?
                         wrapHideCallback(options.success) : hideCallback;
@@ -88,12 +70,41 @@ if (typeof window.serviceManager === 'undefined') {
         }
 
         function checkNew(params, options) {
-            if (options)
-                window.Teamlab.getMailFolders(params, options);
-            else {
-                window.Teamlab.getMailFolders();
-            }
-            window.Teamlab.getMailFilteredConversations({ folder_id: MailFilter.getFolder() }, MailFilter.toData(), {});
+            params = params || {};
+            params.forced = params.forced || MailFilter.getFolder() == TMMail.sysfolders.userfolder.id;
+
+            window.Teamlab.getMailFolders(params, options);
+
+            if (commonSettingsPage.isConversationsEnabled())
+                window.Teamlab.getMailFilteredConversations({ folder_id: MailFilter.getFolder() }, MailFilter.toData(),
+                {
+                    error: function (p, errors) {
+                        console.error("getMailFilteredConversations()", errors);
+
+                        if (errors[0] === "Folder not found") {
+                            if (MailFilter.getFolder() !== TMMail.sysfolders.inbox.id) {
+                                window.toastr.error(MailScriptResource.UserFolderNotFoundError);
+                                TMMail.moveToInbox();
+                            }
+                            userFoldersManager.reloadTree(0);
+                        }
+                    }
+                });
+            else
+                window.Teamlab.getMailFilteredMessages({ folder_id: MailFilter.getFolder() }, MailFilter.toData(),
+                {
+                    error: function (p, errors) {
+                        console.error("getMailFilteredMessages()", errors);
+
+                        if (errors[0] === "Folder not found") {
+                            if (MailFilter.getFolder() !== TMMail.sysfolders.inbox.id) {
+                                window.toastr.error(MailScriptResource.UserFolderNotFoundError);
+                                TMMail.moveToInbox();
+                            }
+                            userFoldersManager.reloadTree(0);
+                        }
+                    }
+                });
         }
 
         var updateFolders = wrapper(2, function (params, options) {
@@ -148,8 +159,12 @@ if (typeof window.serviceManager === 'undefined') {
             window.Teamlab.createMailMailboxSimple(params, email, password, options);
         });
 
-        var createOAuthBox = wrapper(5, function(email, refreshToken, serviceType, params, options) {
-            window.Teamlab.createMailMailboxOAuth(params, email, refreshToken, serviceType, options);
+        var createOAuthBox = wrapper(5, function(code, serviceType, params, options) {
+            window.Teamlab.createMailMailboxOAuth(params, code, serviceType, options);
+        });
+
+        var updateOAuthBox = wrapper(6, function (code, serviceType, mailboxId, params, options) {
+            window.Teamlab.updateMailMailboxOAuth(params, code, serviceType, mailboxId, options);
         });
 
         var getDefaultMailboxSettings = wrapper(3, function(email, params, options) {
@@ -185,7 +200,11 @@ if (typeof window.serviceManager === 'undefined') {
         });
 
         var getMailFilteredConversations = wrapper(2, function(params, options) {
-            window.Teamlab.getMailFilteredConversations({ folder_id: MailFilter.getFolder() }, MailFilter.toData(), {});
+            window.Teamlab.getMailFilteredConversations({ folder_id: MailFilter.getFolder() }, MailFilter.toData(), options || {});
+        });
+
+        var getMailFilteredMessages = wrapper(2, function (params, options) {
+            window.Teamlab.getMailFilteredMessages({ folder_id: MailFilter.getFolder() }, MailFilter.toData(), options || {});
         });
 
         var getMessage = wrapper(4, function (id, loadImages, params, options) {
@@ -271,12 +290,12 @@ if (typeof window.serviceManager === 'undefined') {
             window.Teamlab.markMailConversations(params, ids, status, options);
         });
 
-        var moveMailMessages = wrapper(4, function(ids, toFolder, params, options) {
-            window.Teamlab.moveMailMessages(params, ids, toFolder, options);
+        var moveMailMessages = wrapper(5, function (ids, toFolder, userFolderId, params, options) {
+            window.Teamlab.moveMailMessages(params, ids, toFolder, userFolderId, options);
         });
 
-        var moveMailConversations = wrapper(4, function(ids, toFolder, params, options) {
-            window.Teamlab.moveMailConversations(params, ids, toFolder, options);
+        var moveMailConversations = wrapper(5, function (ids, toFolder, userFolderId, params, options) {
+            window.Teamlab.moveMailConversations(params, ids, toFolder, userFolderId, options);
         });
 
         var restoreMailMessages = wrapper(3, function (ids, params, options) {
@@ -440,14 +459,21 @@ if (typeof window.serviceManager === 'undefined') {
             window.Teamlab.removeMailDomain(params, idDomain, options);
         });
 
-        var addMailbox = wrapper(6, function(name, localPart, domainId, userId, params, options) {
-            window.Teamlab.addMailbox(params, name, localPart, domainId, userId, options);
+        var addMailbox = wrapper(8, function (name, localPart, domainId, userId, notifyCurrent, notifyProfile, params, options) {
+            window.Teamlab.addMailbox(params, name, localPart, domainId, userId, notifyCurrent, notifyProfile, options);
         });
 
         var addMyMailbox = wrapper(3, function (mailboxName, params, options) {
             window.Teamlab.addMyMailbox(params, mailboxName, options);
         });
 
+        var changeMailboxPassword = wrapper(4, function (mailboxId, password, params, options) {
+            window.Teamlab.changeMailboxPassword(params, mailboxId, password, options);
+        });
+
+        var getRandomPassword = wrapper(2, function (params, options) {
+            window.Teamlab.getRandomPassword(params, options);
+        });
         var getMailboxes = wrapper(2, function(params, options) {
             window.Teamlab.getMailboxes(params, options);
         });
@@ -500,15 +526,38 @@ if (typeof window.serviceManager === 'undefined') {
             window.Teamlab.getDomainDnsSettings(params, domainId, options);
         });
 
+        var setConversationEnabledFlag = wrapper(3, function(enabled, params, options) {
+            window.Teamlab.setMailConversationEnabledFlag(params, enabled, options);
+        });
+
+        var setAlwaysDisplayImagesFlag = wrapper(3, function (enabled, params, options) {
+            window.Teamlab.setMailAlwaysDisplayImagesFlag(params, enabled, options);
+        });
+
+        var setCacheUnreadMessagesFlag = wrapper(3, function (enabled, params, options) {
+            window.Teamlab.setMailCacheUnreadMessagesFlag(params, enabled, options);
+        });
+
+        var setEnableGoNextAfterMove = wrapper(3, function (enabled, params, options) {
+            window.Teamlab.setMailEnableGoNextAfterMove(params, enabled, options);
+        });
+
+        var getMailOperationStatus = wrapper(3, function (id, params, options) {
+            window.Teamlab.getMailOperationStatus(params, id, options);
+        });
+
+        var setEnableReplaceMessageBody = wrapper(3, function (enabled, params, options) {
+            window.Teamlab.setMailEnableReplaceMessageBody(params, enabled, options);
+        });
+
         return {
             init: init,
-            bind: bind,
-            unbind: unbind,
 
             getAccounts: getAccounts,
             createBox: createBox,
             createMinBox: createMinBox,
             createOAuthBox: createOAuthBox,
+            updateOAuthBox: updateOAuthBox,
             getDefaultMailboxSettings: getDefaultMailboxSettings,
             removeBox: removeBox,
             updateBox: updateBox,
@@ -582,6 +631,8 @@ if (typeof window.serviceManager === 'undefined') {
             removeMailDomain: removeMailDomain,
             addMailbox: addMailbox,
             addMyMailbox: addMyMailbox,
+            changeMailboxPassword: changeMailboxPassword,
+            getRandomPassword: getRandomPassword,
             getMailboxes: getMailboxes,
             removeMailbox: removeMailbox,
             addMailBoxAlias: addMailBoxAlias,
@@ -595,7 +646,16 @@ if (typeof window.serviceManager === 'undefined') {
             isDomainExists: isDomainExists,
             checkDomainOwnership: checkDomainOwnership,
             getDomainDnsSettings: getDomainDnsSettings,
-            getMailFilteredConversations: getMailFilteredConversations
+            getMailFilteredConversations: getMailFilteredConversations,
+            getMailFilteredMessages: getMailFilteredMessages,
+
+            setConversationEnabledFlag: setConversationEnabledFlag,
+            setAlwaysDisplayImagesFlag: setAlwaysDisplayImagesFlag,
+            setCacheUnreadMessagesFlag: setCacheUnreadMessagesFlag,
+            setEnableGoNextAfterMove: setEnableGoNextAfterMove,
+            setEnableReplaceMessageBody: setEnableReplaceMessageBody,
+
+            getMailOperationStatus: getMailOperationStatus
         };
     })(jQuery);
 }

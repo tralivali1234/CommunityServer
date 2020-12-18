@@ -1,36 +1,27 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Common.Caching;
-using ASC.Core.Tenants;
-using ASC.Core.Users;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using ASC.Common.Caching;
+using ASC.Core.Tenants;
+using ASC.Core.Users;
 
 namespace ASC.Core.Caching
 {
@@ -67,7 +58,7 @@ namespace ASC.Core.Caching
             PhotoExpiration = TimeSpan.FromMinutes(10);
 
             cacheNotify = AscCache.Notify;
-            cacheNotify.Subscribe<UserInfo>((u, a) => InvalidateCache());
+            cacheNotify.Subscribe<UserInfo>((u, a) => InvalidateCache(u));
             cacheNotify.Subscribe<UserPhoto>((p, a) => cache.Remove(p.Key));
             cacheNotify.Subscribe<Group>((g, a) => InvalidateCache());
             cacheNotify.Subscribe<UserGroupRef>((r, a) => UpdateUserGroupRefCache(r, a == CacheNotifyAction.Remove));
@@ -85,6 +76,11 @@ namespace ASC.Core.Caching
 
         public UserInfo GetUser(int tenant, Guid id)
         {
+            if (CoreContext.Configuration.Personal)
+            {
+                return GetUserForPersonal(tenant, id);
+            }
+
             var users = GetUsers(tenant);
             lock (users)
             {
@@ -94,9 +90,35 @@ namespace ASC.Core.Caching
             }
         }
 
-        public UserInfo GetUser(int tenant, string login, string passwordHash)
+        /// <summary>
+        /// For Personal only
+        /// </summary>
+        /// <param name="tenant"></param>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        private UserInfo GetUserForPersonal(int tenant, Guid id)
         {
-            return service.GetUser(tenant, login, passwordHash);
+            if (!CoreContext.Configuration.Personal) return GetUser(tenant, id);
+
+            var key = GetUserCacheKeyForPersonal(tenant, id);
+            var user = cache.Get<UserInfo>(key);
+
+            if (user == null)
+            {
+                user = service.GetUser(tenant, id);
+
+                if (user != null)
+                {
+                    cache.Insert(key, user, CacheExpiration);
+                }
+            }
+
+            return user;
+        }
+
+        public UserInfo GetUserByPasswordHash(int tenant, string login, string passwordHash)
+        {
+            return service.GetUserByPasswordHash(tenant, login, passwordHash);
         }
 
         public UserInfo SaveUser(int tenant, UserInfo user)
@@ -109,7 +131,7 @@ namespace ASC.Core.Caching
         public void RemoveUser(int tenant, Guid id)
         {
             service.RemoveUser(tenant, id);
-            cacheNotify.Publish(new UserInfo { ID = id }, CacheNotifyAction.Remove);
+            cacheNotify.Publish(new UserInfo { Tenant = tenant, ID = id }, CacheNotifyAction.Remove);
         }
 
         public byte[] GetUserPhoto(int tenant, Guid id)
@@ -129,14 +151,14 @@ namespace ASC.Core.Caching
             cacheNotify.Publish(new UserPhoto { Key = GetUserPhotoCacheKey(tenant, id) }, CacheNotifyAction.Remove);
         }
 
-        public string GetUserPassword(int tenant, Guid id)
+        public DateTime GetUserPasswordStamp(int tenant, Guid id)
         {
-            return service.GetUserPassword(tenant, id);
+            return service.GetUserPasswordStamp(tenant, id);
         }
 
-        public void SetUserPassword(int tenant, Guid id, string password)
+        public void SetUserPasswordHash(int tenant, Guid id, string passwordHash)
         {
-            service.SetUserPassword(tenant, id, password);
+            service.SetUserPasswordHash(tenant, id, passwordHash);
         }
 
 
@@ -206,9 +228,19 @@ namespace ASC.Core.Caching
             cacheNotify.Publish(r, CacheNotifyAction.Remove);
         }
 
-
         public void InvalidateCache()
         {
+            InvalidateCache(null);
+        }
+
+        private void InvalidateCache(UserInfo userInfo)
+        {
+            if (CoreContext.Configuration.Personal && userInfo != null)
+            {
+                var key = GetUserCacheKeyForPersonal(userInfo.Tenant, userInfo.ID);
+                cache.Remove(key);
+            }
+
             trustInterval.Expire();
         }
 
@@ -222,6 +254,7 @@ namespace ASC.Core.Caching
             if (users == null)
             {
                 users = service.GetUsers(tenant, default(DateTime));
+
                 cache.Insert(key, users, CacheExpiration);
             }
             return users;
@@ -354,6 +387,11 @@ namespace ASC.Core.Caching
         private static string GetUserCacheKey(int tenant)
         {
             return tenant.ToString() + USERS;
+        }
+
+        private static string GetUserCacheKeyForPersonal(int tenant, Guid userId)
+        {
+            return tenant.ToString() + USERS + userId;
         }
 
 

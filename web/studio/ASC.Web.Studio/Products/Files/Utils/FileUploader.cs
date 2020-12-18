@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -52,7 +43,7 @@ namespace ASC.Web.Files.Utils
             return Exec(folderId, title, contentLength, data, !FilesSettings.UpdateIfExist);
         }
 
-        public static File Exec(string folderId, string title, long contentLength, Stream data, bool createNewIfExist)
+        public static File Exec(string folderId, string title, long contentLength, Stream data, bool createNewIfExist, bool deleteConvertStatus = true)
         {
             if (contentLength <= 0)
                 throw new Exception(FilesCommonResource.ErrorMassage_EmptyFile);
@@ -67,7 +58,7 @@ namespace ASC.Web.Files.Utils
             FileMarker.MarkAsNew(file);
 
             if (FileConverter.EnableAsUploaded && FileConverter.MustConvert(file))
-                FileConverter.ExecAsync(file, true);
+                FileConverter.ExecAsync(file, deleteConvertStatus);
 
             return file;
         }
@@ -91,6 +82,8 @@ namespace ASC.Web.Files.Utils
                     file.ConvertedType = null;
                     file.Comment = FilesCommonResource.CommentUpload;
                     file.Version++;
+                    file.VersionGroup++;
+                    file.Encrypted = false;
 
                     return file;
                 }
@@ -121,7 +114,8 @@ namespace ASC.Web.Files.Utils
                    && !CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsVisitor()
                    && !EntryManager.FileLockedForMe(file.ID)
                    && !FileTracker.IsEditing(file.ID)
-                   && file.RootFolderType != FolderType.TRASH;
+                   && file.RootFolderType != FolderType.TRASH
+                   && !file.Encrypted;
         }
 
         private static string GetFolderId(object folderId, IList<string> relativePath)
@@ -178,7 +172,7 @@ namespace ASC.Web.Files.Utils
             return file;
         }
 
-        public static ChunkedUploadSession InitiateUpload(string folderId, string fileId, string fileName, long contentLength)
+        public static ChunkedUploadSession InitiateUpload(string folderId, string fileId, string fileName, long contentLength, bool encrypted)
         {
             if (string.IsNullOrEmpty(folderId))
                 folderId = null;
@@ -186,18 +180,25 @@ namespace ASC.Web.Files.Utils
             if (string.IsNullOrEmpty(fileId))
                 fileId = null;
 
-            var file = new File {ID = fileId, FolderID = folderId, Title = fileName, ContentLength = contentLength};
+            var file = new File
+                {
+                    ID = fileId,
+                    FolderID = folderId,
+                    Title = fileName,
+                    ContentLength = contentLength
+                };
 
             using (var dao = Global.DaoFactory.GetFileDao())
             {
                 var uploadSession = dao.CreateUploadSession(file, contentLength);
 
                 uploadSession.Expired = uploadSession.Created + ChunkedUploadSessionHolder.SlidingExpiration;
-                uploadSession.Location = FilesLinkUtility.GetUploadChunkLocationUrl(uploadSession.Id, contentLength > 0);
+                uploadSession.Location = FilesLinkUtility.GetUploadChunkLocationUrl(uploadSession.Id);
                 uploadSession.TenantId = CoreContext.TenantManager.GetCurrentTenant().TenantId;
                 uploadSession.UserId = SecurityContext.CurrentAccount.ID;
                 uploadSession.FolderId = folderId;
                 uploadSession.CultureName = Thread.CurrentThread.CurrentUICulture.Name;
+                uploadSession.Encrypted = encrypted;
 
                 ChunkedUploadSessionHolder.StoreSession(uploadSession);
 
@@ -215,7 +216,7 @@ namespace ASC.Web.Files.Utils
                 throw new Exception(FilesCommonResource.ErrorMassage_EmptyFile);
             }
 
-            if (chunkLength > SetupInfo.MaxUploadSize)
+            if (chunkLength > SetupInfo.ChunkUploadSize)
             {
                 throw FileSizeComment.GetFileSizeException(SetupInfo.MaxUploadSize);
             }

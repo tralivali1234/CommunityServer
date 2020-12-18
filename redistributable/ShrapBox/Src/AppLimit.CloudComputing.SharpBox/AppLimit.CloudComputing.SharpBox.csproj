@@ -64,12 +64,8 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\Microsoft.VisualStudio.QualityTools.UnitTestFramework.11.0.50727.1\Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll</HintPath>
-    </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\..\..\packages\Newtonsoft.Json.11.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
@@ -208,12 +204,6 @@
     <Compile Include="StorageProvider\GenericStorageProviderService.cs" />
     <Compile Include="SyncFramework\DirectoryDiff.cs" />
     <Compile Include="SyncFramework\DirectoryDiffResultItem.cs" />
-    <Compile Include="Tests\StorageProviderTests\Dropbox\DropboxTests.cs" />
-    <Compile Include="Tests\StorageProviderTests\GoogleDrive\GoogleDocsProviderTests.cs" />
-    <Compile Include="Tests\StorageProviderTests\SkyDrive\SkyDriveTest.cs" />
-    <Compile Include="Tests\StorageProviderTests\StorageProviderTestsBase.cs" />
-    <Compile Include="Tests\StorageProviderTests\WebDav\BoxNetTests.cs" />
-    <Compile Include="Tests\StorageProviderTests\WebDav\YandexTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Exceptions\ErrorMessages.resx">
@@ -240,14 +230,8 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Tests\StorageProviderTests\testtesttesttest.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="AppLimit.CloudComputing.SharpBox.snk" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="$(TrunkDir)\.nuget\NuGet.targets" />
 </Project>

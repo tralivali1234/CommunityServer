@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -61,7 +52,7 @@ namespace ASC.Api.CRM
         {
             if (opportunityid <= 0) throw new ArgumentException();
 
-            var deal = DaoFactory.GetDealDao().GetByID(opportunityid);
+            var deal = DaoFactory.DealDao.GetByID(opportunityid);
             if (deal == null || !CRMSecurity.CanAccessTo(deal)) throw new ItemNotFoundException();
 
             return ToOpportunityWrapper(deal);
@@ -84,18 +75,18 @@ namespace ASC.Api.CRM
         {
             if (opportunityid <= 0 || stageid <= 0) throw new ArgumentException();
 
-            var deal = DaoFactory.GetDealDao().GetByID(opportunityid);
+            var deal = DaoFactory.DealDao.GetByID(opportunityid);
             if (deal == null || !CRMSecurity.CanEdit(deal)) throw new ItemNotFoundException();
 
-            var stage = DaoFactory.GetDealMilestoneDao().GetByID(stageid);
+            var stage = DaoFactory.DealMilestoneDao.GetByID(stageid);
             if (stage == null) throw new ItemNotFoundException();
 
             deal.DealMilestoneID = stageid;
             deal.DealMilestoneProbability = stage.Probability;
 
             deal.ActualCloseDate = stage.Status != DealMilestoneStatus.Open ? DateTime.UtcNow : DateTime.MinValue;
-            DaoFactory.GetDealDao().EditDeal(deal);
-            MessageService.Send(Request, MessageAction.OpportunityUpdatedStage, deal.Title);
+            DaoFactory.DealDao.EditDeal(deal);
+            MessageService.Send(Request, MessageAction.OpportunityUpdatedStage, MessageTarget.Create(deal.ID), deal.Title);
 
             return ToOpportunityWrapper(deal);
         }
@@ -118,7 +109,7 @@ namespace ASC.Api.CRM
         {
             if (opportunityid <= 0) throw new ArgumentException();
 
-            var deal = DaoFactory.GetDealDao().GetByID(opportunityid);
+            var deal = DaoFactory.DealDao.GetByID(opportunityid);
             if (deal == null) throw new ItemNotFoundException();
 
             if (!(CRMSecurity.IsAdmin || deal.CreateBy == SecurityContext.CurrentAccount.ID)) throw CRMSecurity.CreateSecurityException();
@@ -134,7 +125,7 @@ namespace ASC.Api.CRM
                 if (isNotify)
                 {
                     accessListLocal = accessListLocal.Where(u => u != SecurityContext.CurrentAccount.ID).ToList();
-                    ASC.Web.CRM.Services.NotifyService.NotifyClient.Instance.SendAboutSetAccess(EntityType.Opportunity, deal.ID, accessListLocal.ToArray());
+                    ASC.Web.CRM.Services.NotifyService.NotifyClient.Instance.SendAboutSetAccess(EntityType.Opportunity, deal.ID, DaoFactory, accessListLocal.ToArray());
                 }
 
                 if (!accessListLocal.Contains(SecurityContext.CurrentAccount.ID))
@@ -146,8 +137,8 @@ namespace ASC.Api.CRM
 
                 if (isMessageServicSende)
                 {
-                    var users = GetUsersByIdList(accessListLocal).Select(x => x.DisplayUserName(false));
-                    MessageService.Send(Request, MessageAction.OpportunityRestrictedAccess, deal.Title, users);
+                    var users = GetUsersByIdList(accessListLocal);
+                    MessageService.Send(Request, MessageAction.OpportunityRestrictedAccess, MessageTarget.Create(deal.ID), deal.Title, users.Select(x => x.DisplayUserName(false)));
                 }
             }
             else
@@ -155,7 +146,7 @@ namespace ASC.Api.CRM
                 CRMSecurity.MakePublic(deal);
                 if (isMessageServicSende)
                 {
-                    MessageService.Send(Request, MessageAction.OpportunityOpenedAccess, deal.Title);
+                    MessageService.Send(Request, MessageAction.OpportunityOpenedAccess, MessageTarget.Create(deal.ID), deal.Title);
                 }
             }
 
@@ -197,7 +188,7 @@ namespace ASC.Api.CRM
             )
         {
             var result = new List<Deal>();
-            var deals = DaoFactory.GetDealDao()
+            var deals = DaoFactory.DealDao
                                   .GetDeals(_context.FilterValue,
                                             responsibleid,
                                             opportunityStagesid,
@@ -241,7 +232,7 @@ namespace ASC.Api.CRM
             
             var result = new List<Deal>();
 
-            var deals = DaoFactory.GetDealDao().GetDeals(opportunityid.ToArray());
+            var deals = DaoFactory.DealDao.GetDeals(opportunityid.ToArray());
 
             if (!deals.Any()) return new List<OpportunityWrapper>();
 
@@ -275,8 +266,8 @@ namespace ASC.Api.CRM
         {
             if (opportunityids == null || !opportunityids.Any()) throw new ArgumentException();
 
-            var opportunities = DaoFactory.GetDealDao().DeleteBatchDeals(opportunityids.ToArray());
-            MessageService.Send(Request, MessageAction.OpportunitiesDeleted, opportunities.Select(o => o.Title));
+            var opportunities = DaoFactory.DealDao.DeleteBatchDeals(opportunityids.ToArray());
+            MessageService.Send(Request, MessageAction.OpportunitiesDeleted, MessageTarget.Create(opportunityids), opportunities.Select(o => o.Title));
 
             return ToListOpportunityWrapper(opportunities);
         }
@@ -310,7 +301,7 @@ namespace ASC.Api.CRM
             ApiDateTime fromDate,
             ApiDateTime toDate)
         {
-            var deals = DaoFactory.GetDealDao().GetDeals(_context.FilterValue,
+            var deals = DaoFactory.DealDao.GetDeals(_context.FilterValue,
                                                          responsibleid,
                                                          opportunityStagesid,
                                                          tags,
@@ -321,8 +312,8 @@ namespace ASC.Api.CRM
 
             if (!deals.Any()) return Enumerable.Empty<OpportunityWrapper>();
 
-            deals = DaoFactory.GetDealDao().DeleteBatchDeals(deals);
-            MessageService.Send(Request, MessageAction.OpportunitiesDeleted, deals.Select(d => d.ID.ToString(CultureInfo.InvariantCulture)));
+            deals = DaoFactory.DealDao.DeleteBatchDeals(deals);
+            MessageService.Send(Request, MessageAction.OpportunitiesDeleted, MessageTarget.Create(deals.Select(x => x.ID)), deals.Select(d => d.Title));
 
             return ToListOpportunityWrapper(deals);
         }
@@ -380,7 +371,7 @@ namespace ASC.Api.CRM
 
             if (dealsOrderBy != null)
             {
-                result = ToListOpportunityWrapper(DaoFactory.GetDealDao().GetDeals(
+                result = ToListOpportunityWrapper(DaoFactory.DealDao.GetDeals(
                     searchString,
                     responsibleid,
                     opportunityStagesid,
@@ -400,7 +391,7 @@ namespace ASC.Api.CRM
             }
             else
             {
-                result = ToListOpportunityWrapper(DaoFactory.GetDealDao().GetDeals(
+                result = ToListOpportunityWrapper(DaoFactory.DealDao.GetDeals(
                     searchString,
                     responsibleid,
                     opportunityStagesid,
@@ -423,7 +414,7 @@ namespace ASC.Api.CRM
             else
             {
                 totalCount = DaoFactory
-                    .GetDealDao()
+                    .DealDao
                     .GetDealsCount(searchString,
                                    responsibleid,
                                    opportunityStagesid,
@@ -456,10 +447,10 @@ namespace ASC.Api.CRM
         {
             if (opportunityid <= 0) throw new ArgumentException();
 
-            var deal = DaoFactory.GetDealDao().DeleteDeal(opportunityid);
+            var deal = DaoFactory.DealDao.DeleteDeal(opportunityid);
             if (deal == null) throw new ItemNotFoundException();
 
-            MessageService.Send(Request, MessageAction.OpportunityDeleted, deal.Title);
+            MessageService.Send(Request, MessageAction.OpportunityDeleted, MessageTarget.Create(deal.ID), deal.Title);
 
             return ToOpportunityWrapper(deal);
         }
@@ -528,7 +519,7 @@ namespace ASC.Api.CRM
 
             CRMSecurity.DemandCreateOrUpdate(deal);
 
-            deal.ID = DaoFactory.GetDealDao().CreateNewDeal(deal);
+            deal.ID = DaoFactory.DealDao.CreateNewDeal(deal);
 
             deal.CreateBy = SecurityContext.CurrentAccount.ID;
             deal.CreateOn = DateTime.UtcNow;
@@ -542,18 +533,18 @@ namespace ASC.Api.CRM
 
             if (membersList.Any())
             {
-                var contacts = DaoFactory.GetContactDao().GetContacts(membersList.ToArray()).Where(CRMSecurity.CanAccessTo).ToList();
+                var contacts = DaoFactory.ContactDao.GetContacts(membersList.ToArray()).Where(CRMSecurity.CanAccessTo).ToList();
                 membersList = contacts.Select(m => m.ID).ToList();
-                DaoFactory.GetDealDao().SetMembers(deal.ID, membersList.ToArray());
+                DaoFactory.DealDao.SetMembers(deal.ID, membersList.ToArray());
             }
 
             if (customFieldList != null)
             {
-                var existingCustomFieldList = DaoFactory.GetCustomFieldDao().GetFieldsDescription(EntityType.Opportunity).Select(fd => fd.ID).ToList();
+                var existingCustomFieldList = DaoFactory.CustomFieldDao.GetFieldsDescription(EntityType.Opportunity).Select(fd => fd.ID).ToList();
                 foreach (var field in customFieldList)
                 {
                     if (string.IsNullOrEmpty(field.Value) || !existingCustomFieldList.Contains(field.Key)) continue;
-                    DaoFactory.GetCustomFieldDao().SetFieldValue(EntityType.Opportunity, deal.ID, field.Key, field.Value);
+                    DaoFactory.CustomFieldDao.SetFieldValue(EntityType.Opportunity, deal.ID, field.Key, field.Value);
                 }
             }
 
@@ -608,7 +599,7 @@ namespace ASC.Api.CRM
             IEnumerable<Guid> accessList,
             bool isNotify)
         {
-            var deal = DaoFactory.GetDealDao().GetByID(opportunityid);
+            var deal = DaoFactory.DealDao.GetByID(opportunityid);
             if (deal == null) throw new ItemNotFoundException();
 
             deal.Title = title;
@@ -626,17 +617,17 @@ namespace ASC.Api.CRM
 
             CRMSecurity.DemandCreateOrUpdate(deal);
 
-            DaoFactory.GetDealDao().EditDeal(deal);
+            DaoFactory.DealDao.EditDeal(deal);
 
-            deal = DaoFactory.GetDealDao().GetByID(opportunityid);
+            deal = DaoFactory.DealDao.GetByID(opportunityid);
 
             var membersList = members != null ? members.ToList() : new List<int>();
             if (membersList.Any())
             {
-                var contacts = DaoFactory.GetContactDao().GetContacts(membersList.ToArray()).Where(CRMSecurity.CanAccessTo).ToList();
+                var contacts = DaoFactory.ContactDao.GetContacts(membersList.ToArray()).Where(CRMSecurity.CanAccessTo).ToList();
                 membersList = contacts.Select(m => m.ID).ToList();
 
-                DaoFactory.GetDealDao().SetMembers(deal.ID, membersList.ToArray());
+                DaoFactory.DealDao.SetMembers(deal.ID, membersList.ToArray());
             }
 
 
@@ -647,11 +638,11 @@ namespace ASC.Api.CRM
 
             if (customFieldList != null)
             {
-                var existingCustomFieldList = DaoFactory.GetCustomFieldDao().GetFieldsDescription(EntityType.Opportunity).Select(fd => fd.ID).ToList();
+                var existingCustomFieldList = DaoFactory.CustomFieldDao.GetFieldsDescription(EntityType.Opportunity).Select(fd => fd.ID).ToList();
                 foreach (var field in customFieldList)
                 {
                     if (string.IsNullOrEmpty(field.Value) || !existingCustomFieldList.Contains(field.Key)) continue;
-                    DaoFactory.GetCustomFieldDao().SetFieldValue(EntityType.Opportunity, deal.ID, field.Key, field.Value);
+                    DaoFactory.CustomFieldDao.SetFieldValue(EntityType.Opportunity, deal.ID, field.Key, field.Value);
                 }
             }
 
@@ -670,14 +661,14 @@ namespace ASC.Api.CRM
         [Read(@"opportunity/{opportunityid:[0-9]+}/contact")]
         public IEnumerable<ContactWrapper> GetDealMembers(int opportunityid)
         {
-            var opportunity = DaoFactory.GetDealDao().GetByID(opportunityid);
+            var opportunity = DaoFactory.DealDao.GetByID(opportunityid);
 
             if (opportunity == null || !CRMSecurity.CanAccessTo(opportunity)) throw new ItemNotFoundException();
 
-            var contactIDs = DaoFactory.GetDealDao().GetMembers(opportunityid);
+            var contactIDs = DaoFactory.DealDao.GetMembers(opportunityid);
             if (contactIDs == null) return new ItemList<ContactWrapper>();
 
-            var result = ToListContactWrapper(DaoFactory.GetContactDao().GetContacts(contactIDs)).ToList();
+            var result = ToListContactWrapper(DaoFactory.ContactDao.GetContacts(contactIDs)).ToList();
 
             result.ForEach(item => { if (item.ID == opportunity.ContactID) item.CanEdit = false; });
 
@@ -700,18 +691,18 @@ namespace ASC.Api.CRM
         {
             if (opportunityid <= 0 || contactid <= 0) throw new ArgumentException();
 
-            var opportunity = DaoFactory.GetDealDao().GetByID(opportunityid);
+            var opportunity = DaoFactory.DealDao.GetByID(opportunityid);
             if (opportunity == null || !CRMSecurity.CanAccessTo(opportunity)) throw new ItemNotFoundException();
 
-            var contact = DaoFactory.GetContactDao().GetByID(contactid);
+            var contact = DaoFactory.ContactDao.GetByID(contactid);
             if (contact == null || !CRMSecurity.CanAccessTo(contact)) throw new ItemNotFoundException();
 
             var result = ToContactWrapper(contact);
 
-            DaoFactory.GetDealDao().AddMember(opportunityid, contactid);
+            DaoFactory.DealDao.AddMember(opportunityid, contactid);
 
             var messageAction = contact is Company ? MessageAction.OpportunityLinkedCompany : MessageAction.OpportunityLinkedPerson;
-            MessageService.Send(Request, messageAction, opportunity.Title, contact.GetTitle());
+            MessageService.Send(Request, messageAction, MessageTarget.Create(opportunity.ID), opportunity.Title, contact.GetTitle());
 
             return result;
         }
@@ -733,18 +724,18 @@ namespace ASC.Api.CRM
         {
             if ((opportunityid <= 0) || (contactid <= 0)) throw new ArgumentException();
 
-            var opportunity = DaoFactory.GetDealDao().GetByID(opportunityid);
+            var opportunity = DaoFactory.DealDao.GetByID(opportunityid);
             if (opportunity == null || !CRMSecurity.CanAccessTo(opportunity)) throw new ItemNotFoundException();
 
-            var contact = DaoFactory.GetContactDao().GetByID(contactid);
+            var contact = DaoFactory.ContactDao.GetByID(contactid);
             if (contact == null || !CRMSecurity.CanAccessTo(contact)) throw new ItemNotFoundException();
 
             var result = ToContactWrapper(contact);
 
-            DaoFactory.GetDealDao().RemoveMember(opportunityid, contactid);
+            DaoFactory.DealDao.RemoveMember(opportunityid, contactid);
 
             var messageAction = contact is Company ? MessageAction.OpportunityUnlinkedCompany : MessageAction.OpportunityUnlinkedPerson;
-            MessageService.Send(Request, messageAction, opportunity.Title, contact.GetTitle());
+            MessageService.Send(Request, messageAction, MessageTarget.Create(opportunity.ID), opportunity.Title, contact.GetTitle());
 
             return result;
         }
@@ -754,19 +745,20 @@ namespace ASC.Api.CRM
         /// </summary>
         /// <param optional="true" name="prefix"></param>
         /// <param optional="true" name="contactID"></param>
+        /// <param optional="true" name="internalSearch"></param>
         /// <category>Opportunities</category>
         /// <returns>
         ///    Opportunities list
         /// </returns>
         /// <visible>false</visible>
         [Read(@"opportunity/byprefix")]
-        public IEnumerable<OpportunityWrapper> GetDealsByPrefix(string prefix, int contactID)
+        public IEnumerable<OpportunityWrapper> GetDealsByPrefix(string prefix, int contactID, bool internalSearch = true)
         {
             var result = new List<OpportunityWrapper>();
 
-            if (contactID > 0)
+            if (contactID > 0 && internalSearch)
             {
-                var findedDeals = DaoFactory.GetDealDao().GetDealsByContactID(contactID);
+                var findedDeals = DaoFactory.DealDao.GetDealsByContactID(contactID);
                 foreach (var item in findedDeals)
                 {
                     if (item.Title.IndexOf(prefix, StringComparison.Ordinal) != -1)
@@ -775,12 +767,12 @@ namespace ASC.Api.CRM
                     }
                 }
 
-                _context.SetTotalCount(findedDeals.Count);
+                _context.SetTotalCount(result.Count);
             }
             else
             {
                 const int maxItemCount = 30;
-                var findedDeals = DaoFactory.GetDealDao().GetDealsByPrefix(prefix, 0, maxItemCount);
+                var findedDeals = DaoFactory.DealDao.GetDealsByPrefix(prefix, 0, maxItemCount, contactID, internalSearch);
                 foreach (var item in findedDeals)
                 {
                     result.Add(ToOpportunityWrapper(item));
@@ -802,9 +794,36 @@ namespace ASC.Api.CRM
         [Read(@"opportunity/bycontact/{contactid:[0-9]+}")]
         public IEnumerable<OpportunityWrapper> GetDeals(int contactid)
         {
-            var deals = DaoFactory.GetDealDao().GetDealsByContactID(contactid);
+            var deals = DaoFactory.DealDao.GetDealsByContactID(contactid);
             return ToListOpportunityWrapper(deals);
         }
+
+        /// <visible>false</visible>
+        [Update(@"opportunity/{opportunityid:[0-9]+}/creationdate")]
+        public void SetDealCreationDate(int opportunityid, ApiDateTime creationDate)
+        {
+            var dao = DaoFactory.DealDao;
+            var opportunity = dao.GetByID(opportunityid);
+
+            if (opportunity == null || !CRMSecurity.CanAccessTo(opportunity))
+                throw new ItemNotFoundException();
+
+            dao.SetDealCreationDate(opportunityid, creationDate);
+        }
+
+        /// <visible>false</visible>
+        [Update(@"opportunity/{opportunityid:[0-9]+}/lastmodifeddate")]
+        public void SetDealLastModifedDate(int opportunityid, ApiDateTime lastModifedDate)
+        {
+            var dao = DaoFactory.DealDao;
+            var opportunity = dao.GetByID(opportunityid);
+
+            if (opportunity == null || !CRMSecurity.CanAccessTo(opportunity))
+                throw new ItemNotFoundException();
+
+            dao.SetDealLastModifedDate(opportunityid, lastModifedDate);
+        }
+
 
         private IEnumerable<OpportunityWrapper> ToListOpportunityWrapper(ICollection<Deal> deals)
         {
@@ -827,15 +846,15 @@ namespace ASC.Api.CRM
 
             var contacts = new Dictionary<int, ContactBaseWrapper>();
 
-            var customFields = DaoFactory.GetCustomFieldDao().GetEnityFields(EntityType.Opportunity, dealIDs.ToArray())
+            var customFields = DaoFactory.CustomFieldDao.GetEnityFields(EntityType.Opportunity, dealIDs.ToArray())
                                          .GroupBy(item => item.EntityID)
                                          .ToDictionary(item => item.Key, item => item.Select(ToCustomFieldBaseWrapper));
 
-            var dealMilestones = DaoFactory.GetDealMilestoneDao().GetAll(dealMilestoneIDs.ToArray())
+            var dealMilestones = DaoFactory.DealMilestoneDao.GetAll(dealMilestoneIDs.ToArray())
                                            .ToDictionary(item => item.ID, item => new DealMilestoneBaseWrapper(item));
 
 
-            var dealMembers = DaoFactory.GetDealDao().GetMembers(dealIDs.ToArray());
+            var dealMembers = DaoFactory.DealDao.GetMembers(dealIDs.ToArray());
 
             foreach (var value in dealMembers.Values)
             {
@@ -846,7 +865,7 @@ namespace ASC.Api.CRM
 
             if (contactIDs.Count > 0)
             {
-                DaoFactory.GetContactDao().GetContacts(contactIDs.ToArray()).ForEach(item =>
+                DaoFactory.ContactDao.GetContacts(contactIDs.ToArray()).ForEach(item =>
                     {
                         if (item == null) return;
                         contacts.Add(item.ID, ToContactBaseWrapper(item));
@@ -898,11 +917,11 @@ namespace ASC.Api.CRM
             var dealWrapper = new OpportunityWrapper(deal);
 
             if (deal.ContactID > 0)
-                dealWrapper.Contact = ToContactBaseWrapper(DaoFactory.GetContactDao().GetByID(deal.ContactID));
+                dealWrapper.Contact = ToContactBaseWrapper(DaoFactory.ContactDao.GetByID(deal.ContactID));
 
             if (deal.DealMilestoneID > 0)
             {
-                var dealMilestone = DaoFactory.GetDealMilestoneDao().GetByID(deal.DealMilestoneID);
+                var dealMilestone = DaoFactory.DealMilestoneDao.GetByID(deal.DealMilestoneID);
 
                 if (dealMilestone == null)
                     throw new ItemNotFoundException();
@@ -918,12 +937,12 @@ namespace ASC.Api.CRM
             if (!string.IsNullOrEmpty(deal.BidCurrency))
                 dealWrapper.BidCurrency = ToCurrencyInfoWrapper(CurrencyProvider.Get(deal.BidCurrency));
 
-            dealWrapper.CustomFields = DaoFactory.GetCustomFieldDao().GetEnityFields(EntityType.Opportunity, deal.ID, false).ConvertAll(item => new CustomFieldBaseWrapper(item)).ToSmartList();
+            dealWrapper.CustomFields = DaoFactory.CustomFieldDao.GetEnityFields(EntityType.Opportunity, deal.ID, false).ConvertAll(item => new CustomFieldBaseWrapper(item)).ToSmartList();
 
             dealWrapper.Members = new List<ContactBaseWrapper>();
 
-            var memberIDs = DaoFactory.GetDealDao().GetMembers(deal.ID);
-            var membersList = DaoFactory.GetContactDao().GetContacts(memberIDs);
+            var memberIDs = DaoFactory.DealDao.GetMembers(deal.ID);
+            var membersList = DaoFactory.ContactDao.GetContacts(memberIDs);
             var membersWrapperList = new List<ContactBaseWrapper>();
 
             foreach (var member in membersList)

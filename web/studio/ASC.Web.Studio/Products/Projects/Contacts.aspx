@@ -2,7 +2,7 @@
 <%@ Assembly Name="ASC.Data.Storage" %>
 <%@ Assembly Name="ASC.Web.Core" %>
 
-<%@ Page Title="" Language="C#" MasterPageFile="Masters/BasicTemplate.Master"
+<%@ Page Language="C#" MasterPageFile="Masters/BasicTemplate.Master"
     AutoEventWireup="true" CodeBehind="Contacts.aspx.cs" Inherits="ASC.Web.Projects.Contacts" %>
 <%@ Import Namespace="ASC.Web.Projects.Resources" %>
 <%@ MasterType TypeName="ASC.Web.Projects.Masters.BasicTemplate" %>
@@ -19,13 +19,10 @@
     <% } %>
 
     <div id="contactListBox">
-        <table id="contactTable" class="table-list" cellpadding="4" cellspacing="0">
+        <table id="contactTable" class="table-list padding4">
             <tbody>
             </tbody>
         </table>
     </div>
     <asp:PlaceHolder ID="emptyScreen" runat="server"></asp:PlaceHolder>
-</asp:Content>
-
-<asp:Content ID="projectsClientTemplatesResourcesPlaceHolder" ContentPlaceHolderID="projectsClientTemplatesResourcesPlaceHolder" runat="server">
 </asp:Content>

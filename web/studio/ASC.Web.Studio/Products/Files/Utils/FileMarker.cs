@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -31,6 +22,7 @@ using ASC.Core.Users;
 using ASC.Files.Core;
 using ASC.Web.Files.Classes;
 using ASC.Web.Files.Resources;
+using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Utility;
 using System;
 using System.Collections.Generic;
@@ -58,7 +50,7 @@ namespace ASC.Web.Files.Utils
             {
                 object parentFolderId;
 
-                if (obj.FileEntry is File)
+                if (obj.FileEntry.FileEntryType == FileEntryType.File)
                     parentFolderId = ((File)obj.FileEntry).FolderID;
                 else
                     parentFolderId = obj.FileEntry.ID;
@@ -123,7 +115,8 @@ namespace ASC.Web.Files.Utils
 
                         foreach (var userID in userIDs)
                         {
-                            var userFolderId = folderDao.GetFolderID(FileConstant.ModuleId, "my", userID.ToString(), false);
+                            var userFolderId = folderDao.GetFolderIDUser(false, userID);
+                            if (Equals(userFolderId, 0)) continue;
 
                             Folder rootFolder = null;
                             if (obj.FileEntry.ProviderEntry)
@@ -151,8 +144,7 @@ namespace ASC.Web.Files.Utils
                             RemoveFromCahce(rootFolder.ID, userID);
                         }
                     }
-
-                    if (obj.FileEntry.RootFolderType == FolderType.COMMON)
+                    else if (obj.FileEntry.RootFolderType == FolderType.COMMON)
                     {
                         userIDs.ForEach(userID => RemoveFromCahce(Global.FolderCommon, userID));
 
@@ -168,6 +160,24 @@ namespace ASC.Web.Files.Utils
 
                                                     RemoveFromCahce(Global.FolderCommon, userID);
                                                 });
+                        }
+                    }
+                    else if (obj.FileEntry.RootFolderType == FolderType.Privacy)
+                    {
+                        foreach (var userID in userIDs)
+                        {
+                            var privacyFolderId = folderDao.GetFolderIDPrivacy(false, userID);
+                            if (Equals(privacyFolderId, 0)) continue;
+
+                            var rootFolder = folderDao.GetFolder(privacyFolderId);
+                            if (rootFolder == null) continue;
+
+                            if (userEntriesData.ContainsKey(userID))
+                                userEntriesData[userID].Add(rootFolder);
+                            else
+                                userEntriesData.Add(userID, new List<FileEntry> { rootFolder });
+
+                            RemoveFromCahce(rootFolder.ID, userID);
                         }
                     }
 
@@ -192,7 +202,7 @@ namespace ASC.Web.Files.Utils
 
                         var entries = userEntriesData[userID].Distinct().ToList();
 
-                        var exist = tagDao.GetNewTags(userID, entries.ToArray()).ToList();
+                        var exist = tagDao.GetNewTags(userID, entries).ToList();
                         var update = exist.Where(t => t.EntryType == FileEntryType.Folder).ToList();
                         update.ForEach(t => t.Count++);
                         updateTags.AddRange(update);
@@ -207,9 +217,9 @@ namespace ASC.Web.Files.Utils
                     }
 
                     if (updateTags.Any())
-                        tagDao.UpdateNewTags(updateTags.ToArray());
+                        tagDao.UpdateNewTags(updateTags);
                     if (newTags.Any())
-                        tagDao.SaveTags(newTags.ToArray());
+                        tagDao.SaveTags(newTags);
                 }
             }
         }
@@ -269,11 +279,12 @@ namespace ASC.Web.Files.Utils
 
                 object folderID;
                 int valueNew;
-                var userFolderId = folderDao.GetFolderID(FileConstant.ModuleId, "my", userID.ToString(), false);
+                var userFolderId = folderDao.GetFolderIDUser(false, userID);
+                var privacyFolderId = folderDao.GetFolderIDPrivacy(false, userID);
 
                 var removeTags = new List<Tag>();
 
-                if (fileEntry is File)
+                if (fileEntry.FileEntryType == FileEntryType.File)
                 {
                     folderID = ((File)fileEntry).FolderID;
 
@@ -292,7 +303,7 @@ namespace ASC.Web.Files.Utils
                         var folderTags = listTags.Where(tag => tag.EntryType == FileEntryType.Folder);
 
                         var providerFolderTags = folderTags.Select(tag => new KeyValuePair<Tag, Folder>(tag, folderDao.GetFolder(tag.EntryId)))
-                                                           .Where(pair => pair.Value.ProviderEntry).ToList();
+                                                           .Where(pair => pair.Value != null && pair.Value.ProviderEntry).ToList();
 
                         foreach (var providerFolderTag in providerFolderTags)
                         {
@@ -307,11 +318,16 @@ namespace ASC.Web.Files.Utils
                 var parentFolders = folderDao.GetParentFolders(folderID);
                 parentFolders.Reverse();
 
-                var rootFolder = parentFolders.Last();
+                var rootFolder = parentFolders.LastOrDefault();
                 object rootFolderId = null;
                 object cacheFolderId = null;
-                if (rootFolder.RootFolderType == FolderType.BUNCH)
+                if (rootFolder == null)
+                {
+                }
+                else if (rootFolder.RootFolderType == FolderType.BUNCH)
+                {
                     cacheFolderId = rootFolderId = Global.FolderProjects;
+                }
                 else if (rootFolder.RootFolderType == FolderType.COMMON)
                 {
                     if (rootFolder.ProviderEntry)
@@ -329,10 +345,18 @@ namespace ASC.Web.Files.Utils
                     else
                         cacheFolderId = userFolderId;
                 }
+                else if (rootFolder.RootFolderType == FolderType.Privacy)
+                {
+                    if (!Equals(privacyFolderId, 0))
+                    {
+                        cacheFolderId = rootFolderId = privacyFolderId;
+                    }
+                }
                 else if (rootFolder.RootFolderType == FolderType.SHARE)
                 {
                     cacheFolderId = Global.FolderShare;
                 }
+
                 if (rootFolderId != null)
                 {
                     parentFolders.Add(folderDao.GetFolder(rootFolderId));
@@ -363,9 +387,9 @@ namespace ASC.Web.Files.Utils
                 }
 
                 if (updateTags.Any())
-                    tagDao.UpdateNewTags(updateTags.ToArray());
+                    tagDao.UpdateNewTags(updateTags);
                 if (removeTags.Any())
-                    tagDao.RemoveTags(removeTags.ToArray());
+                    tagDao.RemoveTags(removeTags);
             }
         }
 
@@ -375,7 +399,7 @@ namespace ASC.Web.Files.Utils
 
             using (var tagDao = Global.DaoFactory.GetTagDao())
             {
-                var tags = tagDao.GetTags(fileEntry.ID, fileEntry is File ? FileEntryType.File : FileEntryType.Folder, TagType.New);
+                var tags = tagDao.GetTags(fileEntry.ID, fileEntry.FileEntryType == FileEntryType.File ? FileEntryType.File : FileEntryType.Folder, TagType.New);
                 userIDs = tags.Select(tag => tag.Owner).Distinct().ToList();
             }
 
@@ -394,6 +418,11 @@ namespace ASC.Web.Files.Utils
                     Global.FolderShare,
                     Global.FolderProjects
                 };
+
+            if (PrivacyRoomSettings.Enabled)
+            {
+                rootIds.Add(Global.FolderPrivacy);
+            }
 
             var requestIds = new List<object>();
             var news = new Dictionary<object, int>();
@@ -418,7 +447,7 @@ namespace ASC.Web.Files.Utils
                 using (var folderDao = Global.DaoFactory.GetFolderDao())
                 {
 
-                    requestTags = tagDao.GetNewTags(SecurityContext.CurrentAccount.ID, folderDao.GetFolders(requestIds.ToArray()).ToArray());
+                    requestTags = tagDao.GetNewTags(SecurityContext.CurrentAccount.ID, folderDao.GetFolders(requestIds.ToArray()));
                 }
 
                 requestIds.ForEach(requestId =>
@@ -439,7 +468,7 @@ namespace ASC.Web.Files.Utils
             if (!Global.GetFilesSecurity().CanRead(folder)) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_ViewFolder);
             if (folder.RootFolderType == FolderType.TRASH && !Equals(folder.ID, Global.FolderTrash)) throw new SecurityException(FilesCommonResource.ErrorMassage_ViewTrashItem);
 
-            Dictionary<FileEntry, Tag> entryTags;
+            var entryTags = new Dictionary<FileEntry, Tag>();
 
             using (var tagDao = Global.DaoFactory.GetTagDao())
             using (var fileDao = Global.DaoFactory.GetFileDao())
@@ -454,7 +483,7 @@ namespace ASC.Web.Files.Utils
                     var folderTags = tags.Where(tag => tag.EntryType == FileEntryType.Folder);
 
                     var providerFolderTags = folderTags.Select(tag => new KeyValuePair<Tag, Folder>(tag, folderDao.GetFolder(tag.EntryId)))
-                                                       .Where(pair => pair.Value.ProviderEntry).ToList();
+                                                       .Where(pair => pair.Value != null && pair.Value.ProviderEntry).ToList();
                     providerFolderTags.Reverse();
 
                     foreach (var providerFolderTag in providerFolderTags)
@@ -468,18 +497,28 @@ namespace ASC.Web.Files.Utils
                 tags = tags.Where(t => t.EntryType == FileEntryType.Folder)
                            .Concat(tags.Where(t => t.EntryType == FileEntryType.File)).ToList();
 
-                entryTags = tags.ToDictionary(
-                    tag =>
-                    tag.EntryType == FileEntryType.File
-                        ? (FileEntry)fileDao.GetFile(tag.EntryId)
-                        : (FileEntry)folderDao.GetFolder(tag.EntryId));
+                foreach (var tag in tags)
+                {
+                    var entry = tag.EntryType == FileEntryType.File
+                                    ? (FileEntry)fileDao.GetFile(tag.EntryId)
+                                    : (FileEntry)folderDao.GetFolder(tag.EntryId);
+                    if (entry != null
+                        && (!entry.ProviderEntry || FilesSettings.EnableThirdParty))
+                    {
+                        entryTags.Add(entry, tag);
+                    }
+                    else
+                    {
+                        //todo: RemoveMarkAsNew(tag);
+                    }
+                }
             }
 
             foreach (var entryTag in entryTags)
             {
                 var entry = entryTag.Key;
                 var parentId =
-                    entryTag.Key is File
+                    entry.FileEntryType == FileEntryType.File
                         ? ((File)entry).FolderID
                         : ((Folder)entry).ParentFolderID;
 
@@ -544,7 +583,7 @@ namespace ASC.Web.Files.Utils
                                 tagDao.UpdateNewTags(parentFolderTag);
                             }
 
-                            object cacheFolderId = parent.ID;
+                            var cacheFolderId = parent.ID;
                             var parentsList = folderDao.GetParentFolders(parent.ID);
                             parentsList.Reverse();
                             parentsList.Remove(parent);
@@ -568,7 +607,7 @@ namespace ASC.Web.Files.Utils
 
                                 foreach (var folderFromList in parentsList)
                                 {
-                                    var parentTreeTag = tagDao.GetNewTags(SecurityContext.CurrentAccount.ID, new FileEntry[] { folderFromList }).FirstOrDefault();
+                                    var parentTreeTag = tagDao.GetNewTags(SecurityContext.CurrentAccount.ID, folderFromList).FirstOrDefault();
 
                                     if (parentTreeTag == null)
                                     {
@@ -599,12 +638,15 @@ namespace ASC.Web.Files.Utils
                     entries.ToList().ForEach(
                         entry =>
                         {
-                            var folder = entry as Folder;
-                            if (folder != null)
-                            {
-                                var curTag = totalTags.FirstOrDefault(tag => tag.EntryType == FileEntryType.Folder && tag.EntryId.Equals(folder.ID));
+                            var curTag = totalTags.FirstOrDefault(tag => tag.EntryType == entry.FileEntryType && tag.EntryId.Equals(entry.ID));
 
-                                folder.NewForMe = curTag != null ? curTag.Count : 0;
+                            if (entry.FileEntryType == FileEntryType.Folder)
+                            {
+                                ((Folder)entry).NewForMe = curTag != null ? curTag.Count : 0;
+                            }
+                            else if (curTag != null)
+                            {
+                                entry.IsNew = true;
                             }
                         });
                 }

@@ -1,25 +1,16 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -48,16 +39,34 @@ window.mailCache = (function($) {
             console.log("%s is loading to cache", id);
             async.parallel([
                 function (cb) {
-                    Teamlab.getMailConversation(null, id, data,
-                    {
-                        success: function (params, messages) {
-                            cb(null, messages);
-                        },
-                        error: function (err) {
-                            cb(err);
-                        },
-                        async: true
-                    });
+
+                    if (commonSettingsPage.isConversationsEnabled()) {
+                        Teamlab.getMailConversation({ skipIO: true },
+                            id,
+                            data,
+                            {
+                                success: function(params, messages) {
+                                    cb(null, messages);
+                                },
+                                error: function(err) {
+                                    cb(err);
+                                },
+                                async: true
+                            });
+                    } else {
+                        Teamlab.getMailMessage({ skipIO: true },
+                            id,
+                            data,
+                            {
+                                success: function (params, messages) {
+                                    cb(null, messages);
+                                },
+                                error: function (err) {
+                                    cb(err);
+                                },
+                                async: true
+                            });
+                    }
                 },
                 function (cb) {
                     if (ASC.Mail.Constants.CRM_AVAILABLE) {
@@ -80,7 +89,7 @@ window.mailCache = (function($) {
                 if (err) {
                     callback(err);
                 } else {
-                    var content = $.extend(true, {}, { messages: data[0], hasLinked: data[1].isLinked });
+                    var content = $.extend(true, {}, { messages: commonSettingsPage.isConversationsEnabled() ? data[0] : [data[0]], hasLinked: data[1].isLinked });
                     set(id, content);
                     callback();
                 }
@@ -305,19 +314,35 @@ window.mailCache = (function($) {
         }
     }
 
-    function setImportant(id, important) {
-        var content = get(id);
-        if (content) {
-            for (var i = 0, n = content.messages.length; i < n; i++) {
-                var m = content.messages[i];
-                if (m.important !== important) {
-                    m.important = important;
+    function setImportant(ids, important) {
+        if (!ids) return;
+
+        if (!(ids instanceof Array)) {
+            ids = [ids];
+        }
+
+        for (var i = 0, n = ids.length; i < n; i++) {
+            var id = ids[i];
+
+            var content = get(id);
+            if (content) {
+                for (var j = 0, m = content.messages.length; j < m; j++) {
+                    var msg = content.messages[j];
+                    if (msg.important !== important) {
+                        msg.important = important;
+                    }
                 }
             }
         }
     }
 
     function setRead(ids, isRead) {
+        if (!ids) return;
+
+        if (!(ids instanceof Array)) {
+            ids = [ids];
+        }
+
         for (var i = 0, n = ids.length; i < n; i++) {
             var id = ids[i];
             var item = getCacheItem(id);
@@ -370,7 +395,7 @@ window.mailCache = (function($) {
         }
     }
 
-    function setFolder(ids, folder) {
+    function setFolder(ids, folder, userFolderId) {
         for (var i = 0, n = ids.length; i < n; i++) {
             var id = ids[i];
             var content = get(id);
@@ -380,6 +405,11 @@ window.mailCache = (function($) {
                     var msg = content.messages[j];
                     if (msg.folder != folder) {
                         msg.folder = folder;
+                        needUpdate = true;
+                    }
+
+                    if (msg.userFolderId != userFolderId) {
+                        msg.userFolderId = userFolderId;
                         needUpdate = true;
                     }
                 }

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,17 +18,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Web;
 using ASC.Api.Attributes;
+using ASC.Api.Collections;
 using ASC.Api.CRM.Wrappers;
+using ASC.Api.Documents;
 using ASC.Api.Exceptions;
 using ASC.CRM.Core;
 using ASC.CRM.Core.Entities;
-using ASC.Api.Collections;
+using ASC.Core;
 using ASC.MessagingSystem;
 using ASC.Specific;
 using ASC.Web.CRM.Classes;
-using ASC.Api.Documents;
-using System.Security;
+using ASC.Web.Studio.Utility;
 
 namespace ASC.Api.CRM
 {
@@ -55,7 +48,7 @@ namespace ASC.Api.CRM
         {
             if (invoiceid <= 0) throw new ArgumentException();
 
-            var invoice = DaoFactory.GetInvoiceDao().GetByID(invoiceid);
+            var invoice = DaoFactory.InvoiceDao.GetByID(invoiceid);
             if (invoice == null) throw new ItemNotFoundException();
 
             if (!CRMSecurity.CanAccessTo(invoice)) {
@@ -75,8 +68,8 @@ namespace ASC.Api.CRM
         public InvoiceWrapper GetInvoiceSample()
         {
             var sample = InvoiceWrapper.GetSample();
-            sample.Number = DaoFactory.GetInvoiceDao().GetNewInvoicesNumber();
-            sample.Terms = DaoFactory.GetInvoiceDao().GetSettings().Terms ?? string.Empty;
+            sample.Number = DaoFactory.InvoiceDao.GetNewInvoicesNumber();
+            sample.Terms = DaoFactory.InvoiceDao.GetSettings().Terms ?? string.Empty;
 
             sample.IssueDate = (ApiDateTime)DateTime.UtcNow;
             sample.DueDate = (ApiDateTime)DateTime.UtcNow.AddDays(30);
@@ -99,7 +92,7 @@ namespace ASC.Api.CRM
         [Read(@"invoice/jsondata/{invoiceid:[0-9]+}")]
         public string GetInvoiceJsonData(int invoiceid)
         {
-            var invoice = DaoFactory.GetInvoiceDao().GetByID(invoiceid);
+            var invoice = DaoFactory.InvoiceDao.GetByID(invoiceid);
             if (invoice == null) throw new ItemNotFoundException();
 
             if (!CRMSecurity.CanAccessTo(invoice)) {
@@ -168,7 +161,7 @@ namespace ASC.Api.CRM
             if (invoiceOrderBy != null)
             {
                 result = ToListInvoiceBaseWrappers(
-                    DaoFactory.GetInvoiceDao().GetInvoices(
+                    DaoFactory.InvoiceDao.GetInvoices(
                         searchString,
                         status,
                         issueDateFrom, issueDateTo,
@@ -185,7 +178,7 @@ namespace ASC.Api.CRM
             else
             {
                 result = ToListInvoiceBaseWrappers(
-                    DaoFactory.GetInvoiceDao().GetInvoices(
+                    DaoFactory.InvoiceDao.GetInvoices(
                         searchString,
                         status,
                         issueDateFrom, issueDateTo,
@@ -205,7 +198,7 @@ namespace ASC.Api.CRM
             }
             else
             {
-                totalCount = DaoFactory.GetInvoiceDao().GetInvoicesCount(
+                totalCount = DaoFactory.InvoiceDao.GetInvoicesCount(
                     searchString,
                     status,
                     issueDateFrom, issueDateTo,
@@ -232,7 +225,7 @@ namespace ASC.Api.CRM
         {
             if (String.IsNullOrEmpty(entityType) || entityid <= 0) throw new ArgumentException();
 
-            return ToListInvoiceBaseWrappers(DaoFactory.GetInvoiceDao().GetEntityInvoices(ToEntityType(entityType), entityid));
+            return ToListInvoiceBaseWrappers(DaoFactory.InvoiceDao.GetEntityInvoices(ToEntityType(entityType), entityid));
         }
 
         /// <summary>
@@ -251,9 +244,9 @@ namespace ASC.Api.CRM
         {
             if (invoiceids == null || !invoiceids.Any()) throw new ArgumentException();
 
-            var oldInvoices = DaoFactory.GetInvoiceDao().GetByID(invoiceids).Where(CRMSecurity.CanAccessTo).ToList();
+            var oldInvoices = DaoFactory.InvoiceDao.GetByID(invoiceids).Where(CRMSecurity.CanAccessTo).ToList();
 
-            var updatedInvoices = DaoFactory.GetInvoiceDao().UpdateInvoiceBatchStatus(oldInvoices.ToList().Select(i => i.ID).ToArray(), status);
+            var updatedInvoices = DaoFactory.InvoiceDao.UpdateInvoiceBatchStatus(oldInvoices.ToList().Select(i => i.ID).ToArray(), status);
 
             // detect what really changed
             var realUpdatedInvoices = updatedInvoices
@@ -263,14 +256,14 @@ namespace ASC.Api.CRM
 
             if (realUpdatedInvoices.Any())
             {
-                MessageService.Send(Request, MessageAction.InvoicesUpdatedStatus, realUpdatedInvoices.Select(x => x.Number), status.ToLocalizedString());
+                MessageService.Send(Request, MessageAction.InvoicesUpdatedStatus, MessageTarget.Create(realUpdatedInvoices.Select(x => x.ID)), realUpdatedInvoices.Select(x => x.Number), status.ToLocalizedString());
             }
 
             var invoiceItemsUpdated = new List<InvoiceItem>();
 
             if (status == InvoiceStatus.Sent || status == InvoiceStatus.Rejected)
             {
-                var invoiceItemsAll = DaoFactory.GetInvoiceItemDao().GetAll();
+                var invoiceItemsAll = DaoFactory.InvoiceItemDao.GetAll();
                 var invoiceItemsWithTrackInventory = invoiceItemsAll.Where(item => item.TrackInventory).ToList();
 
                 if (status == InvoiceStatus.Sent && invoiceItemsWithTrackInventory != null && invoiceItemsWithTrackInventory.Count != 0)
@@ -284,7 +277,7 @@ namespace ASC.Api.CRM
                             if (oldInv != null && oldInv.Status == InvoiceStatus.Draft)
                             {
                                 //was changed to Sent
-                                var invoiceLines = DaoFactory.GetInvoiceLineDao().GetInvoiceLines(inv.ID);
+                                var invoiceLines = DaoFactory.InvoiceLineDao.GetInvoiceLines(inv.ID);
 
                                 foreach (var line in invoiceLines)
                                 {
@@ -292,7 +285,7 @@ namespace ASC.Api.CRM
                                     if (item != null)
                                     {
                                         item.StockQuantity -= line.Quantity;
-                                        DaoFactory.GetInvoiceItemDao().SaveOrUpdateInvoiceItem(item);
+                                        DaoFactory.InvoiceItemDao.SaveOrUpdateInvoiceItem(item);
                                         var oldItem = invoiceItemsUpdated.Find(i => i.ID == item.ID);
                                         if (oldItem != null)
                                         {
@@ -317,7 +310,7 @@ namespace ASC.Api.CRM
                             if (oldInv != null && oldInv.Status == InvoiceStatus.Sent)
                             {
                                 //was changed from Sent to Rejectes
-                                var invoiceLines = DaoFactory.GetInvoiceLineDao().GetInvoiceLines(inv.ID);
+                                var invoiceLines = DaoFactory.InvoiceLineDao.GetInvoiceLines(inv.ID);
 
                                 foreach (var line in invoiceLines)
                                 {
@@ -325,7 +318,7 @@ namespace ASC.Api.CRM
                                     if (item != null)
                                     {
                                         item.StockQuantity += line.Quantity;
-                                        DaoFactory.GetInvoiceItemDao().SaveOrUpdateInvoiceItem(item);
+                                        DaoFactory.InvoiceItemDao.SaveOrUpdateInvoiceItem(item);
                                         var oldItem = invoiceItemsUpdated.Find(i => i.ID == item.ID);
                                         if (oldItem != null)
                                         {
@@ -357,10 +350,10 @@ namespace ASC.Api.CRM
         {
             if (invoiceid <= 0) throw new ArgumentException();
 
-            var invoice = DaoFactory.GetInvoiceDao().DeleteInvoice(invoiceid);
+            var invoice = DaoFactory.InvoiceDao.DeleteInvoice(invoiceid);
             if (invoice == null) throw new ItemNotFoundException();
 
-            MessageService.Send(Request, MessageAction.InvoiceDeleted, invoice.Number);
+            MessageService.Send(Request, MessageAction.InvoiceDeleted, MessageTarget.Create(invoice.ID), invoice.Number);
             return ToInvoiceBaseWrapper(invoice);
         }
 
@@ -376,8 +369,8 @@ namespace ASC.Api.CRM
         {
             if (invoiceids == null || !invoiceids.Any()) throw new ArgumentException();
 
-            var invoices = DaoFactory.GetInvoiceDao().DeleteBatchInvoices(invoiceids.ToArray());
-            MessageService.Send(Request, MessageAction.InvoicesDeleted, invoices.Select(x => x.Number));
+            var invoices = DaoFactory.InvoiceDao.DeleteBatchInvoices(invoiceids.ToArray());
+            MessageService.Send(Request, MessageAction.InvoicesDeleted, MessageTarget.Create(invoices.Select(x => x.ID)), invoices.Select(x => x.Number));
 
             return ToListInvoiceBaseWrappers(invoices);
         }
@@ -481,24 +474,24 @@ namespace ASC.Api.CRM
 
             if (billingAddressID > 0)
             {
-                var address = DaoFactory.GetContactInfoDao().GetByID(billingAddressID);
+                var address = DaoFactory.ContactInfoDao.GetByID(billingAddressID);
                 if (address == null || address.InfoType != ContactInfoType.Address || address.Category != (int)AddressCategory.Billing || address.ContactID != contactId)
                     throw new ArgumentException();
             }
 
             if (deliveryAddressID > 0)
             {
-                var address = DaoFactory.GetContactInfoDao().GetByID(deliveryAddressID);
+                var address = DaoFactory.ContactInfoDao.GetByID(deliveryAddressID);
                 if (address == null || address.InfoType != ContactInfoType.Address || address.Category != (int)AddressCategory.Postal || address.ContactID != consigneeId)
                     throw new ArgumentException();
             }
 
 
-            invoice.ID = DaoFactory.GetInvoiceDao().SaveOrUpdateInvoice(invoice);
+            invoice.ID = DaoFactory.InvoiceDao.SaveOrUpdateInvoice(invoice);
 
             CreateInvoiceLines(invoiceLinesList, invoice);
 
-            DaoFactory.GetInvoiceDao().UpdateInvoiceJsonData(invoice, billingAddressID, deliveryAddressID);
+            DaoFactory.InvoiceDao.UpdateInvoiceJsonData(invoice, billingAddressID, deliveryAddressID);
             return ToInvoiceWrapper(invoice);
         }
 
@@ -512,13 +505,13 @@ namespace ASC.Api.CRM
                     line.Discount < 0 || line.Discount > 100 ||
                     line.InvoiceTax1ID < 0 || line.InvoiceTax2ID < 0)
                     return false;
-                if (!DaoFactory.GetInvoiceItemDao().IsExist(line.InvoiceItemID))
+                if (!DaoFactory.InvoiceItemDao.IsExist(line.InvoiceItemID))
                     return false;
 
-                if (line.InvoiceTax1ID > 0 && !DaoFactory.GetInvoiceTaxDao().IsExist(line.InvoiceTax1ID))
+                if (line.InvoiceTax1ID > 0 && !DaoFactory.InvoiceTaxDao.IsExist(line.InvoiceTax1ID))
                     return false;
 
-                if (line.InvoiceTax2ID > 0 && !DaoFactory.GetInvoiceTaxDao().IsExist(line.InvoiceTax2ID))
+                if (line.InvoiceTax2ID > 0 && !DaoFactory.InvoiceTaxDao.IsExist(line.InvoiceTax2ID))
                     return false;
             }
             return true;
@@ -540,10 +533,10 @@ namespace ASC.Api.CRM
                     Description = invoiceLines[i].Description,
                     Quantity = invoiceLines[i].Quantity,
                     Price = invoiceLines[i].Price,
-                    Discount = Convert.ToInt32(invoiceLines[i].Discount)
+                    Discount = invoiceLines[i].Discount
                 };
 
-                line.ID = DaoFactory.GetInvoiceLineDao().SaveOrUpdateInvoiceLine(line);
+                line.ID = DaoFactory.InvoiceLineDao.SaveOrUpdateInvoiceLine(line);
                 result.Add(line);
             }
             return result;
@@ -560,7 +553,7 @@ namespace ASC.Api.CRM
         /// <param optional="true" name="entityId">Invoice entity ID</param>
         /// <param optional="true" name="billingAddressID">Invoice billing address ID</param>
         /// <param optional="true" name="deliveryAddressID">Invoice delivery address ID</param>
-        /// <param optional="true" name="dueDate">Invoice due date</param>
+        /// <param name="dueDate">Invoice due date</param>
         /// <param optional="false" name="language">Invoice language</param>
         /// <param optional="false" name="currency" remark="Allowed values: EUR, RUB etc. You can get the whole list of available currencies by api">Invoice currency</param>
         /// <param optional="false" name="exchangeRate">Invoice exchange rate</param>
@@ -602,7 +595,7 @@ namespace ASC.Api.CRM
         /// 
         /// ]]>
         /// </example>
-        [Update(@"invoice/{invoiceid:[0-9]+}")]
+        [Update(@"invoice/{id:[0-9]+}")]
         public InvoiceWrapper UpdateInvoice(
             int id,
             ApiDateTime issueDate,
@@ -625,7 +618,7 @@ namespace ASC.Api.CRM
             var invoiceLinesList = invoiceLines != null ? invoiceLines.ToList() : new List<InvoiceLine>();
             if (!invoiceLinesList.Any() || !IsLinesForInvoiceCorrect(invoiceLinesList)) throw new ArgumentException();
 
-            var invoice = DaoFactory.GetInvoiceDao().GetByID(id);
+            var invoice = DaoFactory.InvoiceDao.GetByID(id);
             if (invoice == null || !CRMSecurity.CanEdit(invoice)) throw new ItemNotFoundException();
 
             invoice.IssueDate = issueDate;
@@ -647,29 +640,29 @@ namespace ASC.Api.CRM
 
             if (billingAddressID > 0)
             {
-                var address = DaoFactory.GetContactInfoDao().GetByID(billingAddressID);
+                var address = DaoFactory.ContactInfoDao.GetByID(billingAddressID);
                 if (address == null || address.InfoType != ContactInfoType.Address || address.Category != (int)AddressCategory.Billing || address.ContactID != contactId)
                     throw new ArgumentException();
             }
 
             if (deliveryAddressID > 0)
             {
-                var address = DaoFactory.GetContactInfoDao().GetByID(deliveryAddressID);
+                var address = DaoFactory.ContactInfoDao.GetByID(deliveryAddressID);
                 if (address == null || address.InfoType != ContactInfoType.Address || address.Category != (int)AddressCategory.Postal || address.ContactID != consigneeId)
                     throw new ArgumentException();
             }
 
-            DaoFactory.GetInvoiceDao().SaveOrUpdateInvoice(invoice);
+            DaoFactory.InvoiceDao.SaveOrUpdateInvoice(invoice);
 
 
-            DaoFactory.GetInvoiceLineDao().DeleteInvoiceLines(invoice.ID);
+            DaoFactory.InvoiceLineDao.DeleteInvoiceLines(invoice.ID);
             CreateInvoiceLines(invoiceLinesList, invoice);
 
-            DaoFactory.GetInvoiceDao().UpdateInvoiceJsonData(invoice, billingAddressID, deliveryAddressID);
+            DaoFactory.InvoiceDao.UpdateInvoiceJsonData(invoice, billingAddressID, deliveryAddressID);
 
             if (Global.CanDownloadInvoices)
             {
-                new InvoiceFileUpdateHelper().UpdateInvoiceFileIDInThread(invoice.ID);
+                PdfQueueWorker.StartTask(HttpContext.Current, TenantProvider.CurrentTenantID, SecurityContext.CurrentAccount.ID, invoice.ID);
             }
 
             return ToInvoiceWrapper(invoice);
@@ -687,14 +680,14 @@ namespace ASC.Api.CRM
         {
             if (invoiceid <= 0) throw new ArgumentException();
 
-            var invoice = DaoFactory.GetInvoiceDao().GetByID(invoiceid);
+            var invoice = DaoFactory.InvoiceDao.GetByID(invoiceid);
             if (invoice == null) throw new ItemNotFoundException();
 
             if (!CRMSecurity.CanAccessTo(invoice)) {
                 throw CRMSecurity.CreateSecurityException();
             }
 
-            return new FileWrapper(Global.GetInvoicePdfExistingOrCreate(invoice));
+            return new FileWrapper(Global.GetInvoicePdfExistingOrCreate(invoice, DaoFactory));
         }
 
         /// <summary>
@@ -711,7 +704,7 @@ namespace ASC.Api.CRM
         {
             if (invoiceId <= 0) throw new ArgumentException();
 
-            var invoice = DaoFactory.GetInvoiceDao().GetByID(invoiceId);
+            var invoice = DaoFactory.InvoiceDao.GetByID(invoiceId);
             if (invoice == null) throw new ItemNotFoundException();
 
             if (!CRMSecurity.CanAccessTo(invoice)) {
@@ -725,7 +718,7 @@ namespace ASC.Api.CRM
                 InvoiceId = invoiceId
             };
 
-            var existingFile = invoice.GetInvoiceFile();
+            var existingFile = invoice.GetInvoiceFile(DaoFactory);
             if (existingFile != null)
             {
                 converterData.FileId = invoice.FileID;
@@ -738,12 +731,12 @@ namespace ASC.Api.CRM
             }
             else
             {
-                var convertedFile = PdfCreator.GetConvertedFile(converterData);
+                var convertedFile = PdfCreator.GetConvertedFile(converterData, DaoFactory);
                 if (convertedFile != null)
                 {
                     invoice.FileID = Int32.Parse(convertedFile.ID.ToString());
-                    DaoFactory.GetInvoiceDao().UpdateInvoiceFileID(invoice.ID, invoice.FileID);
-                    DaoFactory.GetRelationshipEventDao().AttachFiles(invoice.ContactID, invoice.EntityType, invoice.EntityID, new[] { invoice.FileID });
+                    DaoFactory.InvoiceDao.UpdateInvoiceFileID(invoice.ID, invoice.FileID);
+                    DaoFactory.RelationshipEventDao.AttachFiles(invoice.ContactID, invoice.EntityType, invoice.EntityID, new[] { invoice.FileID });
 
                     converterData.FileId = invoice.FileID;
                     return converterData;
@@ -766,7 +759,7 @@ namespace ASC.Api.CRM
         public Boolean GetInvoiceByNumberExistence(string number)
         {
             if (String.IsNullOrEmpty(number)) throw new ArgumentException();
-            return DaoFactory.GetInvoiceDao().IsExist(number);
+            return DaoFactory.InvoiceDao.IsExist(number);
         }
 
         /// <summary>
@@ -781,7 +774,7 @@ namespace ASC.Api.CRM
         {
             if (String.IsNullOrEmpty(number)) throw new ArgumentException();
 
-            var invoice = DaoFactory.GetInvoiceDao().GetByNumber(number);
+            var invoice = DaoFactory.InvoiceDao.GetByNumber(number);
             if (invoice == null) throw new ItemNotFoundException();
             if (!CRMSecurity.CanAccessTo(invoice)) {
                 throw CRMSecurity.CreateSecurityException();
@@ -827,7 +820,7 @@ namespace ASC.Api.CRM
 
             if (invoiceOrderBy != null)
             {
-                result = DaoFactory.GetInvoiceItemDao().GetInvoiceItems(
+                result = DaoFactory.InvoiceItemDao.GetInvoiceItems(
                     searchString,
                     status,
                     inventoryStock,
@@ -841,7 +834,7 @@ namespace ASC.Api.CRM
             }
             else
             {
-                result = DaoFactory.GetInvoiceItemDao().GetInvoiceItems(
+                result = DaoFactory.InvoiceItemDao.GetInvoiceItems(
                     searchString,
                     status,
                     inventoryStock,
@@ -858,7 +851,7 @@ namespace ASC.Api.CRM
             }
             else
             {
-                totalCount = DaoFactory.GetInvoiceItemDao().GetInvoiceItemsCount(
+                totalCount = DaoFactory.InvoiceItemDao.GetInvoiceItemsCount(
                     searchString,
                     status,
                     inventoryStock);
@@ -867,6 +860,24 @@ namespace ASC.Api.CRM
             _context.SetTotalCount(totalCount);
 
             return result.ToSmartList();
+        }
+
+        /// <summary>
+        ///  Returns the detailed information about the invoice item with the ID specified in the request
+        /// </summary>
+        /// <param name="invoiceitemid">Invoice Item ID</param>
+        /// <short>Get invoice item by ID</short> 
+        /// <category>Invoices</category>
+        /// <returns>Invoice Item</returns>
+        [Read(@"invoiceitem/{invoiceitemid:[0-9]+}")]
+        public InvoiceItemWrapper GetInvoiceItemByID(int invoiceitemid)
+        {
+            if (invoiceitemid <= 0) throw new ArgumentException();
+
+            var invoiceItem = DaoFactory.InvoiceItemDao.GetByID(invoiceitemid);
+            if (invoiceItem == null) throw new ItemNotFoundException();
+
+            return ToInvoiceItemWrapper(invoiceItem);
         }
 
         /// <summary>
@@ -892,9 +903,9 @@ namespace ASC.Api.CRM
             int invoiceTax2Id,
             int sortOrder,
             string description,
-            int quantity,
+            decimal quantity,
             decimal price,
-            int discount
+            decimal discount
             )
         {
             var invoiceLine = new InvoiceLine
@@ -912,15 +923,15 @@ namespace ASC.Api.CRM
 
             if (invoiceId <= 0)
                 throw new ArgumentException();
-            var invoice = Global.DaoFactory.GetInvoiceDao().GetByID(invoiceId);
+            var invoice = DaoFactory.InvoiceDao.GetByID(invoiceId);
             CRMSecurity.DemandCreateOrUpdate(invoiceLine, invoice);
 
-            invoiceLine.ID = DaoFactory.GetInvoiceLineDao().SaveOrUpdateInvoiceLine(invoiceLine);
+            invoiceLine.ID = DaoFactory.InvoiceLineDao.SaveOrUpdateInvoiceLine(invoiceLine);
 
-            DaoFactory.GetInvoiceDao().UpdateInvoiceJsonDataAfterLinesUpdated(invoice);
+            DaoFactory.InvoiceDao.UpdateInvoiceJsonDataAfterLinesUpdated(invoice);
             if (Global.CanDownloadInvoices)
             {
-                new InvoiceFileUpdateHelper().UpdateInvoiceFileIDInThread(invoice.ID);
+                PdfQueueWorker.StartTask(HttpContext.Current, TenantProvider.CurrentTenantID, SecurityContext.CurrentAccount.ID, invoice.ID);
             }
 
             return ToInvoiceLineWrapper(invoiceLine);
@@ -942,7 +953,7 @@ namespace ASC.Api.CRM
         /// <short>Update invoice line</short>
         /// <category>Invoices</category>
         /// <returns>InvoiceLine</returns>
-        [Update(@"invoiceline/{invoicelineid:[0-9]+}")]
+        [Update(@"invoiceline/{id:[0-9]+}")]
         public InvoiceLineWrapper UpdateInvoiceLine(
             int id,
             int invoiceId,
@@ -951,15 +962,15 @@ namespace ASC.Api.CRM
             int invoiceTax2Id,
             int sortOrder,
             string description,
-            int quantity,
+            decimal quantity,
             decimal price,
-            int discount
+            decimal discount
             )
         {
             if (invoiceId <= 0)
                 throw new ArgumentException();
 
-            var invoiceLine = DaoFactory.GetInvoiceLineDao().GetByID(id);
+            var invoiceLine = DaoFactory.InvoiceLineDao.GetByID(id);
             if (invoiceLine == null || invoiceLine.InvoiceID != invoiceId) throw new ItemNotFoundException();
 
 
@@ -973,15 +984,15 @@ namespace ASC.Api.CRM
             invoiceLine.Price = price;
             invoiceLine.Discount = discount;
 
-            var invoice = Global.DaoFactory.GetInvoiceDao().GetByID(invoiceId);
+            var invoice = DaoFactory.InvoiceDao.GetByID(invoiceId);
             CRMSecurity.DemandCreateOrUpdate(invoiceLine, invoice);
 
-            DaoFactory.GetInvoiceLineDao().SaveOrUpdateInvoiceLine(invoiceLine);
+            DaoFactory.InvoiceLineDao.SaveOrUpdateInvoiceLine(invoiceLine);
 
-            DaoFactory.GetInvoiceDao().UpdateInvoiceJsonDataAfterLinesUpdated(invoice);
+            DaoFactory.InvoiceDao.UpdateInvoiceJsonDataAfterLinesUpdated(invoice);
             if (Global.CanDownloadInvoices)
             {
-                new InvoiceFileUpdateHelper().UpdateInvoiceFileIDInThread(invoice.ID);
+                PdfQueueWorker.StartTask(HttpContext.Current, TenantProvider.CurrentTenantID, SecurityContext.CurrentAccount.ID, invoice.ID);
             }
 
             return ToInvoiceLineWrapper(invoiceLine);
@@ -994,23 +1005,23 @@ namespace ASC.Api.CRM
         /// <short>Delete invoice line</short> 
         /// <category>Invoices</category>
         /// <returns>Line ID</returns>
-        [Delete(@"invoiceline/{invoicelineid:[0-9]+}")]
+        [Delete(@"invoiceline/{id:[0-9]+}")]
         public int DeleteInvoiceLine(int id)
         {
-            var invoiceLine = DaoFactory.GetInvoiceLineDao().GetByID(id);
+            var invoiceLine = DaoFactory.InvoiceLineDao.GetByID(id);
             if (invoiceLine == null) throw new ItemNotFoundException();
-            if (!DaoFactory.GetInvoiceLineDao().CanDelete(invoiceLine.ID)) throw new ArgumentException();
+            if (!DaoFactory.InvoiceLineDao.CanDelete(invoiceLine.ID)) throw new Exception("Can't delete invoice line");
 
-            var invoice = DaoFactory.GetInvoiceDao().GetByID(invoiceLine.InvoiceID);
+            var invoice = DaoFactory.InvoiceDao.GetByID(invoiceLine.InvoiceID);
             if (invoice == null) throw new ItemNotFoundException();
             if (!CRMSecurity.CanEdit(invoice)) throw CRMSecurity.CreateSecurityException();
 
-            DaoFactory.GetInvoiceLineDao().DeleteInvoiceLine(id);
+            DaoFactory.InvoiceLineDao.DeleteInvoiceLine(id);
 
-            DaoFactory.GetInvoiceDao().UpdateInvoiceJsonDataAfterLinesUpdated(invoice);
+            DaoFactory.InvoiceDao.UpdateInvoiceJsonDataAfterLinesUpdated(invoice);
             if (Global.CanDownloadInvoices)
             {
-                new InvoiceFileUpdateHelper().UpdateInvoiceFileIDInThread(invoice.ID);
+                PdfQueueWorker.StartTask(HttpContext.Current, TenantProvider.CurrentTenantID, SecurityContext.CurrentAccount.ID, invoice.ID);
             }
 
             return id;
@@ -1022,12 +1033,12 @@ namespace ASC.Api.CRM
 
             if (invoice.ContactID > 0)
             {
-                result.Contact = ToContactBaseWithEmailWrapper(DaoFactory.GetContactDao().GetByID(invoice.ContactID));
+                result.Contact = ToContactBaseWrapperQuick(DaoFactory.ContactDao.GetByID(invoice.ContactID));
             }
 
             if (invoice.ConsigneeID > 0)
             {
-                result.Consignee = ToContactBaseWithEmailWrapper(DaoFactory.GetContactDao().GetByID(invoice.ConsigneeID));
+                result.Consignee = ToContactBaseWrapperQuick(DaoFactory.ContactDao.GetByID(invoice.ConsigneeID));
             }
 
             if (invoice.EntityID > 0)
@@ -1035,7 +1046,7 @@ namespace ASC.Api.CRM
                 result.Entity = ToEntityWrapper(invoice.EntityType, invoice.EntityID);
             }
 
-            result.Cost = invoice.GetInvoiceCost();
+            result.Cost = invoice.GetInvoiceCost(DaoFactory);
 
             return result;
         }
@@ -1047,7 +1058,6 @@ namespace ASC.Api.CRM
         /// <param optional="true" name="description">Item description</param>
         /// <param optional="false" name="price">Item price</param>
         /// <param optional="true" name="sku">Item stock keeping unit</param>
-        /// <param optional="true" name="quantity">Item quantity</param>
         /// <param optional="true" name="stockQuantity">Item stock quantity</param>
         /// <param optional="true" name="trackInventory">Track inventory</param>
         /// <param optional="true" name="invoiceTax1id">Item first invoice tax ID</param>
@@ -1061,8 +1071,7 @@ namespace ASC.Api.CRM
             string description,
             decimal price,
             string sku,
-            int quantity,
-            int stockQuantity,
+            decimal stockQuantity,
             bool trackInventory,
             int invoiceTax1id,
             int invoiceTax2id)
@@ -1071,7 +1080,7 @@ namespace ASC.Api.CRM
                 throw CRMSecurity.CreateSecurityException();
             }
 
-            if (String.IsNullOrEmpty(title) || price == 0) throw new ArgumentException();
+            if (String.IsNullOrEmpty(title) || price <= 0) throw new ArgumentException();
 
             var invoiceItem = new InvoiceItem
                 {
@@ -1079,15 +1088,14 @@ namespace ASC.Api.CRM
                     Description = description,
                     Price = price,
                     StockKeepingUnit = sku,
-                    Quantity = quantity,
                     StockQuantity = stockQuantity,
                     TrackInventory = trackInventory,
                     InvoiceTax1ID = invoiceTax1id,
                     InvoiceTax2ID = invoiceTax2id
                 };
 
-            invoiceItem = DaoFactory.GetInvoiceItemDao().SaveOrUpdateInvoiceItem(invoiceItem);
-            MessageService.Send(Request, MessageAction.InvoiceItemCreated, invoiceItem.Title);
+            invoiceItem = DaoFactory.InvoiceItemDao.SaveOrUpdateInvoiceItem(invoiceItem);
+            MessageService.Send(Request, MessageAction.InvoiceItemCreated, MessageTarget.Create(invoiceItem.ID), invoiceItem.Title);
 
             return ToInvoiceItemWrapper(invoiceItem);
         }
@@ -1100,7 +1108,6 @@ namespace ASC.Api.CRM
         /// <param optional="true" name="description">Item description</param>
         /// <param optional="false" name="price">Item price</param>
         /// <param optional="true" name="sku">Item stock keeping unit</param>
-        /// <param optional="true" name="quantity">Item quantity</param>
         /// <param optional="true" name="stockQuantity">Item stock quantity</param>
         /// <param optional="true" name="trackInventory">Track inventory</param>
         /// <param optional="true" name="invoiceTax1id">Item first invoice tax ID</param>
@@ -1114,8 +1121,7 @@ namespace ASC.Api.CRM
                                                     string description,
                                                     decimal price,
                                                     string sku,
-                                                    int quantity,
-                                                    int stockQuantity,
+                                                    decimal stockQuantity,
                                                     bool trackInventory,
                                                     int invoiceTax1id,
                                                     int invoiceTax2id)
@@ -1124,9 +1130,9 @@ namespace ASC.Api.CRM
                 throw CRMSecurity.CreateSecurityException();
             }
 
-            if (id <= 0 || String.IsNullOrEmpty(title) || price == 0) throw new ArgumentException();
+            if (id <= 0 || String.IsNullOrEmpty(title) || price <= 0) throw new ArgumentException();
 
-            if (!DaoFactory.GetInvoiceItemDao().IsExist(id)) throw new ItemNotFoundException();
+            if (!DaoFactory.InvoiceItemDao.IsExist(id)) throw new ItemNotFoundException();
 
             var invoiceItem = new InvoiceItem
                 {
@@ -1135,15 +1141,14 @@ namespace ASC.Api.CRM
                     Description = description,
                     Price = price,
                     StockKeepingUnit = sku,
-                    Quantity = quantity,
                     StockQuantity = stockQuantity,
                     TrackInventory = trackInventory,
                     InvoiceTax1ID = invoiceTax1id,
                     InvoiceTax2ID = invoiceTax2id
                 };
 
-            invoiceItem = DaoFactory.GetInvoiceItemDao().SaveOrUpdateInvoiceItem(invoiceItem);
-            MessageService.Send(Request, MessageAction.InvoiceItemUpdated, invoiceItem.Title);
+            invoiceItem = DaoFactory.InvoiceItemDao.SaveOrUpdateInvoiceItem(invoiceItem);
+            MessageService.Send(Request, MessageAction.InvoiceItemUpdated, MessageTarget.Create(invoiceItem.ID), invoiceItem.Title);
 
             return ToInvoiceItemWrapper(invoiceItem);
         }
@@ -1164,10 +1169,10 @@ namespace ASC.Api.CRM
 
             if (id <= 0) throw new ArgumentException();
 
-            var invoiceItem = DaoFactory.GetInvoiceItemDao().DeleteInvoiceItem(id);
+            var invoiceItem = DaoFactory.InvoiceItemDao.DeleteInvoiceItem(id);
             if (invoiceItem == null) throw new ItemNotFoundException();
 
-            MessageService.Send(Request, MessageAction.InvoiceItemDeleted, invoiceItem.Title);
+            MessageService.Send(Request, MessageAction.InvoiceItemDeleted, MessageTarget.Create(invoiceItem.ID), invoiceItem.Title);
             return ToInvoiceItemWrapper(invoiceItem);
         }
 
@@ -1188,8 +1193,8 @@ namespace ASC.Api.CRM
             if (ids == null) throw new ArgumentException();
             ids = ids.Distinct();
 
-            var items = DaoFactory.GetInvoiceItemDao().DeleteBatchInvoiceItems(ids.ToArray());
-            MessageService.Send(Request, MessageAction.InvoiceItemsDeleted, items.Select(x => x.Title));
+            var items = DaoFactory.InvoiceItemDao.DeleteBatchInvoiceItems(ids.ToArray());
+            MessageService.Send(Request, MessageAction.InvoiceItemsDeleted, MessageTarget.Create(ids), items.Select(x => x.Title));
 
             return items.ConvertAll(ToInvoiceItemWrapper);
         }
@@ -1203,7 +1208,7 @@ namespace ASC.Api.CRM
         [Read(@"invoice/tax")]
         public IEnumerable<InvoiceTaxWrapper> GetInvoiceTaxes()
         {
-            return DaoFactory.GetInvoiceTaxDao().GetAll().ConvertAll(ToInvoiceTaxWrapper);
+            return DaoFactory.InvoiceTaxDao.GetAll().ConvertAll(ToInvoiceTaxWrapper);
         }
 
         /// <summary>
@@ -1219,14 +1224,14 @@ namespace ASC.Api.CRM
         public InvoiceTaxWrapper CreateInvoiceTax(
             string name,
             string description,
-            int rate)
+            decimal rate)
         {
             if (!CRMSecurity.IsAdmin) {
                 throw CRMSecurity.CreateSecurityException();
             }
 
-            if (String.IsNullOrEmpty(name)) throw new ArgumentException();
-            if(DaoFactory.GetInvoiceTaxDao().IsExist(name)) throw new ArgumentException();
+            if (String.IsNullOrEmpty(name)) throw new ArgumentException(Web.CRM.Resources.CRMInvoiceResource.EmptyTaxNameError);
+            if (DaoFactory.InvoiceTaxDao.IsExist(name)) throw new ArgumentException(Web.CRM.Resources.CRMInvoiceResource.ExistTaxNameError);
 
             var invoiceTax = new InvoiceTax
                 {
@@ -1235,8 +1240,8 @@ namespace ASC.Api.CRM
                     Rate = rate
                 };
 
-            invoiceTax = DaoFactory.GetInvoiceTaxDao().SaveOrUpdateInvoiceTax(invoiceTax);
-            MessageService.Send(Request, MessageAction.InvoiceTaxCreated, invoiceTax.Name);
+            invoiceTax = DaoFactory.InvoiceTaxDao.SaveOrUpdateInvoiceTax(invoiceTax);
+            MessageService.Send(Request, MessageAction.InvoiceTaxCreated, MessageTarget.Create(invoiceTax.ID), invoiceTax.Name);
 
             return ToInvoiceTaxWrapper(invoiceTax);
         }
@@ -1256,15 +1261,15 @@ namespace ASC.Api.CRM
             int id,
             string name,
             string description,
-            int rate)
+            decimal rate)
         {
             if (!CRMSecurity.IsAdmin) {
                 throw CRMSecurity.CreateSecurityException();
             }
 
-            if (id <= 0 || String.IsNullOrEmpty(name)) throw new ArgumentException();
+            if (id <= 0 || String.IsNullOrEmpty(name)) throw new ArgumentException(Web.CRM.Resources.CRMInvoiceResource.EmptyTaxNameError);
 
-            if (!DaoFactory.GetInvoiceTaxDao().IsExist(id)) throw new ItemNotFoundException();
+            if (!DaoFactory.InvoiceTaxDao.IsExist(id)) throw new ItemNotFoundException();
 
             var invoiceTax = new InvoiceTax
                 {
@@ -1274,8 +1279,8 @@ namespace ASC.Api.CRM
                     Rate = rate
                 };
 
-            invoiceTax = DaoFactory.GetInvoiceTaxDao().SaveOrUpdateInvoiceTax(invoiceTax);
-            MessageService.Send(Request, MessageAction.InvoiceTaxUpdated, invoiceTax.Name);
+            invoiceTax = DaoFactory.InvoiceTaxDao.SaveOrUpdateInvoiceTax(invoiceTax);
+            MessageService.Send(Request, MessageAction.InvoiceTaxUpdated, MessageTarget.Create(invoiceTax.ID), invoiceTax.Name);
 
             return ToInvoiceTaxWrapper(invoiceTax);
         }
@@ -1296,10 +1301,10 @@ namespace ASC.Api.CRM
 
             if (id <= 0) throw new ArgumentException();
 
-            var invoiceTax = DaoFactory.GetInvoiceTaxDao().DeleteInvoiceTax(id);
+            var invoiceTax = DaoFactory.InvoiceTaxDao.DeleteInvoiceTax(id);
             if (invoiceTax == null) throw new ItemNotFoundException();
 
-            MessageService.Send(Request, MessageAction.InvoiceTaxDeleted, invoiceTax.Name);
+            MessageService.Send(Request, MessageAction.InvoiceTaxDeleted, MessageTarget.Create(invoiceTax.ID), invoiceTax.Name);
             return ToInvoiceTaxWrapper(invoiceTax);
         }
 
@@ -1312,7 +1317,7 @@ namespace ASC.Api.CRM
         [Read(@"invoice/settings")]
         public InvoiceSetting GetSettings()
         {
-            return DaoFactory.GetInvoiceDao().GetSettings();
+            return DaoFactory.InvoiceDao.GetSettings();
         }
 
         /// <summary>
@@ -1332,7 +1337,7 @@ namespace ASC.Api.CRM
             if (autogenerated && string.IsNullOrEmpty(number))
                 throw new ArgumentException();
 
-            if (autogenerated && DaoFactory.GetInvoiceDao().IsExist(prefix + number))
+            if (autogenerated && DaoFactory.InvoiceDao.IsExist(prefix + number))
                 throw new ArgumentException();
 
             var invoiceSetting = GetSettings();
@@ -1341,7 +1346,7 @@ namespace ASC.Api.CRM
             invoiceSetting.Prefix = prefix;
             invoiceSetting.Number = number;
 
-            var settings = DaoFactory.GetInvoiceDao().SaveInvoiceSettings(invoiceSetting);
+            var settings = DaoFactory.InvoiceDao.SaveInvoiceSettings(invoiceSetting);
             MessageService.Send(Request, MessageAction.InvoiceNumberFormatUpdated);
 
             return settings;
@@ -1363,12 +1368,37 @@ namespace ASC.Api.CRM
 
             invoiceSetting.Terms = terms;
 
-            var result = DaoFactory.GetInvoiceDao().SaveInvoiceSettings(invoiceSetting);
+            var result = DaoFactory.InvoiceDao.SaveInvoiceSettings(invoiceSetting);
             MessageService.Send(Request, MessageAction.InvoiceDefaultTermsUpdated);
 
             return result;
         }
 
+        /// <visible>false</visible>
+        [Update(@"invoice/{invoiceid:[0-9]+}/creationdate")]
+        public void SetInvoiceCreationDate(int invoiceid, ApiDateTime creationDate)
+        {
+            var dao = DaoFactory.InvoiceDao;
+            var invoice = dao.GetByID(invoiceid);
+
+            if (invoice == null || !CRMSecurity.CanAccessTo(invoice))
+                throw new ItemNotFoundException();
+
+            dao.SetInvoiceCreationDate(invoiceid, creationDate);
+        }
+
+        /// <visible>false</visible>
+        [Update(@"invoice/{invoiceid:[0-9]+}/lastmodifeddate")]
+        public void SetInvoiceLastModifedDate(int invoiceid, ApiDateTime lastModifedDate)
+        {
+            var dao = DaoFactory.InvoiceDao;
+            var invoice = dao.GetByID(invoiceid);
+
+            if (invoice == null || !CRMSecurity.CanAccessTo(invoice))
+                throw new ItemNotFoundException();
+
+            dao.SetInvoiceLastModifedDate(invoiceid, lastModifedDate);
+        }
 
         private InvoiceWrapper ToInvoiceWrapper(Invoice invoice)
         {
@@ -1376,12 +1406,12 @@ namespace ASC.Api.CRM
 
             if (invoice.ContactID > 0)
             {
-                result.Contact = ToContactBaseWithEmailWrapper(DaoFactory.GetContactDao().GetByID(invoice.ContactID));
+                result.Contact = ToContactBaseWrapperQuick(DaoFactory.ContactDao.GetByID(invoice.ContactID));
             }
 
             if (invoice.ConsigneeID > 0)
             {
-                result.Consignee = ToContactBaseWithEmailWrapper(DaoFactory.GetContactDao().GetByID(invoice.ConsigneeID));
+                result.Consignee = ToContactBaseWrapperQuick(DaoFactory.ContactDao.GetByID(invoice.ConsigneeID));
             }
 
             if (invoice.EntityID > 0)
@@ -1389,9 +1419,9 @@ namespace ASC.Api.CRM
                 result.Entity = ToEntityWrapper(invoice.EntityType, invoice.EntityID);
             }
 
-            result.Cost = invoice.GetInvoiceCost();
+            result.Cost = invoice.GetInvoiceCost(DaoFactory);
 
-            result.InvoiceLines = invoice.GetInvoiceLines().Select(ToInvoiceLineWrapper).ToList();
+            result.InvoiceLines = invoice.GetInvoiceLines(DaoFactory).Select(ToInvoiceLineWrapper).ToList();
 
             return result;
         }
@@ -1402,11 +1432,11 @@ namespace ASC.Api.CRM
 
             if (invoiceItem.InvoiceTax1ID > 0)
             {
-                result.InvoiceTax1 = ToInvoiceTaxWrapper(DaoFactory.GetInvoiceTaxDao().GetByID(invoiceItem.InvoiceTax1ID));
+                result.InvoiceTax1 = ToInvoiceTaxWrapper(DaoFactory.InvoiceTaxDao.GetByID(invoiceItem.InvoiceTax1ID));
             }
             if (invoiceItem.InvoiceTax2ID > 0)
             {
-                result.InvoiceTax2 = ToInvoiceTaxWrapper(DaoFactory.GetInvoiceTaxDao().GetByID(invoiceItem.InvoiceTax2ID));
+                result.InvoiceTax2 = ToInvoiceTaxWrapper(DaoFactory.InvoiceTaxDao.GetByID(invoiceItem.InvoiceTax2ID));
             }
 
             return result;
@@ -1422,21 +1452,58 @@ namespace ASC.Api.CRM
             return new InvoiceLineWrapper(invoiceLine);
         }
 
-        private IEnumerable<InvoiceBaseWrapper> ToListInvoiceBaseWrappers(ICollection<Invoice> items)
+        private IEnumerable<InvoiceBaseWrapper> ToListInvoiceBaseWrappers(ICollection<Invoice> invoices)
         {
-            if (items == null || items.Count == 0) return new List<InvoiceWrapper>();
+            if (invoices == null || invoices.Count == 0) return new List<InvoiceWrapper>();
 
             var result = new List<InvoiceBaseWrapper>();
 
+            var invoiceIDs = new HashSet<int>();
+            var contactIDs = new HashSet<int>();
+            var dealsIDs = new HashSet<int>();
 
-            var contactIDs = items.Select(item => item.ContactID);
-            contactIDs.ToList().AddRange(items.Select(item => item.ConsigneeID));
+            foreach (var invoice in invoices)
+            {
+                invoiceIDs.Add(invoice.ID);
+                contactIDs.Add(invoice.ContactID);
+                contactIDs.Add(invoice.ConsigneeID);
+                dealsIDs.Add(invoice.EntityID);
+            }
 
-            var contacts = DaoFactory.GetContactDao().GetContacts(contactIDs.Distinct().ToArray())
-                                     .ToDictionary(item => item.ID, ToContactBaseWithEmailWrapper);
+            var contacts = DaoFactory.ContactDao.GetContacts(contactIDs.ToArray())
+                            .ToDictionary(contact => contact.ID, ToContactBaseWrapperQuick);
 
+            var deals = DaoFactory.DealDao.GetDeals(dealsIDs.ToArray())
+                            .ToDictionary(
+                                deal => deal.ID,
+                                deal => new EntityWrapper
+                                {
+                                    EntityId = deal.ID,
+                                    EntityTitle = deal.Title,
+                                    EntityType = "opportunity"
+                                }
+                            );
 
-            foreach (var invoice in items)
+            var invoiceLines = DaoFactory.InvoiceLineDao.GetInvoicesLines(invoiceIDs.ToArray());
+
+            var invoiceTaxIDs = new HashSet<int>();
+
+            foreach (var invoiceLine in invoiceLines)
+            {
+                invoiceTaxIDs.Add(invoiceLine.InvoiceTax1ID);
+                invoiceTaxIDs.Add(invoiceLine.InvoiceTax2ID);
+            }
+
+            var invoiceTaxes = DaoFactory.InvoiceTaxDao.GetByID(invoiceTaxIDs.ToArray());
+
+            var invoiceCosts = invoiceLines
+                                .GroupBy(invoiceLine => invoiceLine.InvoiceID)
+                                .ToDictionary(
+                                    item => item.Key,
+                                    item => DaoFactory.InvoiceDao.CalculateInvoiceCost(item.Select(invoiceLine => invoiceLine), invoiceTaxes)
+                                );
+
+            foreach (var invoice in invoices)
             {
                 var invoiceWrapper = new InvoiceBaseWrapper(invoice);
 
@@ -1447,15 +1514,18 @@ namespace ASC.Api.CRM
 
                 if (contacts.ContainsKey(invoice.ConsigneeID))
                 {
-                    invoiceWrapper.Consignee = contacts[invoice.ContactID];
+                    invoiceWrapper.Consignee = contacts[invoice.ConsigneeID];
                 }
 
-                if (invoice.EntityID > 0)
+                if (invoice.EntityID > 0 && deals.ContainsKey(invoice.EntityID))
                 {
-                    invoiceWrapper.Entity = ToEntityWrapper(invoice.EntityType, invoice.EntityID); //Need to optimize
+                    invoiceWrapper.Entity = deals[invoice.EntityID];
                 }
 
-                invoiceWrapper.Cost = invoice.GetInvoiceCost();
+                if (invoiceCosts.ContainsKey(invoice.ID))
+                {
+                    invoiceWrapper.Cost = invoiceCosts[invoice.ID];
+                }
 
                 result.Add(invoiceWrapper);
             }

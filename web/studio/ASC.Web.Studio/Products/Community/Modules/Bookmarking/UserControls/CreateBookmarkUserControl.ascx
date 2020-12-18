@@ -30,11 +30,11 @@
 			<div class="clearFix">
 				<%if (!IsNewBookmark)
       { %>
-					<div style="float: left; width: 96%;" id="BookmarkUrlContainer">
+					<div style="float: left; width: calc(100% - 70px);" id="BookmarkUrlContainer">
 				<% }
       else
       { %>
-					<div style="float: left; width: 96%;" id="BookmarkUrlContainer">
+					<div style="float: left; width: calc(100% - 70px);" id="BookmarkUrlContainer">
 				<% } %>
 					<input type="text" class="bookmarkingInputUrl" onkeydown="return bookmarkInputUrlOnKeyDown(event);"
 						style="background-color:#FFFFFF;" id="BookmarkUrl" name="BookmarkUrl"
@@ -57,7 +57,7 @@
 				<% }
                  else
                  { %>				
-				<a href="default.aspx" class="button gray big">
+				<a href="Default.aspx" class="button gray big">
 				<% } %>
 					<%= BookmarkingUCResource.Cancel%>
 				</a>
@@ -121,7 +121,7 @@
 				<% }
               else
               { %>				
-				<a href="default.aspx" class="button gray big">
+				<a href="Default.aspx" class="button gray big">
 				<% } %>
 					<%= BookmarkingUCResource.Cancel%>
 				</a>				

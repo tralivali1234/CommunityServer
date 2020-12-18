@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -36,6 +27,7 @@ using ASC.Common.Data.Sql.Expressions;
 using ASC.Core;
 using ASC.Core.Tenants;
 using ASC.CRM.Core.Entities;
+using ASC.Web.CRM.Classes;
 
 namespace ASC.CRM.Core.Dao
 {
@@ -43,8 +35,8 @@ namespace ASC.CRM.Core.Dao
     {
         private readonly HttpRequestDictionary<InvoiceItem> _invoiceItemCache = new HttpRequestDictionary<InvoiceItem>("crm_invoice_item");
 
-        public CachedInvoiceItemDao(int tenantID, string storageKey)
-            : base(tenantID, storageKey)
+        public CachedInvoiceItemDao(int tenantID)
+            : base(tenantID)
         {
         }
 
@@ -81,65 +73,50 @@ namespace ASC.CRM.Core.Dao
 
     public class InvoiceItemDao : AbstractDao
     {
-        public InvoiceItemDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public InvoiceItemDao(int tenantID)
+            : base(tenantID)
         {
         }
 
 
         public Boolean IsExist(int invoiceItemID)
         {
-            using (var db = GetDb())
-            {
-                return IsExist(invoiceItemID, db);
-            }
+            return IsExistInDb(invoiceItemID);
         }
 
-        public Boolean IsExist(int invoiceItemID, DbManager db)
+        public Boolean IsExistInDb(int invoiceItemID)
         {
-             return db.ExecuteScalar<bool>(@"select exists(select 1 from crm_invoice_item where tenant_id = @tid and id = @id)",
+             return Db.ExecuteScalar<bool>(@"select exists(select 1 from crm_invoice_item where tenant_id = @tid and id = @id)",
                             new { tid = TenantID, id = invoiceItemID });
         }
 
         public Boolean CanDelete(int invoiceItemID)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(@"select count(*) from crm_invoice_line where tenant_id = @tid and invoice_item_id = @id",
-                              new { tid = TenantID, id = invoiceItemID }) == 0;
-            }
+            return Db.ExecuteScalar<int>(@"select count(*) from crm_invoice_line where tenant_id = @tid and invoice_item_id = @id",
+                            new { tid = TenantID, id = invoiceItemID }) == 0;
         }
 
         #region Get
 
         public virtual List<InvoiceItem> GetAll()
         {
-            using (var db = GetDb())
-            {
-                return GetAll(db);
-            }
+            return GetAllInDb();
         }
-        public virtual List<InvoiceItem> GetAll(DbManager db)
+        public virtual List<InvoiceItem> GetAllInDb()
         {
-            return db.ExecuteList(GetInvoiceItemSqlQuery(null)).ConvertAll(ToInvoiceItem);
+            return Db.ExecuteList(GetInvoiceItemSqlQuery(null)).ConvertAll(ToInvoiceItem);
         }
 
         public virtual List<InvoiceItem> GetByID(int[] ids)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceItemSqlQuery(Exp.In("id", ids))).ConvertAll(ToInvoiceItem);
-            }
+            return Db.ExecuteList(GetInvoiceItemSqlQuery(Exp.In("id", ids))).ConvertAll(ToInvoiceItem);
         }
 
         public virtual InvoiceItem GetByID(int id)
         {
-            using (var db = GetDb())
-            {
-                var invoiceItems = db.ExecuteList(GetInvoiceItemSqlQuery(Exp.Eq("id", id))).ConvertAll(ToInvoiceItem);
+            var invoiceItems = Db.ExecuteList(GetInvoiceItemSqlQuery(Exp.Eq("id", id))).ConvertAll(ToInvoiceItem);
 
-                return invoiceItems.Count > 0 ? invoiceItems[0] : null;
-            }
+            return invoiceItems.Count > 0 ? invoiceItems[0] : null;
         }
 
         public List<InvoiceItem> GetInvoiceItems(IEnumerable<int> ids)
@@ -148,10 +125,7 @@ namespace ASC.CRM.Core.Dao
 
             var sqlQuery = GetInvoiceItemSqlQuery(Exp.In("id", ids.ToArray()));
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery).ConvertAll(ToInvoiceItem);
-            }
+            return Db.ExecuteList(sqlQuery).ConvertAll(ToInvoiceItem);
         }
 
         public List<InvoiceItem> GetInvoiceItems(
@@ -193,7 +167,7 @@ namespace ASC.CRM.Core.Dao
                         sqlQuery.OrderBy("price", orderBy.IsAsc);
                         break;
                     case InvoiceItemSortedByType.Quantity:
-                        sqlQuery.OrderBy("case when track_inventory = 1 then stock_quantity else quantity end", orderBy.IsAsc).OrderBy("title", true);
+                        sqlQuery.OrderBy("stock_quantity", orderBy.IsAsc).OrderBy("title", true);
                         break;
                     case InvoiceItemSortedByType.Created:
                         sqlQuery.OrderBy("create_on", orderBy.IsAsc);
@@ -208,10 +182,7 @@ namespace ASC.CRM.Core.Dao
                 sqlQuery.OrderBy("title", true);
             }
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery).ConvertAll(ToInvoiceItem);
-            }
+            return Db.ExecuteList(sqlQuery).ConvertAll(ToInvoiceItem);
         }
 
 
@@ -240,29 +211,26 @@ namespace ASC.CRM.Core.Dao
 
             int result;
 
-            using (var db = GetDb())
+            if (withParams)
             {
-                if (withParams)
-                {
-                    var whereConditional = WhereConditional(exceptIDs, searchText, status, inventoryStock);
-                    result = whereConditional != null ? db.ExecuteScalar<int>(Query("crm_invoice_item").Where(whereConditional).SelectCount()) : 0;
-                }
-                else
-                {
-                    var countWithoutPrivate = db.ExecuteScalar<int>(Query("crm_invoice_item").SelectCount());
-                    var privateCount = exceptIDs.Count;
+                var whereConditional = WhereConditional(exceptIDs, searchText, status, inventoryStock);
+                result = whereConditional != null ? Db.ExecuteScalar<int>(Query("crm_invoice_item").Where(whereConditional).SelectCount()) : 0;
+            }
+            else
+            {
+                var countWithoutPrivate = Db.ExecuteScalar<int>(Query("crm_invoice_item").SelectCount());
+                var privateCount = exceptIDs.Count;
 
-                    if (privateCount > countWithoutPrivate)
-                    {
-                        _log.ErrorFormat(@"Private invoice items count more than all cases. Tenant: {0}. CurrentAccount: {1}", 
-                                                               TenantID, 
-                                                               SecurityContext.CurrentAccount.ID);
+                if (privateCount > countWithoutPrivate)
+                {
+                    _log.ErrorFormat(@"Private invoice items count more than all cases. Tenant: {0}. CurrentAccount: {1}", 
+                                                            TenantID, 
+                                                            SecurityContext.CurrentAccount.ID);
                  
-                        privateCount = 0;
-                    }
-
-                    result = countWithoutPrivate - privateCount;
+                    privateCount = 0;
                 }
+
+                result = countWithoutPrivate - privateCount;
             }
 
             if (result > 0)
@@ -282,16 +250,16 @@ namespace ASC.CRM.Core.Dao
             /*_cache.Remove(_invoiceItemCacheKey);
             _cache.Insert(_invoiceItemCacheKey, String.Empty);*/
 
-            using (var db = GetDb())
-            {
-                return SaveOrUpdateInvoiceItem(invoiceItem, db);
-            }
+            return SaveOrUpdateInvoiceItemInDb(invoiceItem);
         }
 
-        private InvoiceItem SaveOrUpdateInvoiceItem(InvoiceItem invoiceItem, DbManager db)
+        private InvoiceItem SaveOrUpdateInvoiceItemInDb(InvoiceItem invoiceItem)
         {
             if (invoiceItem.Price <= 0 || String.IsNullOrEmpty(invoiceItem.Title))
                 throw new ArgumentException();
+
+            if (invoiceItem.Price > Global.MaxInvoiceItemPrice)
+                throw new ArgumentException("Max Invoice Item Price: " + Global.MaxInvoiceItemPrice);
 
             if (!CRMSecurity.IsAdmin) CRMSecurity.CreateSecurityException();
 
@@ -303,16 +271,15 @@ namespace ASC.CRM.Core.Dao
                 invoiceItem.StockKeepingUnit = String.Empty;
             }
 
-            if (!IsExist(invoiceItem.ID, db))
+            if (!IsExistInDb(invoiceItem.ID))
             {
-                invoiceItem.ID = db.ExecuteScalar<int>(
+                invoiceItem.ID = Db.ExecuteScalar<int>(
                                Insert("crm_invoice_item")
                               .InColumnValue("id", 0)
                               .InColumnValue("title", invoiceItem.Title)
                               .InColumnValue("description", invoiceItem.Description)
                               .InColumnValue("stock_keeping_unit", invoiceItem.StockKeepingUnit)
                               .InColumnValue("price", invoiceItem.Price)
-                              .InColumnValue("quantity", invoiceItem.Quantity)
                               .InColumnValue("stock_quantity", invoiceItem.StockQuantity)
                               .InColumnValue("track_inventory", invoiceItem.TrackInventory)
                               .InColumnValue("invoice_tax1_id", invoiceItem.InvoiceTax1ID)
@@ -332,19 +299,18 @@ namespace ASC.CRM.Core.Dao
             else
             {
 
-                var oldInvoiceItem = db.ExecuteList(GetInvoiceItemSqlQuery(Exp.Eq("id", invoiceItem.ID)))
+                var oldInvoiceItem = Db.ExecuteList(GetInvoiceItemSqlQuery(Exp.Eq("id", invoiceItem.ID)))
                     .ConvertAll(ToInvoiceItem)
                     .FirstOrDefault();
 
                 CRMSecurity.DemandEdit(oldInvoiceItem);
 
-                db.ExecuteNonQuery(
+                Db.ExecuteNonQuery(
                     Update("crm_invoice_item")
                         .Set("title", invoiceItem.Title)
                         .Set("description", invoiceItem.Description)
                         .Set("stock_keeping_unit", invoiceItem.StockKeepingUnit)
                         .Set("price", invoiceItem.Price)
-                        .Set("quantity", invoiceItem.Quantity)
                         .Set("stock_quantity", invoiceItem.StockQuantity)
                         .Set("track_inventory", invoiceItem.TrackInventory)
                         .Set("invoice_tax1_id", invoiceItem.InvoiceTax1ID)
@@ -373,10 +339,7 @@ namespace ASC.CRM.Core.Dao
 
             CRMSecurity.DemandDelete(invoiceItem);
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_invoice_item").Where("id", invoiceItemID));
-            }
+            Db.ExecuteNonQuery(Delete("crm_invoice_item").Where("id", invoiceItemID));
 
             /*_cache.Remove(_invoiceItemCacheKey);
             _cache.Insert(_invoiceItemCacheKey, String.Empty);*/
@@ -409,14 +372,11 @@ namespace ASC.CRM.Core.Dao
         {
             var ids = items.Select(x => x.ID).ToArray();
 
-            using (var db = GetDb())
-            {
-                //using (var tx = db.BeginTransaction(true))
-                ///{
-                    db.ExecuteNonQuery(Delete("crm_invoice_item").Where(Exp.In("id", ids)));
-                //    tx.Commit();
-                //}
-            }
+            //using (var tx = db.BeginTransaction(true))
+            ///{
+                Db.ExecuteNonQuery(Delete("crm_invoice_item").Where(Exp.In("id", ids)));
+            //    tx.Commit();
+            //}
         }
 
         private static InvoiceItem ToInvoiceItem(object[] row)
@@ -428,16 +388,15 @@ namespace ASC.CRM.Core.Dao
                     Description = Convert.ToString(row[2]),
                     StockKeepingUnit = Convert.ToString(row[3]),
                     Price = Convert.ToDecimal(row[4]),
-                    Quantity = Convert.ToInt32(row[5]),
-                    StockQuantity = Convert.ToInt32(row[6]),
-                    TrackInventory = Convert.ToBoolean(row[7]),
-                    InvoiceTax1ID = Convert.ToInt32(row[8]),
-                    InvoiceTax2ID = Convert.ToInt32(row[9]),
-                    Currency = Convert.ToString(row[10]),
-                    CreateOn = TenantUtil.DateTimeFromUtc(DateTime.Parse(row[11].ToString())),
-                    CreateBy = ToGuid(row[12]),
-                    LastModifedOn = TenantUtil.DateTimeFromUtc(DateTime.Parse(row[13].ToString())),
-                    LastModifedBy = ToGuid(row[14])
+                    StockQuantity = Convert.ToDecimal(row[5]),
+                    TrackInventory = Convert.ToBoolean(row[6]),
+                    InvoiceTax1ID = Convert.ToInt32(row[7]),
+                    InvoiceTax2ID = Convert.ToInt32(row[8]),
+                    Currency = Convert.ToString(row[9]),
+                    CreateOn = TenantUtil.DateTimeFromUtc(DateTime.Parse(row[10].ToString())),
+                    CreateBy = ToGuid(row[11]),
+                    LastModifedOn = TenantUtil.DateTimeFromUtc(DateTime.Parse(row[12].ToString())),
+                    LastModifedBy = ToGuid(row[13])
                 };
         }
 
@@ -450,7 +409,6 @@ namespace ASC.CRM.Core.Dao
                     "description",
                     "stock_keeping_unit",
                     "price",
-                    "quantity",
                     "stock_quantity",
                     "track_inventory",
                     "invoice_tax1_id",

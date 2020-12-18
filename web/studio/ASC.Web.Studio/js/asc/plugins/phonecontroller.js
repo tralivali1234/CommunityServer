@@ -1,3 +1,20 @@
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
 ;
 var PhoneController = new function() {
 
@@ -51,23 +68,23 @@ var PhoneController = new function() {
         var aInt = a.country_code * 1,
             bInt = b.country_code * 1;
         if (aInt > bInt) {
-            return -1;
-        }
-        if (aInt < bInt) {
             return 1;
         }
+        if (aInt < bInt) {
+            return -1;
+        }
         return typeof (a.def) != "undefined"
-                ? -1
-                : (typeof (b.def) != "undefined" ? 1 : 0);
+                ? 1
+                : (typeof (b.def) != "undefined"
+                    ? -1
+                    : a.title > b.title ? 1 : 0);
     };
 
     _initCountryPhonesDropDown = function() {
-        var html = "",
-            tmp = null,
-            country = null;
+        var html = "";
 
         for (var i = 0, n = PhoneController.countryList.length; i < n; i++) {
-            country = PhoneController.countryList[i];
+            var country = PhoneController.countryList[i];
             if (PhoneController.defaultCountryCallingCode == country.key) {
                 PhoneController.selectedCountryPhone = country;
                 PhoneController.selectedCountryPhone["def"] = true;
@@ -176,8 +193,8 @@ var PhoneController = new function() {
     };
 
     _findCountryByPhone = function(phone) {
-        for (var i = 0, n = PhoneController.countryListSortedByCode.length; i < n; i++) {
-            country = PhoneController.countryListSortedByCode[i];
+        for (var i = PhoneController.countryListSortedByCode.length; i > 0; i--) {
+            var country = PhoneController.countryListSortedByCode[i - 1];
             if (PhoneController.GetCountryPhoneReg(country.country_code).test(phone)) {
                 return country;
             }
@@ -207,11 +224,10 @@ var PhoneController = new function() {
                 this.countryList = countryList;
 
                 this.defaultCountryCallingCode = "";
-                var tmp = null;
 
                 if (typeof (testDefaultCountryCallingCodeList) !== "undefined" && testDefaultCountryCallingCodeList.length > 0) {
                     for (var i = 0, n = testDefaultCountryCallingCodeList.length; i < n; i++) {
-                        tmp = _getCountryByKey(testDefaultCountryCallingCodeList[i]);
+                        var tmp = _getCountryByKey(testDefaultCountryCallingCodeList[i]);
                         if (tmp != null) {
                             this.defaultCountryCallingCode = tmp.key;
                             break;
@@ -225,8 +241,11 @@ var PhoneController = new function() {
                 _renderControl($input);
                 var startPhone = _purePhone();
                 _initCountryPhonesDropDown();
-                PhoneController.phoneControlContainer.find("input.phoneControlInput:first").val(startPhone);
-                _enterPhone(startPhone);
+                
+                if (startPhone != "") {
+                    PhoneController.phoneControlContainer.find("input.phoneControlInput:first").val(startPhone);
+                    _enterPhone(startPhone);
+                }
 
                 this.isInit = true;
             }

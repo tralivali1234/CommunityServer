@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,27 +18,30 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading;
 using System.Web;
-using ASC.Common.Utils;
 using ASC.Core;
+using ASC.Core.Users;
 using ASC.Files.Core;
 using ASC.MessagingSystem;
+using ASC.Security.Cryptography;
 using ASC.Web.Core.Files;
 using ASC.Web.Files.Classes;
 using ASC.Web.Files.Core;
+using ASC.Web.Files.Core.Entries;
 using ASC.Web.Files.Helpers;
 using ASC.Web.Files.Resources;
 using ASC.Web.Files.Services.NotifyService;
 using ASC.Web.Files.ThirdPartyApp;
 using ASC.Web.Files.Utils;
-using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Utility;
-using Newtonsoft.Json.Linq;
-using ASC.Core.Users;
 using CommandMethod = ASC.Web.Core.Files.DocumentService.CommandMethod;
 using File = ASC.Files.Core.File;
 
@@ -65,18 +59,39 @@ namespace ASC.Web.Files.Services.DocumentService
             Corrupted = 3,
             Closed = 4,
             MailMerge = 5,
+            ForceSave = 6,
+            CorruptedForceSave = 7,
         }
 
-        [DebuggerDisplay("{Status}")]
+        [DebuggerDisplay("{Status} - {Key}")]
         public class TrackerData
         {
+            public List<Action> Actions;
             public string ChangesUrl;
-            public string ChangesHistory;
+            public ForceSaveInitiator ForceSaveType;
+            public object History;
             public string Key;
+            public MailMergeData MailMerge;
             public TrackerStatus Status;
+            public string Token;
             public string Url;
             public List<string> Users;
-            public MailMergeData MailMerge;
+            public string UserData;
+            public bool Encrypted;
+
+            [DebuggerDisplay("{Type} - {UserId}")]
+            public class Action
+            {
+                public string Type;
+                public string UserId;
+            }
+
+            public enum ForceSaveInitiator
+            {
+                Command = 0,
+                User = 1,
+                Timer = 2
+            }
         }
 
         public enum MailMergeType
@@ -90,6 +105,7 @@ namespace ASC.Web.Files.Services.DocumentService
         public class MailMergeData
         {
             public int RecordCount;
+            public int RecordErrorCount;
             public int RecordIndex;
 
             public string From;
@@ -101,56 +117,82 @@ namespace ASC.Web.Files.Services.DocumentService
             public string Message; //attach
         }
 
+        [Serializable]
+        [DataContract(Name = "response", Namespace = "")]
+        public class TrackResponse
+        {
+            [DataMember(Name = "error")]
+            public int Error
+            {
+                set { }
+                get
+                {
+                    return string.IsNullOrEmpty(Message)
+                               ? 0 //error:0 - sended
+                               : 1; //error:1 - some error
+                }
+            }
+
+            [DataMember(Name = "message", EmitDefaultValue = false)]
+            public string Message = null;
+
+            public static string Serialize(TrackResponse response)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    var serializer = new DataContractJsonSerializer(typeof (TrackResponse));
+                    serializer.WriteObject(ms, response);
+                    ms.Seek(0, SeekOrigin.Begin);
+                    return Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
+                }
+            }
+        }
+
         #endregion
 
-
-        public static bool StartTrack(string fileId, string docKeyForTrack, bool isNew)
+        public static string GetCallbackUrl(string fileId)
         {
             var callbackUrl = CommonLinkUtility.GetFullAbsolutePath(FilesLinkUtility.FileHandlerPath
                                                                     + "?" + FilesLinkUtility.Action + "=track"
-                                                                    + "&vkey=" + HttpUtility.UrlEncode(Signature.Create(fileId, StudioKeySettings.GetSKey()))
-                                                                    + "&new=" + isNew.ToString().ToLower());
+                                                                    + "&" + FilesLinkUtility.FileId + "=" + HttpUtility.UrlEncode(fileId)
+                                                                    + "&" + FilesLinkUtility.AuthKey + "=" + EmailValidationKeyProvider.GetEmailKey(fileId));
             callbackUrl = DocumentServiceConnector.ReplaceCommunityAdress(callbackUrl);
+            return callbackUrl;
+        }
+
+        public static bool StartTrack(string fileId, string docKeyForTrack)
+        {
+            var callbackUrl = GetCallbackUrl(fileId);
             return DocumentServiceConnector.Command(CommandMethod.Info, docKeyForTrack, fileId, callbackUrl);
         }
 
-        public static string ProcessData(string fileId, bool isNew, string trackDataString)
+        public static TrackResponse ProcessData(string fileId, TrackerData fileData)
         {
-            if (string.IsNullOrEmpty(trackDataString))
-            {
-                throw new ArgumentException("DocService return null");
-            }
-
-            var data = JObject.Parse(trackDataString);
-            if (data == null)
-            {
-                throw new ArgumentException("DocService response is incorrect");
-            }
-
-            var fileData = data.ToObject<TrackerData>();
             switch (fileData.Status)
             {
                 case TrackerStatus.NotFound:
                 case TrackerStatus.Closed:
                     FileTracker.Remove(fileId);
+                    Global.SocketManager.FilesChangeEditors(fileId, true);
                     break;
 
                 case TrackerStatus.Editing:
-                    ProcessEdit(fileId, isNew, fileData);
+                    ProcessEdit(fileId, fileData);
                     break;
 
                 case TrackerStatus.MustSave:
                 case TrackerStatus.Corrupted:
-                    return ProcessSave(fileId, isNew, fileData);
+                case TrackerStatus.ForceSave:
+                case TrackerStatus.CorruptedForceSave:
+                    return ProcessSave(fileId, fileData);
 
                 case TrackerStatus.MailMerge:
-                    ProcessMailMerge(fileId, fileData);
-                    break;
+                    return ProcessMailMerge(fileId, fileData);
             }
             return null;
         }
 
-        private static void ProcessEdit(string fileId, bool isNew, TrackerData fileData)
+        private static void ProcessEdit(string fileId, TrackerData fileData)
         {
             if (ThirdPartySelector.GetAppByFileId(fileId) != null)
             {
@@ -158,33 +200,58 @@ namespace ASC.Web.Files.Services.DocumentService
             }
 
             var users = FileTracker.GetEditingBy(fileId);
-            var usersDrop = new List<Guid>();
+            var usersDrop = new List<string>();
 
-            foreach (var user in fileData.Users)
+            string docKey;
+            var app = ThirdPartySelector.GetAppByFileId(fileId);
+            if (app == null)
             {
-                Guid userId;
-                if (!Guid.TryParse(user, out userId))
+                File fileStable;
+                using (var fileDao = Global.DaoFactory.GetFileDao())
                 {
-                    Global.Logger.Error("DocService userId is not Guid: " + user);
-                    continue;
+                    fileStable = fileDao.GetFileStable(fileId);
                 }
-                users.Remove(userId);
 
-                try
+                docKey = DocumentServiceHelper.GetDocKey(fileStable);
+            }
+            else
+            {
+                docKey = fileData.Key;
+            }
+
+            if (!fileData.Key.Equals(docKey))
+            {
+                Global.Logger.InfoFormat("DocService editing file {0} ({1}) with key {2} for {3}", fileId, docKey, fileData.Key, string.Join(", ", fileData.Users));
+                usersDrop = fileData.Users;
+            }
+            else
+            {
+                foreach (var user in fileData.Users)
                 {
-                    var shareLinkKey = FileShareLink.CreateKey(fileId);
-                    EntryManager.TrackEditing(fileId, userId, userId, isNew, shareLinkKey);
-                }
-                catch (Exception e)
-                {
-                    Global.Logger.DebugFormat("Drop command: fileId '{0}' docKey '{1}' for user {2} : {3}", fileId, fileData.Key, user, e.Message);
-                    usersDrop.Add(userId);
+                    Guid userId;
+                    if (!Guid.TryParse(user, out userId))
+                    {
+                        Global.Logger.Error("DocService userId is not Guid: " + user);
+                        continue;
+                    }
+                    users.Remove(userId);
+
+                    try
+                    {
+                        var doc = FileShareLink.CreateKey(fileId);
+                        EntryManager.TrackEditing(fileId, userId, userId, doc);
+                    }
+                    catch (Exception e)
+                    {
+                        Global.Logger.DebugFormat("Drop command: fileId '{0}' docKey '{1}' for user {2} : {3}", fileId, fileData.Key, user, e.Message);
+                        usersDrop.Add(userId.ToString());
+                    }
                 }
             }
 
             if (usersDrop.Any())
             {
-                if (!Drop(fileData.Key, usersDrop, fileId))
+                if (!DocumentServiceHelper.DropUser(fileData.Key, usersDrop.ToArray(), fileId))
                 {
                     Global.Logger.Error("DocService drop failed for users " + string.Join(",", usersDrop));
                 }
@@ -194,23 +261,52 @@ namespace ASC.Web.Files.Services.DocumentService
             {
                 FileTracker.Remove(fileId, userId: removeUserId);
             }
+            Global.SocketManager.FilesChangeEditors(fileId);
         }
 
-        private static string ProcessSave(string fileId, bool isNew, TrackerData fileData)
+        private static TrackResponse ProcessSave(string fileId, TrackerData fileData)
         {
             Guid userId;
             var comments = new List<string>();
-            if (fileData.Status == TrackerStatus.Corrupted)
+            if (fileData.Status == TrackerStatus.Corrupted
+                || fileData.Status == TrackerStatus.CorruptedForceSave)
                 comments.Add(FilesCommonResource.ErrorMassage_SaveCorrupted);
+
+            var forcesave = fileData.Status == TrackerStatus.ForceSave || fileData.Status == TrackerStatus.CorruptedForceSave;
 
             if (fileData.Users == null || fileData.Users.Count == 0 || !Guid.TryParse(fileData.Users[0], out userId))
             {
                 userId = FileTracker.GetEditingBy(fileId).FirstOrDefault();
             }
 
+            var app = ThirdPartySelector.GetAppByFileId(fileId);
+            if (app == null)
+            {
+                File fileStable;
+                using (var fileDao = Global.DaoFactory.GetFileDao())
+                {
+                    fileStable = fileDao.GetFileStable(fileId);
+                }
+
+                var docKey = DocumentServiceHelper.GetDocKey(fileStable);
+                if (!string.IsNullOrEmpty(docKey) && !fileData.Key.Equals(docKey))
+                {
+                    Global.Logger.ErrorFormat("DocService saving file {0} ({1}) with key {2}", fileId, docKey, fileData.Key);
+
+                    StoringFileAfterError(fileId, userId.ToString(), DocumentServiceConnector.ReplaceDocumentAdress(fileData.Url));
+                    return new TrackResponse { Message = "Expected key " + docKey };
+                }
+            }
+
+            UserInfo user = null;
             try
             {
                 SecurityContext.AuthenticateMe(userId);
+
+                user = CoreContext.UserManager.GetUsers(userId);
+                var culture = string.IsNullOrEmpty(user.CultureName) ? CoreContext.TenantManager.GetCurrentTenant().GetCulture() : CultureInfo.GetCultureInfo(user.CultureName);
+                Thread.CurrentThread.CurrentCulture = culture;
+                Thread.CurrentThread.CurrentUICulture = culture;
             }
             catch (Exception ex)
             {
@@ -222,7 +318,7 @@ namespace ASC.Web.Files.Services.DocumentService
             }
 
             File file = null;
-            var saved = false;
+            var saveMessage = "Not saved";
 
             if (string.IsNullOrEmpty(fileData.Url))
             {
@@ -230,14 +326,15 @@ namespace ASC.Web.Files.Services.DocumentService
                 {
                     comments.Add(FilesCommonResource.ErrorMassage_SaveUrlLost);
 
-                    FileTracker.Remove(fileId);
-
                     file = EntryManager.CompleteVersionFile(fileId, 0, false, false);
 
                     using (var fileDao = Global.DaoFactory.GetFileDao())
                     {
                         fileDao.UpdateComment(file.ID, file.Version, string.Join("; ", comments));
                     }
+
+                    file = null;
+                    Global.Logger.ErrorFormat("DocService save error. Empty url. File id: '{0}'. UserId: {1}. DocKey '{2}'", fileId, userId, fileData.Key);
                 }
                 catch (Exception ex)
                 {
@@ -246,38 +343,64 @@ namespace ASC.Web.Files.Services.DocumentService
             }
             else
             {
+                if (fileData.Encrypted)
+                {
+                    comments.Add(FilesCommonResource.CommentEditEncrypt);
+                }
+
+                var forcesaveType = ForcesaveType.None;
+                if (forcesave)
+                {
+                    switch (fileData.ForceSaveType)
+                    {
+                        case TrackerData.ForceSaveInitiator.Command:
+                            forcesaveType = ForcesaveType.Command;
+                            break;
+                        case TrackerData.ForceSaveInitiator.Timer:
+                            forcesaveType = ForcesaveType.Timer;
+                            break;
+                        case TrackerData.ForceSaveInitiator.User:
+                            forcesaveType = ForcesaveType.User;
+                            break;
+                    }
+                    comments.Add(fileData.ForceSaveType == TrackerData.ForceSaveInitiator.User
+                                     ? FilesCommonResource.CommentForcesave
+                                     : FilesCommonResource.CommentAutosave);
+                }
+
                 try
                 {
-                    file = EntryManager.SaveEditing(fileId, -1, userId, null, fileData.Url, null, isNew, string.Empty, string.Join("; ", comments), false);
-                    saved = fileData.Status == TrackerStatus.MustSave;
+                    file = EntryManager.SaveEditing(fileId, null, DocumentServiceConnector.ReplaceDocumentAdress(fileData.Url), null, string.Empty, string.Join("; ", comments), false, fileData.Encrypted, forcesaveType);
+                    saveMessage = fileData.Status == TrackerStatus.MustSave || fileData.Status == TrackerStatus.ForceSave ? null : "Status " + fileData.Status;
                 }
                 catch (Exception ex)
                 {
                     Global.Logger.Error(string.Format("DocService save error. File id: '{0}'. UserId: {1}. DocKey '{2}'. DownloadUri: {3}", fileId, userId, fileData.Key, fileData.Url), ex);
+                    saveMessage = ex.Message;
 
-                    StoringFileAfterError(fileId, userId.ToString(), fileData.Url);
+                    StoringFileAfterError(fileId, userId.ToString(), DocumentServiceConnector.ReplaceDocumentAdress(fileData.Url));
                 }
             }
 
+            if (!forcesave)
+                FileTracker.Remove(fileId);
+
             if (file != null)
             {
-                var user = CoreContext.UserManager.GetUsers(userId);
                 if (user != null)
                     FilesMessageService.Send(file, MessageInitiator.DocsService, MessageAction.UserFileUpdated, user.DisplayUserName(false), file.Title);
 
-                SaveHistory(file, fileData.ChangesHistory, fileData.ChangesUrl);
+                if (!forcesave)
+                    SaveHistory(file, (fileData.History ?? "").ToString(), DocumentServiceConnector.ReplaceDocumentAdress(fileData.ChangesUrl));
             }
 
-            FileTracker.Remove(fileId);
+            Global.SocketManager.FilesChangeEditors(fileId, !forcesave);
 
-            DocumentServiceConnector.Command(CommandMethod.Saved, fileData.Key, fileId, null, userId.ToString(), saved ? "1" : "0");
-
-            return saved
-                       ? "0" //error:0 - saved
-                       : "1"; //error:1 - some error
+            var result = new TrackResponse { Message = saveMessage };
+            return result;
         }
 
-        private static void ProcessMailMerge(string fileId, TrackerData fileData)
+        private static TrackResponse ProcessMailMerge(string fileId, TrackerData fileData)
         {
             Guid userId;
             if (fileData.Users == null || fileData.Users.Count == 0 || !Guid.TryParse(fileData.Users[0], out userId))
@@ -285,9 +408,16 @@ namespace ASC.Web.Files.Services.DocumentService
                 userId = FileTracker.GetEditingBy(fileId).FirstOrDefault();
             }
 
+            string saveMessage;
+
             try
             {
                 SecurityContext.AuthenticateMe(userId);
+
+                var user = CoreContext.UserManager.GetUsers(userId);
+                var culture = string.IsNullOrEmpty(user.CultureName) ? CoreContext.TenantManager.GetCurrentTenant().GetCulture() : CultureInfo.GetCultureInfo(user.CultureName);
+                Thread.CurrentThread.CurrentCulture = culture;
+                Thread.CurrentThread.CurrentUICulture = culture;
 
                 if (string.IsNullOrEmpty(fileData.Url)) throw new ArgumentException("emptry url");
 
@@ -299,7 +429,7 @@ namespace ASC.Web.Files.Services.DocumentService
                 {
                     case MailMergeType.AttachDocx:
                     case MailMergeType.AttachPdf:
-                        var downloadRequest = (HttpWebRequest) WebRequest.Create(fileData.Url);
+                        var downloadRequest = (HttpWebRequest)WebRequest.Create(DocumentServiceConnector.ReplaceDocumentAdress(fileData.Url));
 
                         // hack. http://ubuntuforums.org/showthread.php?t=1841740
                         if (WorkContext.IsMono)
@@ -335,7 +465,7 @@ namespace ASC.Web.Files.Services.DocumentService
                         break;
 
                     case MailMergeType.Html:
-                        var httpWebRequest = (HttpWebRequest) WebRequest.Create(fileData.Url);
+                        var httpWebRequest = (HttpWebRequest)WebRequest.Create(DocumentServiceConnector.ReplaceDocumentAdress(fileData.Url));
 
                         // hack. http://ubuntuforums.org/showthread.php?t=1841740
                         if (WorkContext.IsMono)
@@ -343,7 +473,7 @@ namespace ASC.Web.Files.Services.DocumentService
                             ServicePointManager.ServerCertificateValidationCallback += (s, ce, ca, p) => true;
                         }
 
-                        using (var httpWebResponse = (HttpWebResponse) httpWebRequest.GetResponse())
+                        using (var httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse())
                         using (var stream = httpWebResponse.GetResponseStream())
                             if (stream != null)
                                 using (var reader = new StreamReader(stream, Encoding.GetEncoding(Encoding.UTF8.WebName)))
@@ -366,8 +496,9 @@ namespace ASC.Web.Files.Services.DocumentService
                 {
                     var response = mailMergeTask.Run();
                     Global.Logger.InfoFormat("DocService mailMerge {0}/{1} send: {2}",
-                                             fileData.MailMerge.RecordIndex, fileData.MailMerge.RecordCount, response);
+                                             fileData.MailMerge.RecordIndex + 1, fileData.MailMerge.RecordCount, response);
                 }
+                saveMessage = null;
             }
             catch (Exception ex)
             {
@@ -376,21 +507,21 @@ namespace ASC.Web.Files.Services.DocumentService
                                   (fileData.MailMerge == null ? "" : " " + fileData.MailMerge.RecordIndex + "/" + fileData.MailMerge.RecordCount),
                                   userId, fileData.Url),
                     ex);
+                saveMessage = ex.Message;
             }
 
             if (fileData.MailMerge != null &&
                 fileData.MailMerge.RecordIndex == fileData.MailMerge.RecordCount - 1)
             {
-                NotifyClient.SendMailMergeEnd(userId, fileData.MailMerge.RecordCount);
+                var errorCount = fileData.MailMerge.RecordErrorCount;
+                if (!string.IsNullOrEmpty(saveMessage)) errorCount++;
+
+                NotifyClient.SendMailMergeEnd(userId, fileData.MailMerge.RecordCount, errorCount);
             }
+
+            return new TrackResponse { Message = saveMessage };
         }
 
-
-        public static bool Drop(string docKeyForTrack, List<Guid> users, object fileId = null)
-        {
-            var dropString = "[\"" + string.Join("\",\"", users) + "\"]";
-            return DocumentServiceConnector.Command(CommandMethod.Drop, docKeyForTrack, fileId, null, dropString);
-        }
 
         private static void StoringFileAfterError(string fileId, string userId, string downloadUri)
         {

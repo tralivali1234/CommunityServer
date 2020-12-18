@@ -13,8 +13,8 @@
 
     <div class="gantt-chart-top-panel mainPageLayout page-menu">
         <ul id="mainActionButtons" class="menu-actions">
-            <li id="menuCreateNewButton" class="menu-main-button without-separator middle disable">
-                <span class="main-button-text" ><%= ProjectsCommonResource.CreateNewButton %></span>
+            <li id="menuCreateNewButton" class="menu-main-button without-separator middle disable" title="<%= ProjectsCommonResource.CreateNewButton %>">
+                <span class="main-button-text"><%= ProjectsCommonResource.CreateNewButton %></span>
                 <span class="white-combobox">&nbsp;</span>
             </li>
             <li id="undoButton" class="menu-upload-button disable" title="<%=ProjectResource.GanttUndo %>">
@@ -64,7 +64,7 @@
                 </select>
             </div>
             <%--<div class="task-filter-container">
-                <a class="link underline" href="tasks.aspx?prjID=<%=Project.ID%>" target="_blank"><%=ProjectsJSResource.ToTaskList %></a>        если список будет формироваться из разных проектов, то эта ссылка не нужна
+                <a class="link underline" href="Tasks.aspx?prjID=<%=Project.ID%>" target="_blank"><%=ProjectsJSResource.ToTaskList %></a>        если список будет формироваться из разных проектов, то эта ссылка не нужна
             </div>--%>
         </div>
         <div class="mode-button-container">
@@ -77,9 +77,9 @@
     </div>
 
     <div id="ganttHelpPanel" class="studio-action-panel gantt-legend gantt-context-menu">
-         <% if (!string.IsNullOrEmpty(CommonLinkUtility.GetHelpLink()))
+         <% if (!string.IsNullOrEmpty(HelpLink))
              { %>
-        <a class="link underline blue to-full-help" href="<%= CommonLinkUtility.GetHelpLink() + "projects.aspx" %>" target="_blank"><%=ProjectResource.GanttSeeFullGuide %></a>
+        <a class="link underline blue to-full-help" href="<%= HelpLink %>" target="_blank"><%=ProjectResource.GanttSeeFullGuide %></a>
          <% } %>
         <div class="header-base middle"><%=ProjectResource.GanttLegend %>:</div>
         <i class="gray-text"><%=ProjectResource.GanttLegendSimbDesc %></i>
@@ -261,20 +261,6 @@
         </sc:Container>
     </div>
 
-    <div id="createNewLinkError" style="display: none">
-        <sc:Container ID="_newLinkError" runat="server">
-            <header>
-                <%= TaskResource.ErrorCreateNewLink %>
-            </header>
-            <body>
-                <p><%=TaskResource.ErrorCreateTaskLinkChart %></p>
-                <div class="middle-button-container">
-                    <a class="button gray middle cancel"><%= ProjectResource.OkButton %></a>
-                </div>
-            </body>
-        </sc:Container>
-    </div>
-
     <div id="moveTaskOutMilestone" style="display: none">
         <sc:Container ID="_moveTaskOutMilestone" runat="server">
             <Header>
@@ -304,6 +290,14 @@
         <ul id="statusList" class="dropdown-content">
             <li class="open dropdown-item"><%= TaskResource.Open%></li>
             <li class="closed dropdown-item"><%= TaskResource.Closed%></li>
+        </ul>
+    </div>
+
+    <div id="statusListTaskContainer" class="studio-action-panel gantt-context-menu">
+        <ul id="statusListTask" class="dropdown-content">
+            <% foreach(var s in Statuses) {  %>
+            <li data-id="<%= s.Id %>" class="<%= s.Id %> dropdown-item" style="background: url('data:<%= s.ImageType %>;base64,<%= s.Image %>') no-repeat 2px 4px"><%= s.Title %></li>
+            <%} %>
         </ul>
     </div>
 
@@ -342,6 +336,5 @@
         <canvas id="layer0" class="gantt-canvas layer0" width="640" height="480"> </canvas>
         <canvas id="layer1" class="gantt-canvas layer1" width="640" height="480"> </canvas>
     </div>
-        <asp:PlaceHolder ID="_taskAction" runat="server"/>
 <asp:PlaceHolder ID="_milestoneAction" runat="server"/>
 </asp:Content>

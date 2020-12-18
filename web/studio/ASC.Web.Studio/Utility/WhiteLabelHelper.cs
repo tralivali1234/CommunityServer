@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,25 +18,23 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Net;
-using ASC.Core;
-using ASC.Core.Configuration;
-using ASC.Core.Tenants;
-using ASC.Data.Storage;
 using System.Linq;
-using ASC.Web.Core.Client;
-using ASC.Web.Core.Utility.Settings;
+using System.Net;
+using ASC.Common.Logging;
+using ASC.Core;
+using ASC.Core.Common.Settings;
+using ASC.Core.Configuration;
+using ASC.Data.Storage;
 using ASC.Web.Core.WhiteLabel;
 using ASC.Web.Studio.Core;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using log4net;
 
 namespace ASC.Web.Studio.Utility
 {
     public class WhiteLabelHelper
     {
-        private readonly static ILog Log = LogManager.GetLogger(typeof(WhiteLabelHelper));
+        private readonly static ILog Log = LogManager.GetLogger("ASC");
 
         private const string Base64StartPng = "data:image/png;base64,";
 
@@ -57,7 +46,7 @@ namespace ASC.Web.Studio.Utility
 
         public static void ApplyPartnerWhiteLableSettings()
         {
-            if (!CoreContext.Configuration.Standalone) return;
+            if (!TenantExtra.Enterprise && !CoreContext.Configuration.CustomMode) return;
 
             var firstVisit = CompanyWhiteLabelSettings.Instance.IsDefault &&
                              AdditionalWhiteLabelSettings.Instance.IsDefault &&
@@ -65,16 +54,15 @@ namespace ASC.Web.Studio.Utility
 
             try
             {
-                var partnerdataStorage = StorageFactory.GetStorage(Tenant.DEFAULT_TENANT.ToString(CultureInfo.InvariantCulture), "static_partnerdata");
+                var partnerdataStorage = StorageFactory.GetStorage(string.Empty, "static_partnerdata");
 
                 if (partnerdataStorage == null) return;
 
                 if (!partnerdataStorage.IsFile(JsonDataFilePath)) return;
 
-                var stream = partnerdataStorage.GetReadStream(JsonDataFilePath);
-
                 JObject jsonObject;
 
+                using (var stream = partnerdataStorage.GetReadStream(JsonDataFilePath))
                 using (var reader = new StreamReader(stream))
                 {
                     jsonObject = JObject.Parse(reader.ReadToEnd());
@@ -82,23 +70,19 @@ namespace ASC.Web.Studio.Utility
 
                 if(jsonObject == null) return;
 
-                var companySettings = JsonConvert.DeserializeObject<CompanyWhiteLabelSettings>(jsonObject["CompanyWhiteLabelSettings"].ToString());
-                var additionalSettings = JsonConvert.DeserializeObject<AdditionalWhiteLabelSettings>(jsonObject["AdditionalWhiteLabelSettings"].ToString());
-                var mailSettings = JsonConvert.DeserializeObject<MailWhiteLabelSettings>(jsonObject["MailWhiteLabelSettings"].ToString());
-                var tenantSettings = JsonConvert.DeserializeObject<TenantWhiteLabelSettings>(jsonObject["TenantWhiteLabelSettings"].ToString());
-                var smtpSettingsStr = jsonObject["SmtpSettings"].ToString();
-                var defaultCultureName = jsonObject["DefaultCulture"].ToString();
+                SaveSettings<CompanyWhiteLabelSettings>(jsonObject, "CompanyWhiteLabelSettings");
+                SaveSettings<AdditionalWhiteLabelSettings>(jsonObject, "AdditionalWhiteLabelSettings");
+                SaveSettings<MailWhiteLabelSettings>(jsonObject, "MailWhiteLabelSettings");
+                SaveSettings<TenantWhiteLabelSettings>(jsonObject, "TenantWhiteLabelSettings");
 
-                SettingsManager.Instance.SaveSettings(companySettings, Tenant.DEFAULT_TENANT);
-                SettingsManager.Instance.SaveSettings(additionalSettings, Tenant.DEFAULT_TENANT);
-                SettingsManager.Instance.SaveSettings(mailSettings, Tenant.DEFAULT_TENANT);
-                SettingsManager.Instance.SaveSettings(tenantSettings, Tenant.DEFAULT_TENANT);
+                var smtpSettingsStr = (jsonObject["SmtpSettings"] ?? "").ToString();
+                var defaultCultureName = (jsonObject["DefaultCulture"] ?? "").ToString();
 
                 if (!String.IsNullOrEmpty(smtpSettingsStr))
                 {
                     try
                     {
-                        SmtpSettings.Deserialize(smtpSettingsStr); // try deserialize SmtpSettings object
+                        SmtpSettings.Deserialize(smtpSettingsStr);
                         CoreContext.Configuration.SaveSetting("SmtpSettings", smtpSettingsStr);
                     }
                     catch (Exception e)
@@ -128,13 +112,26 @@ namespace ASC.Web.Studio.Utility
 
                 if (!firstVisit) return;
 
-                var tenantInfoSettings = SettingsManager.Instance.LoadSettings<TenantInfoSettings>(TenantProvider.CurrentTenantID);
+                var tenantInfoSettings = TenantInfoSettings.Load();
                 tenantInfoSettings.RestoreDefaultTenantName();
             }
             catch (Exception e)
             {
                 Log.Error(e.Message, e);
             }
+        }
+
+        private static void SaveSettings<T>(JObject jsonObject, string prop) where T : class, ISettings
+        {
+            var jsonObjectToken = jsonObject[prop];
+
+            if (jsonObjectToken == null) return;
+
+            var settings = JsonConvert.DeserializeObject<T>(jsonObjectToken.ToString()) as BaseSettings<T>;
+
+            if (settings == null) return;
+
+            settings.SaveForDefaultTenant();
         }
 
         private static void MakeLogoFiles(IDataStore store, JObject jObject)

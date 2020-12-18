@@ -1,40 +1,28 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using ASC.Api.Attributes;
-using ASC.Api.MailServer.DataContracts;
-using ASC.Api.MailServer.Extensions;
-using ASC.Mail.Aggregator.Common;
-using ASC.Mail.Server.DnsChecker;
-using ASC.Mail.Server.Utils;
-using System.Security;
+using ASC.Core;
+using ASC.Mail.Core.Engine.Operations.Base;
+using ASC.Mail.Data.Contracts;
+
+// ReSharper disable InconsistentNaming
 
 namespace ASC.Api.MailServer
 {
@@ -47,23 +35,15 @@ namespace ASC.Api.MailServer
         /// <short>Get tenant web domain list</short> 
         /// <category>Domains</category>
         [Read(@"domains/get")]
-        public List<WebDomainData> GetDomains()
+        public List<ServerDomainData> GetDomains()
         {
-            if (!IsAdmin)
-                throw new SecurityException("Need admin privileges.");
+            var listDomainData = MailEngineFactory.ServerDomainEngine.GetDomains();
 
-            var listDomains = MailServer.GetWebDomains(MailServerFactory);
-
-            var listDomainData = listDomains.Select(domain =>
-                {
-                    var dns = domain.GetDns(MailServerFactory);
-                    var isVerified = dns.CheckDnsStatus();
-
-                    if (domain.IsVerified != isVerified)
-                        domain.SetVerified(isVerified);
-
-                    return domain.ToWebDomainData(dns.ToDnsData());
-                }).ToList();
+            if (CoreContext.Configuration.Standalone)
+            {
+                //Skip common domain
+               listDomainData = listDomainData.Where(d => !d.IsSharedDomain).ToList();
+            }
 
             return listDomainData;
         }
@@ -75,22 +55,10 @@ namespace ASC.Api.MailServer
         /// <short>Get common web domain</short> 
         /// <category>Domains</category>
         [Read(@"domains/common")]
-        public WebDomainData GetCommonDomain()
+        public ServerDomainData GetCommonDomain()
         {
-            var listDomains = MailServer.GetWebDomains(MailServerFactory).Where(x=> x.Tenant == Defines.SHARED_TENANT_ID);
-
-            var listDomainData = listDomains.Select(domain =>
-            {
-                var dns = domain.GetDns(MailServerFactory);
-                var isVerified = dns.CheckDnsStatus();
-
-                if (domain.IsVerified != isVerified)
-                    domain.SetVerified(isVerified);
-
-                return domain.ToWebDomainData(dns.ToDnsData());
-            }).ToList();
-
-            return listDomainData.FirstOrDefault();
+            var commonDomain = MailEngineFactory.ServerDomainEngine.GetCommonDomain();
+            return commonDomain;
         }
 
         /// <summary>
@@ -102,62 +70,24 @@ namespace ASC.Api.MailServer
         /// <short>Add domain to mail server</short> 
         /// <category>Domains</category>
         [Create(@"domains/add")]
-        public WebDomainData AddDomain(string name, int id_dns)
+        public ServerDomainData AddDomain(string name, int id_dns)
         {
-            if (!IsAdmin)
-                throw new SecurityException("Need admin privileges.");
-
-            if (string.IsNullOrEmpty(name))
-                throw new ArgumentException(@"Invalid domain name.", "name");
-
-            if (name.Length > 255)
-                throw new ArgumentException(@"Domain name exceed limitation of 255 characters.", "name");
-
-            if (!Parser.IsDomainValid(name))
-                throw new ArgumentException(@"Incorrect domain name.", "name");
-
-            var domainName = name.ToLowerInvariant();
-
-            var freeDns = MailServer.GetFreeDnsRecords(MailServerFactory);
-
-            if (freeDns.Id != id_dns)
-                throw new InvalidDataException("This dkim public key is already in use. Please reopen wizard again.");
-
-            if (!DnsChecker.IsTxtRecordCorrect(domainName, freeDns.DomainCheckRecord, Logger))
-                throw new InvalidOperationException("txt record is not correct.");
-
-            var isVerified = freeDns.CheckDnsStatus(domainName);
-
-            var webDomain = MailServer.CreateWebDomain(domainName, isVerified, MailServerFactory);
-
-            webDomain.AddDns(id_dns, MailServerFactory);
-
-            return webDomain.ToWebDomainData(freeDns.ToDnsData());
+            var domain = MailEngineFactory.ServerDomainEngine.AddDomain(name, id_dns);
+            return domain;
         }
 
         /// <summary>
         ///    Deletes the selected web domain
         /// </summary>
         /// <param name="id">id of web domain</param>
-        /// <returns>id of web domain</returns>
+        /// <returns>MailOperationResult object</returns>
         /// <short>Remove domain from mail server</short> 
         /// <category>Domains</category>
         [Delete(@"domains/remove/{id}")]
-        public int RemoveDomain(int id)
+        public MailOperationStatus RemoveDomain(int id)
         {
-            if (!IsAdmin)
-                throw new SecurityException("Need admin privileges.");
-
-            if (id < 0)
-                throw new ArgumentException(@"Invalid domain id.", "id");
-
-            var domain = MailServer.GetWebDomain(id, MailServerFactory);
-            if (domain.Tenant == Defines.SHARED_TENANT_ID)
-                throw new SecurityException("Can not remove shared domain.");
-
-            MailServer.DeleteWebDomain(domain, MailServerFactory);
-
-            return id;
+            var status = MailEngineFactory.ServerDomainEngine.RemoveDomain(id);
+            return status;
         }
 
         /// <summary>
@@ -168,27 +98,10 @@ namespace ASC.Api.MailServer
         /// <short>Returns dns records</short>
         /// <category>DnsRecords</category>
         [Read(@"domains/dns/get")]
-        public DnsData GetDnsRecords(int id)
+        public ServerDomainDnsData GetDnsRecords(int id)
         {
-            if (!IsAdmin)
-                throw new SecurityException("Need admin privileges.");
-
-            if (id < 0)
-                throw new ArgumentException(@"Invalid domain id.", "id");
-
-            var domain = MailServer.GetWebDomain(id, MailServerFactory);
-
-            var dns = domain.GetDns(MailServerFactory);
-
-            if (dns == null)
-                return new DnsData();
-
-            var isVerified = dns.CheckDnsStatus();
-
-            if (domain.IsVerified != isVerified)
-                domain.SetVerified(isVerified);
-
-            return dns.ToDnsData();
+            var dns = MailEngineFactory.ServerDomainEngine.GetDnsData(id);
+            return dns;
         }
 
         /// <summary>
@@ -201,22 +114,7 @@ namespace ASC.Api.MailServer
         [Read(@"domains/exists")]
         public bool IsDomainExists(string name)
         {
-            if (!IsAdmin)
-                throw new SecurityException("Need admin privileges.");
-
-            if (string.IsNullOrEmpty(name))
-                throw new ArgumentException(@"Invalid domain name.", "name");
-
-            if (name.Length > 255)
-                throw new ArgumentException(@"Domain name exceed limitation of 255 characters.", "name");
-
-            if (!Parser.IsDomainValid(name))
-                throw new ArgumentException(@"Incorrect domain name.", "name");
-
-            var domainName = name.ToLowerInvariant();
-
-            var isExists = MailServer.IsDomainExists(domainName);
-
+            var isExists = MailEngineFactory.ServerDomainEngine.IsDomainExists(name);
             return isExists;
         }
 
@@ -230,23 +128,8 @@ namespace ASC.Api.MailServer
         [Read(@"domains/ownership/check")]
         public bool CheckDomainOwnership(string name)
         {
-            if (!IsAdmin)
-                throw new SecurityException("Need admin privileges.");
-
-            if (string.IsNullOrEmpty(name))
-                throw new ArgumentException(@"Invalid domain name.", "name");
-
-            if (name.Length > 255)
-                throw new ArgumentException(@"Domain name exceed limitation of 255 characters.", "name");
-
-            if (!Parser.IsDomainValid(name))
-                throw new ArgumentException(@"Incorrect domain name.", "name");
-
-            var domainName = name.ToLowerInvariant();
-
-            var dns = GetUnusedDnsRecords();
-
-            return DnsChecker.IsTxtRecordCorrect(domainName, dns.DomainCheckRecord.Value, Logger);
+            var isOwnershipProven = MailEngineFactory.ServerEngine.CheckDomainOwnership(name);
+            return isOwnershipProven;
         }
     }
 }

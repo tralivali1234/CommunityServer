@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -34,13 +25,11 @@ using ASC.Web.Community.Blogs.Views;
 using ASC.Web.Community.Product;
 using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Utility;
-using ASC.Web.Studio.Utility.HtmlUtility;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Web;
-using System.Web.UI.WebControls;
 
 namespace ASC.Web.Community.Blogs
 {
@@ -59,7 +48,6 @@ namespace ASC.Web.Community.Blogs
                 mainContainer.Options.InfoMessageText = "";
             }
 
-            mainContainer.CurrentPageCaption = BlogsResource.NewPost;
             Title = HeaderStringHelper.GetPageTitle(BlogsResource.NewPost);
 
             InitPreviewTemplate();
@@ -82,10 +70,10 @@ namespace ASC.Web.Community.Blogs
 
         private void InitScript()
         {
-            Page.RegisterBodyScripts("~/usercontrols/common/ckeditor/ckeditor-connector.js");
+            Page.RegisterBodyScripts("~/UserControls/Common/ckeditor/ckeditor-connector.js");
 
-            //Page.RegisterInlineScript("ckeditorConnector.onReady(function () {BlogsManager.blogsEditor = jq('#ckEditor').ckeditor({ toolbar : 'ComBlog', filebrowserUploadUrl: '" + RenderRedirectUpload() + @"'}).editor;});");
-            Page.RegisterInlineScript("ckeditorConnector.onReady(function () {" +
+            //Page.RegisterInlineScript("ckeditorConnector.load(function () {BlogsManager.blogsEditor = jq('#ckEditor').ckeditor({ toolbar : 'ComBlog', filebrowserUploadUrl: '" + RenderRedirectUpload() + @"'}).editor;});");
+            Page.RegisterInlineScript("ckeditorConnector.load(function () {" +
                                       "BlogsManager.blogsEditor = CKEDITOR.replace('ckEditor', { toolbar : 'ComBlog', filebrowserUploadUrl: '" + RenderRedirectUpload() + "'});" +
                                       "BlogsManager.blogsEditor.on('change',  function() {if (this.getData() == '') {jq('#btnPreview').addClass('disable');} else {jq('#btnPreview').removeClass('disable');}});"+
                                        "});");
@@ -140,17 +128,6 @@ namespace ASC.Web.Community.Blogs
             return resp;
         }
 
-        [AjaxMethod(HttpSessionStateRequirement.ReadWrite)]
-        public string[] GetPreview(string title, string html)
-        {
-            var result = new string[2];
-
-            result[0] = HttpUtility.HtmlEncode(title);
-            result[1] = HtmlUtility.GetFull(html);
-
-            return result;
-        }
-
         private Post AddNewBlog(BlogsEngine engine)
         {
             var authorId = SecurityContext.CurrentAccount.ID;
@@ -189,7 +166,7 @@ namespace ASC.Web.Community.Blogs
                 return newPost;
             }
 
-            Response.Redirect("addblog.aspx");
+            Response.Redirect("AddBlog.aspx");
             return null;
         }
 
@@ -200,7 +177,7 @@ namespace ASC.Web.Community.Blogs
                 var post = AddNewBlog(engine);
 
                 if (post != null)
-                    Response.Redirect("viewblog.aspx?blogid=" + post.ID.ToString());
+                    Response.Redirect("ViewBlog.aspx?blogid=" + post.ID.ToString());
                 else
                     Response.Redirect(Constants.DefaultPageUrl);
             }
@@ -221,13 +198,11 @@ namespace ASC.Web.Community.Blogs
                     UserID = SecurityContext.CurrentAccount.ID
                 };
 
-            var control = (ViewBlogView)LoadControl("~/products/community/modules/blogs/views/viewblogview.ascx");
+            var control = (ViewBlogView)LoadControl("~/Products/Community/Modules/Blogs/Views/ViewBlogView.ascx");
             control.IsPreview = true;
             control.post = post;
 
-            PlaceHolderPreview.Controls.Add(new Literal { Text = "<div class='headerPanel' style='margin-top:25px;'>" + BlogsResource.PreviewButton + "</div>" });
             PlaceHolderPreview.Controls.Add(control);
-            PlaceHolderPreview.Controls.Add(new Literal { Text = "<div style='margin-top:20px;'><a class='button blue big' href='javascript:void(0);' onclick='BlogsManager.HidePreview(); return false;'>" + BlogsResource.HideButton + "</a></div>" });
         }
 
         #region Events

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,11 +18,56 @@
 ;
 jq(document).ready(function () {
 
+    jq("#logout_ref").on('click', function () {
+        if (localStorage.getItem('onlyoffice') == 'logout') {
+            localStorage.setItem('onlyoffice', 'logout_');
+        } else {
+            localStorage.setItem('onlyoffice', 'logout');
+        }
+    });
+    
     jq.dropdownToggle({
         switcherSelector: ".studio-top-panel .product-menu",
         dropdownID: "studio_productListPopupPanel",
         addLeft: -15,
         toggleOnOver: true,
+        beforeShowFunction: function (switcherObj, dropdownItem) {
+            var wrapper = dropdownItem.find(".wrapper").removeClass("col2 col3");
+            var mainCount = wrapper.find(".main-nav-items .dropdown-content li:not(.dropdown-item-seporator)").length;
+            var customCount = wrapper.find(".custom-nav-items .dropdown-content li:not(.dropdown-item-seporator)").length;
+            var specCount = wrapper.find(".spec-nav-items .dropdown-content li:not(.dropdown-item-seporator)").length;
+
+            if (mainCount + customCount + specCount > 12) {
+                (mainCount + customCount < 13) || (customCount + specCount < 13) ?
+                    wrapper.addClass("col2") : wrapper.addClass("col3");
+            }
+        },
+        afterShowFunction: function (switcherObj, dropdownItem) {
+            var wrapper = dropdownItem.find(".wrapper");
+
+            wrapper.find(".dropdown-content li.dropdown-item-seporator").remove();
+
+            var seporator = jq("<li/>").addClass("dropdown-item-seporator");
+
+            var customContent = wrapper.find(".custom-nav-items");
+            var specContent = wrapper.find(".spec-nav-items");
+
+            var customLeft = wrapper.find(".custom-nav-items").position().left;
+            var specLeft = wrapper.find(".spec-nav-items").position().left;
+
+            var customCount = customContent.find("li").length;
+            var specCount = specContent.find("li").length;
+
+            if (customCount && customLeft == 0)
+                customContent.find(".dropdown-content").prepend(seporator.clone());
+
+            if (specCount && specLeft == 0)
+                specContent.find(".dropdown-content").prepend(seporator.clone());
+
+            if (specCount && customCount && customLeft == 150 && specLeft == 150)
+                specContent.find(".dropdown-content").prepend(seporator.clone());
+
+        }
     });
 
     jq.dropdownToggle({
@@ -101,10 +137,27 @@ jq(document).ready(function () {
         .replaceWith(jq("#aboutCompanyPopupBody").removeClass("display-none").addClass("containerBodyBlock"));
 
     $aboutBtn.on("click", function () {
-        StudioBlockUIManager.blockUI('#aboutCompanyPopup', 680, 600);
+        StudioBlockUIManager.blockUI('#aboutCompanyPopup', 680);
         jq('.studio-action-panel').hide();
     });
 
+    if (jq("#appsPopupBody").length == 1) {
+        var $appsBtn = jq("#studio_productListPopupPanel .apps .dropdown-item:first");
+        jq.tmpl("template-blockUIPanel", {
+            id: "appsPopup",
+            headerTest: jq.trim($appsBtn.text())
+        })
+        .insertAfter($appsBtn)
+        .addClass("confirmation-popup");
+
+        jq("#appsPopup .containerBodyBlock:first")
+            .replaceWith(jq("#appsPopupBody").removeClass("display-none").addClass("containerBodyBlock"));
+
+        $appsBtn.on("click", function () {
+            StudioBlockUIManager.blockUI('#appsPopup', 565);
+            jq('.studio-action-panel').hide();
+        });
+    }
 
     if (jq("#debugInfoPopUpBody").length == 1) {
         var $debugBtn = jq("#studio_myStaffPopupPanel .dropdown-debuginfo-btn:first");
@@ -119,12 +172,52 @@ jq(document).ready(function () {
         jq("#debugInfoPopUp .button.blue.middle").on("click", function(){jq.unblockUI();});
 
         $debugBtn.on("click", function () {
-            StudioBlockUIManager.blockUI('#debugInfoPopUp', 1000, 300, -300);
+            StudioBlockUIManager.blockUI('#debugInfoPopUp', 1000);
             jq('.studio-action-panel').hide();
         });
     }
+    if (jQuery.browser.msie || /iPad|iPhone|iPod/.test(navigator.userAgent) || /Sailfish/.test(navigator.userAgent) || /^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
+        svg4everybody();
+    }
 
 
+    var $dropGiftPopupPanel = jq("#studio_dropGiftPopupPanel");
+
+    if ($dropGiftPopupPanel.length) {
+        jq.dropdownToggle({
+            switcherSelector: ".studio-top-panel .giftBox",
+            dropdownID: "studio_dropGiftPopupPanel",
+            addTop: 5,
+            addLeft: -392
+        });
+
+        $dropGiftPopupPanel.find(".left-btn").on("click", function () {
+            if (Teamlab.profile.isAdmin) {
+                $dropGiftPopupPanel.hide();
+                location.href = jq(this).data("url");
+            } else {
+                $dropGiftPopupPanel.hide();
+            }
+        });
+
+        $dropGiftPopupPanel.find(".right-btn").on("click", function () {
+            if (Teamlab.profile.isAdmin) {
+                $dropGiftPopupPanel.hide();
+            } else {
+                Teamlab.markGiftAsReaded({}, {
+                    success: function () {
+                        $dropGiftPopupPanel.hide();
+                        jq(".studio-top-panel .giftBox").remove();
+                    },
+                    error: function (p, e) {
+                        $dropGiftPopupPanel.hide();
+                        jq(".studio-top-panel .giftBox").remove();
+                        window.console.error(e);
+                    }
+                });
+            }
+        });
+    }
 });
 
 var Searcher = new function () {
@@ -186,7 +279,7 @@ var UnreadMailManager = new function () {
                     success: onGetDropMail,
                     error: function(p, e) {
                         jq("#studio_dropMailPopupPanel").hide();
-                        window.toastr.error(e[0]);
+                        window.console.error(e);
                     }
                 });
                 event.preventDefault();
@@ -235,28 +328,52 @@ var UnreadMailManager = new function () {
 
     function onGetDropMail(params, response) {
         var $dropMailBox = jq('#drop-mail-box'),
-            $markAllBtn = $dropMailBox.find('.mark-all-btn'),
-            dropMailList = $dropMailBox.find('.list');
+            dropMailList = $dropMailBox.find('.list'),
+            mailActiveBox = jq(".mailActiveBox");
 
         if (response) {
-            var mails = response,
-                ln = mails.length < 10 ? mails.length : 10;
-                        
+            var mails = response;
+
             dropMailList.empty();
 
-            if (ln) {
-                for (var i = 0; i < ln; i++) {
-                    try {
-                        var template = getMailTemplate(mails[i]);
-                        jq.tmpl('dropMailTmpl', template).appendTo(dropMailList);
-                    } catch (e) {
-                        toastr.error(e);
+            var isListEmpty = true;
+
+            if (mails.length > 0) {
+                try {
+                    var unreadMails = [];
+                    var i, n;
+                    for (i = 0, n = mails.length; i < n; i++) {
+                        if (mails[i].isNew) {
+                            if (unreadMails.length >= 10)
+                                break;
+
+                            if (!mails[i].subject || mails[i].subject.length === 0)
+                                mails[i].subject = ASC.Resources.Master.Resource.MailNoSubject;
+
+                            var unreadMail = getMailTemplate(mails[i]);
+                            unreadMails.push(unreadMail);
+                        }
                     }
+
+                    if (unreadMails.length > 0) {
+                        isListEmpty = false;
+                        jq.tmpl("dropMailsTmpl", unreadMails).appendTo(dropMailList);
+                    } else {
+                        hideLoaderMail(true);
+                        var mailUrl =  mailActiveBox.prop("href");
+                        setTimeout(function () { window.location.href = mailUrl; }, 1000);
+                        return;
+                    }
+
+                } catch (e) {
+                    console.error(e);
                 }
+
             } else {
-                jq(".mailActiveBox").removeClass("has-led");
+                mailActiveBox.removeClass("has-led");
             }
-            hideLoaderMail(!ln);
+
+            hideLoaderMail(isListEmpty);
             dropMailList.scrollTop(0);
             return;
         }
@@ -300,6 +417,10 @@ var UnreadMailManager = new function () {
                 }
 
                 jq("#studio_dropMailPopupPanel").hide();
+            },
+            error: function (p, e) {
+                jq("#studio_dropMailPopupPanel").hide();
+                window.console.error(e);
             }
         });
     }

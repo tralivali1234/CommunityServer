@@ -1,25 +1,16 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -46,6 +37,10 @@ window.ServiceFactory = (function() {
         myProfile = {},
         portalSettings = {},
         portalQuotas = {},
+        post = 'post',
+        get = 'get',
+        dlt = 'delete',
+        put = 'put',
         supportedImgs = [],
         supportedDocs = [],
         supportedTypes = [],
@@ -88,7 +83,9 @@ window.ServiceFactory = (function() {
             gbuzz: { name: 'gbuzz', type: 2, title: 'Google Buzz' },
             gtalk: { name: 'gtalk', type: 2, title: 'Google Talk' },
             phone: { name: 'phone', type: 1, title: 'Tel' },
-            mobphone: { name: 'mobphone', type: 1, title: 'Mobile' }
+            mobphone: { name: 'mobphone', type: 1, title: 'Mobile' },
+            extmobphone: { name: 'extmobphone', type: 1, title: 'Mobile' },
+            extmail: { name: 'extmail', type: 0, title: 'Email' }
         },
         contactTypes = {
             phone: { id: 0, title: 'Phone', categories: { home: { id: 0, title: 'Home' }, work: { id: 1, title: 'Work' }, mobile: { id: 2, title: 'Mobile' }, fax: { id: 3, title: 'Fax' }, direct: { id: 4, title: 'Direct' }, other: { id: 5, title: 'Other' } } },
@@ -169,277 +166,304 @@ window.ServiceFactory = (function() {
             Restrict: '3'
         },
         apiAnchors = [
-            { handler: 'cmt-blog', re: /blog\.json/, method: 'post' },
-            { handler: 'cmt-blog', re: /blog\/[\w\d-]+\.json/ },
-            { handler: 'cmt-topic', re: /forum\/topic\/[\w\d-]+\.json/ },
-            { handler: 'cmt-event', re: /event\/[\w\d-]+\.json/ },
-            { handler: 'cmt-event', re: /event\.json/, method: 'post' },
-            { handler: 'cmt-bookmark', re: /bookmark\/[\w\d-]+\.json/ },
-            { handler: 'cmt-bookmark', re: /bookmark\.json/, method: 'post' },
-            { handler: 'cmt-blogs', re: /blog\.json/, method: 'get' },
-            { handler: 'cmt-blogs', re: /blog\/@search\/.+\.json/, method: 'get' },
-            { handler: 'cmt-topics', re: /forum\/topic\/recent\.json/ },
-            { handler: 'cmt-topics', re: /forum\/@search\/.+\.json/, method: 'get' },
-            { handler: 'cmt-categories', re: /forum\.json/ },
-            { handler: 'cmt-events', re: /event\.json/, method: 'get' },
-            { handler: 'cmt-events', re: /event\/@search\/.+\.json/, method: 'get' },
-            { handler: 'cmt-bookmarks', re: /bookmark\/top\/recent\.json/, method: 'get' },
-            { handler: 'cmt-bookmarks', re: /bookmark\/@search\/.+\.json/, method: 'get' },
-            { handler: 'prj-task', re: /project\/[\w\d-]+\/task\.json/, method: 'post' },
-            { handler: 'prj-task', re: /project\/task\/[\w\d-]+\.json/ },
-            { handler: 'prj-task', re: /project\/task\/[\w\d-]+\/[\w\d-]+\.json/ },
-            { handler: 'prj-task', re: /project\/task\/[\w\d-]+\/status\.json/ },
-            { handler: 'prj-task', re: /project\/task\/[\w\d-]+\/[\w\d-]+\/status\.json/ },
-            { handler: 'prj-tasks', re: /project\/[\w\d-]+\/task\.json/, method: 'get' },
-            { handler: 'prj-tasks', re: /project\/[\w\d-]+\/task\/@self\.json/ },
-            { handler: 'prj-tasks', re: /project\/[\w\d-]+\/task\/filter\.json/ },
-            { handler: 'prj-tasks', re: /project\/task\/filter\.json/ },
-            { handler: 'prj-tasks', re: /project\/task\.json\?taskid/ },
-            { handler: 'prj-simpletasks', re: /project\/task\/filter\/simple\.json/, method: 'get' },
-            { handler: 'prj-tasks', re: /project\/task\/@self\.json/ },
-            { handler: 'prj-milestone', re: /project\/milestone\/[\w\d-]+\.json/ },
-            { handler: 'prj-milestone', re: /project\/[\w\d-]+\/milestone\.json/, method: 'post' },
-            { handler: 'prj-milestones', re: /project\/[\w\d-]+\/milestone\.json/, method: 'get' },
-            { handler: 'prj-milestones', re: /project\/milestone\/[\w\d-]+\/[\w\d-]+\/[\w\d-]+\.json/ },
-            { handler: 'prj-milestones', re: /project\/milestone\/[\w\d-]+\/[\w\d-]+\.json/ },
-            { handler: 'prj-milestones', re: /project\/milestone\/late\.json/ },
-            { handler: 'prj-milestones', re: /project\/milestone\.json/ },
-            { handler: 'prj-milestones', re: /project\/milestone\/filter\.json/ },
-            { handler: 'prj-milestone', re: /project\/milestone\/[\w\d-]+\/status\.json/ },
-            { handler: 'prj-discussion', re: /project\/message\/[\w\d-]+\.json/ },
-            { handler: 'prj-discussion', re: /project\/[\w\d-]+\/message\.json/, method: 'post' },
-            { handler: 'prj-discussions', re: /project\/message\.json/ },
-            { handler: 'prj-discussions', re: /project\/[\w\d-]+\/message\.json/, method: 'get' },
-            { handler: 'prj-discussions', re: /project\/message\/filter\.json/ },
+            apiHandler('cmt-blog', /blog\.json/, post),
+            apiHandler('cmt-blog', /blog\/[\w\d-]+\.json/),
+            apiHandler('cmt-topic', /forum\/topic\/[\w\d-]+\.json/),
+            apiHandler('cmt-event', /event\/[\w\d-]+\.json/),
+            apiHandler('cmt-event', /event\.json/, post),
+            apiHandler('cmt-bookmark', /bookmark\/[\w\d-]+\.json/),
+            apiHandler('cmt-bookmark', /bookmark\.json/, post),
+            apiHandler('cmt-blogs', /blog\.json/, get),
+            apiHandler('cmt-blogs', /blog\/@search\/.+\.json/, get),
+            apiHandler('cmt-topics', /forum\/topic\/recent\.json/),
+            apiHandler('cmt-topics', /forum\/@search\/.+\.json/, get),
+            apiHandler('cmt-categories', /forum\.json/),
+            apiHandler('cmt-events', /event\.json/, get),
+            apiHandler('cmt-events', /event\/@search\/.+\.json/, get),
+            apiHandler('cmt-bookmarks', /bookmark\/top\/recent\.json/, get),
+            apiHandler('cmt-bookmarks', /bookmark\/@search\/.+\.json/, get),
+            apiHandler('prj-task', /project\/[\w\d-]+\/task\.json/, post),
+            apiHandler('prj-task', /project\/task\/[\w\d-]+\.json/),
+            apiHandler('prj-task', /project\/task\/[\w\d-]+\/status\.json/),
+            apiHandler('prj-task', /project\/task\/[\w\d-]+\/copy\.json/),
+            apiHandler('prj-task', /project\/task\/[\w\d-]+\/milestone\.json/),
+            apiHandler('prj-tasks', /project\/[\w\d-]+\/task\.json/, get),
+            apiHandler('prj-tasks', /project\/[\w\d-]+\/task\/@self\.json/),
+            apiHandler('prj-tasks', /project\/[\w\d-]+\/task\/filter\.json/),
+            apiHandler('prj-tasks', /project\/task\/filter\.json/),
+            apiHandler('prj-tasks', /project\/task\.json\?taskid/),
+            apiHandler('prj-tasks', /project\/task\/status\.json/),
+            apiHandler('prj-tasks', /project\/task\/milestone\.json/),
+            apiHandler('prj-tasks', /project\/task\.json/, dlt),
+            apiHandler('prj-simpletasks', /project\/task\/filter\/simple\.json/, get),
+            apiHandler('prj-tasks', /project\/task\/@self\.json/),
+            apiHandler('prj-subtask', /project\/task\/[\d]+\.json/, post),
+            apiHandler('prj-subtask', /project\/task\/[\d]+\/[\d]+\/copy\.json/),
+            apiHandler('prj-subtask', /project\/task\/[\d]+\/[\d]+\.json/),
+            apiHandler('prj-subtask', /project\/task\/[\d]+\/[\d]+\/status\.json/),
+            apiHandler('prj-milestone', /project\/milestone\/[\w\d-]+\.json/),
+            apiHandler('prj-milestone', /project\/[\w\d-]+\/milestone\.json/, post),
+            apiHandler('prj-milestones', /project\/[\w\d-]+\/milestone\.json/, get),
+            apiHandler('prj-milestones', /project\/milestone\/[\w\d-]+\/[\w\d-]+\/[\w\d-]+\.json/),
+            apiHandler('prj-milestones', /project\/milestone\/[\w\d-]+\/[\w\d-]+\.json/),
+            apiHandler('prj-milestones', /project\/milestone\/late\.json/),
+            apiHandler('prj-milestones', /project\/milestone\.json/),
+            apiHandler('prj-milestones', /project\/milestone\/filter\.json/),
+            apiHandler('prj-milestone', /project\/milestone\/[\w\d-]+\/status\.json/),
+            apiHandler('prj-discussion', /project\/message\/[\w\d-]+\.json/),
+            apiHandler('prj-discussion', /project\/[\w\d-]+\/message\.json/, post),
+            apiHandler('prj-discussions', /project\/message\.json/),
+            apiHandler('prj-discussions', /project\/[\w\d-]+\/message\.json/, get),
+            apiHandler('prj-discussions', /project\/message\/filter\.json/),
 
-            { handler: 'prj-project', re: /project\/[\w\d-]+\/contact\.json/, method: 'post' },
-            { handler: 'prj-project', re: /project\/[\w\d-]+\/contact\.json/, method: 'delete' },
-            { handler: 'prj-projects', re: /project[\/]*[@self|@follow]*\.json/ },
-            { handler: 'prj-projects', re: /project\/filter\.json/ },
-            { handler: 'prj-projects', re: /project\/contact\/[\w\d-]+\.json/ },
-            { handler: 'prj-searchentries', re: /project\/@search\/.+\.json/ },
-            { handler: 'prj-projectperson', re: /project\/[\w\d-]+\/team\.json/, method: 'post' },
-            { handler: 'prj-projectperson', re: /project\/[\w\d-]+\/team\.json/, method: 'delete' },
-            { handler: 'prj-projectpersons', re: /project\/[\w\d-]+\/team\.json/, method: 'get' },
-            { handler: 'prj-timespend', re: /project\/time\/[\w\d-]+\.json/ },
-            { handler: 'prj-timespends', re: /project\/time\/filter\.json/, method: 'get' },
-            { handler: 'prj-timespends', re: /project\/task\/[\w\d-]+\/time\.json/, method: 'get' },
-            { handler: 'prj-activities', re: /project\/activities\/filter\.json/ },
-            { handler: 'prj-project', re: /project\.json/, method: 'post' },
-            { handler: 'doc-miss', re: /files\/fileops.json/ },
-            { handler: 'doc-folder', re: /files\/[@\w\d-]+\.json/ },
-            { handler: 'doc-folder', re: /files\/[\w\d-]+\/[text|html|file]+\.json/ },
-            { handler: 'doc-folder', re: /project\/[\w\d-]+\/files\.json/ },
-            { handler: 'doc-files', re: /project\/task\/[\w\d-]+\/files\.json/ },
-            { handler: 'doc-files', re: /project\/[\w\d-]+\/entityfiles\.json/ },
-            { handler: 'doc-files', re: /crm\/[\w\d-]+\/[\w\d-]+\/files\.json/, method: 'get' },
-            { handler: 'doc-file', re: /files\/file\/[\w\d-]+\.json/ },
-            { handler: 'doc-file', re: /files\/[\w\d-]+\/upload\.xml/ },
-            { handler: 'doc-file', re: /files\/[\w\d-]+\/upload\.json/ },
-            { handler: 'doc-session', re: /files\/[\w\d-]+\/upload\/create_session\.json/ },
-            { handler: 'doc-file', re: /crm\/files\/[\w\d-]+\.json/ },
-            { handler: 'doc-file', re: /crm\/[case|contact|opportunity]+\/[\w\d-]+\/files\/upload\.xml/ },
-            { handler: 'doc-file', re: /crm\/[case|contact|opportunity]+\/[\w\d-]+\/files\/upload\.json/ },
-            { handler: 'doc-file', re: /crm\/[case|contact|opportunity]+\/[\w\d-]+\/files\/text\.json/ },
-            { handler: 'doc-miss', re: /files\/fileops.json/ },
-            { handler: 'doc-check', re: /files\/checkdocservice.json/ },
-            { handler: 'crm-addresses', re: /crm\/contact\/[\w\d-]+\/data\.json/, method: 'get' },
-            { handler: 'crm-address', re: /crm\/contact\/[\w\d-]+\/data\/[\w\d-]+\.json/ },
-            { handler: 'crm-address', re: /crm\/contact\/[\w\d-]+\/data\.json/, method: 'post' },
-            { handler: 'crm-address', re: /crm\/contact\/[\w\d-]+\/batch\.json/ },
-            { handler: 'crm-contact', re: /crm\/contact\/[\w\d-]+\.json/ },
-            { handler: 'crm-contact', re: /crm\/contact\/company\/[\w\d-]+\/type\.json/, method: 'post' },
-            { handler: 'crm-contact', re: /crm\/contact\/company\/[\w\d-]+\/person\.json/, method: 'post' },
-            { handler: 'crm-contact', re: /crm\/contact\/company\/[\w\d-]+\/person\.json/, method: 'delete' },
-            { handler: 'crm-contact', re: /crm\/[case|opportunity]+\/[\w\d-]+\/contact\.json/, method: 'post' },
-            { handler: 'crm-contact', re: /crm\/[case|opportunity]+\/[\w\d-]+\/contact\/[\w\d-]+\.json/, method: 'post' },
-            { handler: 'crm-contact', re: /crm\/[case|opportunity]+\/[\w\d-]+\/contact\/[\w\d-]+\.json/ },
-            { handler: 'crm-contacts', re: /crm\/contact\/bycontactinfo\.json/, method: 'get' },
-            { handler: 'crm-contact', re: /crm\/contact\/merge\.json/ },
-            { handler: 'crm-socialmediaavatars', re: /crm\/contact\/socialmediaavatar\.json/ },
-            { handler: 'crm-tweets', re: /crm\/contact\/[\w\d-]+\/tweets\.json/ },
-            { handler: 'crm-twitterprofiles', re: /crm\/contact\/twitterprofile\.json/ },
-            { handler: 'crm-facebookprofiles', re: /crm\/contact\/facebookprofile\.json/ },
-            { handler: 'crm-progressitem', re: /crm\/contact\/mailsmtp\/send\.json/ },
-            { handler: 'crm-progressitem', re: /crm\/contact\/mailsmtp\/status\.json/ },
-            { handler: 'crm-progressitem', re: /crm\/contact\/mailsmtp\/cancel\.json/ },
-            { handler: 'crm-progressitem', re: /crm\/[contact|person|company|opportunity|case]+\/import\/status\.json/ },
-            { handler: 'crm-progressitem', re: /crm\/contact\/export\/status\.json/ },
-            { handler: 'crm-progressitem', re: /crm\/contact\/export\/cancel\.json/ },
-            { handler: 'crm-progressitem', re: /crm\/contact\/export\/start\.json/ },
-            { handler: 'crm-fileuploadresult', re: /crm\/import\/uploadfake\.json/ },
-            { handler: 'crm-task', re: /crm\/task\.json/ },
-            { handler: 'crm-task', re: /crm\/task\/[\w\d-]+\.json/ },
-            { handler: 'crm-task', re: /crm\/task\/[\w\d-]+\/close\.json/ },
-            { handler: 'crm-task', re: /crm\/task\/[\w\d-]+\/reopen\.json/ },
-            { handler: 'crm-opportunity', re: /crm\/opportunity\/[\w\d-]+\.json/ },
-            { handler: 'crm-opportunity', re: /crm\/opportunity\/[\w\d-]+\/stage\/[\w\d-]+\.json/ },
-            { handler: 'crm-opportunity', re: /crm\/contact\/[\w\d-]+\/opportunity\/[\w\d-]+\.json/ },
-            { handler: 'crm-dealmilestone', re: /crm\/opportunity\/stage\/[\w\d-]+\.json/ },
-            { handler: 'crm-dealmilestone', re: /crm\/opportunity\/stage\/[\w\d-]+\/color\.json/ },
-            { handler: 'crm-dealmilestone', re: /crm\/opportunity\/stage\.json/, method: 'post' },
-            { handler: 'crm-dealmilestones', re: /crm\/opportunity\/stage\/reorder\.json/ },
-            { handler: 'crm-dealmilestones', re: /crm\/opportunity\/stage\.json/, method: 'get' },
-            { handler: 'crm-contactstatus', re: /crm\/contact\/status\/[\w\d-]+\/color\.json/ },
-            { handler: 'crm-contactstatus', re: /crm\/contact\/status\/[\w\d-]+\.json/ },
-            { handler: 'crm-contactstatus', re: /crm\/contact\/status\.json/, method: 'post' },
-            { handler: 'crm-contactstatuses', re: /crm\/contact\/status\/reorder\.json/ },
-            { handler: 'crm-contactstatuses', re: /crm\/contact\/status\.json/, method: 'get' },
-            { handler: 'crm-contacttypekind', re: /crm\/contact\/type\/[\w\d-]+\.json/ },
-            { handler: 'crm-contacttypekind', re: /crm\/contact\/type\.json/, method: 'post' },
-            { handler: 'crm-contacttypekinds', re: /crm\/contact\/type\/reorder\.json/ },
-            { handler: 'crm-contacttypekinds', re: /crm\/contact\/type\.json/, method: 'get' },
-            { handler: 'crm-customfield', re: /crm\/[contact|person|company|opportunity|case]+\/customfield\/[\w\d-]+\.json/ },
-            { handler: 'crm-customfield', re: /crm\/[contact|person|company|opportunity|case]+\/customfield\.json/ },
-            { handler: 'crm-customfields', re: /crm\/[contact|person|company|opportunity|case]+\/customfield\/definitions\.json/ },
-            { handler: 'crm-customfields', re: /crm\/[contact|person|company|opportunity|case]+\/customfield\/reorder\.json/ },
-            { handler: 'crm-tag', re: /crm\/[case|contact|opportunity]+\/tag\.json/ },
-            { handler: 'crm-tag', re: /crm\/[case|contact|opportunity]+\/taglist\.json/ },
-            { handler: 'crm-tag', re: /crm\/[case|contact|opportunity]+\/[\w\d-]+\/tag\.json/ },
-            { handler: 'crm-tags', re: /crm\/[case|contact|opportunity]+\/tag\/unused\.json/ },
-            { handler: 'crm-tags', re: /crm\/[case|contact|opportunity]+\/tag\/[\w\d-]+\.json/ },
-            { handler: 'crm-fulltags', re: /crm\/[case|contact|opportunity]+\/tag\.json/, method: 'get' },
-            { handler: 'crm-caseitem', re: /crm\/case\/[\w\d-]+\/close\.json/ },
-            { handler: 'crm-caseitem', re: /crm\/case\/[\w\d-]+\/reopen\.json/ },
-            { handler: 'crm-cases', re: /crm\/cases\.json/ },
-            { handler: 'crm-cases', re: /crm\/case\/filter\.json/ },
-            { handler: 'crm-cases', re: /crm\/case\/byprefix\.json/ },
-            { handler: 'crm-contacts', re: /crm\/contact\.json/ },
-            { handler: 'crm-basecontacts', re: /crm\/contact\/byprefix\.json/ },
-            { handler: 'crm-contacts', re: /crm\/contact\/filter\.json/ },
-            { handler: 'crm-simplecontacts', re: /crm\/contact\/simple\/filter\.json/ },
-            { handler: 'crm-basecontacts', re: /crm\/contact\/mail\.json/ },
-            { handler: 'crm-contacts', re: /crm\/contact\/company\/[\w\d-]+\/person\.json/, method: 'get' },
-            { handler: 'crm-contacts', re: /crm\/[case|opportunity]+\/[\w\d-]+\/contact\.json/, method: 'get' },
-            { handler: 'crm-contacts', re: /crm\/contact\/access\.json/ },
-            { handler: 'crm-contacts', re: /crm\/contact\/[\w\d-]+\/access\.json/ },
-            { handler: 'crm-cases', re: /crm\/case\/access\.json/ },
-            { handler: 'crm-cases', re: /crm\/case\/[\w\d-]+\/access\.json/ },
-            { handler: 'crm-opportunities', re: /crm\/opportunity\/access\.json/ },
-            { handler: 'crm-opportunities', re: /crm\/opportunity\/[\w\d-]+\/access\.json/ },
-            //{handler : 'crm-customfields', re : /crm\/contact\/[\w\d-]+\/access\.json/},
-            { handler: 'crm-tasks', re: /crm\/task\/filter\.json/ },
-            { handler: 'crm-opportunities', re: /crm\/opportunity\/filter\.json/ },
-            { handler: 'crm-opportunities', re: /crm\/opportunity\/bycontact\/[\w\d-]+\.json/ },
-            { handler: 'crm-opportunities', re: /crm\/opportunity\/byprefix\.json/ },
-            { handler: 'crm-taskcategory', re: /crm\/task\/category\/[\w\d-]+\.json/ },
-            { handler: 'crm-taskcategory', re: /crm\/task\/category\/[\w\d-]+\/icon\.json/ },
-            { handler: 'crm-taskcategory', re: /crm\/task\/category\.json/, method: 'post' },
-            { handler: 'crm-taskcategories', re: /crm\/task\/category\/reorder\.json/ },
-            { handler: 'crm-taskcategories', re: /crm\/task\/category\.json/, method: 'get' },
-            { handler: 'crm-historyevent', re: /crm\/history\.json/ },
-            { handler: 'crm-historyevent', re: /crm\/history\/[\w\d-]+.json/ },
-            { handler: 'crm-historyevent', re: /crm\/[contact|opportunity|case]+\/[\w\d-]+\/files\.json/, method: 'post' },
-            { handler: 'crm-historyevents', re: /crm\/history\/filter\.json/ },
-            { handler: 'crm-historycategory', re: /crm\/history\/category\/[\w\d-]+\.json/ },
-            { handler: 'crm-historycategory', re: /crm\/history\/category\/[\w\d-]+\/icon\.json/ },
-            { handler: 'crm-historycategory', re: /crm\/history\/category\.json/, method: 'post' },
-            { handler: 'crm-historycategories', re: /crm\/history\/category\/reorder\.json/ },
-            { handler: 'crm-historycategories', re: /crm\/history\/category\.json/, method: 'get' },
-            { handler: 'crm-currency', re: /crm\/settings\/currency\.json/ },
-            { handler: 'crm-currencies', re: /crm\/settings\/currency\.json/, method: 'get' },
-            { handler: 'crm-smtpsettings', re: /crm\/settings\/smtp\.json/ },
-            { handler: 'crm-rootfolder', re: /crm\/files\/root\.json/ },
-            { handler: 'crm-tasktemplatecontainer', re: /crm\/[contact|person|company|opportunity|case]+\/tasktemplatecontainer\.json/ },
-            { handler: 'crm-tasktemplatecontainer', re: /crm\/tasktemplatecontainer\/[\w\d-]+\.json/ },
-            { handler: 'crm-tasktemplate', re: /crm\/tasktemplatecontainer\/[\w\d-]+\/tasktemplate\.json/ },
-            { handler: 'crm-tasktemplate', re: /crm\/tasktemplatecontainer\/tasktemplate\/[\w\d-]+\.json/ },
-            { handler: 'crm-invoiceline', re: /crm\/invoiceline\.json/ },
-            { handler: 'crm-invoiceline', re: /crm\/invoice\/[\w\d-]+\.json/ },
-            { handler: 'crm-invoice', re: /crm\/invoice\.json/, method: 'post' },
-            { handler: 'crm-invoice', re: /crm\/invoice\/[\w\d-]+\.json/ },
-            { handler: 'crm-invoice', re: /crm\/invoice\/sample\.json/ },
-            { handler: 'crm-invoice', re: /crm\/invoice\/sample\.json/ },
-            { handler: 'crm-invoice', re: /crm\/invoice\/bynumber\.json/ },
-            { handler: 'crm-invoiceJsonData', re: /crm\/invoice\/jsondata\/[\w\d-]+\.json/ },
-            { handler: 'crm-invoices', re: /crm\/invoice\.json/, method: 'delete' },
-            { handler: 'crm-invoicesAndItems', re: /crm\/invoice\/status\/[\w\d-]+\.json/ },
-            { handler: 'crm-invoices', re: /crm\/invoice\/filter\.json/ },
-            { handler: 'crm-invoices', re: /crm\/[contact|person|company|opportunity]+\/invoicelist\/[\w\d-]+\.json/ },
-            { handler: 'crm-invoiceItem', re: /crm\/invoiceitem\.json/, method: 'post' },
-            { handler: 'crm-invoiceItems', re: /crm\/invoiceitem\.json/, method: 'delete' },
-            { handler: 'crm-invoiceItems', re: /crm\/invoiceitem\/filter\.json/ },
-            { handler: 'crm-invoiceTax', re: /crm\/invoice\/tax\/[\w\d-]+\.json/ },
-            { handler: 'crm-invoiceTax', re: /crm\/invoice\/tax\.json/, method: 'post' },
-            { handler: 'crm-invoiceTaxes', re: /crm\/invoice\/tax\.json/, method: 'get' },
-            { handler: 'crm-invoiceSettings', re: /crm\/invoice\/settings\.json/ },
-            { handler: 'crm-invoiceSettings', re: /crm\/invoice\/settings\/name\.json/ },
-            { handler: 'crm-invoiceSettings', re: /crm\/invoice\/settings\/terms\.json/ },
-            { handler: 'doc-file', re: /crm\/invoice\/[\w\d-]+\/pdf\.json/ },
-            { handler: 'crm-converterData', re: /crm\/invoice\/converter\/data\.json/ },            
-            { handler: 'crm-currencyRates', re: /crm\/currency\/rates\.json/, method: 'get' },
-            { handler: 'crm-currencyRate', re: /crm\/currency\/rates\/[\w\d-]+\.json/ },
-            { handler: 'crm-currencyRate', re: /crm\/currency\/rates\/\w{3}\/\w{3}\.json/, method: 'get' },
-            { handler: 'crm-currencyRate', re: /crm\/currency\/rates\.json/, method: 'post' },            
-            { handler: 'crm-voipNumbers', re: /crm\/voip\/numbers\/available\.json/ },
-            { handler: 'crm-voipNumbers', re: /crm\/voip\/numbers\/existing\.json/ },
-            { handler: 'crm-voipNumber', re: /crm\/voip\/numbers\.json/, method: 'post' },
-            { handler: 'crm-voipNumber', re: /crm\/voip\/numbers\/current\.json/ },
-            { handler: 'crm-voipCall', re: /crm\/voip\/call\.json/, method: 'post' },
-            { handler: 'crm-voipCalls', re: /crm\/voip\/call\.json/, method: 'get' },
-            { handler: 'crm-voipCall', re: /crm\/voip\/call\/[\w\d-]+\.json/, method: 'get' },
-            { handler: 'crm-voipCalls', re: /crm\/voip\/call\/missed\.json/, method: 'get' },
-            { handler: 'crm-voipUploads', re: /crm\/voip\/uploads\.json/ },
-            { handler: 'authentication', re: /authentication\.json/ },
-            { handler: 'settings', re: /settings\.json/ },
-            { handler: 'security', re: /settings\/security\.json/ },
-            { handler: 'access', re: /settings\/security\/access\.json/ },
-            { handler: 'administrator', re: /settings\/security\/administrator\.json/ },
-            { handler: 'quotas', re: /settings\/quota\.json/ },
-            { handler: 'profile', re: /people\/[\w\d-]+\.json/ },
-            { handler: 'isme', re: /people\/@self\.json/ },
-            { handler: 'profiles', re: /people\/status\/[\w\d-]+\.json/ },
-            { handler: 'profiles', re: /people\/status\/[\w\d-]+\/@search\/.+\.json/ },
-            { handler: 'profiles', re: /people\/status\/[\w\d-]+\/search\.json/ },
-            { handler: 'profiles', re: /people\.json/ },
-            { handler: 'profiles', re: /people\/@search\/.+\.json/ },
-            { handler: 'profiles', re: /people\/search\.json/ },
-            { handler: 'profiles', re: /people\/filter\.json/ },
-            { handler: 'profiles', re: /people\/type\/[\w\d-]+\.json/ },
-            { handler: 'profiles', re: /people\/invite\.json/ },
-            { handler: 'text', re: /people\/remindpwd\.json/ },
-            { handler: 'text', re: /people\/thirdparty\/linkaccount\.json/ },
-            { handler: 'text', re: /people\/thirdparty\/unlinkaccount\.json/ },
-            { handler: 'group', re: /group\/[\w\d-]+\.json/ },
-            { handler: 'groups', re: /group\.json/ },
-            { handler: 'crm-tasks', re: /crm\/contact\/task\/group\.json/ },
-            { handler: 'crm-tag', re: /crm\/[company|person]+\/[\w\d-]+\/tag\/group\.json/ },
-            { handler: 'crm-voipNumber', re: /crm\/voip\/numbers\/[\w]+\/settings.json/, method: 'put' },
-            { handler: 'crm-voipSettings', re: /crm\/voip\/numbers\/settings.json/ },
-            { handler: 'comment', re: /comment\.json/, method: 'post' },
-            { handler: 'comments', re: /comment\.json/, method: 'get' },
+            apiHandler('prj-project', /project\/[\d-]+\.json/, get),
+            apiHandler('prj-project', /project\/[\d-]+\/status\.json/, put),
+            apiHandler('prj-project', /project\/[\w\d-]+\/contact\.json/, post),
+            apiHandler('prj-project', /project\/[\w\d-]+\/contact\.json/, dlt),
+            apiHandler('prj-projects', /project[\/]*[@self|@follow]*\.json/),
+            apiHandler('prj-projects', /project\/filter\.json/),
+            apiHandler('prj-projects', /project\/contact\/[\w\d-]+\.json/),
+            apiHandler('prj-searchentries', /project\/@search\/.+\.json/),
+            apiHandler('prj-projectperson', /project\/[\w\d-]+\/team\.json/, post),
+            apiHandler('prj-projectperson', /project\/[\w\d-]+\/team\.json/, dlt),
+            apiHandler('prj-projectpersons', /project\/[\w\d-]+\/team\.json/, get),
+            apiHandler('prj-projectpersons', /project\/[\w\d-]+\/teamExcluded\.json/, get),
+            apiHandler('prj-timespend', /project\/time\/[\w\d-]+\.json/),
+            apiHandler('prj-timespends', /project\/time\/times\/status\.json/, put),
+            apiHandler('prj-timespends', /project\/time\/filter\.json/, get),
+            apiHandler('prj-timespends', /project\/task\/[\w\d-]+\/time\.json/, get),
+            apiHandler('prj-activities', /project\/activities\/filter\.json/),
+            apiHandler('prj-project', /project\.json/, post),
+            apiHandler('doc-folder', /files\/[@\w\d-]+\.json/),
+            apiHandler('doc-folder', /files\/[\w\d-]+\/[text|html|file]+\.json/),
+            apiHandler('doc-folder', /project\/[\w\d-]+\/files\.json/),
+            apiHandler('doc-files', /project\/task\/[\w\d-]+\/files\.json/),
+            apiHandler('doc-files', /project\/[\w\d-]+\/entityfiles\.json/),
+            apiHandler('doc-files', /crm\/[\w\d-]+\/[\w\d-]+\/files\.json/, get),
+            apiHandler('doc-file', /files\/file\/[\w\d-]+\.json/),
+            apiHandler('doc-file', /files\/[\w\d-]+\/upload\.xml/),
+            apiHandler('doc-file', /files\/[\w\d-]+\/upload\.json/),
+            apiHandler('doc-session', /files\/[\w\d-]+\/upload\/create_session\.json/),
+            apiHandler('doc-file', /crm\/files\/[\w\d-]+\.json/),
+            apiHandler('doc-file', /crm\/[case|contact|opportunity]+\/[\w\d-]+\/files\/upload\.xml/),
+            apiHandler('doc-file', /crm\/[case|contact|opportunity]+\/[\w\d-]+\/files\/upload\.json/),
+            apiHandler('doc-file', /crm\/[case|contact|opportunity]+\/[\w\d-]+\/files\/text\.json/),
+            apiHandler('doc-miss', /files\/fileops.json/),
+            apiHandler('doc-miss', /files\/storeoriginal.json/),
+            apiHandler('doc-miss', /files\/hideconfirmconvert.json/),
+            apiHandler('doc-miss', /files\/displayfavorite.json/),
+            apiHandler('doc-miss', /files\/displayrecent.json/),
+            apiHandler('doc-miss', /files\/displaytemplates.json/),
+            apiHandler('doc-check', /files\/docservice.json/),
+            apiHandler('crm-addresses', /crm\/contact\/[\w\d-]+\/data\.json/, get),
+            apiHandler('crm-address', /crm\/contact\/[\w\d-]+\/data\/[\w\d-]+\.json/),
+            apiHandler('crm-address', /crm\/contact\/[\w\d-]+\/data\.json/, post),
+            apiHandler('crm-address', /crm\/contact\/[\w\d-]+\/batch\.json/),
+            apiHandler('crm-contact', /crm\/contact\/[\w\d-]+\.json/),
+            apiHandler('crm-contact', /crm\/contact\/company\/[\w\d-]+\/type\.json/, post),
+            apiHandler('crm-contact', /crm\/contact\/company\/[\w\d-]+\/person\.json/, post),
+            apiHandler('crm-contact', /crm\/contact\/company\/[\w\d-]+\/person\.json/, dlt),
+            apiHandler('crm-contact', /crm\/[case|opportunity]+\/[\w\d-]+\/contact\.json/, post),
+            apiHandler('crm-contact', /crm\/[case|opportunity]+\/[\w\d-]+\/contact\/[\w\d-]+\.json/, post),
+            apiHandler('crm-contact', /crm\/[case|opportunity]+\/[\w\d-]+\/contact\/[\w\d-]+\.json/),
+            apiHandler('crm-contacts', /crm\/contact\/bycontactinfo\.json/, get),
+            apiHandler('crm-contact', /crm\/contact\/merge\.json/),
+            apiHandler('crm-socialmediaavatars', /crm\/contact\/socialmediaavatar\.json/),
+            apiHandler('crm-tweets', /crm\/contact\/[\w\d-]+\/tweets\.json/),
+            apiHandler('crm-twitterprofiles', /crm\/contact\/twitterprofile\.json/),
+            apiHandler('crm-progressitem', /crm\/contact\/mailsmtp\/send\.json/),
+            apiHandler('crm-progressitem', /crm\/contact\/mailsmtp\/status\.json/),
+            apiHandler('crm-progressitem', /crm\/contact\/mailsmtp\/cancel\.json/),
+            apiHandler('crm-progressitem', /crm\/[contact|person|company|opportunity|case]+\/import\/status\.json/),
+            apiHandler('crm-progressitem', /crm\/contact\/export\/status\.json/),
+            apiHandler('crm-progressitem', /crm\/contact\/export\/cancel\.json/),
+            apiHandler('crm-progressitem', /crm\/contact\/export\/start\.json/),
+            apiHandler('crm-exportitem', /crm\/export\/partial\/status\.json/),
+            apiHandler('crm-exportitem', /crm\/export\/partial\/cancel\.json/),
+            apiHandler('crm-exportitem', /crm\/export\/partial\/[\w\d-]+\/start\.json/),
+            apiHandler('crm-fileuploadresult', /crm\/import\/uploadfake\.json/),
+            apiHandler('crm-task', /crm\/task\.json/),
+            apiHandler('crm-task', /crm\/task\/[\w\d-]+\.json/),
+            apiHandler('crm-task', /crm\/task\/[\w\d-]+\/close\.json/),
+            apiHandler('crm-task', /crm\/task\/[\w\d-]+\/reopen\.json/),
+            apiHandler('crm-opportunity', /crm\/opportunity\/[\w\d-]+\.json/),
+            apiHandler('crm-opportunity', /crm\/opportunity\/[\w\d-]+\/stage\/[\w\d-]+\.json/),
+            apiHandler('crm-opportunity', /crm\/contact\/[\w\d-]+\/opportunity\/[\w\d-]+\.json/),
+            apiHandler('crm-dealmilestone', /crm\/opportunity\/stage\/[\w\d-]+\.json/),
+            apiHandler('crm-dealmilestone', /crm\/opportunity\/stage\/[\w\d-]+\/color\.json/),
+            apiHandler('crm-dealmilestone', /crm\/opportunity\/stage\.json/, post),
+            apiHandler('crm-dealmilestones', /crm\/opportunity\/stage\/reorder\.json/),
+            apiHandler('crm-dealmilestones', /crm\/opportunity\/stage\.json/, get),
+            apiHandler('crm-contactstatus', /crm\/contact\/status\/[\w\d-]+\/color\.json/),
+            apiHandler('crm-contactstatus', /crm\/contact\/status\/[\w\d-]+\.json/),
+            apiHandler('crm-contactstatus', /crm\/contact\/status\.json/, post),
+            apiHandler('crm-contactstatuses', /crm\/contact\/status\/reorder\.json/),
+            apiHandler('crm-contactstatuses', /crm\/contact\/status\.json/, get),
+            apiHandler('crm-contacttypekind', /crm\/contact\/type\/[\w\d-]+\.json/),
+            apiHandler('crm-contacttypekind', /crm\/contact\/type\.json/, post),
+            apiHandler('crm-contacttypekinds', /crm\/contact\/type\/reorder\.json/),
+            apiHandler('crm-contacttypekinds', /crm\/contact\/type\.json/, get),
+            apiHandler('crm-customfield', /crm\/[contact|person|company|opportunity|case]+\/customfield\/[\w\d-]+\.json/),
+            apiHandler('crm-customfield', /crm\/[contact|person|company|opportunity|case]+\/customfield\.json/),
+            apiHandler('crm-customfields', /crm\/[contact|person|company|opportunity|case]+\/customfield\/definitions\.json/),
+            apiHandler('crm-customfields', /crm\/[contact|person|company|opportunity|case]+\/customfield\/reorder\.json/),
+            apiHandler('crm-tag', /crm\/[case|contact|opportunity]+\/tag\.json/),
+            apiHandler('crm-tag', /crm\/[case|contact|opportunity]+\/taglist\.json/),
+            apiHandler('crm-tag', /crm\/[case|contact|opportunity]+\/[\w\d-]+\/tag\.json/),
+            apiHandler('crm-tags', /crm\/[case|contact|opportunity]+\/tag\/unused\.json/),
+            apiHandler('crm-tags', /crm\/[case|contact|opportunity]+\/tag\/[\w\d-]+\.json/),
+            apiHandler('crm-fulltags', /crm\/[case|contact|opportunity]+\/tag\.json/, get),
+            apiHandler('crm-caseitem', /crm\/case\/[\w\d-]+\/close\.json/),
+            apiHandler('crm-caseitem', /crm\/case\/[\w\d-]+\/reopen\.json/),
+            apiHandler('crm-cases', /crm\/cases\.json/),
+            apiHandler('crm-cases', /crm\/case\/filter\.json/),
+            apiHandler('crm-cases', /crm\/case\/byprefix\.json/),
+            apiHandler('crm-contacts', /crm\/contact\.json/),
+            apiHandler('crm-contacts', /crm\/contact\/project\/[\w\d-]+\.json/),
+            apiHandler('crm-basecontacts', /crm\/contact\/byprefix\.json/),
+            apiHandler('crm-contacts', /crm\/contact\/filter\.json/),
+            apiHandler('crm-simplecontacts', /crm\/contact\/simple\/filter\.json/),
+            apiHandler('crm-basecontacts', /crm\/contact\/mail\.json/),
+            apiHandler('crm-contacts', /crm\/contact\/company\/[\w\d-]+\/person\.json/, get),
+            apiHandler('crm-contacts', /crm\/[case|opportunity]+\/[\w\d-]+\/contact\.json/, get),
+            apiHandler('crm-contacts', /crm\/contact\/access\.json/),
+            apiHandler('crm-contacts', /crm\/contact\/[\w\d-]+\/access\.json/, put),
+            apiHandler('crm-cases', /crm\/case\/access\.json/),
+            apiHandler('crm-cases', /crm\/case\/[\w\d-]+\/access\.json/),
+            apiHandler('crm-opportunities', /crm\/opportunity\/access\.json/),
+            apiHandler('crm-opportunities', /crm\/opportunity\/[\w\d-]+\/access\.json/),
+            //ApiHandler : 'crm-customfields', re : /crm\/contact\/[\w\d-]+\/access\.json/},
+            apiHandler('crm-tasks', /crm\/task\/filter\.json/),
+            apiHandler('crm-opportunities', /crm\/opportunity\/filter\.json/),
+            apiHandler('crm-opportunities', /crm\/opportunity\/bycontact\/[\w\d-]+\.json/),
+            apiHandler('crm-opportunities', /crm\/opportunity\/byprefix\.json/),
+            apiHandler('crm-taskcategory', /crm\/task\/category\/[\w\d-]+\.json/),
+            apiHandler('crm-taskcategory', /crm\/task\/category\/[\w\d-]+\/icon\.json/),
+            apiHandler('crm-taskcategory', /crm\/task\/category\.json/, post),
+            apiHandler('crm-taskcategories', /crm\/task\/category\/reorder\.json/),
+            apiHandler('crm-taskcategories', /crm\/task\/category\.json/, get),
+            apiHandler('crm-historyevent', /crm\/history\.json/),
+            apiHandler('crm-historyevent', /crm\/history\/[\w\d-]+.json/),
+            apiHandler('crm-historyevent', /crm\/[contact|opportunity|case]+\/[\w\d-]+\/files\.json/, post),
+            apiHandler('crm-historyevents', /crm\/history\/filter\.json/),
+            apiHandler('crm-historycategory', /crm\/history\/category\/[\w\d-]+\.json/),
+            apiHandler('crm-historycategory', /crm\/history\/category\/[\w\d-]+\/icon\.json/),
+            apiHandler('crm-historycategory', /crm\/history\/category\.json/, post),
+            apiHandler('crm-historycategories', /crm\/history\/category\/reorder\.json/),
+            apiHandler('crm-historycategories', /crm\/history\/category\.json/, get),
+            apiHandler('crm-currency', /crm\/settings\/currency\.json/),
+            apiHandler('crm-currencies', /crm\/settings\/currency\.json/, get),
+            apiHandler('crm-smtpsettings', /crm\/settings\/smtp\.json/),
+            apiHandler('crm-rootfolder', /crm\/files\/root\.json/),
+            apiHandler('crm-tasktemplatecontainer', /crm\/[contact|person|company|opportunity|case]+\/tasktemplatecontainer\.json/),
+            apiHandler('crm-tasktemplatecontainer', /crm\/tasktemplatecontainer\/[\w\d-]+\.json/),
+            apiHandler('crm-tasktemplate', /crm\/tasktemplatecontainer\/[\w\d-]+\/tasktemplate\.json/),
+            apiHandler('crm-tasktemplate', /crm\/tasktemplatecontainer\/tasktemplate\/[\w\d-]+\.json/),
+            apiHandler('crm-invoiceline', /crm\/invoiceline\.json/),
+            apiHandler('crm-invoiceline', /crm\/invoice\/[\w\d-]+\.json/),
+            apiHandler('crm-invoice', /crm\/invoice\.json/, post),
+            apiHandler('crm-invoice', /crm\/invoice\/[\w\d-]+\.json/),
+            apiHandler('crm-invoice', /crm\/invoice\/sample\.json/),
+            apiHandler('crm-invoice', /crm\/invoice\/sample\.json/),
+            apiHandler('crm-invoice', /crm\/invoice\/bynumber\.json/),
+            apiHandler('crm-invoiceJsonData', /crm\/invoice\/jsondata\/[\w\d-]+\.json/),
+            apiHandler('crm-invoices', /crm\/invoice\.json/, dlt),
+            apiHandler('crm-invoicesAndItems', /crm\/invoice\/status\/[\w\d-]+\.json/),
+            apiHandler('crm-invoices', /crm\/invoice\/filter\.json/),
+            apiHandler('crm-invoices', /crm\/[contact|person|company|opportunity]+\/invoicelist\/[\w\d-]+\.json/),
+            apiHandler('crm-invoiceItem', /crm\/invoiceitem\.json/, post),
+            apiHandler('crm-invoiceItems', /crm\/invoiceitem\.json/, dlt),
+            apiHandler('crm-invoiceItems', /crm\/invoiceitem\/filter\.json/),
+            apiHandler('crm-invoiceTax', /crm\/invoice\/tax\/[\w\d-]+\.json/),
+            apiHandler('crm-invoiceTax', /crm\/invoice\/tax\.json/, post),
+            apiHandler('crm-invoiceTaxes', /crm\/invoice\/tax\.json/, get),
+            apiHandler('crm-invoiceSettings', /crm\/invoice\/settings\.json/),
+            apiHandler('crm-invoiceSettings', /crm\/invoice\/settings\/name\.json/),
+            apiHandler('crm-invoiceSettings', /crm\/invoice\/settings\/terms\.json/),
+            apiHandler('doc-file', /crm\/invoice\/[\w\d-]+\/pdf\.json/),
+            apiHandler('crm-converterData', /crm\/invoice\/converter\/data\.json/),            
+            apiHandler('crm-currencyRates', /crm\/currency\/rates\.json/, get),
+            apiHandler('crm-currencyRate', /crm\/currency\/rates\/[\w\d-]+\.json/),
+            apiHandler('crm-currencyRate', /crm\/currency\/rates\/\w{3}\/\w{3}\.json/, get),
+            apiHandler('crm-currencyRate', /crm\/currency\/rates\.json/, post),            
+            apiHandler('crm-voipNumbers', /crm\/voip\/numbers\/available\.json/),
+            apiHandler('crm-voipNumbers', /crm\/voip\/numbers\/existing\.json/),
+            apiHandler('crm-voipNumber', /crm\/voip\/numbers\.json/, post),
+            apiHandler('crm-voipNumber', /crm\/voip\/numbers\/current\.json/),
+            apiHandler('crm-voipCall', /crm\/voip\/call\.json/, post),
+            apiHandler('crm-voipCalls', /crm\/voip\/call\.json/, get),
+            apiHandler('crm-voipCall', /crm\/voip\/call\/[\w\d-]+\.json/, get),
+            apiHandler('crm-voipCalls', /crm\/voip\/call\/missed\.json/, get),
+            apiHandler('authentication', /authentication\.json/),
+            apiHandler('settings', /settings\.json/),
+            apiHandler('security', /settings\/security\.json/),
+            apiHandler('access', /settings\/security\/access\.json/),
+            apiHandler('administrator', /settings\/security\/administrator\.json/),
+            apiHandler('quotas', /settings\/quota\.json/),
+            apiHandler('profile', /people\/[\w\d-]+\.json/),
+            apiHandler('isme', /people\/@self\.json/),
+            apiHandler('profiles', /people\/status\/[\w\d-]+\.json/),
+            apiHandler('profiles', /people\/status\/[\w\d-]+\/@search\/.+\.json/),
+            apiHandler('profiles', /people\/status\/[\w\d-]+\/search\.json/),
+            apiHandler('profiles', /people\.json/),
+            apiHandler('profiles', /people\/@search\/.+\.json/),
+            apiHandler('profiles', /people\/search\.json/),
+            apiHandler('profiles', /people\/filter\.json/),
+            apiHandler('profiles', /people\/type\/[\w\d-]+\.json/),
+            apiHandler('profiles', /people\/invite\.json/),
+            apiHandler('text', /people\/password\.json/),
+            apiHandler('text', /people\/thirdparty\/linkaccount\.json/),
+            apiHandler('text', /people\/thirdparty\/unlinkaccount\.json/),
+            apiHandler('group', /group\/[\w\d-]+\.json/),
+            apiHandler('groups', /group\.json/),
+            apiHandler('crm-tasks', /crm\/contact\/task\/group\.json/),
+            apiHandler('crm-tag', /crm\/[company|person]+\/[\w\d-]+\/tag\/group\.json/),
+            apiHandler('crm-voipNumber', /crm\/voip\/numbers\/[\w]+\/settings.json/, put),
+            apiHandler('crm-voipSettings', /crm\/voip\/numbers\/settings.json/),
+            apiHandler('comment', /comment\.json/, post),
+            apiHandler('comments', /comment\.json/, get),
+
+            apiHandler('prj-settings', /project\/settings\.json/),
+            apiHandler('prj-report', /project\/report\/files\.json/),
+            
+            apiHandler('text', /project\/comment\/[\w\d-]+\.json/, dlt),
+            apiHandler('text', /community\/wiki\/comment\/[\w\d-]+\.json/, dlt),
+            apiHandler('text', /community\/event\/comment\/[\w\d-]+\.json/, dlt),
+            apiHandler('text', /community\/bookmark\/comment\/[\w\d-]+\.json/, dlt),
+            apiHandler('text', /community\/blog\/comment\/[\w\d-]+\.json/, dlt),
+            
+            apiHandler('text', /project\/comment\/[\w\d-]+\.json/, put),
+            apiHandler('text', /community\/wiki\/comment\/[\w\d-]+\.json/, put),
+            apiHandler('text', /community\/event\/comment\/[\w\d-]+\.json/, put),
+            apiHandler('text', /community\/bookmark\/comment\/[\w\d-]+\.json/, put),
+            apiHandler('text', /community\/blog\/comment\/[\w\d-]+\.json/, put),
+            
+            apiHandler('text', /project\/message\/discussion\/preview\.json/),
+            apiHandler('commentinlist', /project\/message\/preview\.json/),
+            apiHandler('commentinlist', /community\/wiki\/comment\/preview\.json/),
+            apiHandler('commentinlist', /community\/event\/comment\/preview\.json/),
+            apiHandler('commentinlist', /community\/bookmark\/comment\/preview\.json/),
+            apiHandler('commentinlist', /community\/blog\/comment\/preview\.json/),
+            
+            apiHandler('commentinlist', /project\/comment\.json/, post),
+            apiHandler('commentinlist', /community\/wiki\/comment\.json/, post),
+            apiHandler('commentinlist', /community\/event\/comment\.json/, post),
+            apiHandler('commentinlist', /community\/bookmark\/comment\.json/, post),
+            apiHandler('commentinlist', /community\/blog\/comment\.json/, post),
             
             
-            { handler: 'text', re: /project\/comment\/[\w\d-]+\.json/, method: 'delete' },
-            { handler: 'text', re: /community\/wiki\/comment\/[\w\d-]+\.json/, method: 'delete' },
-            { handler: 'text', re: /community\/event\/comment\/[\w\d-]+\.json/, method: 'delete' },
-            { handler: 'text', re: /community\/bookmark\/comment\/[\w\d-]+\.json/, method: 'delete' },
-            { handler: 'text', re: /community\/blog\/comment\/[\w\d-]+\.json/, method: 'delete' },
             
-            { handler: 'text', re: /project\/comment\/[\w\d-]+\.json/, method: 'put' },
-            { handler: 'text', re: /community\/wiki\/comment\/[\w\d-]+\.json/, method: 'put' },
-            { handler: 'text', re: /community\/event\/comment\/[\w\d-]+\.json/, method: 'put' },
-            { handler: 'text', re: /community\/bookmark\/comment\/[\w\d-]+\.json/, method: 'put' },
-            { handler: 'text', re: /community\/blog\/comment\/[\w\d-]+\.json/, method: 'put' },
-            
-            { handler: 'text', re: /project\/message\/discussion\/preview\.json/ },
-            { handler: 'commentinlist', re: /project\/message\/preview\.json/ },
-            { handler: 'commentinlist', re: /community\/wiki\/comment\/preview\.json/ },
-            { handler: 'commentinlist', re: /community\/event\/comment\/preview\.json/ },
-            { handler: 'commentinlist', re: /community\/bookmark\/comment\/preview\.json/ },
-            { handler: 'commentinlist', re: /community\/blog\/comment\/preview\.json/ },
-            
-            { handler: 'commentinlist', re: /project\/comment\.json/, method: 'post' },
-            { handler: 'commentinlist', re: /community\/wiki\/comment\.json/, method: 'post' },
-            { handler: 'commentinlist', re: /community\/event\/comment\.json/, method: 'post' },
-            { handler: 'commentinlist', re: /community\/bookmark\/comment\.json/, method: 'post' },
-            { handler: 'commentinlist', re: /community\/blog\/comment\.json/, method: 'post' },
-            
-            
-            
-            { handler: 'feed-feeds', re: /feed\/filter\.json/ },
-            { handler: 'text', re: /crm\/[contact|opportunity|case|relationshipevent]+\/[\w\d-]+\/files\/hidden\.json/ }
+            apiHandler('feed-feeds', /feed\/filter\.json/),
+            apiHandler('text', /crm\/[contact|opportunity|case|relationshipevent]+\/[\w\d-]+\/files\/hidden\.json/)
         ];
+
+    function apiHandler(handler, re, method) {
+        var result = { handler: handler, re: re };
+        if (typeof method != "undefined") {
+            result.method = method;
+        }
+        return result;
+    }
 
     function isArray(o) {
         return o ? o.constructor.toString().indexOf("Array") != -1 : false;
@@ -768,7 +792,7 @@ window.ServiceFactory = (function() {
                     response = getResponse(response);
                     if (response) {
                         response = response.hasOwnProperty('response') ? response.response : response;
-                        create(fld, 'get', response);
+                        create(fld, get, response);
                     }
                 }
             }
@@ -818,7 +842,7 @@ window.ServiceFactory = (function() {
     };
 
     var serializeDate = (function() {
-        if (new Date(Date.parse('1970-01-01T00:00:00.000Z')).getTime() === new Date(Date.parse('1970-01-01T00:00:00.000Z')).getTime() && false) {
+        if (false && new Date(Date.parse('1970-01-01T00:00:00.000Z')).getTime() === new Date(Date.parse('1970-01-01T00:00:00.000Z')).getTime()) {
             return function(d, toLocalTime) {
                 if (!d) {
                     return null;
@@ -959,9 +983,7 @@ window.ServiceFactory = (function() {
             return '';
         }
 
-        var hours = date.getHours(),
-            amhours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours,
-            output = '',
+        var output = '',
             term = '',
             islit = false;
         format = format.split('');
@@ -994,27 +1016,24 @@ window.ServiceFactory = (function() {
     };
 
     var getDisplayTime = function(date) {
-        var displaydate = date ? date.toLocaleTimeString() : '';
         if (date && formatTime) {
-            displaydate = formattingDate(date, formatTime, dayShortNames, dayNames, monthShortNames, monthNames);
+            return formattingDate(date, formatTime, dayShortNames, dayNames, monthShortNames, monthNames);
         }
-        return displaydate;
+        return date ? date.toLocaleTimeString() : '';
     };
 
     var getDisplayDate = function(date) {
-        var displaydate = date ? date.toLocaleDateString() : '';
         if (date && formatDate) {
-            displaydate = formattingDate(date, formatDate, dayShortNames, dayNames, monthShortNames, monthNames);
+            return formattingDate(date, formatDate, dayShortNames, dayNames, monthShortNames, monthNames);
         }
-        return displaydate;
+        return date ? date.toLocaleDateString() : '';
     };
 
     var getDisplayDatetime = function(date) {
-        var displaydate = date ? date.toLocaleTimeString() + ' ' + date.toLocaleDateString() : '';
         if (date && formatDatetime) {
-            displaydate = formattingDate(date, formatDatetime, dayShortNames, dayNames, monthShortNames, monthNames);
+            return formattingDate(date, formatDatetime, dayShortNames, dayNames, monthShortNames, monthNames);
         }
-        return displaydate;
+        return date ? date.toLocaleTimeString() + ' ' + date.toLocaleDateString() : '';
     };
 
     function createGroup(o) {
@@ -1082,6 +1101,7 @@ window.ServiceFactory = (function() {
             displayDateTrtdate: getDisplayDate(trtdate),
             displayTimeTrtdate: getDisplayTime(trtdate),
             birthday: bthdate,
+            birthdayApiString: o.birthday || '',
             userName: o.userName || '',
             firstName: o.firstName || '',
             lastName: o.lastName || '',
@@ -1090,15 +1110,14 @@ window.ServiceFactory = (function() {
             tel: contacts.telephones.length > 0 ? contacts.telephones[0].val : '',
             contacts: contacts,
             avatar: o.avatar || o.avatarSmall || defaultAvatar,
+            avatarBig: o.avatarBig,
             avatarSmall: o.avatarSmall || defaultAvatarSmall,
-            group: createGroup(o.groups && o.groups.length > 0 ? o.groups[0] || null : null),
             groups: createGroups(o.groups || []),
             status: o.status || 0,
             activationStatus: o.activationStatus || 0,
             isActivated: activationStatuses.activated.id === (o.activationStatus || 0),
-            isOnline: typeof(o.isOnline) != "undefined" ? o.isOnline : '',
             isPending: activationStatuses.pending.id === (o.activationStatus || 0),
-            isTerminated: profileStatuses.terminated.id === (o.status || 0),
+            isTerminated: typeof (o.isTerminated) !== "undefined" ? o.isTerminated : profileStatuses.terminated.id === (o.status || 0),
             isMe: myProfile ? myProfile.id === o.id : false,
             isManager: false,
             isPortalOwner: typeof(o.isOwner) != "undefined" ? o.isOwner : null,
@@ -1111,7 +1130,9 @@ window.ServiceFactory = (function() {
             title: o.title || '',
             notes: o.notes || '',
             culture: o.cultureName || '',
-            profileUrl: o.profileUrl || ''
+            profileUrl: o.profileUrl || '',
+            isLDAP: typeof (o.isLDAP) != "undefined" ? o.isLDAP : typeof (o.isldap) != "undefined" ? o.isldap : false,
+            isSSO: typeof (o.isSSO) != "undefined" ? o.isSSO : typeof (o.issso) != "undefined" ? o.issso : false
         };
 
         return person;
@@ -1178,7 +1199,7 @@ window.ServiceFactory = (function() {
         uptdate = serializeDate(o.updated);
         createdBy = createPerson(o.createdBy);
 
-        return {
+        var result = {
             type: 'comment',
             id: o.id,
             inactive: o.hasOwnProperty('inactive') ? o.inactive : false,
@@ -1200,6 +1221,12 @@ window.ServiceFactory = (function() {
             comments: [],
             text: o.text || ''
         }
+
+        if (o.hasOwnProperty('canEdit')) {
+            result.canEdit = o.canEdit;
+        }
+
+        return result;
     };
     
     
@@ -1321,7 +1348,10 @@ window.ServiceFactory = (function() {
                 storageUsage: factories.storageusage(response.storageUsage),
                 maxUsersCount: response.maxUsersCount,
                 usersCount: response.usersCount,
-                availableUsersCount: response.availableUsersCount
+                availableUsersCount: response.availableUsersCount,
+                userStorageSize: response.userStorageSize,
+                userUsedSize: response.userUsedSize,
+                userAvailableSize: response.userAvailableSize
             };
 
             return portalQuotas;
@@ -1347,7 +1377,7 @@ window.ServiceFactory = (function() {
                         return factories.doc.file(response);
                     case 'task':
                     case 'subtask':
-                        return factories.prj.task(response);
+                        return factories.prj.subtask(response);
                     case 'discussion':
                         return factories.prj.discussion(response);
                     case 'milestone':
@@ -1505,9 +1535,38 @@ window.ServiceFactory = (function() {
 
     /* projects */
     factories.prj = {
-        item: function(response) {
-            var createdBy = createPerson(response.createdBy || response.author),
-                responsible = createPerson(response.responsible ? response.responsible : (response.responsibles && response.responsibles.length > 0 ? response.responsibles[0] : null)),
+        item: function (response) {
+            var createdBy, responsible, updatedBy, responsibles  = [];
+
+            if (typeof response.createdBy === "object") {
+                createdBy = createPerson(response.createdBy);
+            } else if (typeof response.createdById === "string") {
+                createdBy = UserManager.getPerson(response.createdById, createPerson);
+            } else {
+                createdBy = createPerson(response.author);
+            }
+
+            if (typeof response.updatedBy === "object") {
+                updatedBy = createPerson(response.updatedBy);
+            } else if (typeof response.updatedById === "string") {
+                updatedBy = UserManager.getPerson(response.updatedById, createPerson);
+            }
+
+            if (typeof response.responsible === "object") {
+                responsible = createPerson(response.responsible);
+            } else if (typeof response.responsibleId === "string") {
+                responsible = UserManager.getPerson(response.responsibleId, createPerson);
+            }
+
+            if (response.responsibles) {
+                responsibles = createPersons(response.responsibles || response.responsible);
+            } else if (response.responsibleIds) {
+                responsibles = response.responsibleIds.map(function(item) {
+                    return createPerson(UserManager.getUser(item) || UserManager.getRemovedProfile());
+                });
+            }
+
+            var
                 crtdate = serializeDate(response.created),
                 uptdate = serializeDate(response.updated);
 
@@ -1520,9 +1579,9 @@ window.ServiceFactory = (function() {
                 displayUptdate: getDisplayDatetime(uptdate),
                 displayDateUptdate: getDisplayDate(uptdate),
                 createdBy: createdBy,
-                updatedBy: createPerson(response.updatedBy),
-                responsible: responsible,
-                responsibles: createPersons(response.responsibles || response.responsible),
+                updatedBy: updatedBy,
+                responsible: responsible || responsibles[0],
+                responsibles: responsibles,
                 canEdit: response.canEdit || false,
                 isPrivate: response.isPrivate || false,
                 isShared: response.isShared || false,
@@ -1539,19 +1598,23 @@ window.ServiceFactory = (function() {
             var dlndate = serializeDate(response.deadline, false),
                 startdate = serializeDate(response.startDate, false),
                 todaydate = new Date(),
-                tomorrowdate = new Date();
+                year = todaydate.getFullYear(),
+                month = todaydate.getMonth(),
+                day = todaydate.getDate();
 
-            todaydate = new Date(todaydate.getFullYear(), todaydate.getMonth(), todaydate.getDate(), 0, 0, 0, 0);
-            tomorrowdate = new Date(tomorrowdate.getFullYear(), tomorrowdate.getMonth(), tomorrowdate.getDate() + 1, 0, 0, 0, 0);
-
+            todaydate = new Date(year, month, day, 0, 0, 0, 0);
+            var tomorrowdate = new Date(year, month, day + 1, 0, 0, 0, 0);
+            var hasProjectOwner = response.hasOwnProperty('projectOwner');
 
             return extend(this.item(response), {
                 type: 'task',
-                projectId: response.hasOwnProperty('projectOwner') ? response.projectOwner.id : -1,
-                projectTitle: response.hasOwnProperty('projectOwner') ? response.projectOwner.title : '',
+                projectId: hasProjectOwner ? response.projectOwner.id : -1,
+                projectTitle: hasProjectOwner ? response.projectOwner.title : '',
                 projectOwner: response.projectOwner,
                 canCreateSubtask: response.canCreateSubtask,
                 canCreateTimeSpend: response.canCreateTimeSpend,
+                canReadFiles: response.canReadFiles,
+                canEditFiles: response.canEditFiles,
                 canDelete: response.canDelete,
                 deadline: dlndate,
                 displayDeadline: getDisplayDatetime(dlndate),
@@ -1561,8 +1624,8 @@ window.ServiceFactory = (function() {
                 displayStartDate: getDisplayDatetime(startdate),
                 displayDateStart: getDisplayDate(startdate),
                 displayTimeStart: getDisplayTime(startdate),
-                status: response.status,
-                statusname: getTaskStatusName(response.status),
+                status: response.status > 2 ? 1 : response.status,
+                statusname: getTaskStatusName(response.status > 2 ? 1 : response.status),
                 priority: response.priority,
                 subtasks: factories.prj.subtasks(response.subtasks),
                 progress: response.hasOwnProperty('progress') ? response.progress : 0,
@@ -1572,7 +1635,15 @@ window.ServiceFactory = (function() {
                 deadlineToday: dlndate ? dlndate.getTime() >= todaydate.getTime() && dlndate.getTime() < tomorrowdate.getTime() : false,
                 isOpened: response.status == taskStatuses.open.id,
                 isExpired: response.isExpired || false,
-                links: response.hasOwnProperty('links') ? factories.prj.links(response.links) : null
+                links: response.hasOwnProperty('links') ? factories.prj.links(response.links) : [],
+                files: response.files,
+                commentsCount: response.commentsCount,
+                isSubscribed: response.isSubscribed,
+                project: response.project,
+                timeSpend: response.timeSpend,
+                comments: response.comments ? response.comments : [],
+                canCreateComment: response.canCreateComment,
+                customTaskStatus: response.customTaskStatus
             });
         },
 
@@ -1580,11 +1651,12 @@ window.ServiceFactory = (function() {
             var dlndate = serializeDate(response.deadline, false),
                 startdate = serializeDate(response.startDate, false),
                 todaydate = new Date(),
-                tomorrowdate = new Date();
+                year = todaydate.getFullYear(),
+                month = todaydate.getMonth(),
+                day = todaydate.getDate();
 
-            todaydate = new Date(todaydate.getFullYear(), todaydate.getMonth(), todaydate.getDate(), 0, 0, 0, 0);
-            tomorrowdate = new Date(tomorrowdate.getFullYear(), tomorrowdate.getMonth(), tomorrowdate.getDate() + 1, 0, 0, 0, 0);
-
+            todaydate = new Date(year, month, day, 0, 0, 0, 0);
+            var tomorrowdate = new Date(year, month, day + 1, 0, 0, 0, 0);
 
             return extend(this.item(response), {
                 type: 'task',
@@ -1601,8 +1673,9 @@ window.ServiceFactory = (function() {
                 displayStartDate: getDisplayDatetime(startdate),
                 displayDateStart: getDisplayDate(startdate),
                 responsibles: response.responsibles,
-                status: response.status,
-                statusname: getTaskStatusName(response.status),
+                status: response.status > 2 ? 1 : response.status,
+                customTaskStatus: response.customTaskStatus,
+                statusname: getTaskStatusName(response.status > 2 ? 1 : response.status),
                 priority: response.priority,
                 subtasksCount: response.subtasksCount,
                 progress: response.hasOwnProperty('progress') ? response.progress : 0,
@@ -1617,10 +1690,12 @@ window.ServiceFactory = (function() {
         milestone: function(response) {
             var dlndate = serializeDate(response.deadline, false),
                 todaydate = new Date(),
-                tomorrowdate = new Date();
+                year = todaydate.getFullYear(),
+                month = todaydate.getMonth(),
+                day = todaydate.getDate();
 
-            todaydate = new Date(todaydate.getFullYear(), todaydate.getMonth(), todaydate.getDate(), 0, 0, 0, 0);
-            tomorrowdate = new Date(tomorrowdate.getFullYear(), tomorrowdate.getMonth(), tomorrowdate.getDate() + 1, 0, 0, 0, 0);
+            todaydate = new Date(year, month, day, 0, 0, 0, 0);
+            var tomorrowdate = new Date(year, month, day + 1, 0, 0, 0, 0);
 
             return extend(this.item(response), {
                 type: 'milestone',
@@ -1647,17 +1722,40 @@ window.ServiceFactory = (function() {
                 type: 'discussion',
                 projectId: response.hasOwnProperty('projectOwner') ? response.projectOwner.id : -1,
                 projectTitle: response.hasOwnProperty('projectOwner') ? response.projectOwner.title : '',
+                projectOwner: response.projectOwner,
                 parentId: null,
-                comments: null,
+                comments: response.comments ? response.comments : [],
                 text: response.text || '',
                 status: response.status,
-                displayTimeCrtdate: getDisplayTime(crtdate)
+                displayTimeCrtdate: getDisplayTime(crtdate),
+                displayDateTimeCrtdate: getDisplayDatetime(crtdate),
+                canReadFiles: response.canReadFiles,
+                canEditFiles: response.canEditFiles,
+                canCreateComment: response.canCreateComment,
+                commentsCount: response.commentsCount,
+                subscribers: response.subscribers,
+                files: response.files,
+                project: response.project
             });
         },
 
         project: function (response) {
-            var createdBy = createPerson(response.createdBy);
-            var responsible = createPerson(response.responsible);
+            var createdBy;
+            var responsible;
+
+            if (typeof response.createdBy === "object") {
+                createdBy = createPerson(response.createdBy);
+            } else if (typeof response.createdById === "string") {
+                createdBy = UserManager.getPerson(response.createdById, createPerson);
+            }
+
+            if (typeof response.responsible === "object") {
+                responsible = createPerson(response.responsible);
+            } else if (typeof response.responsibleId === "string") {
+                responsible = UserManager.getPerson(response.responsibleId, createPerson);
+            } else if (typeof response.responsible === "string") {
+                responsible = UserManager.getPerson(response.responsible, createPerson);
+            }
 
             return {
                 id: response.id,
@@ -1668,6 +1766,9 @@ window.ServiceFactory = (function() {
                 canCreateMessage: response.hasOwnProperty('security') ? response.security.canCreateMessage : '',
                 canCreateMilestone: response.hasOwnProperty('security') ? response.security.canCreateMilestone : '',
                 canCreateTask: response.hasOwnProperty('security') ? response.security.canCreateTask : '',
+                canCreateTimeSpend: response.hasOwnProperty('security') ? response.security.canCreateTimeSpend : '',
+                canEditTeam: response.hasOwnProperty('security') ? response.security.canEditTeam : '',
+                security: response.security,
 
                 isPrivate: response.isPrivate || false,
                 isInTeam: response.hasOwnProperty('security') ? response.security.isInTeam : '',
@@ -1675,13 +1776,20 @@ window.ServiceFactory = (function() {
 
                 displayDateCrtdate: getDisplayDate(serializeDate(response.created)),
                 taskCount: response.taskCount,
+                taskCountTotal: response.taskCountTotal,
                 milestoneCount: response.milestoneCount,
                 participantCount: response.participantCount,
-                responsibleId: response.responsible.id ? response.responsible.id : response.responsible,
+                discussionCount: response.discussionCount,
+                documentsCount: response.documentsCount,
+                responsibleId: responsible != null && responsible.id ? responsible.id : responsible,
                 canEdit: response.canEdit || false,
+                canDelete: response.canDelete,
 
                 createdBy: createdBy,
-                responsible: responsible
+                responsible: responsible,
+                timeTrackingTotal: response.timeTrackingTotal,
+                isFollow: response.isFollow,
+                tags: response.hasOwnProperty('tags') ? response.tags : []
             };
         },
 
@@ -1718,16 +1826,21 @@ window.ServiceFactory = (function() {
             });
         },
 
-        subtasks: function(response) {
-            return collection(response, this.item, function(response) {
-                return {
-                    type: 'subtask',
-                    status: response.status
-                };
+        subtask: function(response) {
+            return extend(this.item(response), {
+                type: 'subtask',
+                status: response.status,
+                taskid: response.taskId
             });
         },
 
-        tasks: function(response) {
+        subtasks: function(response) {
+            return collection(response, this.item, function(response) {
+                return factories.prj.subtask(response);
+            });
+        },
+
+        tasks: function (response) {
             return collection(response, this.item, function(response) {
                 return factories.prj.task(response);
             });
@@ -1747,13 +1860,7 @@ window.ServiceFactory = (function() {
 
         discussions: function(response) {
             return collection(response, this.item, function(response) {
-                return {
-                    type: 'discussion',
-                    projectId: response.hasOwnProperty('projectOwner') ? response.projectOwner.id : -1,
-                    projectTitle: response.hasOwnProperty('projectOwner') ? response.projectOwner.title : '',
-                    text: response.text || '',
-                    commentsCount: response.commentsCount
-                };
+                return factories.prj.discussion(response);
             });
         },
 
@@ -1780,6 +1887,7 @@ window.ServiceFactory = (function() {
             person.isAdministrator = response.isAdministrator;
             person.isManager = response.isManager;
             person.department = response.department || "";
+            person.isRemovedFromTeam = response.isRemovedFromTeam;
             return person;
         },
 
@@ -1815,12 +1923,14 @@ window.ServiceFactory = (function() {
                 displayTimeCreation: getDisplayTime(creationdate),
                 hours: response.hours,
                 note: response.note,
+                status: response.paymentStatus,
                 paymentStatus: response.paymentStatus,
                 statusChanged: getDisplayDate(statusChangedDate),
                 canEditPaymentStatus: response.canEditPaymentStatus,
                 relatedProject: response.relatedProject,
                 relatedTask: response.relatedTask,
                 relatedTaskTitle: response.relatedTaskTitle,
+                task: factories.prj.task(response.task),
                 person: response.hasOwnProperty('person') ? createPerson(response.person) : ""
             });
         },
@@ -1834,6 +1944,13 @@ window.ServiceFactory = (function() {
             return collection(response, this.item, function(response) {
                 return factories.prj.activity(response);
             });
+        },
+        settings: function(response) {
+            return response;
+        },
+
+        report: function(response) {
+            return response;
         }
     };
 
@@ -1892,15 +2009,10 @@ window.ServiceFactory = (function() {
             }
 
             function getComment(comment) {
-                var commentDateStr = comment.Date.slice(0, -1) + ".0+" + ASC.Resources.Master.CurrentTenantUtcOffset;
+                var commentDateStr = comment.Date.slice(0, -1);
                 var commentDate = serializeDate(commentDateStr);
 
-                var offsetHours = parseInt(ASC.Resources.Master.CurrentTenantUtcHoursOffset);
-                var offsetMinutes = parseInt(ASC.Resources.Master.CurrentTenantUtcMinutesOffset);
-                if (!isNaN(offsetHours)) {
-                    commentDate.setHours(commentDate.getHours() + offsetHours);
-                    commentDate.setMinutes(commentDate.getMinutes() + offsetMinutes);
-                }
+                commentDate.setMinutes(commentDate.getMinutes() + ASC.Resources.Master.CurrentTenantTimeZone.UtcOffset);
 
                 return {
                     id: comment.Id,
@@ -2017,7 +2129,9 @@ window.ServiceFactory = (function() {
             });
         },
 
-        file: function(response) {
+        file: function (response) {
+            if (!response) return undefined;
+
             var title = response.title ? response.title : '';
 
             var filename = title.substring(0, title.lastIndexOf('.'));
@@ -2036,8 +2150,8 @@ window.ServiceFactory = (function() {
                 contentLength: response.contentLength,
                 pureContentLength: response.pureContentLength,
                 webUrl: fixUrl(response.webUrl || ''),
-                viewUrl: fixUrl(response.viewUri || response.viewUrl || ''),
-                fileUrl: fixUrl(response.fileUri || response.fileUrl || ''),
+                viewUrl: fixUrl(response.viewUrl || ''),
+                fileUrl: fixUrl(response.fileUrl || ''),
                 isSupported: isSupportedFileType(extension),
                 isUploaded: false
             });
@@ -2178,6 +2292,7 @@ window.ServiceFactory = (function() {
                 displayName: response.displayName,
                 isCompany: response.isCompany,
                 isPrivate: response.isPrivate,
+                accessList: response.accessList,
                 isShared: response.isShared,
                 shareType: response.shareType,
                 smallFotoUrl: response.smallFotoUrl,
@@ -2294,6 +2409,7 @@ window.ServiceFactory = (function() {
                 type: "tweet",
                 userImageUrl: response.userImageUrl,
                 userName: response.userName,
+                userId: response.userId,
                 text: response.text,
                 postedOn: postedOn,
                 postedOnDisplay: getDisplayDatetime(postedOn),
@@ -2325,24 +2441,23 @@ window.ServiceFactory = (function() {
             });
         },
 
-        facebookprofile: function(response) {
-            var postedOn = serializeDate(response.postedOn);
-            return {
-                type: "facebookprofile",
-                userID: response.userID,
-                userName: response.userName,
-                smallImageUrl: response.smallImageUrl
-            };
-        },
-
-        facebookprofiles: function(response) {
-            return collection(response, null, function(response) {
-                return factories.crm.facebookprofile(response);
-            });
-        },
-
         progressitem: function(response) {
             return response;
+        },
+
+        exportitem: function (response) {
+            if (!response || jq.isEmptyObject(response)) return response;
+
+            return {
+                id: response.id,
+                status: response.status,
+                percentage: response.percentage,
+                isCompleted: response.isCompleted,
+                exception: response.error || response.errorText,
+                fileId: response.fileId,
+                fileUrl: response.fileUrl,
+                fileName: response.fileName
+            };
         },
 
         fileuploadresult:  function(response) {
@@ -2601,9 +2716,7 @@ window.ServiceFactory = (function() {
                     ? getDisplayDate(dueDate)
                     : getDisplayDatetime(dueDate),
                 crtdate = response.createOn ? serializeDate(response.createOn) : null,
-                tmpDate = new Date(),
-                today = new Date(tmpDate.getFullYear(), tmpDate.getMonth(), tmpDate.getDate(), 0, 0, 0, 0),
-                debtor = response.status.id == 2 && dueDate < today;
+                debtor = response.status.id == 2 && dueDate < new Date();
 
             return extend(this.item(response), {
                 type: 'invoice',
@@ -2683,10 +2796,8 @@ window.ServiceFactory = (function() {
                 description: response.description,
                 price: response.price,
                 currency: response.currency,
-                quantity: response.quantity,
                 stockQuantity: response.stockQuantity,
                 trackInvenory: response.trackInvenory,
-
                 invoiceTax1: response.invoiceTax1 ? factories.crm.invoiceTax(response.invoiceTax1) : null,
                 invoiceTax2: response.invoiceTax2 ? factories.crm.invoiceTax(response.invoiceTax2) : null,
                 sortOrder: response.sortOrder,
@@ -2785,24 +2896,10 @@ window.ServiceFactory = (function() {
                 time: getDisplayTime(serializedDate),
                 dialDuration: response.dialDuration,
                 cost: response.cost,
-                recordUrl: "",
-                recordDuration: 0,
+                recordUrl: response.recordUrl,
+                recordDuration: response.recordDuration,
                 contact: response.hasOwnProperty('contact') && response.contact ? factories.crm.contact(response.contact) : null,
                 history: response.history
-            };
-        },
-
-        voipUploads: function(response) {
-            return collection(response, null, function(response) {
-                return factories.crm.voipUpload(response);
-            });
-        },
-
-        voipUpload: function(response) {
-            return {
-                path: response.path,
-                name: response.name,
-                audioType: response.audioType,
             };
         },
 

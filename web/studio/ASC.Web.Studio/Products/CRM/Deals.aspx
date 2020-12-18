@@ -7,14 +7,21 @@
 
 <%@ Import Namespace="ASC.Web.CRM.Resources" %>
 
-<asp:Content ID="PageContentWithoutCommonContainer" ContentPlaceHolderID="BTPageContentWithoutCommonContainer" runat="server">
-    <asp:PlaceHolder ID="_navigationPanelContent" runat="server"></asp:PlaceHolder>
+<asp:Content ContentPlaceHolderID="TitleContent" runat="server">
+    <asp:PlaceHolder ID="TabsHolder" runat="server" Visible="False">
+        <div id="DealTabs"></div>
+    </asp:PlaceHolder>
 </asp:Content>
-<asp:Content ID="CommonContainer" ContentPlaceHolderID="BTPageContent" runat="server">
+
+<asp:Content ContentPlaceHolderID="BTPageContent" runat="server">
     <asp:PlaceHolder ID="loaderHolder" runat="server"></asp:PlaceHolder>
     <asp:PlaceHolder ID="CommonContainerHolder" runat="server"></asp:PlaceHolder>
     <div id="files_hintStagesPanel" class="hintDescriptionPanel">
         <%=CRMDealResource.TooltipStages%>
-        <a href="http://www.onlyoffice.com/help/tipstricks/opportunity-stages.aspx" target="_blank"><%=CRMCommonResource.ButtonLearnMore%></a>
+        <% if (!string.IsNullOrEmpty(HelpLink)) { %>
+        <a href="<%= HelpLink + "/tipstricks/opportunity-stages.aspx" %>" target="_blank">
+            <%=CRMCommonResource.ButtonLearnMore%>
+        </a>
+        <% } %>
     </div>
 </asp:Content>

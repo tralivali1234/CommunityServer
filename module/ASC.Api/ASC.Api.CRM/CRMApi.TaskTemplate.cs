@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -47,7 +38,8 @@ namespace ASC.Api.CRM
         /// <returns>
         ///     Task template container
         /// </returns>
-        ///<exception cref="ArgumentException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        /// <visible>false</visible>
         [Create(@"{entityType:(contact|person|company|opportunity|case)}/tasktemplatecontainer")]
         public TaskTemplateContainerWrapper CreateTaskTemplateContainer(string entityType, string title)
         {
@@ -59,7 +51,7 @@ namespace ASC.Api.CRM
                     Title = title
                 };
 
-            taskTemplateContainer.ID = DaoFactory.GetTaskTemplateContainerDao().SaveOrUpdate(taskTemplateContainer);
+            taskTemplateContainer.ID = DaoFactory.TaskTemplateContainerDao.SaveOrUpdate(taskTemplateContainer);
             return ToTaskTemplateContainerWrapper(taskTemplateContainer);
         }
 
@@ -72,10 +64,11 @@ namespace ASC.Api.CRM
         /// <returns>
         ///     Task template container list
         /// </returns>
+        /// <visible>false</visible>
         [Read(@"{entityType:(contact|person|company|opportunity|case)}/tasktemplatecontainer")]
         public IEnumerable<TaskTemplateContainerWrapper> GetTaskTemplateContainers(string entityType)
         {
-            return ToTaskListTemplateContainerWrapper(DaoFactory.GetTaskTemplateContainerDao().GetItems(ToEntityType(entityType)));
+            return ToTaskListTemplateContainerWrapper(DaoFactory.TaskTemplateContainerDao.GetItems(ToEntityType(entityType)));
         }
 
         /// <summary>
@@ -87,17 +80,18 @@ namespace ASC.Api.CRM
         /// <returns>
         ///    Deleted task template container
         /// </returns>
-        ///<exception cref="ArgumentException"></exception>
-        ///<exception cref="ItemNotFoundException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="ItemNotFoundException"></exception>
+        /// <visible>false</visible>
         [Delete(@"tasktemplatecontainer/{containerid:[0-9]+}")]
         public TaskTemplateContainerWrapper DeleteTaskTemplateContainer(int containerid)
         {
             if (containerid <= 0) throw new ArgumentException();
 
-            var result = ToTaskTemplateContainerWrapper(DaoFactory.GetTaskTemplateContainerDao().GetByID(containerid));
+            var result = ToTaskTemplateContainerWrapper(DaoFactory.TaskTemplateContainerDao.GetByID(containerid));
             if (result == null) throw new ItemNotFoundException();
 
-            DaoFactory.GetTaskTemplateContainerDao().Delete(containerid);
+            DaoFactory.TaskTemplateContainerDao.Delete(containerid);
 
             return result;
         }
@@ -112,19 +106,20 @@ namespace ASC.Api.CRM
         /// <returns>
         ///     Task template container
         /// </returns>
-        ///<exception cref="ArgumentException"></exception>
-        ///<exception cref="ItemNotFoundException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="ItemNotFoundException"></exception>
+        /// <visible>false</visible>
         [Update(@"tasktemplatecontainer/{containerid:[0-9]+}")]
         public TaskTemplateContainerWrapper UpdateTaskTemplateContainer(int containerid, string title)
         {
             if (containerid <= 0 || string.IsNullOrEmpty(title)) throw new ArgumentException();
 
-            var result = DaoFactory.GetTaskTemplateContainerDao().GetByID(containerid);
+            var result = DaoFactory.TaskTemplateContainerDao.GetByID(containerid);
             if (result == null) throw new ItemNotFoundException();
 
             result.Title = title;
 
-            DaoFactory.GetTaskTemplateContainerDao().SaveOrUpdate(result);
+            DaoFactory.TaskTemplateContainerDao.SaveOrUpdate(result);
 
             return ToTaskTemplateContainerWrapper(result);
         }
@@ -138,14 +133,15 @@ namespace ASC.Api.CRM
         /// <returns>
         ///     Task template container
         /// </returns>
-        ///<exception cref="ArgumentException"></exception>
-        ///<exception cref="ItemNotFoundException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="ItemNotFoundException"></exception>
+        /// <visible>false</visible>
         [Read(@"tasktemplatecontainer/{containerid:[0-9]+}")]
         public TaskTemplateContainerWrapper GetTaskTemplateContainerByID(int containerid)
         {
             if (containerid <= 0) throw new ArgumentException();
 
-            var item = DaoFactory.GetTaskTemplateContainerDao().GetByID(containerid);
+            var item = DaoFactory.TaskTemplateContainerDao.GetByID(containerid);
             if (item == null) throw new ItemNotFoundException();
 
             return ToTaskTemplateContainerWrapper(item);
@@ -160,17 +156,18 @@ namespace ASC.Api.CRM
         /// <returns>
         ///     Task template list
         /// </returns>
-        ///<exception cref="ArgumentException"></exception>
-        ///<exception cref="ItemNotFoundException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="ItemNotFoundException"></exception>
+        /// <visible>false</visible>
         [Read(@"tasktemplatecontainer/{containerid:[0-9]+}/tasktemplate")]
         public IEnumerable<TaskTemplateWrapper> GetTaskTemplates(int containerid)
         {
             if (containerid <= 0) throw new ArgumentException();
 
-            var container = DaoFactory.GetTaskTemplateContainerDao().GetByID(containerid);
+            var container = DaoFactory.TaskTemplateContainerDao.GetByID(containerid);
             if (container == null) throw new ItemNotFoundException();
 
-            return DaoFactory.GetTaskTemplateDao().GetList(containerid).ConvertAll(ToTaskTemplateWrapper);
+            return DaoFactory.TaskTemplateDao.GetList(containerid).ConvertAll(ToTaskTemplateWrapper);
         }
 
         /// <summary>
@@ -189,6 +186,7 @@ namespace ASC.Api.CRM
         /// <returns>Task template</returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ItemNotFoundException"></exception>
+        /// <visible>false</visible>
         [Create(@"tasktemplatecontainer/{containerid:[0-9]+}/tasktemplate")]
         public TaskTemplateWrapper CreateTaskTemplate(
             int containerid,
@@ -203,7 +201,7 @@ namespace ASC.Api.CRM
         {
             if (containerid <= 0 || string.IsNullOrEmpty(title) || categoryid <= 0) throw new ArgumentException();
 
-            var container = DaoFactory.GetTaskTemplateContainerDao().GetByID(containerid);
+            var container = DaoFactory.TaskTemplateContainerDao.GetByID(containerid);
             if (container == null) throw new ItemNotFoundException();
 
             var item = new TaskTemplate
@@ -218,7 +216,7 @@ namespace ASC.Api.CRM
                     Offset = TimeSpan.FromTicks(offsetTicks)
                 };
 
-            item.ID = DaoFactory.GetTaskTemplateDao().SaveOrUpdate(item);
+            item.ID = DaoFactory.TaskTemplateDao.SaveOrUpdate(item);
 
             return ToTaskTemplateWrapper(item);
         }
@@ -240,6 +238,7 @@ namespace ASC.Api.CRM
         /// <returns>Task template</returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ItemNotFoundException"></exception>
+        /// <visible>false</visible>
         [Update(@"tasktemplatecontainer/{containerid:[0-9]+}/tasktemplate")]
         public TaskTemplateWrapper UpdateTaskTemplate(
             int id,
@@ -255,10 +254,10 @@ namespace ASC.Api.CRM
         {
             if (containerid <= 0 || string.IsNullOrEmpty(title) || categoryid <= 0) throw new ArgumentException();
 
-            var updatingItem = DaoFactory.GetTaskTemplateDao().GetByID(id);
+            var updatingItem = DaoFactory.TaskTemplateDao.GetByID(id);
             if (updatingItem == null) throw new ItemNotFoundException();
 
-            var container = DaoFactory.GetTaskTemplateContainerDao().GetByID(containerid);
+            var container = DaoFactory.TaskTemplateContainerDao.GetByID(containerid);
             if (container == null) throw new ItemNotFoundException();
 
             var item = new TaskTemplate
@@ -274,7 +273,7 @@ namespace ASC.Api.CRM
                     Offset = TimeSpan.FromTicks(offsetTicks)
                 };
 
-            item.ID = DaoFactory.GetTaskTemplateDao().SaveOrUpdate(item);
+            item.ID = DaoFactory.TaskTemplateDao.SaveOrUpdate(item);
 
             return ToTaskTemplateWrapper(item);
         }
@@ -288,17 +287,18 @@ namespace ASC.Api.CRM
         /// <returns>Task template</returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ItemNotFoundException"></exception>
+        /// <visible>false</visible>
         [Delete(@"tasktemplatecontainer/tasktemplate/{id:[0-9]+}")]
         public TaskTemplateWrapper DeleteTaskTemplate(int id)
         {
             if (id <= 0) throw new ArgumentException();
 
-            var taskTemplate = DaoFactory.GetTaskTemplateDao().GetByID(id);
+            var taskTemplate = DaoFactory.TaskTemplateDao.GetByID(id);
             if (taskTemplate == null) throw new ItemNotFoundException();
 
             var result = ToTaskTemplateWrapper(taskTemplate);
 
-            DaoFactory.GetTaskTemplateDao().Delete(id);
+            DaoFactory.TaskTemplateDao.Delete(id);
 
             return result;
         }
@@ -312,12 +312,13 @@ namespace ASC.Api.CRM
         /// <returns>Task template</returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ItemNotFoundException"></exception>
+        /// <visible>false</visible>
         [Read(@"tasktemplatecontainer/tasktemplate/{id:[0-9]+}")]
         public TaskTemplateWrapper GetTaskTemplateByID(int id)
         {
             if (id <= 0) throw new ArgumentException();
 
-            var taskTemplate = DaoFactory.GetTaskTemplateDao().GetByID(id);
+            var taskTemplate = DaoFactory.TaskTemplateDao.GetByID(id);
             if (taskTemplate == null) throw new ItemNotFoundException();
 
             return ToTaskTemplateWrapper(taskTemplate);
@@ -343,7 +344,7 @@ namespace ASC.Api.CRM
         {
             var result = new List<TaskTemplateContainerWrapper>();
 
-            var taskTemplateDictionary = DaoFactory.GetTaskTemplateDao().GetAll()
+            var taskTemplateDictionary = DaoFactory.TaskTemplateDao.GetAll()
                                                    .GroupBy(item => item.ContainerID)
                                                    .ToDictionary(x => x.Key, y => y.Select(ToTaskTemplateWrapper));
 

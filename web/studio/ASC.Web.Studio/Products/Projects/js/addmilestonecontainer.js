@@ -1,92 +1,96 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 ASC.Projects.MilestoneContainer = (function () {
+    var $addTaskContainer,
+        $addMilestoneContainer,
+        $addMilestone,
+        $taskActionPanel,
+        $milestoneActionsPanel;
+
     var init = function () {
-        if (location.href.indexOf('projects.aspx') > 0) {
-            ASC.Projects.CreateMilestoneContainer.init("<span class='chooseResponsible nobody'><span class='dottedLink'>" + ASC.Projects.Resources.ProjectsJSResource.ChooseResponsible + "</span></span>");
+        $addTaskContainer = jq('#addTaskContainer'),
+        $addMilestoneContainer = jq("#addMilestoneContainer"),
+        $addMilestone = jq("#addMilestone"),
+        $taskActionPanel = jq('#taskActionPanel'),
+        $milestoneActionsPanel = jq("#milestoneActions");
+
+        var href = location.href.toLowerCase();
+
+        if (href.indexOf('projects.aspx') > 0) {
+            ASC.Projects.CreateProjectStructure.init(jq.tmpl("projects_choose_responsible")[0].outerHTML);
         }
         
-        if (location.href.indexOf('projectTemplates.aspx') > 0) {
+        if (href.indexOf('projecttemplates.aspx') > 0) {
             ASC.Projects.EditMilestoneContainer.init();
         }
         
         jq("#newMilestoneTitle, #newTaskTitle").val('');
 
         jq(document).on('click', ".task .entity-menu", function () {
-            hideAddTaskContainer();
-            hideAddMilestoneContainer();
-            var target = jq(this).parents('.task').attr('id');
-            jq("#" + target).addClass("open");
-            jq("#taskActionPanel").attr('target', target);
-            showActionsPanel("taskActionPanel", this);
+            entityMenuOnClick(this, $taskActionPanel, '.task');
             return false;
         });
         jq(document).on('click', ".milestone .mainInfo .entity-menu", function () {
-            hideAddTaskContainer();
-            hideAddMilestoneContainer();
-            var target = jq(this).parents('.milestone').attr('id');
-            jq("#milestoneActions").attr('target', target);
-            jq("#" + target).addClass("open");
-            showActionsPanel("milestoneActions", this);
+            entityMenuOnClick(this, $milestoneActionsPanel, '.milestone');
             return false;
         });
 
+        function entityMenuOnClick(self, actionPanel, parent) {
+            hideAddTaskContainer();
+            hideAddMilestoneContainer();
+            var target = jq(self).parents(parent).attr('id');
+            actionPanel.attr('target', target);
+            jq("#" + target).addClass("open");
+            showActionsPanel(actionPanel, self);
+        }
+
         jq(document).on('click', ".addTaskContainer .link", function () {
             hideAddMilestoneContainer();
-            if (jq('#addTaskContainer').hasClass('edit')) {
-                jq('#' + jq('#addTaskContainer').attr('target')).show();
-                jq('#addTaskContainer').removeClass('edit');
+            if ($addTaskContainer.hasClass('edit')) {
+                jq('#' + $addTaskContainer.attr('target')).show();
+                $addTaskContainer.removeClass('edit');
             }
             jq("#newTaskTitle").val("");
             var target;
             var parent = jq(this).parent().parent();
-            if (jq(parent).attr("id") == "noAssignTaskContainer") {
+            if (jq(parent).attr("id") === "noAssignTaskContainer") {
                 target = "noAssign";
             } else {
                 target = jq(parent).parent().attr("id");
             }
-            if (jq("#addTaskContainer").attr("target") != "") {
-                var elem = jq("#addTaskContainer").parent();
-                if (jq(elem).attr('id') == "noAssignTaskContainer") {
+            if ($addTaskContainer.attr("target") !== "") {
+                var elem = $addTaskContainer.parent();
+                if (jq(elem).attr('id') === "noAssignTaskContainer") {
                     jq("#noAssignTaskContainer .addTaskContainer").appendTo("#noAssignTaskContainer");
                 }
                 jq(elem).children(".addTaskContainer").show();
             }
 
-            var chooseRespBlock = jq("#addTaskContainer").find(".chooseResponsible");
+            var chooseRespBlock = $addTaskContainer.find(".chooseResponsible");
 
             if (!chooseRespBlock.length) {
                 jq("#addTaskContainer div:first-child").append(jq(".chooseResponsible:first").clone());
             }
 
-            jq("#addTaskContainer").attr("target", target);
-            jq("#addTaskContainer").appendTo(parent);
+            $addTaskContainer.attr("target", target);
+            $addTaskContainer.appendTo(parent);
             jq(parent).children(".addTaskContainer").hide();
-            jq("#addTaskContainer").show();
+            $addTaskContainer.show();
             jq("#addTaskContainer #newTaskTitle").focus();
         });
 
@@ -105,6 +109,7 @@ ASC.Projects.MilestoneContainer = (function () {
                         isHide = false;
                         return false;
                     }
+                    return false;
                 });
             }
 
@@ -117,8 +122,7 @@ ASC.Projects.MilestoneContainer = (function () {
         });
     };
 
-
-    var showActionsPanel = function (panelId, obj) {
+    function showActionsPanel ($panel, obj) {
         var x, y;
 
         jq('.studio-action-panel').hide();
@@ -126,21 +130,21 @@ ASC.Projects.MilestoneContainer = (function () {
         x = jq(obj).offset().left;
         y = jq(obj).offset().top;
 
-        if (panelId == "projectMemberPanel") {
+        if ($panel.attr("id") === "projectMemberPanel") {
             x = x - 21;
             y = y + 20;
         } else {
-            x = x - 164;
-            y = y + 29;
+            x = x - $panel.outerWidth() + jq(obj).outerWidth();
+            y = y + jq(obj).outerHeight();
         }
 
-        jq('#' + panelId).css("left", x + "px");
-        jq('#' + panelId).css("top", y + "px");
-        jq('#' + panelId).show();
+        $panel.css("left", x + "px");
+        $panel.css("top", y + "px");
+        $panel.show();
     };
 
     var showAction = function (target) {
-        if (target == 'noAssign') {
+        if (target === 'noAssign') {
             var listNoAssignTask = jq("#listNoAssignListTask .task");
             if (listNoAssignTask.length > 0) {
                 jq("#noAssignTaskContainer .addTaskContainer").appendTo(jq("#noAssignTaskContainer"));
@@ -149,30 +153,31 @@ ASC.Projects.MilestoneContainer = (function () {
         }
     };
 
-    var hideAddMilestoneContainer = function () {
-        jq("#addMilestoneContainer").hide();
-        if (jq("#addMilestoneContainer").hasClass("edit")) {
-            var target = jq("#addMilestoneContainer").attr("target");
+    function hideAddMilestoneContainer() {
+        $addMilestoneContainer.hide();
+        if ($addMilestoneContainer.hasClass("edit")) {
+            var target = $addMilestoneContainer.attr("target");
             jq("#" + target + " .mainInfo").show();
-            jq("#addMilestoneContainer").removeClass("edit");
+            $addMilestoneContainer.removeClass("edit");
         }
-        if (jq("#addMilestoneContainer").hasClass('edit')) {
-            jq("#" + jq("#addMilestoneContainer").attr('target')).find(".mainInfo").show();
+        if ($addMilestoneContainer.hasClass('edit')) {
+            jq("#" + $addMilestoneContainer.attr('target')).find(".mainInfo").show();
         }
         jq(".addTaskContainer").show();
-        jq("#addMilestoneContainer #newMilestoneTitle").val('');
-        jq("#addMilestone").show();
+        $addMilestoneContainer.find("#newMilestoneTitle").val('');
+        $addMilestone.show();
     };
 
-    var hideAddTaskContainer = function () {
-        jq("#addTaskContainer").hide();
+    function hideAddTaskContainer() {
+        $addTaskContainer.hide();
         jq('.task').show();
-        var target = jq("#addTaskContainer").attr("target");
+        var target = $addTaskContainer.attr("target");
+        if (target === "") return;
         var elem = jq("#" + target);
         var containerTask;
         if (jq(elem).hasClass("milestone")) {
             containerTask = jq(elem).find(".milestoneTasksContainer");
-            if (jq(containerTask).find(".task").length == 0) {
+            if (jq(containerTask).find(".task").length === 0) {
                 jq(containerTask).hide();
                 jq(containerTask).closest(".milestone").find(".addTask").removeClass("hide");
                 jq(containerTask).find(".addTaskContainer").hide();
@@ -181,11 +186,11 @@ ASC.Projects.MilestoneContainer = (function () {
             }
         } else {
             var container = jq(elem).parent();
-            if (target == "noAssign" || jq(container).attr('id') == "listNoAssignListTask") {
+            if (target === "noAssign" || jq(container).attr('id') === "listNoAssignListTask") {
                 jq("#noAssignTaskContainer .addTaskContainer").show();
             } else {
                 containerTask = jq(elem).closest(".milestoneTasksContainer");
-                if (jq(containerTask).find(".task").length == 0) {
+                if (jq(containerTask).find(".task").length === 0) {
                     jq(containerTask).hide();
                     jq(containerTask).closest(".milestone").find(".addTask").removeClass("hide");
                     jq(containerTask).find(".addTaskContainer").hide();
@@ -194,7 +199,7 @@ ASC.Projects.MilestoneContainer = (function () {
                 }
             }
         }
-        jq("#addTaskContainer").removeAttr("target");
+        $addTaskContainer.removeAttr("target");
         jq("#newTaskTitle").val('');
     };
 
@@ -210,20 +215,33 @@ ASC.Projects.MilestoneContainer = (function () {
 ASC.Projects.EditMilestoneContainer = (function () {
     var milestoneCounter = 0,
         taskCounter = 0;
-    var tmplId;
+    var $addTaskContainer;
+    var $addMilestoneContainer;
+    var $addMilestone;
+
+    var $taskActionPanel;
+    var $milestoneActionsPanel;
+    var milestoneContainer = ASC.Projects.MilestoneContainer;
 
     var init = function () {
+        $addTaskContainer = jq('#addTaskContainer');
+        $addMilestoneContainer = jq('#addMilestoneContainer');
+        $addMilestone = jq('#addMilestone');
+
+        $taskActionPanel = jq('#taskActionPanel');
+        $milestoneActionsPanel = jq("#milestoneActions");
+
         //milestone
-        jq("#addMilestone a").bind('click', function () {
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
-            jq("#addMilestoneContainer").hide();
-            if (jq("#addMilestoneContainer").hasClass('edit')) {
-                jq("#" + jq("#addMilestoneContainer").attr('target')).find(".mainInfo").show();
-                jq("#addMilestoneContainer").removeClass('edit');
+        $addMilestone.find("a").bind('click', function () {
+            milestoneContainer.hideAddTaskContainer();
+            $addMilestoneContainer.hide();
+            if ($addMilestoneContainer.hasClass('edit')) {
+                jq("#" + $addMilestoneContainer.attr('target')).find(".mainInfo").show();
+                $addMilestoneContainer.removeClass('edit');
             }
 
-            jq("#addMilestone").after(jq("#addMilestoneContainer"));
-            jq("#addMilestone").hide();
+            $addMilestone.after($addMilestoneContainer);
+            $addMilestone.hide();
             jq("#newMilestoneTitle").val('');
 
             if (jq("#dueDate").length) {
@@ -232,55 +250,55 @@ ASC.Projects.EditMilestoneContainer = (function () {
                 jq("#dueDate").datepicker("setDate", defDate);
             }
 
-            jq("#addMilestoneContainer").show();
-            jq("#addMilestoneContainer #newMilestoneTitle").focus();
+            $addMilestoneContainer.show();
+
+            jq("#newMilestoneTitle").focus();
         });
 
-        jq("#newMilestoneTitle").bind('keydown', function (e) {
-            jq("#addMilestoneContainer").removeClass("red-border");
-            var targetId = jq("#addMilestoneContainer").attr('target');
-            if (e.which == 13) {
-                jq("#addMilestoneContainer .button").click();
+        jq("body").on('keydown', '#newMilestoneTitle', function (e) {
+            $addMilestoneContainer.removeClass("red-border");
+            var targetId = $addMilestoneContainer.attr('target');
+            if (e.which === 13) {
+                $addMilestoneContainer.find(".button").click();
             } else {
-                if (e.which == 27) {
+                if (e.which === 27) {
                     jq(this).val("");
-                    if (jq("#addMilestoneContainer").hasClass('edit')) {
-                        jq("#addMilestoneContainer").hide();
+                    if ($addMilestoneContainer.hasClass('edit')) {
+                        $addMilestoneContainer.hide();
                         jq("#" + targetId + " .mainInfo").show();
                     } else {
-                        jq("#addMilestoneContainer").hide();
-                        jq("#addMilestone").show();
+                        $addMilestoneContainer.hide();
+                        $addMilestone.show();
                     }
                 }
             }
         });
 
-        jq("#addMilestoneContainer .button").on('click', function (e) {
-            var addMilestoneContainer = jq("#addMilestoneContainer");
-            var targetId = addMilestoneContainer.attr('target');
+        jq("body").on('click', "#addMilestoneContainer .button", function () {
+            var targetId = $addMilestoneContainer.attr('target');
             var milestoneTitle = jq("#newMilestoneTitle");
 
-            addMilestoneContainer.removeClass("red-border");
+            $addMilestoneContainer.removeClass("red-border");
 
             var text = jq.trim(milestoneTitle.val());
             if (!text.length) {
                 alert(jq("#milestoneError").text());
                 return;
             }
-            if (addMilestoneContainer.hasClass('edit')) {
+            if ($addMilestoneContainer.hasClass('edit')) {
 
                 jq("#" + targetId + " .mainInfo .titleContainerEdit span").text(jq.trim(milestoneTitle.val()));
-                var days = jq("#addMilestoneContainer select option:selected").attr('value');
+                var days = $addMilestoneContainer.find("select option:selected").attr('value');
                 jq("#" + targetId + " .mainInfo .daysCount span").text(days);
                 jq("#" + targetId + " .mainInfo .daysCount").attr('value', days);
 
-                addMilestoneContainer.hide();
+                $addMilestoneContainer.hide();
                 jq("#" + targetId + " .mainInfo").show();
-                addMilestoneContainer.removeClass('edit');
+                $addMilestoneContainer.removeClass('edit');
             } else {
                 milestoneCounter++;
                 var milestone = {
-                    title: jq.trim(milestoneTitle.val()), duration: jq("#addMilestoneContainer select option:selected").attr('value'),
+                    title: jq.trim(milestoneTitle.val()), duration: $addMilestoneContainer.find("select option:selected").attr('value'),
                     tasks: [], number: milestoneCounter
                 };
 
@@ -292,113 +310,111 @@ ASC.Projects.EditMilestoneContainer = (function () {
 
         //milestone menu
         jq(document).on('click', ".milestone .mainInfo .title, .milestone .mainInfo .daysCount", function () {
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
-            jq("#addMilestoneContainer").addClass('edit');
+            milestoneContainer.hideAddTaskContainer();
+            milestoneContainer.hideAddMilestoneContainer();
+            $addMilestoneContainer.addClass('edit');
             var target = jq(this).closest('.milestone').attr('id');
-            jq("#addMilestoneContainer").attr('target', target);
+            $addMilestoneContainer.attr('target', target);
             var milestone = jq("#" + target + " .mainInfo");
-            jq("#addMilestoneContainer").prependTo(jq("#" + target));
+            $addMilestoneContainer.prependTo(jq("#" + target));
             jq(milestone).hide();
             var val = jq(milestone).find(".daysCount").attr('value');
-            jq("#addMilestoneContainer").show();
-            jq("#addMilestoneContainer #newMilestoneTitle").val(jq(milestone).children(".titleContainerEdit").text());
-            jq("#addMilestoneContainer select option[value = '" + val + "']").attr("selected", "selected");
-
-            jq("#addMilestoneContainer #newMilestoneTitle").focus();
+            $addMilestoneContainer.show();
+            $addMilestoneContainer.find("#newMilestoneTitle").val(jq(milestone).children(".titleContainerEdit").text());
+            $addMilestoneContainer.find("select option[value = '" + val + "']").attr("selected", "selected");
+            $addMilestoneContainer.find("#newMilestoneTitle").focus();
 
         });
         jq(document).on('click', ".milestone .mainInfo .addTask", function () {
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
+            milestoneContainer.hideAddTaskContainer();
             var target = jq(this).closest('.milestone').attr('id');
             var milestTasksCont = jq("#" + target + " .milestoneTasksContainer");
-            jq("#addTaskContainer").appendTo(milestTasksCont[0]);
+            $addTaskContainer.appendTo(milestTasksCont[0]);
             jq(milestTasksCont).find('.addTaskContainer').hide();
-            jq("#addTaskContainer").attr("target", target);
-            jq("#addTaskContainer").show();
+            $addTaskContainer.attr("target", target);
+            $addTaskContainer.show();
             jq(milestTasksCont).show();
             jq("#addTaskContainer #newTaskTitle").focus();
         });
 
         jq("#milestoneActions .actionList #removeMilestone").bind('click', function () {
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
-            jq("#addTaskContainer").appendTo("#noAssignTaskContainer");
-            jq("#milestoneActions").hide();
+            milestoneContainer.hideAddTaskContainer();
+            $addTaskContainer.appendTo("#noAssignTaskContainer");
+            $milestoneActionsPanel.hide();
             var target = jq(this).parents('.studio-action-panel').attr('target');
             jq("#" + target).removeClass("open");
             jq("#" + target).remove();
         });
 
         jq("#milestoneActions .actionList #addTaskInMilestone").bind('click', function () {
-            jq("#milestoneActions").hide();
+            $milestoneActionsPanel.hide();
             var target = jq(this).parents('.studio-action-panel').attr('target');
             jq("#" + target).removeClass("open");
             var listTasks = jq(".listTasks[milestone='" + target + "']");
             var milestTasksCont = jq(listTasks[0]).closest(".milestoneTasksContainer");
             jq(milestTasksCont).find('.addTaskContainer').hide();
-            jq("#addTaskContainer").appendTo(milestTasksCont[0]);
-            jq("#addTaskContainer").attr("target", target);
-            jq("#addTaskContainer").show();
+            $addTaskContainer.appendTo(milestTasksCont[0]);
+            $addTaskContainer.attr("target", target);
+            $addTaskContainer.show();
             jq(milestTasksCont).find(".addTaskContainer").hide();
             jq(milestTasksCont).show();
             jq("#addTaskContainer #newTaskTitle").focus();
         });
 
         jq("#milestoneActions .actionList #editMilestone").bind('click', function () {
-            jq("#milestoneActions").hide();
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
-            jq("#addMilestoneContainer").addClass('edit');
+            $milestoneActionsPanel.hide();
+            milestoneContainer.hideAddMilestoneContainer();
+            $addMilestoneContainer.addClass('edit');
             var target = jq(this).parents('.studio-action-panel').attr('target');
-            jq("#addMilestoneContainer").attr('target', target);
+            $addMilestoneContainer.attr('target', target);
             jq("#" + target).removeClass("open");
             var milestone = jq("#" + target + " .mainInfo");
-            jq("#addMilestoneContainer").prependTo(jq("#" + target));
+            $addMilestoneContainer.prependTo(jq("#" + target));
             jq(milestone).hide();
             var val = jq(milestone).children(".daysCount").attr('value');
-            jq("#addMilestoneContainer").show();
-            jq("#addMilestoneContainer #newMilestoneTitle").val(jq(milestone).children(".titleContainerEdit").text());
-            jq("#addMilestoneContainer select option[value = '" + val + "']").attr("selected", "selected");
-
-            jq("#addMilestoneContainer #newMilestoneTitle").focus();
+            $addMilestoneContainer.show();
+            $addMilestoneContainer.find("#newMilestoneTitle").val(jq(milestone).children(".titleContainerEdit").text());
+            $addMilestoneContainer.find("select option[value = '" + val + "']").attr("selected", "selected");
+            $addMilestoneContainer.find("#newMilestoneTitle").focus();
         });
 
         //task
 
         jq(document).on('click', ".task .title", function () {
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
-            jq("#addTaskContainer").hide();
-            if (jq("#addTaskContainer").hasClass('edit')) {
-                jq('#' + jq("#addTaskContainer").attr('target')).show();
+            milestoneContainer.hideAddMilestoneContainer();
+            $addTaskContainer.hide();
+            if ($addTaskContainer.hasClass('edit')) {
+                jq('#' + $addTaskContainer.attr('target')).show();
             } else {
-                jq("#addTaskContainer").addClass('edit');
+                $addTaskContainer.addClass('edit');
                 jq('.addTaskContainer').show();
             }
 
             var target = jq(this).parents('.task');
 
-            jq("#addTaskContainer").attr('target', jq(target).attr("id"));
-            jq("#addTaskContainer").insertAfter(target);
+            $addTaskContainer.attr('target', jq(target).attr("id"));
+            $addTaskContainer.insertAfter(target);
             jq(target).hide();
             jq("#addTaskContainer #newTaskTitle").val(jq(target).children(".titleContainer").text());
-            jq("#addTaskContainer").show();
+            $addTaskContainer.show();
             jq("#addTaskContainer #newTaskTitle").focus();
         });
 
         jq("#newTaskTitle").bind('keydown', function (e) {
-            var taskContainer = jq("#addTaskContainer");
+            var taskContainer = $addTaskContainer;
             taskContainer.removeClass("red-border");
             var target = taskContainer.attr('target');
-            if (e.which == 13) {
+            if (e.which === 13) {
                 jq("#addTaskContainer .button").click();
             } else {
-                if (e.which == 27) {
+                if (e.which === 27) {
                     jq(this).val("");
                     if (taskContainer.hasClass('edit')) {
-                        ASC.Projects.MilestoneContainer.hideAddTaskContainer();
+                        milestoneContainer.hideAddTaskContainer();
                         taskContainer.removeClass('edit');
                         jq("#" + target).show();
                     } else {
-                        ASC.Projects.MilestoneContainer.hideAddTaskContainer();
+                        milestoneContainer.hideAddTaskContainer();
                     }
                 }
             }
@@ -418,28 +434,30 @@ ASC.Projects.EditMilestoneContainer = (function () {
             if (taskContainer.hasClass('edit')) {
                 jq("#" + target + " .titleContainer span").text(taskTitle.val());
                 taskContainer.removeClass('edit');
-                ASC.Projects.MilestoneContainer.hideAddTaskContainer();
+                milestoneContainer.hideAddTaskContainer();
                 jq("#" + target).show();
             } else {
                 taskCounter++;
                 var task = { title: jq.trim(taskTitle.val()), number: taskCounter };
-                var tElem = target == 'noAssign' ? jq("#listNoAssignListTask") : jq(".listTasks[milestone='" + target + "']");
+                var tElem = target === 'noAssign' ? jq("#listNoAssignListTask") : jq(".listTasks[milestone='" + target + "']");
                 jq.tmpl("projects_templatesEditTaskTmpl", task).appendTo(tElem);
                 taskTitle.val("");
                 taskTitle.focus();
             }
+
+            return true;
         });
 
         //task menu
 
         jq("#taskActionPanel .actionList #removeTask").bind('click', function () {
-            jq("#taskActionPanel").hide();
+            $taskActionPanel.hide();
             var target = jq(this).parents('.studio-action-panel').attr('target');
             jq("#" + target).removeClass("open");
             var targetParent = jq("#" + target).parent();
             jq("#" + target).remove();
             if (jq(targetParent).hasClass('listTasks')) {
-                if (jq(targetParent).children('.task').length == 0) {
+                if (jq(targetParent).children('.task').length === 0) {
                     jq(targetParent).closest('.milestone').find('.milestoneTasksContainer').hide();
                     jq(targetParent).closest(".milestone").find(".addTask").removeClass("hide");
                 }
@@ -447,16 +465,16 @@ ASC.Projects.EditMilestoneContainer = (function () {
         });
 
         jq("#taskActionPanel .actionList #editTask").bind('click', function () {
-            jq("#taskActionPanel").hide();
+            $taskActionPanel.hide();
             var target = jq(this).parents('.studio-action-panel').attr('target');
             var task = jq("#" + target);
             jq(task).removeClass("open");
-            jq("#addTaskContainer").addClass('edit');
-            jq("#addTaskContainer").attr('target', target);
-            jq("#addTaskContainer").insertAfter(task);
+            $addTaskContainer.addClass('edit');
+            $addTaskContainer.attr('target', target);
+            $addTaskContainer.insertAfter(task);
             jq(task).hide();
             jq("#addTaskContainer #newTaskTitle").val(jq(task).children(".titleContainer").text());
-            jq("#addTaskContainer").show();
+            $addTaskContainer.show();
             jq("#addTaskContainer #newTaskTitle").focus();
         });
     };
@@ -464,26 +482,26 @@ ASC.Projects.EditMilestoneContainer = (function () {
     var showTmplStructure = function (tmpl) {
         var description = { tasks: [], milestones: [] };
         try {
-            description = jQuery.parseJSON(tmpl.description) || { tasks: [], milestones: [] };
+            description = jq.parseJSON(tmpl.description) || { tasks: [], milestones: [] };
         } catch (e) {
 
         }
-
+        var i;
         var milestones = description.milestones;
         if (milestones) {
-            for (var i = 0; i < milestones.length; i++) {
+            for (i = 0; i < milestones.length; i++) {
                 milestoneCounter++;
                 if (milestones[i].duration || milestones[i].duration > 6) {
-                    var duration = jq("#addMilestoneContainer select option[duration='" + milestones[i].duration + "']").text();
-                    if (duration == "") {
+                    var duration = $addMilestoneContainer.find("select option[duration='" + milestones[i].duration + "']").text();
+                    if (duration === "") {
                         duration = milestones[i].duration.toString();
                         duration = duration.replace('.', ',');
-                        milestones[i].duration = jq("#addMilestoneContainer select option[duration^='" + duration + "']").text();
+                        milestones[i].duration = $addMilestoneContainer.find("select option[duration^='" + duration + "']").text();
                     } else {
                         milestones[i].duration = duration;
                     }
                 } else {
-                    milestones[i].duration = jq("#addMilestoneContainer select option:first-child").text();
+                    milestones[i].duration = $addMilestoneContainer.find("select option:first-child").text();
                 }
                 milestones[i].number = milestoneCounter;
                 milestones[i].displayTasks = milestones[i].tasks.length ? true : false;
@@ -492,14 +510,14 @@ ASC.Projects.EditMilestoneContainer = (function () {
         }
         var noAssignTasks = description.tasks;
         if (noAssignTasks) {
-            for (var i = 0; i < noAssignTasks.length; i++) {
+            for (i = 0; i < noAssignTasks.length; i++) {
                 taskCounter++;
                 noAssignTasks[i].number = taskCounter;
                 jq.tmpl("projects_templatesEditTaskTmpl", noAssignTasks[i]).appendTo("#listNoAssignListTask");
             }
             jq("#addTaskContainer").attr("target", 'noAssign');
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
-            ASC.Projects.MilestoneContainer.showAction('noAssign');
+            milestoneContainer.hideAddTaskContainer();
+            milestoneContainer.showAction('noAssign');
         }
     };
 
@@ -510,16 +528,28 @@ ASC.Projects.EditMilestoneContainer = (function () {
 
 })(jQuery);
 
-ASC.Projects.CreateMilestoneContainer = (function () {
-    var prjTitleContainer = jq("input[id*='projectTitle']"),
-        dueDateContainer = jq("#dueDate"),
-        teamContainer = jq("#Team").length ? jq("#Team") : jq("#projectParticipantsContainer");
+ASC.Projects.CreateProjectStructure = (function () {
+    var prjTitleContainer,
+        dueDateContainer,
+        teamContainer;
+    var $projectMemberPanel;
+    var $addTaskContainer;
+    var $addMilestoneContainer;
+
+    var $taskActionPanel;
+    var $milestoneActionsPanel;
+
+    var $addMilestone;
+    var selectedTeam = [];
+
     var regionalFormatDate, chooseRespStr, showRespCombFlag = false,
         milestoneCounter = 0, taskCounter = 0;
     var pmId = null;
+    var milestoneContainer = ASC.Projects.MilestoneContainer;
+    var isInit = false;
 
     var showChooseResponsible = function () {
-        if (selectedTeam.length == 0 && !pmId) {
+        if (selectedTeam.length === 0 && !pmId) {
             jq(".chooseResponsible").remove();
             showRespCombFlag = false;
             return;
@@ -547,16 +577,12 @@ ASC.Projects.CreateMilestoneContainer = (function () {
         updateProjectMemberPanel();
     };
 
-    var updateProjectMemberPanel = function () {
+    function updateProjectMemberPanel() {
         jq("#projectMemberPanel .actionList li").remove();
         var pmName = jq("#projectManagerSelector").attr("data-id") ? jq("#projectManagerSelector").html() : "";
 
         if (pmId)
             jq("#projectMemberPanel .actionList").append("<li id='" + pmId + "' class='dropdown-item'>" + pmName + "</li>");
-
-        if (selectedTeam.length) {
-            teamContainer.show();
-        }
 
         for (var i = 0; i < selectedTeam.length; i++) {
             if (selectedTeam[i].isVisitor) continue;
@@ -569,18 +595,24 @@ ASC.Projects.CreateMilestoneContainer = (function () {
     
     var responsibleInTeam = function (entity, team) {
         var oldResp = jq(entity).attr("guid");
-        return team.some(function (item) { return item.id == oldResp || (pmId && pmId == oldResp); });
+        return team.some(function (item) { return item.id === oldResp || (pmId && pmId === oldResp); });
     };
     
-    var updateMilestoneAndTaskResponsible = function () {
+    function updateMilestoneAndTaskResponsible() {
         var pmName = jq("#projectManagerSelector").attr("data-id") ? jq("#projectManagerSelector").html() : "";
-        var listEntities = jq(".milestone .mainInfo .chooseResponsible .dottedLink, .projects-templates-container .task .dottedLink[guid], #addTaskContainer .chooseResponsible .dottedLink[guid], #addMilestoneContainer .chooseResponsible .dottedLink");
+        var listEntities = jq(".milestone .mainInfo .chooseResponsible .link.dotline, .task .chooseResponsible .link[guid], #addTaskContainer .chooseResponsible .link[guid], #addMilestoneContainer .chooseResponsible .link");
+
+        var check = false;
 
         for (var i = 0; i < listEntities.length; i++) {
-            if (!responsibleInTeam(jq(listEntities[i]), selectedTeam)) {
+            var $listEntity = jq(listEntities[i]);
+            if (!responsibleInTeam($listEntity, selectedTeam)) {
                 if (pmId) {
-                    jq(listEntities[i]).attr("guid", pmId);
-                    jq(listEntities[i]).html(pmName);
+                    $listEntity.attr("guid", pmId);
+                    $listEntity.html(pmName);
+                    if (jq(listEntities[i]).parents("#addMilestoneContainer").length === 0) {
+                        check = true;
+                    }
                 }
                 else {
                     var resp = selectedTeam.find(function (item) { return !item.isVisitor; });
@@ -594,12 +626,30 @@ ASC.Projects.CreateMilestoneContainer = (function () {
                 jq(listEntities[i]).parent().css("display", "inline-block");
             }
         }
+
+        if (check) {
+            jq(document).trigger("chooseResp");
+        }
     };
+    var $projectManagerSelector,
+        $projectTeamSelector;
 
     var init = function (str) {
+        isInit = true;
         chooseRespStr = str;
-        var $projectManagerSelector = jq("#projectManagerSelector"),
-           $projectTeamSelector = jq("#projectTeamSelector");
+        prjTitleContainer = jq("input[id*='projectTitle']"),
+        dueDateContainer = jq("#dueDate"),
+        teamContainer = jq("#Team").length ? jq("#Team") : jq("#projectParticipantsContainer");
+        $projectMemberPanel = jq("#projectMemberPanel");
+        $addTaskContainer = jq('#addTaskContainer');
+        $addMilestoneContainer = jq('#addMilestoneContainer');
+
+        $taskActionPanel = jq('#taskActionPanel');
+        $milestoneActionsPanel = jq("#milestoneActions");
+
+        $addMilestone = jq("#addMilestone");
+        $projectManagerSelector = jq("#projectManagerSelector"),
+            $projectTeamSelector = jq("#projectTeamSelector");
 
         $projectManagerSelector.useradvancedSelector({
             withGuests: false,
@@ -611,17 +661,6 @@ ASC.Projects.CreateMilestoneContainer = (function () {
             showGroups: true
         }).on("showList", onChooseProjectTeam);
 
-        //team popup
-        $projectTeamSelector.click(function () {
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
-            var userIds = [];
-            teamContainer.find('span.items-display-list').each(function () {
-                userIds.push(jq(this).closest('tr').attr('guid'));
-            });
-            jq('#projectTeamSelector').useradvancedSelector("select", userIds);
-        });
-
         //datepicker
         dueDateContainer.val("");
         dueDateContainer.datepicker().mask(ASC.Resources.Master.DatePatternJQ);
@@ -631,27 +670,10 @@ ASC.Projects.CreateMilestoneContainer = (function () {
             }
         });
         regionalFormatDate = jq("#dueDate").datepicker("option", "dateFormat");
-        
-        teamContainer.on('click', ".items-display-list_i .reset-action", function () {
-            var userId = jq(this).closest('li').attr('participantid');
-            $projectTeamSelector.useradvancedSelector("unselect", [userId]);
-            onChooseProjectTeam(null, selectedTeam.filter(function (item) { return item.id != userId; }));
-
-            var tasksResp = jq(".task .chooseResponsible .dottedLink[guid='" + userId + "']");
-            var tasks = new Array();
-            for (var i = 0; i < tasksResp.length; i++) {
-                tasks.push(jq(tasksResp[i]).closest(".task"));
-            }
-            jq(tasksResp).closest(".chooseResponsible").remove();
-            for (var i = 0; i < tasks.length; i++) {
-                var button = jq(tasks[i]).find(".entity-menu");
-                jq(button).after(chooseRespStr);
-            }
-            jq(this).closest('li').remove();
-        });
+       
 
         jq("body").click(function (event) {
-            if (event.target.className != "userName") {
+            if (event.target.className !== "userName") {
                 if (!jq("#projectManagerSelector").attr("data-id")) {
                     pmId = null;
                     //showChooseResponsible();
@@ -660,37 +682,43 @@ ASC.Projects.CreateMilestoneContainer = (function () {
         });
 
         //choose responsible
+
+        function onChooseResponsible(self, itemClass, nobodyDisabled) {
+            jq(this).closest(itemClass).addClass('open');
+            onChooseResponsibleContainer(self, jq(self).closest(itemClass).attr("id"), nobodyDisabled);
+        }
+
+        function onChooseResponsibleContainer(self, target, nobodyDisabled) {
+            milestoneContainer.showActionsPanel($projectMemberPanel, self);
+            var $nobody = $projectMemberPanel.find("#nobody");
+            if (nobodyDisabled) {
+                $nobody.hide();
+            } else {
+                $nobody.show();
+            }
+
+            $projectMemberPanel.attr("target", target);
+        }
+
         jq(document).on("click", ".task .chooseResponsible", function () {
-            jq(this).closest(".task").addClass('open');
-            ASC.Projects.MilestoneContainer.showActionsPanel("projectMemberPanel", this);
-            jq("#projectMemberPanel #nobody").show();
-            var target = jq(this).closest(".task").attr("id");
-            jq("#projectMemberPanel").attr("target", target);
-        });
-
-        jq("#addTaskContainer").on("click", ".chooseResponsible", function () {
-            ASC.Projects.MilestoneContainer.showActionsPanel("projectMemberPanel", this);
-            jq("#projectMemberPanel #nobody").show();
-            jq("#projectMemberPanel").attr("target", "newTask");
-        });
-
-        jq("#addMilestoneContainer").on("click", ".chooseResponsible", function () {
-            ASC.Projects.MilestoneContainer.showActionsPanel("projectMemberPanel", this);
-            jq("#projectMemberPanel #nobody").hide();
-            jq("#projectMemberPanel").attr("target", "newMilestone");
+            onChooseResponsible(this, ".task");
         });
 
         jq(document).on("click", ".milestone .mainInfo .chooseResponsible", function () {
-            jq(this).closest(".milestone").addClass('open');
-            ASC.Projects.MilestoneContainer.showActionsPanel("projectMemberPanel", this);
-            jq("#projectMemberPanel #nobody").hide();
-            var target = jq(this).closest(".milestone").attr("id");
-            jq("#projectMemberPanel").attr("target", target);
+            onChooseResponsible(this, ".milestone", true);
         });
 
-        jq("#projectMemberPanel").on("click", "ul li", function () {
+        $addTaskContainer.on("click", ".chooseResponsible", function () {
+            onChooseResponsibleContainer(this, "newTask");
+        });
+
+        $addMilestoneContainer.on("click", ".chooseResponsible", function () {
+            onChooseResponsibleContainer(this, "newMilestone", true);
+        });
+
+        $projectMemberPanel.on("click", "ul li", function () {
             jq(".studio-action-panel").hide();
-            var target = jq("#projectMemberPanel").attr("target");
+            var target = $projectMemberPanel.attr("target");
             jq("#" + target).removeClass("open");
             var type = jq("#" + target).attr("class");
             switch (type) {
@@ -706,19 +734,19 @@ ASC.Projects.CreateMilestoneContainer = (function () {
                     }
                 default:
                     {
-                        if (target == "newTask") {
-                            target = jq("#addTaskContainer");
+                        if (target === "newTask") {
+                            target = $addTaskContainer;
                         } else {
-                            target = jq("#addMilestoneContainer");
+                            target = $addMilestoneContainer;
                         }
                     }
             }
 
             var guid = jq(this).attr("id");
             var name;
-            if (guid == "nobody" || guid == "") {
+            if (guid === "nobody" || guid === "") {
                 name = jq("#projectMemberPanel .actionList").attr("chooseRespText");
-                if (type != "newTask") {
+                if (type !== "newTask") {
                     jq(target).find(".chooseResponsible").addClass("nobody");
                 }
             } else {
@@ -726,9 +754,10 @@ ASC.Projects.CreateMilestoneContainer = (function () {
                 jq(target).find(".chooseResponsible").removeClass("nobody");
             }
 
-            var member = jq(target).find(".dottedLink");
+            var member = jq(target).find(".link.dotline");
 
-            if (guid != "nobody" && guid != "") {
+            if (guid !== "nobody" && guid !== "") {
+                jq(document).trigger("chooseResp");
                 jq(member).attr("guid", guid);
             } else {
                 jq(member).removeAttr("guid");
@@ -742,45 +771,44 @@ ASC.Projects.CreateMilestoneContainer = (function () {
 
         //milestone
         jq(document).on('click', ".milestone .mainInfo .title, .milestone .mainInfo .dueDate", function () {
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
-            jq("#addMilestoneContainer").addClass('edit');
+            milestoneContainer.hideAddMilestoneContainer();
+            milestoneContainer.hideAddTaskContainer();
+            $addMilestoneContainer.addClass('edit');
             var target = jq(this).closest('.milestone').attr('id');
-            jq("#addMilestoneContainer").attr('target', target);
+            $addMilestoneContainer.attr('target', target);
             var milestone = jq("#" + target + " .mainInfo");
-            jq("#addMilestoneContainer").prependTo(jq("#" + target));
+            $addMilestoneContainer.prependTo(jq("#" + target));
             jq(milestone).hide();
             var val = jq(milestone).children(".dueDate").text();
             val = jq.datepicker.parseDate(regionalFormatDate, val);
             var chooseRespBlock = jq(milestone).find(".chooseResponsible").clone();
 
             if (!chooseRespBlock.length) {
-                jq("#addMilestoneContainer div:first-child").append(jq(chooseRespBlock));
+                $addMilestoneContainer.find("div:first-child").append(jq(chooseRespBlock));
             }
 
             var pm = jq("#projectManagerSelector").attr("data-id") ? jq("#projectManagerSelector").html() : "";
             if (pmId) {
-                jq(chooseRespBlock).find(".dottedLink").attr("guid", pmId);
-                jq(chooseRespBlock).find(".dottedLink").text(pm);
+                jq(chooseRespBlock).find(".link.dotline").attr("guid", pmId);
+                jq(chooseRespBlock).find(".link.dotline").text(pm);
             }
 
-            jq("#addMilestoneContainer").show();
-            jq("#addMilestoneContainer #newMilestoneTitle").val(jq(milestone).children(".titleContainer").text());
-
-            jq("#addMilestoneContainer #dueDate").datepicker('setDate', val);
-            jq("#addMilestoneContainer #newMilestoneTitle").focus();
+            $addMilestoneContainer.show();
+            $addMilestoneContainer.find("#newMilestoneTitle").val(jq(milestone).children(".titleContainer").text());
+            $addMilestoneContainer.find("#dueDate").datepicker('setDate', val);
+            $addMilestoneContainer.find("#newMilestoneTitle").focus();
         });
 
-        jq("#addMilestone a").bind('click', function () {
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
-            jq("#addMilestoneContainer").hide();
-            if (jq("#addMilestoneContainer").hasClass('edit')) {
-                jq("#" + jq("#addMilestoneContainer").attr('target')).find(".mainInfo").show();
-                jq("#addMilestoneContainer").removeClass('edit');
+        $addMilestone.find("a").bind('click', function () {
+            milestoneContainer.hideAddTaskContainer();
+            $addMilestoneContainer.hide();
+            if ($addMilestoneContainer.hasClass('edit')) {
+                jq("#" + $addMilestoneContainer.attr('target')).find(".mainInfo").show();
+                $addMilestoneContainer.removeClass('edit');
             }
 
-            jq("#addMilestone").after(jq("#addMilestoneContainer"));
-            jq("#addMilestone").hide();
+            $addMilestone.after($addMilestoneContainer);
+            $addMilestone.hide();
             jq("#newMilestoneTitle").val('');
 
             if (jq("#dueDate").length) {
@@ -788,47 +816,45 @@ ASC.Projects.CreateMilestoneContainer = (function () {
                 defDate.setDate(defDate.getDate() + 3);
                 jq("#dueDate").datepicker("setDate", defDate);
             }
-            var chooseRespBlock = jq("#addMilestoneContainer").find(".chooseResponsible");
+            var chooseRespBlock = $addMilestoneContainer.find(".chooseResponsible");
 
             if (!chooseRespBlock.length) {
-                jq("#addMilestoneContainer div:first-child").append(jq(".chooseResponsible:first").clone());
+                $addMilestoneContainer.find("div:first-child").append(jq(".chooseResponsible:first").clone());
 
                 var pm = jq("#projectManagerSelector").attr("data-id");
                 if (pmId) {
-                    jq(chooseRespBlock).find(".dottedLink").attr("guid", pmId);
-                    jq(chooseRespBlock).find(".dottedLink").text(pm);
+                    jq(chooseRespBlock).find(".link.dotline").attr("guid", pmId);
+                    jq(chooseRespBlock).find(".link.dotline").text(pm);
                 }
             }
-            jq("#addMilestoneContainer").show();
-            jq("#addMilestoneContainer #newMilestoneTitle").focus();
+            $addMilestoneContainer.show();
+            $addMilestoneContainer.find("#newMilestoneTitle").focus();
         });
 
-        jq("#newMilestoneTitle").bind('keydown', function (e) {
-            var milestoneContainer = jq("#addMilestoneContainer");
-            milestoneContainer.removeClass("red-border");
-            var targetId = milestoneContainer.attr('target');
-            if (e.which == 13) {
-                jq("#addMilestoneContainer .button").click();
+        jq("body").on('keydown', '#newMilestoneTitle', function (e) {
+            $addMilestoneContainer.removeClass("red-border");
+            var targetId = $addMilestoneContainer.attr('target');
+            if (e.which === 13) {
+                $addMilestoneContainer.find(".button").click();
             } else {
-                if (e.which == 27) {
+                if (e.which === 27) {
                     jq(this).val("");
-                    if (milestoneContainer.hasClass('edit')) {
-                        milestoneContainer.hide();
+                    if ($addMilestoneContainer.hasClass('edit')) {
+                        $addMilestoneContainer.hide();
                         jq("#" + targetId + " .mainInfo").show();
                     } else {
-                        milestoneContainer.hide();
-                        jq("#addMilestone").show();
+                        $addMilestoneContainer.hide();
+                        $addMilestone.show();
                     }
                 }
             }
         });
 
-        jq("#addMilestoneContainer .button").on("click", function () {
-            var milestoneContainer = jq("#addMilestoneContainer");
+        jq("body").on('click', "#addMilestoneContainer .button", function () {
             var milestoneTitle = jq("#newMilestoneTitle");
-            var targetId = milestoneContainer.attr('target');
+            var targetId = $addMilestoneContainer.attr('target');
 
-            milestoneContainer.removeClass("red-border");
+            $addMilestoneContainer.removeClass("red-border");
 
             var text = jq.trim(milestoneTitle.val());
             if (!text.length) {
@@ -838,21 +864,21 @@ ASC.Projects.CreateMilestoneContainer = (function () {
             var milestoneId;
             var date = jq("#dueDate").datepicker("getDate");
             date = jq.datepicker.formatDate(regionalFormatDate, date);
-            if (jq("#addMilestoneContainer").hasClass('edit')) {
+            if ($addMilestoneContainer.hasClass('edit')) {
 
                 jq("#" + targetId + " .mainInfo .titleContainer span").text(jq.trim(milestoneTitle.val()));
 
                 jq("#" + targetId + " .mainInfo .dueDate span").text(date);
-                milestoneContainer.hide();
+                $addMilestoneContainer.hide();
                 jq("#" + targetId + " .mainInfo").show();
-                milestoneContainer.removeClass('edit');
+                $addMilestoneContainer.removeClass('edit');
                 milestoneId = targetId;
                 jq("#" + targetId + " .mainInfo .chooseResponsible").remove();
 
-                if (jq("#addMilestoneContainer .chooseResponsible").length) {
-                    var chooseRespBlock = jq("#addMilestoneContainer .chooseResponsible").clone();
+                if ($addMilestoneContainer.find(".chooseResponsible").length) {
+                    var chooseRespBlock = $addMilestoneContainer.find(".chooseResponsible").clone();
                     jq("#" + milestoneId + " .mainInfo .entity-menu").after(jq(chooseRespBlock));
-                    if (jq(chooseRespBlock).attr('guid') != "") {
+                    if (jq(chooseRespBlock).attr('guid') !== "") {
                         jq("#" + milestoneId + " .mainInfo .chooseResponsible").removeClass("nobody");
                     } else {
                         jq("#" + milestoneId + " .mainInfo .chooseResponsible").addClass("nobody");
@@ -860,32 +886,41 @@ ASC.Projects.CreateMilestoneContainer = (function () {
                 }
             } else {
                 milestoneCounter++;
-                milestoneId = "m_" + milestoneCounter;
-                var milestone = {};
-                milestone.title = jq.trim(milestoneTitle.val());
-                milestone.date = date;
-                milestone.tasks = [];
-                milestone.number = milestoneCounter;
-                milestone.chooseRep = { id: jq("#addMilestoneContainer .dottedLink").attr("guid"), name: jq("#addMilestoneContainer .dottedLink").text() };
+                var milestone = {
+                    title: jq.trim(milestoneTitle.val()),
+                    date: date,
+                    tasks: [],
+                    number: milestoneCounter,
+                    chooseRep: {
+                        id: $addMilestoneContainer.find(".link.dotline").attr("guid"),
+                        name: $addMilestoneContainer.find(".link.dotline").text()
+                    }
+                };
+
                 jq.tmpl("projects_templatesCreateMilestoneTmpl", milestone).appendTo("#listAddedMilestone");
                 milestoneTitle.val("");
                 milestoneTitle.focus();
-            }
 
+                if (milestone.chooseRep.id) {
+                    jq(document).trigger("chooseResp");
+                }
+            }
+            return true;
         });
 
         //milestone menu
 
         jq(document).on('click', ".milestone .mainInfo .addTask", function () {
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
-            ASC.Projects.MilestoneContainer.hideAddTaskContainer();
+            milestoneContainer.hideAddMilestoneContainer();
+            milestoneContainer.hideAddTaskContainer();
             var target = jq(this).closest('.milestone').attr('id');
             var milestTasksCont = jq("#" + target + " .milestoneTasksContainer");
             jq(milestTasksCont).find('.addTaskContainer').hide();
-            jq("#addTaskContainer").appendTo(milestTasksCont[0]);
-            jq("#addTaskContainer").attr("target", target);
-            jq("#addTaskContainer").show();
-            var chooseRespBlock = jq("#addTaskContainer").find(".chooseResponsible");
+            $addTaskContainer.appendTo(milestTasksCont[0]);
+            $addTaskContainer.attr("target", target);
+            $addTaskContainer.removeClass("edit");
+            $addTaskContainer.show();
+            var chooseRespBlock = $addTaskContainer.find(".chooseResponsible");
 
             if (!chooseRespBlock.length) {
                 jq("#addTaskContainer div:first-child").append(jq(".chooseResponsible:first").clone());
@@ -895,67 +930,70 @@ ASC.Projects.CreateMilestoneContainer = (function () {
         });
 
         jq("#milestoneActions .actionList #removeMilestone").bind('click', function () {
-            jq("#addTaskContainer").hide();
-            jq("#addTaskContainer").appendTo("#noAssignTaskContainer");
-            jq("#milestoneActions").hide();
+            $addMilestone.after($addMilestoneContainer);
+            $addTaskContainer.hide();
+            $addTaskContainer.appendTo("#noAssignTaskContainer");
+            $milestoneActionsPanel.hide();
             var target = jq(this).parents('.studio-action-panel').attr('target');
             jq("#" + target).removeClass("open");
             jq("#" + target).remove();
+            if (jq("#listAddedMilestone .milestone").length == 0 && jq("#listNoAssignListTask .task").length == 0 && selectedTeam.length === 0) {
+                jq(document).trigger("unchooseResp");
+            }
         });
 
         jq("#milestoneActions .actionList #addTaskInMilestone").bind('click', function () {
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
+            milestoneContainer.hideAddMilestoneContainer();
             var target = jq(this).parents('.studio-action-panel').attr('target');
             jq("#" + target).removeClass("open");
             var listTasks = jq(".listTasks[milestone='" + target + "']");
             var milestTasksCont = jq(listTasks[0]).parents(".milestoneTasksContainer");
-            jq("#addTaskContainer").appendTo(milestTasksCont[0]);
+            $addTaskContainer.appendTo(milestTasksCont[0]);
             jq(milestTasksCont).find('.addTaskContainer').hide();
-            jq("#addTaskContainer").attr("target", target);
-            var chooseRespBlock = jq("#addTaskContainer").find(".chooseResponsible");
+            $addTaskContainer.attr("target", target);
+            var chooseRespBlock = $addTaskContainer.find(".chooseResponsible");
 
             if (!chooseRespBlock.length) {
                 jq("#addTaskContainer div:first-child").append(jq(".chooseResponsible:first").clone());
             }
 
-            jq("#addTaskContainer").show();
+            $addTaskContainer.show();
             jq(milestTasksCont).show();
             jq("#addTaskContainer #newTaskTitle").focus();
         });
 
         jq("#milestoneActions .actionList #editMilestone").bind('click', function () {
-            jq("#milestoneActions").hide();
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
-            jq("#addMilestoneContainer").addClass('edit');
+            $milestoneActionsPanel.hide();
+            milestoneContainer.hideAddMilestoneContainer();
+            $addMilestoneContainer.addClass('edit');
             var target = jq(this).parents('.studio-action-panel').attr('target');
-            jq("#addMilestoneContainer").attr('target', target);
+            $addMilestoneContainer.attr('target', target);
             jq("#" + target).removeClass("open");
             var milestone = jq("#" + target + " .mainInfo");
-            jq("#addMilestoneContainer").prependTo(jq("#" + target));
+            $addMilestoneContainer.prependTo(jq("#" + target));
             jq(milestone).hide();
             var val = jq(milestone).children(".dueDate").text();
             val = jq.datepicker.parseDate(regionalFormatDate, val);
             var chooseRespBlock = jq(milestone).find(".chooseResponsible").clone();
             if (!chooseRespBlock.length) {
-                jq("#addMilestoneContainer div:first-child").append(jq(chooseRespBlock));
+                $addMilestoneContainer.find("div:first-child").append(jq(chooseRespBlock));
             }
 
-            jq("#addMilestoneContainer").show();
-            jq("#addMilestoneContainer #newMilestoneTitle").val(jq(milestone).children(".titleContainer").text());
-
-            jq("#addMilestoneContainer #dueDate").datepicker('setDate', val);
-            jq("#addMilestoneContainer #newMilestoneTitle").focus();
+            $addMilestoneContainer.show();
+            $addMilestoneContainer.find("#newMilestoneTitle").val(jq(milestone).children(".titleContainer").text());
+            $addMilestoneContainer.find("#dueDate").datepicker('setDate', val);
+            $addMilestoneContainer.find("#newMilestoneTitle").focus();
         });
 
         //task
 
         jq(document).on('click', ".task .title", function () {
-            ASC.Projects.MilestoneContainer.hideAddMilestoneContainer();
-            jq("#addTaskContainer").hide();
-            if (jq("#addTaskContainer").hasClass('edit')) {
-                jq('#' + jq("#addTaskContainer").attr('target')).show();
+            milestoneContainer.hideAddMilestoneContainer();
+            $addTaskContainer.hide();
+            if ($addTaskContainer.hasClass('edit')) {
+                jq('#' + $addTaskContainer.attr('target')).show();
             } else {
-                jq("#addTaskContainer").addClass('edit');
+                $addTaskContainer.addClass('edit');
                 jq('.addTaskContainer').show();
             }
 
@@ -963,27 +1001,26 @@ ASC.Projects.CreateMilestoneContainer = (function () {
         });
 
         jq("#newTaskTitle").bind('keydown', function (e) {
-            var taskContainer = jq("#addTaskContainer");
-            taskContainer.removeClass("red-border");
-            var target = taskContainer.attr('target');
-            if (e.which == 13) {
+            $addTaskContainer.removeClass("red-border");
+            var target = $addTaskContainer.attr('target');
+            if (e.which === 13) {
                 jq("#addTaskContainer .button").click();
             } else {
-                if (e.which == 27) {
+                if (e.which === 27) {
                     jq(this).val("");
-                    if (taskContainer.hasClass('edit')) {
-                        ASC.Projects.MilestoneContainer.hideAddTaskContainer();
-                        taskContainer.removeClass('edit');
+                    if ($addTaskContainer.hasClass('edit')) {
+                        milestoneContainer.hideAddTaskContainer();
+                        $addTaskContainer.removeClass('edit');
                         jq("#" + target).show();
                     } else {
-                        ASC.Projects.MilestoneContainer.hideAddTaskContainer();
+                        milestoneContainer.hideAddTaskContainer();
                     }
                 }
             }
         });
 
         jq("#addTaskContainer .button").on('click', function () {
-            var taskContainer = jq("#addTaskContainer");
+            var taskContainer = $addTaskContainer;
             var taskTitle = jq("#newTaskTitle");
             var target = taskContainer.attr('target');
             var text = jq.trim(taskTitle.val());
@@ -998,15 +1035,15 @@ ASC.Projects.CreateMilestoneContainer = (function () {
             if (taskContainer.hasClass('edit')) {
                 jq("#" + target + " .titleContainer span").text(taskTitle.val());
                 taskContainer.removeClass('edit');
-                ASC.Projects.MilestoneContainer.hideAddTaskContainer();
+                milestoneContainer.hideAddTaskContainer();
                 jq("#" + target).show();
                 taskId = target;
                 jq(".task[id='" + taskId + "'] .chooseResponsible").remove();
                 if (jq("#addTaskContainer .chooseResponsible").length) {
                     var chooseRespBlock = jq("#addTaskContainer .chooseResponsible").clone();
                     jq(".task[id='" + taskId + "'] .entity-menu").after(jq(chooseRespBlock));
-                    var guid = jq(chooseRespBlock).find(".dottedLink").attr('guid');
-                    if (guid != "" & guid != "nobody" & guid !== undefined) {
+                    var guid = jq(chooseRespBlock).find(".link.dotline").attr('guid');
+                    if (guid !== "" & guid !== "nobody" & guid !== undefined) {
                         jq(".task[id='" + taskId + "'] .chooseResponsible").removeClass("nobody");
                     } else {
                         jq(".task[id='" + taskId + "'] .chooseResponsible").addClass("nobody");
@@ -1018,14 +1055,14 @@ ASC.Projects.CreateMilestoneContainer = (function () {
                 var task = {};
                 task.title = jq.trim(taskTitle.val());
                 task.number = taskCounter;
-                if (jq("#projectManagerSelector").attr("data-id") || teamContainer.find(".items-display-list_i").length) {
+                if (jq("#projectManagerSelector").attr("data-id") || teamContainer.find("tr").length) {
                     task.selectResp = true;
                 }
-                if (jq("#addTaskContainer .dottedLink").attr("guid")) {
-                    task.chooseRep = { id: jq("#addTaskContainer .dottedLink").attr("guid"), name: jq("#addTaskContainer .dottedLink").text() };
+                if (jq("#addTaskContainer .link.dotline").attr("guid")) {
+                    task.chooseRep = { id: jq("#addTaskContainer .link.dotline").attr("guid"), name: jq("#addTaskContainer .link.dotline").text() };
                 }
                 var tElem;
-                if (target == 'noAssign') {
+                if (target === 'noAssign') {
                     tElem = jq("#listNoAssignListTask");
                 } else {
                     tElem = jq(".listTasks[milestone='" + target + "']");
@@ -1034,6 +1071,10 @@ ASC.Projects.CreateMilestoneContainer = (function () {
 
                 taskTitle.val("");
                 taskTitle.focus();
+
+                if (task.chooseRep && task.chooseRep.id) {
+                    jq(document).trigger("chooseResp");
+                }
             }
 
         });
@@ -1041,53 +1082,80 @@ ASC.Projects.CreateMilestoneContainer = (function () {
         //task menu
 
         jq("#taskActionPanel .actionList #removeTask").bind('click', function () {
-            jq("#taskActionPanel").hide();
+            $taskActionPanel.hide();
             var target = jq(this).parents('.studio-action-panel').attr('target');
             jq("#" + target).removeClass("open");
             var targetParent = jq("#" + target).parent();
             jq("#" + target).remove();
             if (jq(targetParent).hasClass('listTasks')) {
-                if (jq(targetParent).children('.task').length == 0) {
+                if (jq(targetParent).children('.task').length === 0) {
                     jq(targetParent).parents('.milestone').children('.milestoneTasksContainer').hide();
                     jq(targetParent).closest(".milestone").find(".addTask").removeClass("hide");
                 }
             }
+
+            if (jq("#listAddedMilestone .milestone").length == 0 && jq("#listNoAssignListTask .task").length == 0 && selectedTeam.length === 0) {
+                jq(document).trigger("unchooseResp");
+            }
         });
 
         jq("#taskActionPanel .actionList #editTask").bind('click', function () {
-            jq("#taskActionPanel").hide();
+            $taskActionPanel.hide();
             editTask(jq("#" + jq(this).parents('.studio-action-panel').attr('target')));
         });
     };
 
-    var selectedTeam = [];
+    function onResetAction(userId) {
+        if (!isInit) return;
+        onChooseProjectTeam(null, selectedTeam.filter(function (item) { return item.id !== userId; }));
+
+        var tasksResp = jq(".task .chooseResponsible .link[guid='" + userId + "']");
+        var tasks = new Array();
+        var i;
+        for (i = 0; i < tasksResp.length; i++) {
+            tasks.push(jq(tasksResp[i]).closest(".task"));
+        }
+        jq(tasksResp).closest(".chooseResponsible").remove();
+        for (i = 0; i < tasks.length; i++) {
+            var button = jq(tasks[i]).find(".entity-menu");
+            jq(button).after(chooseRespStr);
+        }
+    };
+
     function notOnlyVisitors() {
-        return selectedTeam.some(function(item) {
+        return selectedTeam.length === 0 || selectedTeam.some(function(item) {
             return !item.isVisitor;
         });
     }
 
-    var onChooseProjectTeam = function (e, members) {
-        selectedTeam = members;
+    function onChooseProjectTeam(e, members) {
+        selectedTeam = members.map(function (item) {
+            return Object.assign(Object.assign({}, window.UserManager.getUser(item.id)), item);
+        });
+
         if (pmId || notOnlyVisitors()) {
             showChooseResponsible();
         }
     };
     
-    var onChooseProjectManager = function (e, item) {
+    function onChooseProjectManager(e, item) {
+        if (pmId) {
+            $projectTeamSelector.useradvancedSelector("undisable", [pmId]);
+        }
         pmId = item.id;
+        $projectTeamSelector.useradvancedSelector("disable", [pmId]);
         showChooseResponsible();
     };
     
     var onErrorGetTemplate = function () {
         //window.onbeforeunload = null;
-        location.href = "projectTemplates.aspx#elementNotFound";
+        location.href = "ProjectTemplates.aspx#elementNotFound";
     };
 
     var onGetTemplate = function (param, templ) {
         //get tmpl
 
-        var val = jq.format(prjTitleContainer.attr("defText"), templ.title);
+        var val = jq.format(ASC.Projects.Resources.ProjectTemplatesResource.DefaultProjTitle, templ.title);
         prjTitleContainer.val(val);
         showProjStructure(templ);
 
@@ -1096,34 +1164,47 @@ ASC.Projects.CreateMilestoneContainer = (function () {
         prjTitleContainer.focus();
     };
 
-    var editTask = function (task) {
+    function editTask (task) {
         jq(task).removeClass("open");
-        jq("#addTaskContainer").addClass('edit');
-        jq("#addTaskContainer").attr('target', jq(task).attr("id"));
-        jq("#addTaskContainer").insertAfter(task);
+        $addTaskContainer.addClass('edit');
+        $addTaskContainer.attr('target', jq(task).attr("id"));
+        $addTaskContainer.insertAfter(task);
         jq(task).hide();
         var chooseRespBlock = jq(task).find(".chooseResponsible").clone();
         if (!chooseRespBlock.length) {
             jq("#addTaskContainer div:first-child").append(jq(chooseRespBlock));
         }
         jq("#addTaskContainer #newTaskTitle").val(jq(task).children(".titleContainer").text());
-        jq("#addTaskContainer").show();
+        $addTaskContainer.show();
         jq("#addTaskContainer #newTaskTitle").focus();
     };
 
-    var showProjStructure = function (tmpl) {
+    function showProjStructure(tmpl) {
         var description = { tasks: [], milestones: [] };
         try {
-            description = jQuery.parseJSON(tmpl.description) || { tasks: [], milestones: [] };
+            description = jq.parseJSON(tmpl.description) || { tasks: [], milestones: [] };
         } catch (e) {
 
         }
         jq("#listAddedMilestone").empty();
         jq("#listNoAssignListTask").empty();
-        
+        var chooseRep = undefined, i;
+
+        if (jq("#projectManagerSelector").attr("data-id")) {
+            chooseRep = {
+                id: jq("#projectManagerSelector").attr("data-id"),
+                name: jq("#projectManagerSelector").html()
+            };
+        } else if (teamContainer.find("tr").length) {
+            chooseRep = {
+                id: teamContainer.find("tr:first").attr('data-partisipantid'),
+                name: teamContainer.find("tr:first .user-name").text()
+            };
+        }
+
         var milestones = description.milestones;
         if (milestones) {
-            for (var i = 0; i < milestones.length; i++) {
+            for (i = 0; i < milestones.length; i++) {
                 milestoneCounter++;
                 var duration = parseFloat(milestones[i].duration);
                 var date = new Date();
@@ -1131,31 +1212,21 @@ ASC.Projects.CreateMilestoneContainer = (function () {
                 milestones[i].number = milestoneCounter;
                 milestones[i].date = jq.datepicker.formatDate(regionalFormatDate, date);
                 milestones[i].displayTasks = milestones[i].tasks.length ? true : false;
-                if (jq("#projectManagerSelector").attr("data-id")) {
-                    milestones[i].chooseRep = {
-                        id: jq("#projectManagerSelector").attr("data-id"),
-                        name: jq("#projectManagerSelector").html()
-                    };
-                } else if (teamContainer.find(".items-display-list_i").length) {
-                    milestones[i].chooseRep = {
-                        id: teamContainer.find(".items-display-list_i:first").attr('guid'),
-                        name: teamContainer.find(".items-display-list_i:first").text()
-                    };
-                }
+                milestones[i].chooseRep = chooseRep;
                 jq.tmpl("projects_templatesCreateMilestoneTmpl", milestones[i]).appendTo("#listAddedMilestone");
             }
         }
         var noAssignTasks = description.tasks;
         if (noAssignTasks) {
-            for (var i = 0; i < noAssignTasks.length; i++) {
+            for (i = 0; i < noAssignTasks.length; i++) {
                 taskCounter++;
                 noAssignTasks[i].number = taskCounter;
-                noAssignTasks[i].chooseRep = jq("#projectManagerSelector").attr("data-id") || teamContainer.find(".items-display-list_i").length;
+                noAssignTasks[i].selectResp = chooseRep;
                 jq.tmpl("projects_templatesCreateTaskTmpl", noAssignTasks[i]).appendTo("#listNoAssignListTask");
             }
-            jq("#addTaskContainer").attr("target", 'noAssign');
+            $addTaskContainer.attr("target", 'noAssign');
         }
-        ASC.Projects.MilestoneContainer.showAction('noAssign');
+        milestoneContainer.showAction('noAssign');
     };
 
     var getProjMilestones = function () {
@@ -1172,10 +1243,10 @@ ASC.Projects.CreateMilestoneContainer = (function () {
                 deadLine: Teamlab.serializeTimestamp(deadline)
             };
 
-            var mResponsible = jq(listMilestoneCont[i]).find(".mainInfo").find(".dottedLink");
+            var mResponsible = jq(listMilestoneCont[i]).find(".mainInfo").find(".link.dotline");
             if (mResponsible.length) {
                 var guid = jq(mResponsible).attr("guid");
-                if (typeof guid != 'undefined' && guid != "") {
+                if (typeof guid != 'undefined' && guid !== "") {
                     milestone.responsible = guid;
                 }
             }
@@ -1190,15 +1261,15 @@ ASC.Projects.CreateMilestoneContainer = (function () {
         var listNoAssTaskStr = new Array();
         var listNoAssCont = jq('#noAssignTaskContainer .task');
         var listMilestoneCont = jq("#listAddedMilestone .milestone");
-        
-        for (var i = 0; i < listMilestoneCont.length; i++) {
+        var i, task, guid;
+        for (i = 0; i < listMilestoneCont.length; i++) {
             var listTaskCont = jq(listMilestoneCont[i]).children('.milestoneTasksContainer').children(".listTasks").children('.task');
             for (var j = 0; j < listTaskCont.length; j++) {
-                var task = { title: jq(listTaskCont[j]).children('.titleContainer').text(), milestone: i + 1, responsibles: [] };
-                var tResponsible = jq(listTaskCont[j]).find(".dottedLink");
+                task = { title: jq(listTaskCont[j]).children('.titleContainer').text(), milestone: i + 1, responsibles: [] };
+                var tResponsible = jq(listTaskCont[j]).find(".link.dotline");
                 if (tResponsible.length) {
-                    var guid = jq(tResponsible).attr("guid");
-                    if (typeof guid != 'undefined' && guid != "") {
+                    guid = jq(tResponsible).attr("guid");
+                    if (typeof guid != 'undefined' && guid !== "") {
                         task.responsibles.push(guid);
                     }
                 }
@@ -1206,13 +1277,13 @@ ASC.Projects.CreateMilestoneContainer = (function () {
             }
         }
         
-        for (var i = 0; i < listNoAssCont.length; i++) {
-            var task = { title: jq(listNoAssCont[i]).children('.titleContainer').text() };
+        for (i = 0; i < listNoAssCont.length; i++) {
+            task = { title: jq(listNoAssCont[i]).children('.titleContainer').text() };
 
-            var responsible = jq(listNoAssCont[i]).find(".dottedLink");
+            var responsible = jq(listNoAssCont[i]).find(".link.dotline");
             if (responsible.length) {
-                var guid = jq(responsible).attr("guid");
-                if (typeof guid != 'undefined' && guid != "") {
+                guid = jq(responsible).attr("guid");
+                if (typeof guid != 'undefined' && guid !== "") {
                     task.responsibles = [guid];
                 }
             }
@@ -1229,8 +1300,7 @@ ASC.Projects.CreateMilestoneContainer = (function () {
         onErrorGetTemplate: onErrorGetTemplate,
         getProjMilestones: getProjMilestones,
         getProjTasks: getProjTasks,
-        onChooseProjectManager: onChooseProjectManager,
-        onChooseProjectTeam: onChooseProjectTeam
+        onResetAction: onResetAction
     };
 
 })(jQuery);

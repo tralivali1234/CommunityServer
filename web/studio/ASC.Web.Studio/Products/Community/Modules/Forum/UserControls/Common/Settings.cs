@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -45,8 +36,6 @@ namespace ASC.Web.UserControls.Forum.Common
         public int TopicCountOnPage { get; private set; }
 
         public int PostCountOnPage { get; private set; }
-
-        public string ConfigPath { get; private set; }
 
         public string UserControlsVirtualPath { get; private set; }
 
@@ -93,16 +82,14 @@ namespace ASC.Web.UserControls.Forum.Common
 
             ModuleID = new Guid("853B6EB9-73EE-438d-9B09-8FFEEDF36234");
             ImageItemID = new Guid("853B6EB9-73EE-438d-9B09-8FFEEDF36234");
-            UserControlsVirtualPath = "~/products/community/modules/forum/usercontrols";
-            StartPageVirtualPath = "~/products/community/modules/forum/default.aspx";
-            TopicPageVirtualPath = "~/products/community/modules/forum/topics.aspx";
-            PostPageVirtualPath = "~/products/community/modules/forum/posts.aspx";
-            SearchPageVirtualPath = "~/products/community/modules/forum/search.aspx";
-            NewPostPageVirtualPath = "~/products/community/modules/forum/newpost.aspx";
-            EditTopicPageVirtualPath = "~/products/community/modules/forum/edittopic.aspx";
+            UserControlsVirtualPath = "~/Products/Community/Modules/Forum/UserControls";
+            StartPageVirtualPath = "~/Products/Community/Modules/Forum/Default.aspx";
+            TopicPageVirtualPath = "~/Products/Community/Modules/Forum/Topics.aspx";
+            PostPageVirtualPath = "~/Products/Community/Modules/Forum/Posts.aspx";
+            SearchPageVirtualPath = "~/Products/Community/Modules/Forum/Search.aspx";
+            NewPostPageVirtualPath = "~/Products/Community/Modules/Forum/NewPost.aspx";
+            EditTopicPageVirtualPath = "~/Products/Community/Modules/Forum/EditTopic.aspx";
             FileStoreModuleID = "forum";
-            ConfigPath = "~/products/community/modules/forum/web.config";
-
 
             LinkProvider = new LinkProvider(this);
             //registry

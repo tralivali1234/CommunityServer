@@ -1,25 +1,16 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,14 +20,15 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using ASC.Collections;
-using ASC.Common.Data;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
 using ASC.Core.Tenants;
-using ASC.FullTextIndex;
+using ASC.ElasticSearch;
 using ASC.Projects.Core.DataInterfaces;
 using ASC.Projects.Core.Domain;
 using ASC.Projects.Core.Services.NotifyService;
+using ASC.Web.Projects;
+using ASC.Web.Projects.Core.Search;
 
 namespace ASC.Projects.Data.DAO
 {
@@ -44,7 +36,7 @@ namespace ASC.Projects.Data.DAO
     {
         private readonly HttpRequestDictionary<Message> messageCache = new HttpRequestDictionary<Message>("message");
 
-        public CachedMessageDao(string dbId, int tenant) : base(dbId, tenant)
+        public CachedMessageDao(int tenant) : base(tenant)
         {
         }
 
@@ -83,154 +75,151 @@ namespace ASC.Projects.Data.DAO
     {
         private readonly Converter<object[], Message> converter;
 
-        public MessageDao(string dbId, int tenant)
-            : base(dbId, tenant)
+        public MessageDao(int tenant) : base(tenant)
         {
             converter = ToMessage;
         }
 
         public List<Message> GetAll()
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(CreateQuery()).ConvertAll(converter);
-            }
+            return Db.ExecuteList(CreateQuery()).ConvertAll(converter);
         }
 
         public List<Message> GetByProject(int projectId)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(CreateQuery().Where("t.project_id", projectId).OrderBy("t.create_on", false))
-                    .ConvertAll(converter);
-            }
+            return Db.ExecuteList(CreateQuery().Where("t.project_id", projectId).OrderBy("t.create_on", false))
+                .ConvertAll(converter);
         }
 
         public List<Message> GetMessages(int startIndex, int max)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var query = CreateQuery()
-                    .OrderBy("t.create_on", false)
-                    .SetFirstResult(startIndex)
-                    .SetMaxResults(max);
+            var query = CreateQuery()
+                .OrderBy("t.create_on", false)
+                .SetFirstResult(startIndex)
+                .SetMaxResults(max);
 
-                return db.ExecuteList(query).ConvertAll(converter);
-            }
+            return Db.ExecuteList(query).ConvertAll(converter);
         }
 
         public List<Message> GetRecentMessages(int offset, int max, params int[] projects)
         {
-            using (var db = new DbManager(DatabaseId))
+            var query = CreateQuery()
+                .SetFirstResult(offset)
+                .OrderBy("t.create_on", false)
+                .SetMaxResults(max);
+            if (projects != null && 0 < projects.Length)
             {
-                var query = CreateQuery()
-                    .SetFirstResult(offset)
-                    .OrderBy("t.create_on", false)
-                    .SetMaxResults(max);
-                if (projects != null && 0 < projects.Length)
-                {
-                    query.Where(Exp.In("t.project_id", projects));
-                }
-                return db.ExecuteList(query).ConvertAll(converter);
+                query.Where(Exp.In("t.project_id", projects));
             }
+            return Db.ExecuteList(query).ConvertAll(converter);
         }
 
         public List<Message> GetByFilter(TaskFilter filter, bool isAdmin, bool checkAccess)
         {
-            using (var db = new DbManager(DatabaseId))
+            var query = CreateQuery();
+
+            if (filter.Max > 0 && filter.Max < 150000)
             {
-                var query = CreateQuery();
-
-                if (filter.Max > 0 && filter.Max < 150000)
-                {
-                    query.SetFirstResult((int)filter.Offset);
-                    query.SetMaxResults((int)filter.Max);
-                }
-
-                query.OrderBy("t.status", true);
-
-                if (!string.IsNullOrEmpty(filter.SortBy))
-                {
-                    var sortColumns = filter.SortColumns["Message"];
-                    sortColumns.Remove(filter.SortBy);
-
-                    query.OrderBy(GetSortFilter(filter.SortBy), filter.SortOrder);
-
-                    foreach (var sort in sortColumns.Keys)
-                    {
-                        query.OrderBy(GetSortFilter(sort), sortColumns[sort]);
-                    }
-                }
-
-                CreateQueryFilter(query, filter, isAdmin, checkAccess);
-
-                return db.ExecuteList(query).ConvertAll(converter);
+                query.SetFirstResult((int)filter.Offset);
+                query.SetMaxResults((int)filter.Max);
             }
+
+            query.OrderBy("t.status", true);
+
+            if (!string.IsNullOrEmpty(filter.SortBy))
+            {
+                var sortColumns = filter.SortColumns["Message"];
+                sortColumns.Remove(filter.SortBy);
+
+                query.OrderBy(GetSortFilter(filter.SortBy), filter.SortOrder);
+
+                foreach (var sort in sortColumns.Keys)
+                {
+                    query.OrderBy(GetSortFilter(sort), sortColumns[sort]);
+                }
+            }
+
+            CreateQueryFilter(query, filter, isAdmin, checkAccess);
+
+            return Db.ExecuteList(query).ConvertAll(converter);
         }
 
         public int GetByFilterCount(TaskFilter filter, bool isAdmin, bool checkAccess)
         {
-            using (var db = new DbManager(DatabaseId))
+            var query = new SqlQuery(MessagesTable + " t")
+                .InnerJoin(ProjectsTable + " p", Exp.EqColumns("t.project_id", "p.id") & Exp.EqColumns("t.tenant_id", "p.tenant_id"))
+                .Select("t.id")
+                .GroupBy("t.id")
+                .Where("t.tenant_id", Tenant);
+
+            query = CreateQueryFilter(query, filter, isAdmin, checkAccess);
+
+            var queryCount = new SqlQuery().SelectCount().From(query, "t1");
+            return Db.ExecuteScalar<int>(queryCount);
+        }
+
+        public List<Tuple<Guid, int, int>> GetByFilterCountForReport(TaskFilter filter, bool isAdmin, bool checkAccess)
+        {
+            var query = new SqlQuery(MessagesTable + " t")
+                .InnerJoin(ProjectsTable + " p", Exp.EqColumns("t.project_id", "p.id") & Exp.EqColumns("t.tenant_id", "p.tenant_id"))
+                .Select("t.create_by", "t.project_id")
+                .Where("t.tenant_id", Tenant)
+                .Where(Exp.Between("t.create_on", filter.GetFromDate(), filter.GetToDate()));
+
+            if (filter.HasUserId)
             {
-                var query = new SqlQuery(MessagesTable + " t")
-                    .InnerJoin(ProjectsTable + " p", Exp.EqColumns("t.project_id", "p.id") & Exp.EqColumns("t.tenant_id", "p.tenant_id"))
-                    .Select("t.id")
-                    .GroupBy("t.id")
-                    .Where("t.tenant_id", Tenant);
-
-                query = CreateQueryFilter(query, filter, isAdmin, checkAccess);
-
-                var queryCount = new SqlQuery().SelectCount().From(query, "t1");
-                return db.ExecuteScalar<int>(queryCount);
+                query.Where(Exp.In("t.create_by", filter.GetUserIds()));
+                filter.UserId = Guid.Empty;
+                filter.DepartmentId = Guid.Empty;
             }
+
+            query = CreateQueryFilter(query, filter, isAdmin, checkAccess);
+
+            var queryCount = new SqlQuery()
+                .SelectCount()
+                .Select("t1.create_by", "t1.project_id")
+                .GroupBy("create_by", "project_id")
+                .From(query, "t1");
+
+            return Db.ExecuteList(queryCount).ConvertAll(b => new Tuple<Guid, int, int>(Guid.Parse((string)b[1]), Convert.ToInt32(b[2]), Convert.ToInt32(b[0]))); ;
         }
 
         public virtual Message GetById(int id)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(CreateQuery().Where("t.id", id))
-                    .ConvertAll(converter)
-                    .SingleOrDefault();
-            }
+            return Db.ExecuteList(CreateQuery().Where("t.id", id))
+                .ConvertAll(converter)
+                .SingleOrDefault();
         }
 
         public bool IsExists(int id)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var count = db.ExecuteScalar<long>(Query(MessagesTable).SelectCount().Where("id", id));
-                return 0 < count;
-            }
+            var count = Db.ExecuteScalar<long>(Query(MessagesTable).SelectCount().Where("id", id));
+            return 0 < count;
         }
 
         public virtual Message Save(Message msg)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var insert = Insert(MessagesTable)
-                    .InColumnValue("id", msg.ID)
-                    .InColumnValue("project_id", msg.Project != null ? msg.Project.ID : 0)
-                    .InColumnValue("title", msg.Title)
-                    .InColumnValue("status", msg.Status)
-                    .InColumnValue("create_by", msg.CreateBy.ToString())
-                    .InColumnValue("create_on", TenantUtil.DateTimeToUtc(msg.CreateOn))
-                    .InColumnValue("last_modified_by", msg.LastModifiedBy.ToString())
-                    .InColumnValue("last_modified_on", TenantUtil.DateTimeToUtc(msg.LastModifiedOn))
-                    .InColumnValue("content", msg.Description)
-                    .Identity(1, 0, true);
-                msg.ID = db.ExecuteScalar<int>(insert);
-                return msg;
-            }
+            var insert = Insert(MessagesTable)
+                .InColumnValue("id", msg.ID)
+                .InColumnValue("project_id", msg.Project != null ? msg.Project.ID : 0)
+                .InColumnValue("title", msg.Title)
+                .InColumnValue("status", msg.Status)
+                .InColumnValue("create_by", msg.CreateBy.ToString())
+                .InColumnValue("create_on", TenantUtil.DateTimeToUtc(msg.CreateOn))
+                .InColumnValue("last_modified_by", msg.LastModifiedBy.ToString())
+                .InColumnValue("last_modified_on", TenantUtil.DateTimeToUtc(msg.LastModifiedOn))
+                .InColumnValue("content", msg.Description)
+                .Identity(1, 0, true);
+            msg.ID = Db.ExecuteScalar<int>(insert);
+            return msg;
         }
 
         public virtual void Delete(int id)
         {
-            using (var db = new DbManager(DatabaseId))
-            using (var tx = db.BeginTransaction())
+            using (var tx = Db.BeginTransaction())
             {
-                db.ExecuteNonQuery(Delete(CommentsTable).Where("target_uniq_id", ProjectEntity.BuildUniqId<Message>(id)));
-                db.ExecuteNonQuery(Delete(MessagesTable).Where("id", id));
+                Db.ExecuteNonQuery(Delete(CommentsTable).Where("target_uniq_id", ProjectEntity.BuildUniqId<Message>(id)));
+                Db.ExecuteNonQuery(Delete(MessagesTable).Where("id", id));
 
                 tx.Commit();
             }
@@ -270,6 +259,11 @@ namespace ASC.Projects.Data.DAO
             }
             else
             {
+                if (ProjectsCommonSettings.Load().HideEntitiesInPausedProjects)
+                {
+                    query.Where(!Exp.Eq("p.status", ProjectStatus.Paused));
+                }
+
                 if (filter.MyProjects)
                 {
                     query.InnerJoin(ParticipantTable + " ppp", Exp.EqColumns("ppp.tenant", "t.tenant_id") & Exp.EqColumns("p.id", "ppp.project_id") & Exp.Eq("ppp.removed", false));
@@ -279,8 +273,16 @@ namespace ASC.Projects.Data.DAO
 
             if (filter.TagId != 0)
             {
-                query.InnerJoin(ProjectTagTable + " pt", Exp.EqColumns("pt.project_id", "t.project_id"));
-                query.Where("pt.tag_id", filter.TagId);
+                if (filter.TagId == -1)
+                {
+                    query.LeftOuterJoin(ProjectTagTable + " pt", Exp.EqColumns("pt.project_id", "t.project_id"));
+                    query.Where("pt.tag_id", null);
+                }
+                else
+                {
+                    query.InnerJoin(ProjectTagTable + " pt", Exp.EqColumns("pt.project_id", "t.project_id"));
+                    query.Where("pt.tag_id", filter.TagId);
+                }
             }
 
             if (filter.UserId != Guid.Empty)
@@ -306,10 +308,9 @@ namespace ASC.Projects.Data.DAO
 
             if (!string.IsNullOrEmpty(filter.SearchText))
             {
-                if (FullTextSearch.SupportModule(FullTextSearch.ProjectsMessagesModule))
+                List<int> mIds;
+                if (FactoryIndexer<DiscussionsWrapper>.TrySelectIds(s => s.MatchAll(filter.SearchText), out mIds))
                 {
-                    var mIds = FullTextSearch.Search(FullTextSearch.ProjectsMessagesModule.Match(filter.SearchText));
-
                     query.Where(Exp.In("t.id", mIds));
                 }
                 else
@@ -357,12 +358,9 @@ namespace ASC.Projects.Data.DAO
         }
 
 
-        internal IEnumerable<Message> GetMessages(Exp where)
+        public IEnumerable<Message> GetMessages(Exp where)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(CreateQuery().Where(where)).ConvertAll(converter);
-            }
+            return Db.ExecuteList(CreateQuery().Where(where)).ConvertAll(converter);
         }
     }
 }

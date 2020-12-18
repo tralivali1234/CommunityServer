@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -43,11 +34,34 @@ namespace ASC.Web.Core
     public static class WebItemSecurity
     {
         private static readonly SecurityAction Read = new SecurityAction(new Guid("77777777-32ae-425f-99b5-83176061d1ae"), "ReadWebItem", false, true);
-        private static readonly ICache cache = AscCache.Memory;
+        private static readonly ICache cache;
+        private static readonly ICacheNotify cacheNotify;
 
-                
-        public static bool IsAvailableForUser(string id, Guid @for)
+        static WebItemSecurity()
         {
+            try
+            {
+                cache = AscCache.Memory;
+                cacheNotify = AscCache.Notify;
+                cacheNotify.Subscribe<WebItemSecurityNotifier>((r, act) =>
+                {
+                    ClearCache();
+                });
+            }
+            catch
+            {
+                
+            }
+        }
+
+        public static bool IsAvailableForMe(Guid id)
+        {
+            return IsAvailableForUser(id, SecurityContext.CurrentAccount.ID);
+        }
+
+        public static bool IsAvailableForUser(Guid itemId, Guid @for)
+        {
+            var id = itemId.ToString();
             var result = false;
 
             var key = GetCacheKey();
@@ -100,7 +114,7 @@ namespace ASC.Web.Core
                     else if (webitem is IModule)
                     {
                         result = SecurityContext.PermissionResolver.Check(CoreContext.Authentication.GetAccountByID(@for), securityObj, null, Read) &&
-                            IsAvailableForUser(WebItemManager.Instance.GetParentItemID(webitem.ID).ToString(), @for);
+                            IsAvailableForUser(WebItemManager.Instance.GetParentItemID(webitem.ID), @for);
                     }
                     else
                     {
@@ -126,15 +140,9 @@ namespace ASC.Web.Core
             return result;
         }
 
-
-        public static bool IsLicensed(IWebItem item)
-        {
-            return true;
-        }
-
         public static void SetSecurity(string id, bool enabled, params Guid[] subjects)
         {
-            if(SettingsManager.Instance.LoadSettings<TenantAccessSettings>(TenantProvider.CurrentTenantID).Anyone)
+            if(TenantAccessSettings.Load().Anyone)
                 throw new SecurityException("Security settings are disabled for an open portal");
             
             var securityObj = WebItemSecurityObject.Create(id);
@@ -160,7 +168,7 @@ namespace ASC.Web.Core
                 CoreContext.AuthorizationManager.AddAce(a);
             }
 
-            ClearCache();
+            cacheNotify.Publish(new WebItemSecurityNotifier(), CacheNotifyAction.Any);
         }
 
         public static WebItemSecurityInfo GetSecurityInfo(string id)
@@ -208,35 +216,50 @@ namespace ASC.Web.Core
             {
                 if (CoreContext.UserManager.IsUserInGroup(userid, ASC.Core.Users.Constants.GroupVisitor.ID))
                 {
-                    throw new System.Security.SecurityException("Collaborator can not be an administrator");
+                    throw new SecurityException("Collaborator can not be an administrator");
                 }
+
+                if (productid == WebItemManager.PeopleProductID)
+                {
+                    foreach (var ace in GetPeopleModuleActions(userid))
+                    {
+                        CoreContext.AuthorizationManager.AddAce(ace);
+                    }
+                }
+
                 CoreContext.UserManager.AddUserIntoGroup(userid, productid);
             }
             else
             {
                 if (productid == ASC.Core.Users.Constants.GroupAdmin.ID)
                 {
-                    foreach (var id in WebItemManager.Instance.GetItemsAll().OfType<IProduct>().Select(p => p.ID))
+                    var groups = new List<Guid> { WebItemManager.MailProductID };
+                    groups.AddRange(WebItemManager.Instance.GetItemsAll().OfType<IProduct>().Select(p => p.ID));
+
+                    foreach (var id in groups)
                     {
                         CoreContext.UserManager.RemoveUserFromGroup(userid, id);
                     }
                 }
+
+                if (productid == ASC.Core.Users.Constants.GroupAdmin.ID || productid == WebItemManager.PeopleProductID)
+                {
+                    foreach (var ace in GetPeopleModuleActions(userid))
+                    {
+                        CoreContext.AuthorizationManager.RemoveAce(ace);
+                    }
+                }
+
                 CoreContext.UserManager.RemoveUserFromGroup(userid, productid);
             }
 
-            ClearCache();
+            cacheNotify.Publish(new WebItemSecurityNotifier(), CacheNotifyAction.Any);
         }
 
         public static bool IsProductAdministrator(Guid productid, Guid userid)
         {
-            if (CoreContext.UserManager.IsUserInGroup(userid, ASC.Core.Users.Constants.GroupAdmin.ID))
-            {
-                return true;
-            }
-            else
-            {
-                return CoreContext.UserManager.IsUserInGroup(userid, productid);
-            }
+            return CoreContext.UserManager.IsUserInGroup(userid, ASC.Core.Users.Constants.GroupAdmin.ID) ||
+                   CoreContext.UserManager.IsUserInGroup(userid, productid);
         }
 
         public static IEnumerable<UserInfo> GetProductAdministrators(Guid productid)
@@ -246,6 +269,7 @@ namespace ASC.Web.Core
             {
                 groups.Add(ASC.Core.Users.Constants.GroupAdmin.ID);
                 groups.AddRange(WebItemManager.Instance.GetItemsAll().OfType<IProduct>().Select(p => p.ID));
+                groups.Add(WebItemManager.MailProductID);
             }
             else
             {
@@ -268,6 +292,16 @@ namespace ASC.Web.Core
         private static string GetCacheKey()
         {
             return string.Format("{0}:{1}", TenantProvider.CurrentTenantID, "webitemsecurity");
+        }
+
+        private static IEnumerable<AzRecord> GetPeopleModuleActions(Guid userid)
+        {
+            return new List<Guid>
+                {
+                    ASC.Core.Users.Constants.Action_AddRemoveUser.ID,
+                    ASC.Core.Users.Constants.Action_EditUser.ID,
+                    ASC.Core.Users.Constants.Action_EditGroups.ID
+                }.Select(action => new AzRecord(userid, action, AceType.Allow));
         }
 
         private class WebItemSecurityObject : ISecurityObject
@@ -340,5 +374,10 @@ namespace ASC.Web.Core
                 throw new NotImplementedException();
             }
         }
+    }
+
+    public class WebItemSecurityNotifier
+    {
+        
     }
 }

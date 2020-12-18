@@ -1,25 +1,16 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -31,20 +22,21 @@ window.contactsPage = (function($) {
         isCustomFilterInit = false,
         filter = new Object,
         page,
+        pageActionContainer,
         keepSelectionOnReload = false,
         buttons = [],
         totalCount = 0;
 
     var selection = new TMContainers.IdMap();
 
-    var init = function() {
+    function init() {
         if (isInit === false) {
             isInit = true;
 
             setDefaultValueFilter();
 
-            serviceManager.bind(window.Teamlab.events.updateMailContact, onUpdateContact);
-            serviceManager.bind(window.Teamlab.events.createMailContact, onCreateContact);
+            window.Teamlab.bind(window.Teamlab.events.updateMailContact, onUpdateContact);
+            window.Teamlab.bind(window.Teamlab.events.createMailContact, onCreateContact);
 
             crmFilter.events.bind('set', onSetCrmFilter);
             crmFilter.events.bind('reset', onResetFilter);
@@ -65,20 +57,20 @@ window.contactsPage = (function($) {
             customFilter.init();
 
             page = $('#id_contacts_page');
+            pageActionContainer = $('#pageActionContainer');
 
             buttons = [
                 { selector: "#contactActionMenu .viewContact", handler: viewContact },
                 { selector: "#contactActionMenu .editContact", handler: editContact },
-                { selector: "#contactActionMenu .addContact", handler: editContact },
                 { selector: "#contactActionMenu .deleteContact", handler: deleteContacts },
                 { selector: "#contactActionMenu .writeLetter", handler: massMailing }
             ];
         }
-    };
+    }
 
     // Set checkbox states depending on ids from _Selection
     // Note: _updateSelectionComboCheckbox call don't needed
-    var updateSelectionView = function() {
+    function updateSelectionView() {
         var haveOneUnchecked = false;
         var emptyOrDisabled = true;
         $('#ContactsList .row').each(function() {
@@ -95,16 +87,18 @@ window.contactsPage = (function($) {
             if (selection.HasId(contactId)) {
                 $checkbox.prop('checked', true);
                 $rowDiv.addClass('selected');
+                $rowDiv.addClass('ui-selected');
             } else {
                 $checkbox.prop('checked', false);
                 $rowDiv.removeClass('selected');
+                $rowDiv.removeClass('ui-selected');
                 haveOneUnchecked = true;
             }
         });
         setSelectionComboCheckbox(!haveOneUnchecked && !emptyOrDisabled);
-    };
+    }
 
-    var updateSelectionComboCheckbox = function() {
+    function updateSelectionComboCheckbox() {
         // Update checked state
         var uncheckedFound = false;
         $('#ContactsList .row .checkbox input[type="checkbox"]').each(function() {
@@ -114,19 +108,25 @@ window.contactsPage = (function($) {
             }
         });
         setSelectionComboCheckbox(!uncheckedFound);
-    };
+    }
 
-    var setSelectionComboCheckbox = function(checked) {
-        $('#SelectAllContactsCB').prop('checked', checked);
-    };
+    function setSelectionComboCheckbox(checked) {
+        var checkAll = $('#SelectAllContactsCB');
 
-    var clearCurrentPageSelection = function() {
+        if (selection.GetIds().length && !checked) {
+            checkAll.prop({ 'indeterminate': true, 'checked': true });
+        } else {
+            checkAll.prop({ 'indeterminate': false, 'checked': checked });
+        }
+    }
+
+    function clearCurrentPageSelection() {
         $('#ContactsList .row').each(function() {
             selection.RemoveId($(this).attr('data_id'));
         });
-    };
+    }
 
-    var onSetCrmFilter = function(e, params) {
+    function onSetCrmFilter(e, params) {
         var isChange = false;
         if (isCrmFilterInit === false) {
             isCrmFilterInit = true;
@@ -187,20 +187,15 @@ window.contactsPage = (function($) {
                 window.ASC.Mail.ga_track(ga_Categories.crmContacts, ga_Actions.filterClick, params.id);
             }
         }
-    };
+    }
 
-    var onSetTlFilter = function(e, params) {
+    function onSetTlFilter(e, params) {
         var isChange = false;
         if (isTlFilterInit === false) {
             isTlFilterInit = true;
         } else {
             switch (params.id) {
                 case 'sorter':
-                    // ToDo: refactore
-                    // filter bug workaround - lowercase n make sence
-                    if ('displayname' == params.params.id) {
-                        return;
-                    }
                     if (filter.TlSortBy != params.params.id || filter.TlSortOrder != params.params.sortOrder) {
                         filter.TlSortBy = params.params.id;
                         filter.TlSortOrder = params.params.sortOrder;
@@ -228,9 +223,9 @@ window.contactsPage = (function($) {
             }
         }
 
-    };
+    }
 
-    var onSetCustomFilter = function (e, params) {
+    function onSetCustomFilter(e, params) {
         var isChange = false;
         if (isCustomFilterInit === false) {
             isCustomFilterInit = true;
@@ -270,9 +265,9 @@ window.contactsPage = (function($) {
             }
         }
 
-    };
+    }
 
-    var onResetFilter = function(e, params) {
+    function onResetFilter(e, params) {
         switch (params.id) {
             case 'text':
                 filter.Search = '';
@@ -301,9 +296,9 @@ window.contactsPage = (function($) {
         var newAnchor = getAnchorByType(filter.ContactsStore) + toAnchor();
         if (anchor != newAnchor)
             ASC.Controls.AnchorController.move(newAnchor);
-    };
+    }
 
-    var onResetAllFilter = function() {
+    function onResetAllFilter() {
         filter.ContactListView = '';
         filter.ContactStage = undefined;
         filter.Tags = [];
@@ -316,23 +311,22 @@ window.contactsPage = (function($) {
         if (anchor != newAnchor)
             ASC.Controls.AnchorController.move(newAnchor);
 
-    };
+    }
 
-    var onFilterReady = function() {
+    function onFilterReady() {
         doResetFilter();
         tlFilter.events.unbind('ready');
         crmFilter.events.unbind('ready');
         customFilter.events.unbind('ready');
-    };
+    }
 
-    var redrawPage = function() {
+    function redrawPage() {
         mailBox.hidePages();
-        messagePage.hide();
         mailBox.hideContentDivs();
         mailBox.unmarkAllPanels();
         blankPages.hide();
         contactsPanel.selectContact(filter.ContactsStore);
-        page.find('.contentMenuWrapper').remove();
+        pageActionContainer.empty();
         page.find('#ContactsList').remove();
 
         switch (filter.ContactsStore) {
@@ -352,9 +346,9 @@ window.contactsPage = (function($) {
                 customFilter.show();
                 break;
         }
-    };
+    }
 
-    var onGetTlContacts = function(params, contacts) {
+    function onGetTlContacts(params, contacts) {
         var isTitelEmpty = true;
         $.each(contacts, function (index, value) {
             value.name = value.displayName;
@@ -389,9 +383,9 @@ window.contactsPage = (function($) {
         });
 
         onGetContacts(params, { contacts: contacts, emptyLabel: true, emptyTitel: isTitelEmpty });
-    };
+    }
 
-    var onGetCrmContacts = function(params, contacts) {
+    function onGetCrmContacts(params, contacts) {
         var isLabelEmpty = true,
             isTitelEmpty = true;
         $.each(contacts, function (index, value) {
@@ -416,7 +410,7 @@ window.contactsPage = (function($) {
         });
 
         onGetContacts(params, { contacts: contacts, emptyLabel: isLabelEmpty, emptyTitel: isTitelEmpty });
-    };
+    }
 
     function convertServerMailContact(serverContact) {
         var contact = {};
@@ -454,7 +448,7 @@ window.contactsPage = (function($) {
         onGetContacts(params, { contacts: contacts, emptyLabel: true, emptyTitel: isTitelEmpty });
     }
 
-    var onGetContacts = function(params, data) {
+    function onGetContacts(params, data) {
         redrawPage();
 
         if (data.contacts.length == 0) {
@@ -466,10 +460,12 @@ window.contactsPage = (function($) {
 
         LoadingBanner.hideLoading();
         mailBox.hideLoadingMask();
-    };
+    }
 
-    var showEmptyScreen = function() {
-        page.find('.containerBodyBlock').hide();
+    function showEmptyScreen() {
+        page.find('.containerBodyBlock').toggleClass('hidden', true);
+        pageActionContainer.empty();
+        $('#bottomNavigationBar').hide();
         switch(filter.ContactsStore) {
             case 'crm':
                 if (isFilterEmpty()) {
@@ -491,9 +487,12 @@ window.contactsPage = (function($) {
                 }
                 break;
         }
-    };
+    }
 
-    var showContacts = function (params, data) {
+    function showContacts(params, data) {
+
+        var contactsActionsHtml = $.tmpl("contactsActionsTmpl", {}, { htmlEncode: TMMail.htmlEncode });
+        pageActionContainer.append(contactsActionsHtml);
 
         var contactListHtml = $.tmpl("contactsTmpl", { contacts: data.contacts }, { htmlEncode: TMMail.htmlEncode });
         page.find('.containerBodyBlock').append(contactListHtml);
@@ -503,9 +502,9 @@ window.contactsPage = (function($) {
 
         $('#id_contacts_page').actionMenu('contactActionMenu', buttons, pretreatment);
 
-        crateSelectActionPandel();
+        createSelectActionPandel();
 
-        page.find('#SelectAllContactsCB').bind('click', function(e) {
+        pageActionContainer.find('#SelectAllContactsCB').bind('click', function (e) {
             if (e.target.checked) {
                 actionPanelSelectAll();
             } else {
@@ -515,7 +514,7 @@ window.contactsPage = (function($) {
             $('#SelectAllContactsDropdown').parent().actionPanel('hide');
         });
 
-        page.find('.menuActionSendEmail').click(function() {
+        pageActionContainer.find('.menuActionSendEmail').click(function () {
             if ($(this).hasClass('unlockAction')) {
                 massMailing();
 
@@ -531,19 +530,19 @@ window.contactsPage = (function($) {
         });
 
         if (TMMail.pageIs('personalContact')) {
-            page.find('.menuActionDelete').click(function () {
+            pageActionContainer.find('.menuActionDelete').click(function () {
                 if (!$(this).hasClass('unlockAction')) {
                     return false;
                 }
 
                 deleteContacts();
             });
-            page.find('.menuActionCreate').click(function() {
+            pageActionContainer.find('.menuActionCreate').click(function () {
                 editContactModal.show(null, true);
             });
         } else {
-            page.find('.menuActionDelete').hide();
-            page.find('.menuActionCreate').hide();
+            pageActionContainer.find('.menuActionDelete').hide();
+            pageActionContainer.find('.menuActionCreate').hide();
         }
 
         // _Selection checkbox clicked
@@ -555,10 +554,10 @@ window.contactsPage = (function($) {
         totalCount = params.__total || data.contacts.length;
         redrawNavigation(params.Page, totalCount, params.ContactsStore);
 
-        page.find('.containerBodyBlock').show();
-    };
-    
-    var onClickCheckbox = function()
+        page.find('.containerBodyBlock').toggleClass('hidden', false);
+    }
+
+    function onClickCheckbox()
     {
         var $this = $(this);
         if ($this.hasClass('disable')) {
@@ -567,11 +566,16 @@ window.contactsPage = (function($) {
 
         var row = $this.parent();
         selectRow(row);
-    };
+    }
 
     function selectRow(row)
     {
         var $input = row.find('input');
+
+        if ($input.hasClass('disable')) {
+            return true;
+        }
+
         var contactId = $input.attr('data_id');
         if (row.is('.selected')) {
             selection.RemoveId(contactId);
@@ -585,7 +589,7 @@ window.contactsPage = (function($) {
         commonButtonsState();
     };
 
-    var prepareContactcInfo = function($rows, data) {
+    function prepareContactcInfo($rows, data) {
         for (var j = 0, k = $rows.length; j < k; j++) {
             var $row = $($rows[j]),
                 $emails = $row.find('.email[isprimary="true"]'),
@@ -638,7 +642,7 @@ window.contactsPage = (function($) {
                 $row.find('.title').remove();
             }
         }
-    };
+    }
 
     function onCreateContact(params, serverContact) {
         if (TMMail.pageIs('personalContact')) {
@@ -676,7 +680,7 @@ window.contactsPage = (function($) {
         window.toastr.success(window.MailActionCompleteResource.EditContactSuccess);
     }
 
-    var onPageShow = function() {
+    function onPageShow() {
         page.find('#ContactsList .row').each(function(index, value) {
             createTagsHidePanel($(value));
         });
@@ -695,11 +699,11 @@ window.contactsPage = (function($) {
 
         updateSelectionView();
         commonButtonsState();
-    };
+    }
 
-    var crateSelectActionPandel = function() {
+    function createSelectActionPandel() {
         if (filter.ContactsStore == 'crm') {
-            page.find('#SelectAllContactsDropdown').parent().actionPanel({
+            $('#SelectAllContactsDropdown').parent().actionPanel({
                 buttons: [
                     { text: window.MailScriptResource.AllLabel, handler: actionPanelSelectAll },
                     { text: window.MailScriptResource.WithTags, handler: actionPanelSelectWithTags },
@@ -709,7 +713,7 @@ window.contactsPage = (function($) {
                 css: 'stick-over'
             });
         } else {
-            page.find('#SelectAllContactsDropdown').parent().actionPanel({
+            $('#SelectAllContactsDropdown').parent().actionPanel({
                 buttons: [
                     { text: window.MailScriptResource.AllLabel, handler: actionPanelSelectAll },
                     { text: window.MailScriptResource.NoneLabel, handler: actionPanelSelectNone }
@@ -718,10 +722,10 @@ window.contactsPage = (function($) {
             });
         }
 
-    };
+    }
 
     // Initializes action panel on more emails element
-    var itemListActionPanel = function(items, item_class_name) {
+    function itemListActionPanel(items, item_class_name) {
         var btns = [];
         var itemArray = $(items).find('.' + item_class_name);
         for (var i = 0, n = itemArray.length; i < n; i++) {
@@ -744,14 +748,14 @@ window.contactsPage = (function($) {
         }
 
         $(items).find('.gray').actionPanel({ 'buttons': btns }).click();
-    };
+    }
 
-    var setDefaultValueFilter = function() {
+    function setDefaultValueFilter() {
         setPageInfo(1, TMMail.option('ContactsPageSize'));
         filter.ContactsStore = '';
         filter.CrmSortBy = 'displayname';
         filter.CrmSortOrder = 'ascending';
-        filter.TlSortBy = 'displayName';
+        filter.TlSortBy = ASC.Mail.Master.userDisplayFormat == 1 ? 'firstname' : 'lastname';
         filter.TlSortOrder = 'ascending';
         filter.CustomSortBy = 'displayName';
         filter.CustomSortOrder = 'ascending';
@@ -761,9 +765,9 @@ window.contactsPage = (function($) {
         filter.Search = '';
         filter.FilterValue = '';
         filter.ContactType = '';
-    };
+    }
 
-    var redrawNavigation = function(pageParam, totalItemsCount, contactsType) {
+    function redrawNavigation(pageParam, totalItemsCount, contactsType) {
         var onChangePageSize = function(pageSize) {
             if (isNaN(pageSize) || pageSize < 1) {
                 return;
@@ -786,9 +790,10 @@ window.contactsPage = (function($) {
             window.MailScriptResource.TotalContacts);
         PagesNavigation.FixAnchorPageNumberIfNecessary(pageParam);
         PagesNavigation.RedrawPrevNextControl();
-    };
+        overallDeselectAll();
+    }
 
-    var show = function(type) {
+    function show(type) {
         setDefaultValueFilter();
 
         var anchor = ASC.Controls.AnchorController.getAnchor();
@@ -811,9 +816,9 @@ window.contactsPage = (function($) {
         }
 
         getContacts(type);
-    };
+    }
 
-    var actionPanelSelectAll = function() {
+    function actionPanelSelectAll() {
 
         var category = ga_Categories.crmContacts;
         if (TMMail.pageIs('tlContact')) {
@@ -833,9 +838,9 @@ window.contactsPage = (function($) {
 
         updateSelectionView();
         commonButtonsState();
-    };
+    }
 
-    var actionPanelSelectNone = function() {
+    function actionPanelSelectNone() {
 
         var category = ga_Categories.crmContacts;
         if (TMMail.pageIs('tlContact')) {
@@ -850,26 +855,26 @@ window.contactsPage = (function($) {
 
         updateSelectionView();
         commonButtonsState();
-    };
+    }
 
-    var commonButtonsState = function() {
+    function commonButtonsState() {
         if (isContainEmails()) {
             $('.contentMenuWrapper:visible .menuAction').addClass('unlockAction');
         } else {
             $('.contentMenuWrapper:visible .menuAction:not(.menuActionCreate)').removeClass('unlockAction');
         }
-    };
+    }
 
-    var isFilterEmpty = function() {
+    function isFilterEmpty() {
         var result = false;
         if (!filter.Tags.length && filter.ContactStage == undefined && filter.Search == ''
             && filter.FilterValue == '' && filter.ContactListView == '' && filter.ContactType == '') {
             result = true;
         }
         return result;
-    };
+    }
 
-    var doResetFilter = function() {
+    function doResetFilter() {
 
         switch (filter.ContactsStore) {
             case 'crm':
@@ -924,18 +929,9 @@ window.contactsPage = (function($) {
         if (filter.FilterValue != '') {
             tlFilter.setGroup(filter.FilterValue);
         }
+    }
 
-        switch (filter.ContactType) {
-            case '1':
-                customFilter.setPersonal();
-                break;
-            case '0':
-                customFilter.setAuto();
-                break;
-        }
-    };
-
-    var actionPanelSelectWithTags = function() {
+    function actionPanelSelectWithTags() {
 
         window.ASC.Mail.ga_track(ga_Categories.crmContacts, ga_Actions.actionClick, "whith_tag_select");
 
@@ -948,9 +944,9 @@ window.contactsPage = (function($) {
         });
         updateSelectionView();
         commonButtonsState();
-    };
+    }
 
-    var actionPanelSelectWithoutTags = function() {
+    function actionPanelSelectWithoutTags() {
 
         window.ASC.Mail.ga_track(ga_Categories.crmContacts, ga_Actions.actionClick, "without_select");
 
@@ -963,73 +959,68 @@ window.contactsPage = (function($) {
         });
         updateSelectionView();
         commonButtonsState();
-    };
+    }
 
-    var pretreatment = function (id) {
+    function pretreatment(id) {
         var $row = page.find('.row[data_id="' + id + '"]');
 
         if (!selection.HasId(id)) {
-            clearCurrentPageSelection();
-            updateSelectionView();
+            overallDeselectAll();
             selectRow($row);
         }
 
         var contactIds = selection.GetIds();
         var emails = [];
-        for(var i = 0; i < contactIds.length; i++) {
+        for (var i = 0; i < contactIds.length; i++) {
             emails = page.find('.row[data_id="' + contactIds[i] + '"] .email[isprimary="true"]');
             if (emails.length > 0)
                 break;
         };
 
+        var contactActionMenu = $("#contactActionMenu"),
+            writeLetter = contactActionMenu.find(".writeLetter"),
+            viewContact = contactActionMenu.find(".viewContact"),
+            editContact = contactActionMenu.find(".editContact"),
+            deleteContact = contactActionMenu.find(".deleteContact");
+
         if (emails.length > 0) {
-            $("#contactActionMenu .writeLetter").show();
+            writeLetter.show();
         } else {
-            $("#contactActionMenu .writeLetter").hide();
+            writeLetter.hide();
         }
 
-        switch(filter.ContactsStore)
-        {
-            case 'custom':
-                $("#contactActionMenu .viewContact").hide();
-                $("#contactActionMenu .deleteContact").show();
-                if (contactIds.length > 1) {
-                    $("#contactActionMenu .editContact").hide();
-                    $("#contactActionMenu .addContact").hide();
-                } else {
-                    var type = page.find('.row[data_id="' + id + '"]').attr('type');
-                    if (type == 'auto') {
-                        $("#contactActionMenu .editContact").hide();
-                        $("#contactActionMenu .addContact").show();
-                    } else {
-                        $("#contactActionMenu .editContact").show();
-                        $("#contactActionMenu .addContact").hide();
-                    }
-                }
-                break;
-            case 'crm':
-            case 'teamlab':
-                if (contactIds.length > 1) {
-                    $("#contactActionMenu .viewContact").hide();
-                } else {
-                    $("#contactActionMenu .viewContact").show();
-                }
-                $("#contactActionMenu .editContact").hide();
-                $("#contactActionMenu .deleteContact").hide();
-                $("#contactActionMenu .addContact").hide();
-                break;
+        switch (filter.ContactsStore) {
+        case 'custom':
+            viewContact.hide();
+            deleteContact.show();
+            if (contactIds.length > 1) {
+                editContact.hide();
+            } else {
+                editContact.show();
+            }
+            break;
+        case 'crm':
+        case 'teamlab':
+            if (contactIds.length > 1) {
+                viewContact.hide();
+            } else {
+                viewContact.show();
+            }
+            editContact.hide();
+            deleteContact.hide();
+            break;
         }
-    };
+    }
 
-    var viewContact = function(id) {
+    function viewContact(id) {
         if (filter.ContactsStore == 'crm') {
-            window.open('../../products/crm/default.aspx?id=' + id, "_blank");
+            window.open('../../Products/CRM/Default.aspx?id=' + id, "_blank");
         } else if (filter.ContactsStore == 'teamlab') {
-            window.open('../../products/people/profile.aspx?user=' + id, "_blank");
+            window.open('../../Products/People/Profile.aspx?user=' + id, "_blank");
         }
-    };
+    }
 
-    var editContact = function (id) {
+    function getContactInfo(id) {
         var contact = {};
         var $row = $('#ContactsList').find('.row[data_id="' + id + '"]');
 
@@ -1053,7 +1044,7 @@ window.contactsPage = (function($) {
             email.value = $(emails[i]).find('.contactEmail').html().trim();
             contact.emails.push(email);
         }
-        
+
         contact.phones = [];
         var phones = $row.find('.phone');
         for (i = 0, len = phones.length; i < len; i++) {
@@ -1064,56 +1055,84 @@ window.contactsPage = (function($) {
             contact.phones.push(phone);
         }
 
+        return contact;
+    }
+
+    function editContact(id) {
+        var contact = getContactInfo(id);
         editContactModal.show(contact, false);
-    };
+    }
 
-    var deleteContacts = function () {
-
+    function deleteContacts() {
         var ids = [];
 
         selection.Each(function (id) {
-                ids.push(id);
+            ids.push(id);
         });
 
-        serviceManager.deleteMailContacts(ids, {}, {
-            success: function (e, contactIds) {
-                if (totalCount <= filter.Count) {
-                    totalCount = totalCount - contactIds.length;
-                    $('#totalItemsOnAllPages').html(totalCount);
-                    if (totalCount === 0) {
-                        showEmptyScreen();
+        if (!ids.length)
+            return;
+
+        var question = window.MailResource.DeleteContactsShure;
+        var attention = window.MailResource.DeleteContactsAttention;
+
+        if (ids.length === 1) {
+            var contact = getContactInfo(ids[0]);
+            question = window.MailResource.DeleteContactShure
+                .format(contact.name || (!contact.emails[0] ? null : contact.emails[0].value) || (!contact.phones[0] ? null : contact.phones[0].value) || contact.description);
+            attention = window.MailResource.DeleteContactAttention;
+        }
+
+        var body = $.tmpl('questionBoxTmpl', {
+            attentionText: attention,
+            questionText: question
+        });
+
+        body.find('.button.remove').unbind('click').bind('click', function () {
+            serviceManager.deleteMailContacts(ids, {}, {
+                success: function (e, contactIds) {
+                    if (totalCount <= filter.Count) {
+                        totalCount = totalCount - contactIds.length;
+                        $('#totalItemsOnAllPages').html(totalCount);
+                        if (totalCount === 0) {
+                            showEmptyScreen();
+                        } else {
+                            for (var i = 0, len = contactIds.length; i < len; i++) {
+                                $('#ContactsList').find('.row[data_id="' + contactIds[i] + '"]').remove();
+                                selection.RemoveId(contactIds[i]);
+                            }
+                        }
                     } else {
+                        getContacts('custom');
                         for (var i = 0, len = contactIds.length; i < len; i++) {
-                            $('#ContactsList').find('.row[data_id="' + contactIds[i] + '"]').remove();
                             selection.RemoveId(contactIds[i]);
                         }
                     }
-                } else {
-                    getContacts('custom');
-                    for (var i = 0, len = contactIds.length; i < len; i++) {
-                        selection.RemoveId(contactIds[i]);
-                    }
+
+                    updateSelectionComboCheckbox();
+                    commonButtonsState();
+
+                    if (ids.length > 1)
+                        window.toastr.success(window.MailActionCompleteResource.DeleteManyContacts.replace('%count%', ids.length));
+                    else window.toastr.success(window.MailActionCompleteResource.DeleteOneContact);
+                },
+                error: function (e, error) {
+                    window.toastr.error(window.MailApiErrorsResource.ErrorDeleteContact);
+                    console.error(error);
                 }
+            }, ASC.Resources.Master.Resource.LoadingProcessing);
+            popup.hide();
+        });
 
-                updateSelectionComboCheckbox();
-                commonButtonsState();
+        popup.addBig(window.MailResource.DeleteContacts, body);
+    }
 
-                if (ids.length > 1)
-                    window.toastr.success(window.MailActionCompleteResource.DeleteManyContacts.replace('%count%', ids.length));
-                else window.toastr.success(window.MailActionCompleteResource.DeleteOneContact);
-            },
-            error: function (e, error) {
-                window.toastr.error(window.MailApiErrorsResource.ErrorDeleteContact);
-            }
-        }, ASC.Resources.Master.Resource.LoadingProcessing);
-    };
-
-    var writeLetter = function(event, buttonContext) {
+    function writeLetter(event, buttonContext) {
         messagePage.setToEmailAddresses([getContact(buttonContext.name, buttonContext.contact_name)]);
         messagePage.composeTo();
-    };
+    }
 
-    var massMailing = function() {
+    function massMailing() {
 
         var emails = new TMContainers.StringSet();
 
@@ -1127,9 +1146,9 @@ window.contactsPage = (function($) {
             messagePage.setToEmailAddresses(emails.GetValues());
             messagePage.composeTo();
         }
-    };
+    }
 
-    var isContainEmails = function() {
+    function isContainEmails() {
         var haveEmails = false;
         selection.Each(function(id, email) {
             if (email) {
@@ -1138,9 +1157,9 @@ window.contactsPage = (function($) {
             }
         });
         return haveEmails;
-    };
+    }
 
-    var createTagsHidePanel = function(row) {
+    function createTagsHidePanel(row) {
         var $smalstags = row.find('.tag');
         var $labels = row.find('.labels');
         var labelNames = [];
@@ -1152,22 +1171,24 @@ window.contactsPage = (function($) {
         if (labelNames.length > 0) {
             $labels.hidePanel({ 'items': labelNames, 'item_to_html': labelsToHtml });
         }
-    };
+    }
 
-    var labelsToHtml = function(name) {
+    function labelsToHtml(name) {
         var tag = tagsManager.getTagByName(TMMail.htmlDecode(name));
         var html = $.tmpl("contactTagTmpl", tag, { htmlEncode: TMMail.htmlEncode });
         return html;
-    };
+    }
 
-    var hide = function() {
+    function hide() {
         if (!(TMMail.pageIs('crmContact') && filter.ContactsStore == 'crm') &&
-            !(TMMail.pageIs('tlContact') && filter.ContactsStore == 'teamlab')) {
+            !(TMMail.pageIs('tlContact') && filter.ContactsStore == 'teamlab') &&
+            !(TMMail.pageIs('personalContact') && filter.ContactsStore == 'custom')) {
             page.hide();
         }
-    };
+        pageActionContainer.empty();
+    }
 
-    var toAnchor = function(pageParam) {
+    function toAnchor(pageParam) {
         var res = '/';
 
         switch(filter.ContactsStore) {
@@ -1230,9 +1251,9 @@ window.contactsPage = (function($) {
             res += 'page_size=' + pageSize + '/';
         }
         return res;
-    };
+    }
 
-    var fromAnchor = function(params) {
+    function fromAnchor(params) {
 
         var sortBy, sortOrder, filterValue, contactStage, pageParam, pageSize, contactListView, tag, search, contactType;
 
@@ -1318,9 +1339,9 @@ window.contactsPage = (function($) {
         } else {
             setPageInfo(1, TMMail.option('ContactsPageSize'));
         }
-    };
+    }
 
-    var getContacts = function(type) {
+    function getContacts(type) {
         var filterData = {};
 
         if ('crm' == type) {
@@ -1358,6 +1379,8 @@ window.contactsPage = (function($) {
                 filterData.filtervalue = filter.Search;
             }
 
+            filterData.fields = 'id,status,isAdmin,isOwner,isVisitor,activationStatus,contacts,userName,email,displayName,avatarSmall,birthday,title,location,isLDAP,isSSO';
+
             var options = { filter: filterData, success: onGetTlContacts };
 
             serviceManager.getProfilesByFilter({ Page: getPageFromFilter(), ContactsStore: filter.ContactsStore },
@@ -1374,22 +1397,22 @@ window.contactsPage = (function($) {
             serviceManager.getMailContacts(filterData, { Page: getPageFromFilter(), ContactsStore: filter.ContactsStore },
                 {success: onGetMailContacts }, ASC.Resources.Master.Resource.LoadingProcessing);
         }
-    };
+    }
 
-    var updateAnchor = function(type, pageParam) {
+    function updateAnchor(type, pageParam) {
         ASC.Controls.AnchorController.move(getAnchorByType(type) + toAnchor(pageParam));
-    };
+    }
 
-    var setPageInfo = function(pageParam, pageSize) {
+    function setPageInfo(pageParam, pageSize) {
         filter.Count = pageSize;
         filter.StartIndex = pageSize * (pageParam - 1);
-    };
+    }
 
-    var getPageFromFilter = function() {
+    function getPageFromFilter() {
         return filter.StartIndex / TMMail.option('ContactsPageSize') + 1;
-    };
+    }
 
-    var getAnchorByType = function(type) {
+    function getAnchorByType(type) {
         var anchor = '';
         switch (type) {
             case 'crm':
@@ -1403,38 +1426,38 @@ window.contactsPage = (function($) {
                 break;
         }
         return anchor;
-    };
+    }
 
-    var getContactFromRow = function($row) {
+    function getContactFromRow($row) {
         var email = getEmailFromRow($row);
         var name = getNameFromRow($row);
         return getContact(email, name);
-    };
+    }
 
-    var getContact = function (email, name) {
+    function getContact(email, name) {
         return email ? (new ASC.Mail.Address(name, email, true).ToString()) : undefined;
-    };
+    }
 
-    var getEmailFromRow = function($row) {
+    function getEmailFromRow($row) {
         var $email = $row.find('.email[isprimary="true"]');
         return $email.length > 0 ? $($email[0]).text().trim() : undefined;
-    };
+    }
 
-    var getNameFromRow = function($row) {
+    function getNameFromRow($row) {
         return $row.find('.name').attr('contactName').trim();
-    };
+    }
 
-    var getDisplayNameFromRow = function ($row) {
+    function getDisplayNameFromRow($row) {
         return TMMail.htmlEncode($row.find('.name').text().trim());
-    };
+    }
 
-    var resetFilter = function() {
+    function resetFilter() {
         ASC.Controls.AnchorController.move(getAnchorByType(filter.ContactsStore));
         doResetFilter();
-    };
+    }
 
-    var loadContactFoto = function (imgObj, handlerSrc) {
-        if (handlerSrc.indexOf("filehandler.ashx") != -1 || handlerSrc.indexOf("contactphoto.ashx") != -1) {
+    function loadContactFoto(imgObj, handlerSrc) {
+        if (handlerSrc.indexOf("filehandler.ashx") !== -1 || handlerSrc.indexOf("contactphoto.ashx") !== -1) {
             jq.ajax({
                 type: "GET",
                 url: handlerSrc,
@@ -1455,12 +1478,21 @@ window.contactsPage = (function($) {
             imgObj.prev().addClass("display-none").hide();
             imgObj.removeClass("display-none");
         }
-    };
+    }
+
+    function overallDeselectAll() {
+        selection.Clear();
+        updateSelectionView();
+    }
 
     return {
         init: init,
         show: show,
         hide: hide,
+
+        deselectAll: overallDeselectAll,
+        selectRow: selectRow,
+
         resetFilter: resetFilter
     };
 })(jQuery);

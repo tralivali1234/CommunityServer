@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -64,23 +55,23 @@ namespace ASC.Api.CRM
                 case EntityType.Contact:
                 case EntityType.Person:
                 case EntityType.Company:
-                    var contact = DaoFactory.GetContactDao().GetByID(entityid);
+                    var contact = DaoFactory.ContactDao.GetByID(entityid);
                     if (contact == null || !CRMSecurity.CanAccessTo(contact))
                         throw new ItemNotFoundException();
                     break;
                 case EntityType.Case:
-                    var cases = DaoFactory.GetCasesDao().GetByID(entityid);
+                    var cases = DaoFactory.CasesDao.GetByID(entityid);
                     if (cases == null || !CRMSecurity.CanAccessTo(cases))
                         throw new ItemNotFoundException();
                     break;
                 case EntityType.Opportunity:
-                    var deal = DaoFactory.GetDealDao().GetByID(entityid);
+                    var deal = DaoFactory.DealDao.GetByID(entityid);
                     if (deal == null || !CRMSecurity.CanAccessTo(deal))
                         throw new ItemNotFoundException();
                     break;
             }
 
-            return DaoFactory.GetTagDao().GetEntityTags(entityTypeObj, entityid);
+            return DaoFactory.TagDao.GetEntityTags(entityTypeObj, entityid);
         }
 
         /// <summary>
@@ -97,10 +88,10 @@ namespace ASC.Api.CRM
         public IEnumerable<string> GetContactTags(int contactid)
         {
             if (contactid <= 0) throw new ArgumentException();
-            var contact = DaoFactory.GetContactDao().GetByID(contactid);
+            var contact = DaoFactory.ContactDao.GetByID(contactid);
             if (contact == null || !CRMSecurity.CanAccessTo(contact))
                 throw new ItemNotFoundException();
-            return DaoFactory.GetTagDao().GetEntityTags(EntityType.Contact, contactid).ToItemList();
+            return DaoFactory.TagDao.GetEntityTags(EntityType.Contact, contactid).ToItemList();
         }
 
         /// <summary>
@@ -122,7 +113,7 @@ namespace ASC.Api.CRM
             var entityTypeObj = ToEntityType(entityType);
 
             var messageAction = GetEntityTagCreatedAction(entityTypeObj);
-            DaoFactory.GetTagDao().AddTag(entityTypeObj, tagName);
+            DaoFactory.TagDao.AddTag(entityTypeObj, tagName);
 
             MessageService.Send(Request, messageAction, tagName);
 
@@ -145,8 +136,8 @@ namespace ASC.Api.CRM
             if (string.IsNullOrEmpty(entityType)) throw new ArgumentException();
             var entType = ToEntityType(entityType);
 
-            var tagTitles = DaoFactory.GetTagDao().GetAllTags(entType).ToList();
-            var relativeItemsCountArrayJSON = DaoFactory.GetTagDao().GetTagsLinkCount(entType).ToList();
+            var tagTitles = DaoFactory.TagDao.GetAllTags(entType).ToList();
+            var relativeItemsCountArrayJSON = DaoFactory.TagDao.GetTagsLinkCount(entType).ToList();
             if (tagTitles.Count != relativeItemsCountArrayJSON.Count) throw new ArgumentException();
 
             var result = new List<TagWrapper>();
@@ -208,7 +199,7 @@ namespace ASC.Api.CRM
             string tagName)
         {
             var contacts = DaoFactory
-                .GetContactDao()
+                .ContactDao
                 .GetContacts(_context.FilterValue,
                              tags,
                              contactStage,
@@ -218,7 +209,7 @@ namespace ASC.Api.CRM
                              toDate,
                              0,
                              0,
-                             null).Where(CRMSecurity.CanAccessTo).ToList();
+                             null).Where(CRMSecurity.CanEdit).ToList();
 
             foreach (var contact in contacts)
             {
@@ -259,7 +250,7 @@ namespace ASC.Api.CRM
             string tagName)
         {
             var deals = DaoFactory
-                .GetDealDao()
+                .DealDao
                 .GetDeals(
                     _context.FilterValue,
                     responsibleid,
@@ -293,7 +284,7 @@ namespace ASC.Api.CRM
         [Create(@"case/filter/taglist")]
         public string AddTagToBatchCases(int contactid, bool? isClosed, IEnumerable<string> tags, string tagName)
         {
-            var caseses = DaoFactory.GetCasesDao().GetCases(_context.FilterValue, contactid, isClosed, tags, 0, 0, null)
+            var caseses = DaoFactory.CasesDao.GetCases(_context.FilterValue, contactid, isClosed, tags, 0, 0, null)
                 .Where(CRMSecurity.CanAccessTo).ToList();
 
             if (!caseses.Any()) return tagName;
@@ -320,9 +311,9 @@ namespace ASC.Api.CRM
 
             var entityTypeObj = ToEntityType(entityType);
 
-            var result = DaoFactory.GetTagDao().GetUnusedTags(entityTypeObj);
+            var result = DaoFactory.TagDao.GetUnusedTags(entityTypeObj);
 
-            DaoFactory.GetTagDao().DeleteUnusedTags(entityTypeObj);
+            DaoFactory.TagDao.DeleteUnusedTags(entityTypeObj);
 
             return new List<string>(result);
         }
@@ -344,36 +335,16 @@ namespace ASC.Api.CRM
         {
             if (entityid <= 0 || string.IsNullOrEmpty(tagName)) throw new ArgumentException();
 
-            var entityTitle = "";
             var entityTypeObj = ToEntityType(entityType);
+            DomainObject entityObj;
+            var entityTitle = GetEntityTitle(entityTypeObj, entityid, true, out entityObj);
 
-            switch (entityTypeObj) {
-                case EntityType.Contact:
-                case EntityType.Person:
-                case EntityType.Company:
-                    var contact = DaoFactory.GetContactDao().GetByID(entityid);
-                    if (contact == null || !CRMSecurity.CanAccessTo(contact))
-                        throw new ItemNotFoundException();
-                    entityTitle = contact.GetTitle();
-                    break;
-                case EntityType.Case:
-                    var cases = DaoFactory.GetCasesDao().GetByID(entityid);
-                    if (cases == null || !CRMSecurity.CanAccessTo(cases))
-                        throw new ItemNotFoundException();
-                    entityTitle = cases.Title;
-                    break;
-                case EntityType.Opportunity:
-                    var deal = DaoFactory.GetDealDao().GetByID(entityid);
-                    if (deal == null || !CRMSecurity.CanAccessTo(deal))
-                        throw new ItemNotFoundException();
-                    entityTitle = deal.Title;
-                    break;
-            }
+            if (entityTypeObj == EntityType.Contact && !CRMSecurity.CanEdit(entityObj as Contact)) throw CRMSecurity.CreateSecurityException();
 
-            DaoFactory.GetTagDao().AddTagToEntity(entityTypeObj, entityid, tagName);
+            DaoFactory.TagDao.AddTagToEntity(entityTypeObj, entityid, tagName);
 
             var messageAction = GetTagCreatedAction(entityTypeObj, entityid);
-            MessageService.Send(Request, messageAction, entityTitle, tagName);
+            MessageService.Send(Request, messageAction, MessageTarget.Create(entityid), entityTitle, tagName);
 
             return tagName;
         }
@@ -400,7 +371,7 @@ namespace ASC.Api.CRM
             var entityTypeObj = ToEntityType(entityType);
             if (entityTypeObj != EntityType.Company && entityTypeObj != EntityType.Person) throw new ArgumentException();
 
-            var contactInst = DaoFactory.GetContactDao().GetByID(entityid);
+            var contactInst = DaoFactory.ContactDao.GetByID(entityid);
             if (contactInst == null || !CRMSecurity.CanAccessTo(contactInst)) throw new ItemNotFoundException();
 
             if (contactInst is Person && entityTypeObj == EntityType.Company) throw new Exception(CRMErrorsResource.ContactIsNotCompany);
@@ -414,7 +385,7 @@ namespace ASC.Api.CRM
             {
                 contactIDsToAddTag.Add(contactInst.ID);
 
-                var members = DaoFactory.GetContactDao().GetMembersIDsAndShareType(contactInst.ID);
+                var members = DaoFactory.ContactDao.GetMembersIDsAndShareType(contactInst.ID);
 
                 foreach (var m in members)
                 {
@@ -429,12 +400,12 @@ namespace ASC.Api.CRM
                 var CompanyID = ((Person)contactInst).CompanyID;
                 if (CompanyID != 0)
                 {
-                    var cnt = DaoFactory.GetContactDao().GetByID(CompanyID);
+                    var cnt = DaoFactory.ContactDao.GetByID(CompanyID);
                     if (cnt != null && cnt is Company && CRMSecurity.CanAccessTo(cnt))
                     {
                         contactIDsToAddTag.Add(CompanyID);
 
-                        var members = DaoFactory.GetContactDao().GetMembersIDsAndShareType(CompanyID);
+                        var members = DaoFactory.ContactDao.GetMembersIDsAndShareType(CompanyID);
 
                         foreach (var m in members)
                         {
@@ -455,14 +426,14 @@ namespace ASC.Api.CRM
                 }
             }
 
-            DaoFactory.GetTagDao().AddTagToContacts(contactIDsToAddTag.ToArray(), tagName);
+            DaoFactory.TagDao.AddTagToContacts(contactIDsToAddTag.ToArray(), tagName);
 
 
             var entityTitle = contactInst.GetTitle();
             var messageActions = GetTagCreatedGroupAction(entityTypeObj);
             foreach (var messageAction in messageActions)
             {
-                MessageService.Send(Request, messageAction, entityTitle, tagName);
+                MessageService.Send(Request, messageAction, MessageTarget.Create(contactInst.ID), entityTitle, tagName);
             }
 
             return tagName;
@@ -488,9 +459,9 @@ namespace ASC.Api.CRM
 
             var entityTypeObj = ToEntityType(entityType);
 
-            if (!DaoFactory.GetTagDao().IsExist(entityTypeObj, tagName)) throw new ItemNotFoundException();
+            if (!DaoFactory.TagDao.IsExist(entityTypeObj, tagName)) throw new ItemNotFoundException();
 
-            DaoFactory.GetTagDao().DeleteTag(entityTypeObj, tagName);
+            DaoFactory.TagDao.DeleteTag(entityTypeObj, tagName);
 
             var messageAction = GetEntityTagDeletedAction(entityTypeObj);
             MessageService.Send(Request, messageAction, tagName);
@@ -515,39 +486,18 @@ namespace ASC.Api.CRM
         {
             if (string.IsNullOrEmpty(entityType) || entityid <= 0 || string.IsNullOrEmpty(tagName)) throw new ArgumentException();
 
-            var entityTitle = "";
             var entityTypeObj = ToEntityType(entityType);
+            DomainObject entityObj;
+            var entityTitle = GetEntityTitle(entityTypeObj, entityid, true, out entityObj);
 
-            switch (entityTypeObj) {
-                case EntityType.Contact:
-                case EntityType.Person:
-                case EntityType.Company:
-                    var contact = DaoFactory.GetContactDao().GetByID(entityid);
-                    if (contact == null || !CRMSecurity.CanAccessTo(contact))
-                        throw new ItemNotFoundException();
-                    entityTitle = contact.GetTitle();
-                    break;
-                case EntityType.Case:
-                    var cases = DaoFactory.GetCasesDao().GetByID(entityid);
-                    if (cases == null || !CRMSecurity.CanAccessTo(cases))
-                        throw new ItemNotFoundException();
-                    entityTitle = cases.Title;
-                    break;
-                case EntityType.Opportunity:
-                    var deal = DaoFactory.GetDealDao().GetByID(entityid);
-                    if (deal == null || !CRMSecurity.CanAccessTo(deal))
-                        throw new ItemNotFoundException();
-                    entityTitle = deal.Title;
-                    break;
-            }
+            if (entityTypeObj == EntityType.Contact && !CRMSecurity.CanEdit(entityObj as Contact)) throw CRMSecurity.CreateSecurityException();
 
+            if (!DaoFactory.TagDao.IsExist(entityTypeObj, tagName)) throw new ItemNotFoundException();
 
-            if (!DaoFactory.GetTagDao().IsExist(entityTypeObj, tagName)) throw new ItemNotFoundException();
-
-            DaoFactory.GetTagDao().DeleteTagFromEntity(entityTypeObj, entityid, tagName);
+            DaoFactory.TagDao.DeleteTagFromEntity(entityTypeObj, entityid, tagName);
 
             var messageAction = GetTagDeletedAction(entityTypeObj, entityid);
-            MessageService.Send(Request, messageAction, entityTitle, tagName);
+            MessageService.Send(Request, messageAction, MessageTarget.Create(entityid), entityTitle, tagName);
 
             return tagName;
         }
@@ -574,7 +524,7 @@ namespace ASC.Api.CRM
             var entityTypeObj = ToEntityType(entityType);
             if (entityTypeObj != EntityType.Company && entityTypeObj != EntityType.Person) throw new ArgumentException();
 
-            var contactInst = DaoFactory.GetContactDao().GetByID(entityid);
+            var contactInst = DaoFactory.ContactDao.GetByID(entityid);
             if (contactInst == null) throw new ItemNotFoundException();
 
             if (contactInst is Person && entityTypeObj == EntityType.Company) throw new Exception(CRMErrorsResource.ContactIsNotCompany);
@@ -588,7 +538,7 @@ namespace ASC.Api.CRM
             {
                 contactIDsForDeleteTag.Add(contactInst.ID);
 
-                var members = DaoFactory.GetContactDao().GetMembersIDsAndShareType(contactInst.ID);
+                var members = DaoFactory.ContactDao.GetMembersIDsAndShareType(contactInst.ID);
 
                 foreach (var m in members)
                 {
@@ -603,12 +553,12 @@ namespace ASC.Api.CRM
                 var CompanyID = ((Person)contactInst).CompanyID;
                 if (CompanyID != 0)
                 {
-                    var cnt = DaoFactory.GetContactDao().GetByID(CompanyID);
+                    var cnt = DaoFactory.ContactDao.GetByID(CompanyID);
                     if (cnt != null && cnt is Company && CRMSecurity.CanAccessTo(cnt))
                     {
                         contactIDsForDeleteTag.Add(CompanyID);
 
-                        var members = DaoFactory.GetContactDao().GetMembersIDsAndShareType(CompanyID);
+                        var members = DaoFactory.ContactDao.GetMembersIDsAndShareType(CompanyID);
 
                         foreach (var m in members)
                         {
@@ -629,7 +579,7 @@ namespace ASC.Api.CRM
                 }
             }
 
-            DaoFactory.GetTagDao().DeleteTagFromContacts(contactIDsForDeleteTag.ToArray(), tagName);
+            DaoFactory.TagDao.DeleteTagFromContacts(contactIDsForDeleteTag.ToArray(), tagName);
 
             return tagName;
         }
@@ -670,7 +620,7 @@ namespace ASC.Api.CRM
             switch (entityType)
             {
                 case EntityType.Contact:
-                    var entity = DaoFactory.GetContactDao().GetByID(entityId);
+                    var entity = DaoFactory.ContactDao.GetByID(entityId);
                     return entity is Company ? MessageAction.CompanyCreatedTag : MessageAction.PersonCreatedTag;
                 case EntityType.Company:
                     return MessageAction.CompanyCreatedTag;
@@ -703,7 +653,7 @@ namespace ASC.Api.CRM
             switch (entityType)
             {
                 case EntityType.Contact:
-                    var entity = DaoFactory.GetContactDao().GetByID(entityId);
+                    var entity = DaoFactory.ContactDao.GetByID(entityId);
                     return entity is Company ? MessageAction.CompanyDeletedTag : MessageAction.PersonDeletedTag;
                 case EntityType.Company:
                     return MessageAction.CompanyDeletedTag;

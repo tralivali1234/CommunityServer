@@ -1,30 +1,31 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Security;
+using System.Text;
+using System.Threading;
+using System.Web;
 using ASC.Core;
+using ASC.Core.Common.Configuration;
 using ASC.Core.Tenants;
 using ASC.Core.Users;
 using ASC.FederatedLogin;
@@ -34,8 +35,6 @@ using ASC.FederatedLogin.Profile;
 using ASC.Files.Core;
 using ASC.MessagingSystem;
 using ASC.Security.Cryptography;
-using ASC.Thrdparty;
-using ASC.Thrdparty.Configuration;
 using ASC.Web.Core;
 using ASC.Web.Core.Files;
 using ASC.Web.Core.Users;
@@ -49,41 +48,38 @@ using ASC.Web.Studio.Core.Users;
 using ASC.Web.Studio.UserControls.Common;
 using ASC.Web.Studio.Utility;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Security;
-using System.Text;
-using System.Threading;
-using System.Web;
 using File = ASC.Files.Core.File;
 using MimeMapping = ASC.Common.Web.MimeMapping;
 using SecurityContext = ASC.Core.SecurityContext;
 
 namespace ASC.Web.Files.ThirdPartyApp
 {
-    public class GoogleDriveApp : IThirdPartyApp
+    public class GoogleDriveApp : Consumer, IThirdPartyApp, IOAuthProvider
     {
         public const string AppAttr = "gdrive";
 
+        public string Scopes { get { return ""; } }
+        public string CodeUrl { get { return ""; } }
+        public string AccessTokenUrl { get { return GoogleLoginProvider.Instance.AccessTokenUrl; } }
+        public string RedirectUri { get { return this["googleDriveAppRedirectUrl"]; } }
+        public string ClientID { get { return this["googleDriveAppClientId"]; } }
+        public string ClientSecret { get { return this["googleDriveAppSecretKey"]; } }
 
-        private static string ClientId
+        public bool IsEnabled
         {
-            get { return KeyStorage.Get("googleDriveAppClientId"); }
+            get
+            {
+                return !string.IsNullOrEmpty(ClientID) &&
+                       !string.IsNullOrEmpty(ClientSecret);
+            }
         }
 
-        private static string SecretKey
-        {
-            get { return KeyStorage.Get("googleDriveAppSecretKey"); }
-        }
+        public GoogleDriveApp() { }
 
-        private static string RedirectUrl
+        public GoogleDriveApp(string name, int order, Dictionary<string, string> additional)
+            : base(name, order, additional)
         {
-            get { return KeyStorage.Get("googleDriveAppRedirectUrl"); }
         }
-
 
         public bool Request(HttpContext context)
         {
@@ -111,7 +107,7 @@ namespace ASC.Web.Files.ThirdPartyApp
 
         public string GetRefreshUrl()
         {
-            return GoogleLoginProvider.GoogleOauthTokenUrl;
+            return AccessTokenUrl;
         }
 
         public File GetFile(string fileId, out bool editable)
@@ -153,7 +149,11 @@ namespace ASC.Web.Files.ThirdPartyApp
             if (file == null) return string.Empty;
 
             var fileId = ThirdPartySelector.GetFileId(file.ID.ToString());
+            return GetFileStreamUrl(fileId);
+        }
 
+        private static string GetFileStreamUrl(string fileId)
+        {
             Global.Logger.Debug("GoogleDriveApp: get file stream url " + fileId);
 
             var uriBuilder = new UriBuilder(CommonLinkUtility.GetFullAbsolutePath(ThirdPartyAppHandler.HandlerPath));
@@ -194,21 +194,16 @@ namespace ASC.Web.Files.ThirdPartyApp
             {
                 try
                 {
-                    var key = DocumentServiceConnector.GenerateRevisionId(downloadUrl ?? Guid.NewGuid().ToString());
                     if (stream != null)
                     {
-                        using (var tmpStream = new MemoryStream())
-                        {
-                            stream.CopyTo(tmpStream);
-
-                            Global.Logger.Debug("GoogleDriveApp: GetExternalUri format: " + fileType);
-                            downloadUrl = DocumentServiceConnector.GetExternalUri(tmpStream, fileType, key);
-                        }
+                        downloadUrl = PathProvider.GetTempUrl(stream, fileType);
+                        downloadUrl = DocumentServiceConnector.ReplaceCommunityAdress(downloadUrl);
                     }
 
                     Global.Logger.Debug("GoogleDriveApp: GetConvertedUri from " + fileType + " to " + currentType + " - " + downloadUrl);
 
-                    DocumentServiceConnector.GetConvertedUri(downloadUrl, fileType, currentType, key, false, out downloadUrl);
+                    var key = DocumentServiceConnector.GenerateRevisionId(downloadUrl);
+                    DocumentServiceConnector.GetConvertedUri(downloadUrl, fileType, currentType, key, null, false, out downloadUrl);
                     stream = null;
                 }
                 catch (Exception e)
@@ -218,7 +213,7 @@ namespace ASC.Web.Files.ThirdPartyApp
             }
 
             var request = (HttpWebRequest) WebRequest.Create(GoogleLoginProvider.GoogleUrlFileUpload + "/{fileId}?uploadType=media".Replace("{fileId}", fileId));
-            request.Method = "PUT";
+            request.Method = "PATCH";
             request.Headers.Add("Authorization", "Bearer " + token);
             request.ContentType = MimeMapping.GetMimeMapping(currentType);
 
@@ -256,7 +251,14 @@ namespace ASC.Web.Files.ThirdPartyApp
                 using (var response = request.GetResponse())
                 using (var responseStream = response.GetResponseStream())
                 {
-                    var result = responseStream != null ? new StreamReader(responseStream).ReadToEnd() : null;
+                    string result = null;
+                    if (responseStream != null)
+                    {
+                        using (var readStream = new StreamReader(responseStream))
+                        {
+                            result = readStream.ReadToEnd();
+                        }
+                    }
 
                     Global.Logger.Debug("GoogleDriveApp: save file stream response - " + result);
                 }
@@ -266,7 +268,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                 Global.Logger.Error("GoogleDriveApp: Error save file stream", e);
                 request.Abort();
                 var httpResponse = (HttpWebResponse) e.Response;
-                if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
+                if (httpResponse.StatusCode == HttpStatusCode.Forbidden || httpResponse.StatusCode == HttpStatusCode.Unauthorized)
                 {
                     throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException, e);
                 }
@@ -319,7 +321,7 @@ namespace ASC.Web.Files.ThirdPartyApp
 
                 var cookiesKey = SecurityContext.AuthenticateMe(userInfo.ID);
                 CookiesManager.SetCookies(CookiesType.AuthKey, cookiesKey);
-                MessageService.Send(HttpContext.Current.Request, MessageAction.LoginSuccessViaSocialAccount);
+                MessageService.Send(HttpContext.Current.Request, MessageAction.LoginSuccessViaSocialApp);
 
                 if (isNew)
                 {
@@ -342,7 +344,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                 case "create":
                     var folderId = stateJson.Value<string>("folderId");
 
-                    context.Response.Redirect(App.Location + "?" + FilesLinkUtility.FolderId + "=" + folderId, true);
+                    context.Response.Redirect(App.Location + "?" + FilesLinkUtility.FolderId + "=" + HttpUtility.UrlEncode(folderId), true);
                     return;
                 case "open":
                     var idsArray = stateJson.Value<JArray>("ids") ?? stateJson.Value<JArray>("exportIds");
@@ -368,7 +370,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                         Global.Logger.Debug("GoogleDriveApp: file must be converted");
                         if (FilesSettings.ConvertNotify)
                         {
-                            context.Response.Redirect(App.Location + "?" + FilesLinkUtility.FileId + "=" + fileId, true);
+                            context.Response.Redirect(App.Location + "?" + FilesLinkUtility.FileId + "=" + HttpUtility.UrlEncode(fileId), true);
                             return;
                         }
 
@@ -415,7 +417,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                     throw new Exception("downloadUrl is null");
                 }
 
-                Global.Logger.Debug("GoogleDriveApp: get file stream  downloadUrl - " + downloadUrl);
+                Global.Logger.Debug("GoogleDriveApp: get file stream downloadUrl - " + downloadUrl);
 
                 var request = (HttpWebRequest)WebRequest.Create(downloadUrl);
                 request.Method = "GET";
@@ -427,7 +429,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                     stream.StreamCopyTo(context.Response.OutputStream);
 
                     var contentLength = jsonFile.Value<string>("size");
-                    Global.Logger.Debug("GoogleDriveApp: get file stream  contentLength - " + contentLength);
+                    Global.Logger.Debug("GoogleDriveApp: get file stream contentLength - " + contentLength);
                     context.Response.AddHeader("Content-Length", contentLength);
                 }
             }
@@ -440,10 +442,12 @@ namespace ASC.Web.Files.ThirdPartyApp
             try
             {
                 context.Response.Flush();
-                context.Response.End();
+                context.Response.SuppressContent = true;
+                context.ApplicationInstance.CompleteRequest();
             }
-            catch (HttpException)
+            catch (HttpException ex)
             {
+                Global.Logger.Error("GoogleDriveApp StreamFile", ex);
             }
         }
 
@@ -500,7 +504,7 @@ namespace ASC.Web.Files.ThirdPartyApp
             var jsonFile = JObject.Parse(driveFile);
             var fileId = jsonFile.Value<string>("id");
 
-            context.Response.Redirect(FilesLinkUtility.GetFileWebEditorUrl(ThirdPartySelector.BuildAppFileId(AppAttr, fileId)) + "&new=true", true);
+            context.Response.Redirect(FilesLinkUtility.GetFileWebEditorUrl(ThirdPartySelector.BuildAppFileId(AppAttr, fileId)), true);
         }
 
         private static Token GetToken(string code)
@@ -508,11 +512,7 @@ namespace ASC.Web.Files.ThirdPartyApp
             try
             {
                 Global.Logger.Debug("GoogleDriveApp: GetAccessToken by code " + code);
-                var token = OAuth20TokenHelper.GetAccessToken(GoogleLoginProvider.GoogleOauthTokenUrl,
-                                                              ClientId,
-                                                              SecretKey,
-                                                              RedirectUrl,
-                                                              code);
+                var token = OAuth20TokenHelper.GetAccessToken<GoogleDriveApp>(code);
                 return new Token(token, AppAttr);
             }
             catch (Exception ex)
@@ -551,7 +551,7 @@ namespace ASC.Web.Files.ThirdPartyApp
             LoginProfile loginProfile = null;
             try
             {
-                loginProfile = new GoogleLoginProvider().GetLoginProfile(token.ToString());
+                loginProfile = GoogleLoginProvider.Instance.GetLoginProfile(token.ToString());
             }
             catch (Exception ex)
             {
@@ -583,12 +583,10 @@ namespace ASC.Web.Files.ThirdPartyApp
                     Global.Logger.DebugFormat("From google app new personal user '{0}' without culture {1}", userInfo.Email, cultureName);
                 }
 
-                var pwd = UserManagerWrapper.GeneratePassword();
-
                 try
                 {
                     SecurityContext.AuthenticateMe(ASC.Core.Configuration.Constants.CoreSystem);
-                    userInfo = UserManagerWrapper.AddUser(userInfo, pwd);
+                    userInfo = UserManagerWrapper.AddUser(userInfo, UserManagerWrapper.GeneratePassword());
                 }
                 finally
                 {
@@ -612,7 +610,7 @@ namespace ASC.Web.Files.ThirdPartyApp
             }
             try
             {
-                var requestUrl = GoogleLoginProvider.GoogleUrlFile + googleFileId + "?fields=" + GoogleLoginProvider.FilesField;
+                var requestUrl = GoogleLoginProvider.GoogleUrlFile + googleFileId + "?fields=" + HttpUtility.UrlEncode(GoogleLoginProvider.FilesFields);
                 var resultResponse = RequestHelper.PerformRequest(requestUrl,
                                                                   headers: new Dictionary<string, string> {{"Authorization", "Bearer " + token}});
                 Global.Logger.Debug("GoogleDriveApp: file response - " + resultResponse);
@@ -636,8 +634,7 @@ namespace ASC.Web.Files.ThirdPartyApp
 
             var request = (HttpWebRequest)WebRequest.Create(contentUrl);
 
-            using (var response = request.GetResponse())
-            using (var content = new ResponseStream(response))
+            using (var content = new ResponseStream(request.GetResponse()))
             {
                 return CreateFile(content, fileName, folderId, token);
             }
@@ -688,9 +685,16 @@ namespace ASC.Web.Files.ThirdPartyApp
             try
             {
                 using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
+                using (var responseStream = response.GetResponseStream())
                 {
-                    var result = stream != null ? new StreamReader(stream).ReadToEnd() : null;
+                    string result = null;
+                    if (responseStream != null)
+                    {
+                        using (var readStream = new StreamReader(responseStream))
+                        {
+                            result = readStream.ReadToEnd();
+                        }
+                    }
 
                     Global.Logger.Debug("GoogleDriveApp: create file response - " + result);
                     return result;
@@ -702,7 +706,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                 request.Abort();
 
                 var httpResponse = (HttpWebResponse)e.Response;
-                if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
+                if (httpResponse.StatusCode == HttpStatusCode.Forbidden || httpResponse.StatusCode == HttpStatusCode.Unauthorized)
                 {
                     throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException, e);
                 }
@@ -710,36 +714,11 @@ namespace ASC.Web.Files.ThirdPartyApp
             return null;
         }
 
-        private static string ConvertFile(string downloadUrl, string fromExt, Token token)
+        private static string ConvertFile(string fileId, string fromExt)
         {
             Global.Logger.Debug("GoogleDriveApp: convert file");
 
-            if (string.IsNullOrEmpty(downloadUrl))
-            {
-                Global.Logger.Error("GoogleDriveApp: downloadUrl is null");
-                throw new Exception("downloadUrl is null");
-            }
-
-            var request = (HttpWebRequest)WebRequest.Create(downloadUrl);
-            request.Method = "GET";
-            request.Headers.Add("Authorization", "Bearer " + token);
-
-            try
-            {
-                using (var response = request.GetResponse())
-                using (var fileStream = new ResponseStream(response))
-                {
-                    Global.Logger.Debug("GoogleDriveApp: GetExternalUri - " + downloadUrl);
-
-                    var key = DocumentServiceConnector.GenerateRevisionId(downloadUrl);
-                    downloadUrl = DocumentServiceConnector.GetExternalUri(fileStream, response.ContentType, key);
-                }
-            }
-            catch (WebException e)
-            {
-                Global.Logger.Error("GoogleDriveApp: Error GetExternalUri", e);
-                request.Abort();
-            }
+            var downloadUrl = GetFileStreamUrl(fileId);
 
             var toExt = FileUtility.GetInternalExtension(fromExt);
             try
@@ -747,7 +726,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                 Global.Logger.Debug("GoogleDriveApp: GetConvertedUri- " + downloadUrl);
 
                 var key = DocumentServiceConnector.GenerateRevisionId(downloadUrl);
-                DocumentServiceConnector.GetConvertedUri(downloadUrl, fromExt, toExt, key, false, out downloadUrl);
+                DocumentServiceConnector.GetConvertedUri(downloadUrl, fromExt, toExt, key, null, false, out downloadUrl);
             }
             catch (Exception e)
             {
@@ -761,7 +740,6 @@ namespace ASC.Web.Files.ThirdPartyApp
         {
             var jsonFile = JObject.Parse(driveFile);
             var fileName = GetCorrectTitle(jsonFile);
-            fileName = FileUtility.ReplaceFileExtension(fileName, FileUtility.GetInternalExtension(fileName));
 
             var folderId = (string)jsonFile.SelectToken("parents[0]");
 
@@ -769,11 +747,11 @@ namespace ASC.Web.Files.ThirdPartyApp
 
             var ext = GetCorrectExt(jsonFile);
             var fileId = jsonFile.Value<string>("id");
-            
+
             if (GoogleLoginProvider.GoogleDriveExt.Contains(ext))
             {
-                var fileType = FileUtility.GetFileTypeByExtention(ext);
-                var internalExt = FileUtility.InternalExtension[fileType];
+                var internalExt = FileUtility.GetGoogleDownloadableExtension(ext);
+                fileName = FileUtility.ReplaceFileExtension(fileName, internalExt);
                 var requiredMimeType = MimeMapping.GetMimeMapping(internalExt);
 
                 var downloadUrl = GoogleLoginProvider.GoogleUrlFile
@@ -788,8 +766,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                 Global.Logger.Debug("GoogleDriveApp: download exportLink - " + downloadUrl);
                 try
                 {
-                    using (var response = request.GetResponse())
-                    using (var fileStream = new ResponseStream(response))
+                    using (var fileStream = new ResponseStream(request.GetResponse()))
                     {
                         driveFile = CreateFile(fileStream, fileName, folderId, token);
                     }
@@ -798,13 +775,17 @@ namespace ASC.Web.Files.ThirdPartyApp
                 {
                     Global.Logger.Error("GoogleDriveApp: Error download exportLink", e);
                     request.Abort();
+
+                    var httpResponse = (HttpWebResponse)e.Response;
+                    if (httpResponse.StatusCode == HttpStatusCode.Forbidden || httpResponse.StatusCode == HttpStatusCode.Unauthorized)
+                    {
+                        throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException, e);
+                    }
                 }
             }
             else
             {
-                var downloadUrl = GoogleLoginProvider.GoogleUrlFile + fileId + "?alt=media";
-
-                var convertedUrl = ConvertFile(downloadUrl, ext, token);
+                var convertedUrl = ConvertFile(fileId, ext);
 
                 if (string.IsNullOrEmpty(convertedUrl))
                 {
@@ -812,6 +793,8 @@ namespace ASC.Web.Files.ThirdPartyApp
                     throw new Exception(FilesCommonResource.ErrorMassage_DocServiceException + " (convert)");
                 }
 
+                var toExt = FileUtility.GetInternalExtension(fileName);
+                fileName = FileUtility.ReplaceFileExtension(fileName, toExt);
                 driveFile = CreateFile(convertedUrl, fileName, folderId, token);
             }
 
@@ -822,7 +805,7 @@ namespace ASC.Web.Files.ThirdPartyApp
 
         private static string GetCorrectTitle(JToken jsonFile)
         {
-            var title = (jsonFile.Value<string>("name") ?? "").ToLower();
+            var title = jsonFile.Value<string>("name") ?? "";
             var extTitle = FileUtility.GetFileExtension(title);
             var correctExt = GetCorrectExt(jsonFile);
 

@@ -1,39 +1,31 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using System.Globalization;
-using ASC.Common.Caching;
-using ASC.Core.Tenants;
-using ASC.Data.Storage;
-using log4net;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.Drawing;
+using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Net;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
+
+using HtmlAgilityPack;
 
 namespace ASC.Web.Studio.Core.HelpCenter
 {
@@ -48,86 +40,185 @@ namespace ASC.Web.Studio.Core.HelpCenter
 
     [Serializable]
     [DataContract(Name = "HelpCenterData", Namespace = "")]
-    public class HelpCenterData
+    public class HelpCenterData : BaseHelpCenterData
     {
-        [DataMember(Name = "ListItems")] public List<HelpCenterItem> ListItems;
+        [DataMember(Name = "ListItems")]
+        public List<HelpCenterItem> ListItems { get; set; }
 
-        [DataMember(Name = "ResetCacheKey")] public String ResetCacheKey;
-    }
-
-    public class HelpCenterStorage
-    {
-        private const string FilePath = "helpcenter.html";
-        private const string CacheKey = "helpcenter";
-
-        private static readonly ICache Cache = AscCache.Memory;
-        private static readonly TimeSpan ExpirationTimeout = TimeSpan.FromDays(1);
-
-
-        private static IDataStore GetStore()
+        public HelpCenterData()
         {
-            return StorageFactory.GetStorage(Tenant.DEFAULT_TENANT.ToString(CultureInfo.InvariantCulture), "static_helpcenter");
+            ListItems = new List<HelpCenterItem>();
         }
 
-        public static Dictionary<string, HelpCenterData> GetHelpCenter()
+        public override void Init(string html, string helpLinkBlock, string baseUrl)
         {
-            Dictionary<string, HelpCenterData> data = null;
+            if (string.IsNullOrEmpty(html)) return;
+
             try
             {
-                data = FromCache();
-                if (data == null && GetStore().IsFile(FilePath))
+                if (!baseUrl.EndsWith("/"))
                 {
-                    using (var stream = GetStore().GetReadStream(FilePath))
+                    baseUrl = baseUrl + "/";
+                }
+                var doc = new HtmlDocument();
+                doc.LoadHtml(html);
+
+                var mainContent = doc.DocumentNode.SelectSingleNode("//div[@class='MainHelpCenter GettingStarted']");
+
+                if (mainContent == null) return;
+
+                var blocks = (mainContent.SelectNodes(".//div[@class='gs_content']"))
+                    .Where(r => r.Attributes["id"] != null)
+                    .Select(x => x.Attributes["id"].Value).ToList();
+
+                var i = 0;
+                foreach (var block in mainContent.SelectNodes(".//div[@class='gs_content']"))
+                {
+                    try
                     {
-                        data = (Dictionary<string, HelpCenterData>) FromStream(stream);
+                        i++;
+                        var hrefs = block.SelectNodes(".//a[@href]");
+
+                        if (hrefs != null)
+                        {
+                            foreach (var href in hrefs.Where(r =>
+                            {
+                                var value = r.Attributes["href"].Value;
+                                return r.Attributes["href"] != null
+                                       && !string.IsNullOrEmpty(value)
+                                       && !value.StartsWith("mailto:")
+                                       && !value.StartsWith("http");
+                            }))
+                            {
+                                var value = href.Attributes["href"].Value;
+
+                                if (value.IndexOf("#", StringComparison.Ordinal) != 0 && value.Length > 1)
+                                {
+                                    href.Attributes["href"].Value = baseUrl + value.TrimStart('/');
+                                    href.SetAttributeValue("target", "_blank");
+                                }
+                                else
+                                {
+                                    if (!blocks.Contains(value.Substring(1))) continue;
+
+                                    href.Attributes["href"].Value = helpLinkBlock +
+                                                                    blocks.IndexOf(value.Substring(1))
+                                                                        .ToString(CultureInfo.InvariantCulture);
+                                }
+                            }
+                        }
+
+                        var images = block.SelectNodes(".//img");
+                        if (images != null)
+                        {
+                            foreach (var img in images.Where(img => img.Attributes["src"] != null))
+                            {
+                                var val = img.Attributes["src"].Value;
+                                if (val.StartsWith("data:image") || val.StartsWith("http")) continue;
+                                img.Attributes["src"].Value = GetBase64(baseUrl + val.TrimStart('/'));
+                            }
+
+                            foreach (var screenPhoto in images.Where(img =>
+                                img.Attributes["class"] != null && img.Attributes["class"].Value.Contains("screenphoto")
+                                && img.Attributes["target"] != null && img.ParentNode != null))
+                            {
+                                var bigphotoScreenId = screenPhoto.Attributes["target"].Value;
+
+                                var bigphotoScreen = images.FirstOrDefault(img =>
+                                    img.Attributes["id"] != null && img.Attributes["id"].Value == bigphotoScreenId
+                                    && img.Attributes["class"] != null &&
+                                    img.Attributes["class"].Value.Contains("bigphoto_screen")
+                                    && img.Attributes["src"] != null);
+                                if (bigphotoScreen == null) continue;
+
+                                var hrefNode = doc.CreateElement("a");
+                                var hrefAttribute = doc.CreateAttribute("href");
+                                hrefAttribute.Value = bigphotoScreen.Attributes["src"].Value;
+                                hrefNode.Attributes.Append(hrefAttribute);
+
+                                hrefAttribute = doc.CreateAttribute("class");
+                                hrefAttribute.Value = "screenzoom";
+                                hrefNode.Attributes.Append(hrefAttribute);
+
+                                string title = null;
+                                var titleAttribute = bigphotoScreen.Attributes["title"];
+                                if (titleAttribute != null)
+                                {
+                                    title = titleAttribute.Value;
+                                }
+                                else
+                                {
+                                    var altAttribute = bigphotoScreen.Attributes["alt"];
+                                    if (altAttribute != null)
+                                    {
+                                        title = altAttribute.Value;
+                                    }
+                                }
+                                if (!string.IsNullOrEmpty(title))
+                                {
+                                    hrefAttribute = doc.CreateAttribute("title");
+                                    hrefAttribute.Value = title;
+                                    hrefNode.Attributes.Append(hrefAttribute);
+                                }
+
+                                hrefAttribute = doc.CreateAttribute("rel");
+                                hrefAttribute.Value = "imageHelpCenter";
+                                hrefNode.Attributes.Append(hrefAttribute);
+
+                                screenPhoto.ParentNode.ReplaceChild(hrefNode, screenPhoto);
+                                hrefNode.AppendChild(screenPhoto);
+                            }
+                        }
+
+                        var titles = block.SelectSingleNode(".//h2");
+                        var contents = block.SelectSingleNode(".//div[@class='PortalHelp']");
+
+                        if (titles != null && contents != null)
+                        {
+                            ListItems.Add(new HelpCenterItem
+                            {
+                                Title = titles.InnerText,
+                                Content = contents.InnerHtml
+                            });
+                        }
                     }
-                    ToCache(data);
+                    catch (Exception)
+                    {
+                        //_log.Error(string.Format("Error parse help html in {0} block: {1}. Culture {2}", i, helpLinkBlock, CultureInfo.CurrentCulture.TwoLetterISOLanguageName), e);
+                    }
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                LogManager.GetLogger("ASC.Web.HelpCenter").Error("Error GetHelpCenter", e);
+                //_log.Error(string.Format("Error parse help html: {0}. Culture {1}", helpLinkBlock, CultureInfo.CurrentCulture.TwoLetterISOLanguageName), e);
             }
-            return data ?? new Dictionary<string, HelpCenterData>();
         }
 
-        public static void UpdateHelpCenter(Dictionary<string, HelpCenterData> data)
+        private static string GetBase64(string externalUrl)
         {
+            if ((ConfigurationManagerExtension.AppSettings["web.help-center.internal-uri"] ?? "false") != "true")
+                return externalUrl;
+
             try
             {
-                using (var stream = ToStream(data))
+                var req = (HttpWebRequest)WebRequest.Create(externalUrl);
+                using (var response = req.GetResponse())
+                using (var image = Image.FromStream(response.GetResponseStream()))
+                using (var m = new MemoryStream())
                 {
-                    GetStore().Save(FilePath, stream);
+                    image.Save(m, image.RawFormat);
+                    var imageBytes = m.ToArray();
+
+                    var base64 = Convert.ToBase64String(imageBytes);
+
+                    return "data:image;base64," + base64;
                 }
-                ToCache(data);
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                LogManager.GetLogger("ASC.Web.HelpCenter").Error("Error UpdateHelpCenter", e);
+                //_log.ErrorFormat("GetInternalLink {0}: {1}", externalUrl, e.Message);
             }
-        }
-
-        private static MemoryStream ToStream(object objectType)
-        {
-            var stream = new MemoryStream();
-            IFormatter formatter = new BinaryFormatter();
-            formatter.Serialize(stream, objectType);
-            return stream;
-        }
-
-        private static object FromStream(Stream stream)
-        {
-            return new BinaryFormatter().Deserialize(stream);
-        }
-
-        private static void ToCache(Dictionary<string, HelpCenterData> obj)
-        {
-            Cache.Insert(CacheKey, obj, DateTime.UtcNow.Add(ExpirationTimeout));
-        }
-
-        private static Dictionary<string, HelpCenterData> FromCache()
-        {
-            return Cache.Get<Dictionary<string, HelpCenterData>>(CacheKey);
+            return externalUrl;
         }
     }
 }

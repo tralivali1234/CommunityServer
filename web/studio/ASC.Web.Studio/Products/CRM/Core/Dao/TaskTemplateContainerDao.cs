@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -41,8 +32,8 @@ namespace ASC.CRM.Core.Dao
     {
         #region Constructor
 
-        public CachedTaskTemplateContainerDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public CachedTaskTemplateContainerDao(int tenantID)
+            : base(tenantID)
         {
 
 
@@ -57,8 +48,8 @@ namespace ASC.CRM.Core.Dao
 
         #region Constructor
 
-        public CachedTaskTemplateDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public CachedTaskTemplateDao(int tenantID)
+            : base(tenantID)
         {
 
 
@@ -71,8 +62,8 @@ namespace ASC.CRM.Core.Dao
     {
         #region Constructor
 
-        public TaskTemplateContainerDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public TaskTemplateContainerDao(int tenantID)
+            : base(tenantID)
         {
 
 
@@ -84,41 +75,38 @@ namespace ASC.CRM.Core.Dao
 
         public virtual int SaveOrUpdate(TaskTemplateContainer item)
         {
-            using (var db = GetDb())
+            if (item.ID == 0 && Db.ExecuteScalar<int>(Query("crm_task_template_container").SelectCount().Where(Exp.Eq("id", item.ID))) == 0)
             {
-                if (item.ID == 0 && db.ExecuteScalar<int>(Query("crm_task_template_container").SelectCount().Where(Exp.Eq("id", item.ID))) == 0)
-                {
 
-                    item.ID = db.ExecuteScalar<int>(
-                                        Insert("crm_task_template_container")
-                                       .InColumnValue("id", 0)
-                                       .InColumnValue("title", item.Title)
-                                       .InColumnValue("entity_type", (int)item.EntityType)
-                                       .InColumnValue("create_on", DateTime.UtcNow)
-                                       .InColumnValue("create_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                                       .InColumnValue("last_modifed_on", DateTime.UtcNow)
-                                       .InColumnValue("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                                       .Identity(1, 0, true));
+                item.ID = Db.ExecuteScalar<int>(
+                                    Insert("crm_task_template_container")
+                                    .InColumnValue("id", 0)
+                                    .InColumnValue("title", item.Title)
+                                    .InColumnValue("entity_type", (int)item.EntityType)
+                                    .InColumnValue("create_on", DateTime.UtcNow)
+                                    .InColumnValue("create_by", ASC.Core.SecurityContext.CurrentAccount.ID)
+                                    .InColumnValue("last_modifed_on", DateTime.UtcNow)
+                                    .InColumnValue("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
+                                    .Identity(1, 0, true));
 
-                }
-                else
-                {
-
-                    db.ExecuteScalar<int>(
-                        Update("crm_task_template_container")
-                            .Set("title", item.Title)
-                            .Set("entity_type", (int)item.EntityType)
-                            .Set("last_modifed_on", DateTime.UtcNow)
-                            .Set("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                            .Where(Exp.Eq("id", item.ID)));
-
-
-
-                }
-
-
-                return item.ID;
             }
+            else
+            {
+
+                Db.ExecuteScalar<int>(
+                    Update("crm_task_template_container")
+                        .Set("title", item.Title)
+                        .Set("entity_type", (int)item.EntityType)
+                        .Set("last_modifed_on", DateTime.UtcNow)
+                        .Set("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
+                        .Where(Exp.Eq("id", item.ID)));
+
+
+
+            }
+
+
+            return item.ID;
         }
 
         public virtual void Delete(int id)
@@ -127,10 +115,7 @@ namespace ASC.CRM.Core.Dao
             if (id <= 0)
                 throw new ArgumentException();
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_task_template_container").Where("id", id));
-            }
+            Db.ExecuteNonQuery(Delete("crm_task_template_container").Where("id", id));
         }
 
         public virtual TaskTemplateContainer GetByID(int id)
@@ -139,15 +124,11 @@ namespace ASC.CRM.Core.Dao
             if (id <= 0)
                 throw new ArgumentException();
 
-            using (var db = GetDb())
-            {
-                var result = db.ExecuteList(GetQuery(null).Where(Exp.Eq("id", id))).ConvertAll(row => ToObject(row));
+            var result = Db.ExecuteList(GetQuery(null).Where(Exp.Eq("id", id))).ConvertAll(row => ToObject(row));
 
-                if (result.Count == 0) return null;
+            if (result.Count == 0) return null;
 
-
-                return result[0];
-            }
+            return result[0];
         }
 
         public virtual List<TaskTemplateContainer> GetItems(EntityType entityType)
@@ -155,12 +136,8 @@ namespace ASC.CRM.Core.Dao
             if (!_supportedEntityType.Contains(entityType))
                 throw new ArgumentException("", entityType.ToString());
 
-
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetQuery(Exp.Eq("entity_type", (int)entityType)))
+                return Db.ExecuteList(GetQuery(Exp.Eq("entity_type", (int)entityType)))
                                                   .ConvertAll(row => ToObject(row));
-            }
         }
 
         #endregion
@@ -194,8 +171,8 @@ namespace ASC.CRM.Core.Dao
     {
         #region Constructor
 
-        public TaskTemplateDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public TaskTemplateDao(int tenantID)
+            : base(tenantID)
         {
 
         }
@@ -206,58 +183,54 @@ namespace ASC.CRM.Core.Dao
 
         public int SaveOrUpdate(TaskTemplate item)
         {
-            using (var db = GetDb())
+            if (item.ID == 0 && Db.ExecuteScalar<int>(Query("crm_task_template").SelectCount().Where(Exp.Eq("id", item.ID))) == 0)
             {
-                if (item.ID == 0 && db.ExecuteScalar<int>(Query("crm_task_template").SelectCount().Where(Exp.Eq("id", item.ID))) == 0)
-                {
 
-                    item.ID = db.ExecuteScalar<int>(
-                                        Insert("crm_task_template")
-                                       .InColumnValue("id", 0)
-                                       .InColumnValue("title", item.Title)
-                                       .InColumnValue("category_id", item.CategoryID)
-                                       .InColumnValue("description", item.Description)
-                                       .InColumnValue("responsible_id", item.ResponsibleID)
-                                       .InColumnValue("is_notify", item.isNotify)
-                                       .InColumnValue("offset", item.Offset.Ticks)
-                                       .InColumnValue("deadLine_is_fixed", item.DeadLineIsFixed)
-                                       .InColumnValue("container_id", item.ContainerID)
-                                       .InColumnValue("create_on", DateTime.UtcNow)
-                                       .InColumnValue("create_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                                       .InColumnValue("last_modifed_on", DateTime.UtcNow)
-                                       .InColumnValue("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                                       .Identity(1, 0, true));
+                item.ID = Db.ExecuteScalar<int>(
+                                    Insert("crm_task_template")
+                                    .InColumnValue("id", 0)
+                                    .InColumnValue("title", item.Title)
+                                    .InColumnValue("category_id", item.CategoryID)
+                                    .InColumnValue("description", item.Description)
+                                    .InColumnValue("responsible_id", item.ResponsibleID)
+                                    .InColumnValue("is_notify", item.isNotify)
+                                    .InColumnValue("offset", item.Offset.Ticks)
+                                    .InColumnValue("deadLine_is_fixed", item.DeadLineIsFixed)
+                                    .InColumnValue("container_id", item.ContainerID)
+                                    .InColumnValue("create_on", DateTime.UtcNow)
+                                    .InColumnValue("create_by", ASC.Core.SecurityContext.CurrentAccount.ID)
+                                    .InColumnValue("last_modifed_on", DateTime.UtcNow)
+                                    .InColumnValue("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
+                                    .Identity(1, 0, true));
 
-                }
-                else
-                {
-
-                    db.ExecuteNonQuery(
-                        Update("crm_task_template")
-                           .Set("title", item.Title)
-                           .Set("category_id", item.CategoryID)
-                           .Set("description", item.Description)
-                           .Set("responsible_id", item.ResponsibleID)
-                           .Set("is_notify", item.isNotify)
-                           .Set("offset", item.Offset.Ticks)
-                           .Set("deadLine_is_fixed", item.DeadLineIsFixed)
-                           .Set("container_id", item.ContainerID)
-                           .Set("last_modifed_on", DateTime.UtcNow)
-                           .Set("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                           .Where("id", item.ID));
-
-                }
-
-                return item.ID;
             }
+            else
+            {
+
+                Db.ExecuteNonQuery(
+                    Update("crm_task_template")
+                        .Set("title", item.Title)
+                        .Set("category_id", item.CategoryID)
+                        .Set("description", item.Description)
+                        .Set("responsible_id", item.ResponsibleID)
+                        .Set("is_notify", item.isNotify)
+                        .Set("offset", item.Offset.Ticks)
+                        .Set("deadLine_is_fixed", item.DeadLineIsFixed)
+                        .Set("container_id", item.ContainerID)
+                        .Set("last_modifed_on", DateTime.UtcNow)
+                        .Set("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
+                        .Where("id", item.ID));
+
+            }
+
+            return item.ID;
         }
 
         public TaskTemplate GetNext(int taskID)
         {
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction())
+            using (var tx = Db.BeginTransaction())
             {
-                var sqlResult = db.ExecuteList(
+                var sqlResult = Db.ExecuteList(
                      Query("crm_task_template_task tblTTT")
                      .Select("tblTT.container_id")
                      .Select("tblTT.sort_order")
@@ -266,12 +239,12 @@ namespace ASC.CRM.Core.Dao
 
                 if (sqlResult.Count == 0) return null;
 
-                var result = db.ExecuteList(GetQuery(Exp.Eq("container_id", sqlResult[0][0]) &
+                var result = Db.ExecuteList(GetQuery(Exp.Eq("container_id", sqlResult[0][0]) &
                                                 Exp.Gt("sort_order", sqlResult[0][1]) &
                                                 Exp.Eq("deadLine_is_fixed", false)).SetMaxResults(1)).ConvertAll(
                                                     row => ToObject(row));
 
-                db.ExecuteNonQuery(Delete("crm_task_template_task").Where(Exp.Eq("task_id", taskID)));
+                Db.ExecuteNonQuery(Delete("crm_task_template_task").Where(Exp.Eq("task_id", taskID)));
 
                 tx.Commit();
 
@@ -283,11 +256,8 @@ namespace ASC.CRM.Core.Dao
 
         public List<TaskTemplate> GetAll()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetQuery(null))
-                    .ConvertAll(row => ToObject(row));
-            }
+            return Db.ExecuteList(GetQuery(null))
+                .ConvertAll(row => ToObject(row));
         }
 
         public List<TaskTemplate> GetList(int containerID)
@@ -295,11 +265,8 @@ namespace ASC.CRM.Core.Dao
             if (containerID <= 0)
                 throw new NotImplementedException();
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetQuery(Exp.Eq("container_id", containerID)))
-                               .ConvertAll(row => ToObject(row));
-            }
+            return Db.ExecuteList(GetQuery(Exp.Eq("container_id", containerID)))
+                .ConvertAll(row => ToObject(row));
         }
 
         public virtual TaskTemplate GetByID(int id)
@@ -307,15 +274,12 @@ namespace ASC.CRM.Core.Dao
             if (id <= 0)
                 throw new NotImplementedException();
 
-            using (var db = GetDb())
-            {
-                var items = db.ExecuteList(GetQuery(Exp.Eq("id", id))).ConvertAll(row => ToObject(row));
+            var items = Db.ExecuteList(GetQuery(Exp.Eq("id", id))).ConvertAll(row => ToObject(row));
 
-                if (items.Count == 0)
-                    return null;
+            if (items.Count == 0)
+                return null;
 
-                return items[0];
-            }
+            return items[0];
         }
 
         public virtual void Delete(int id)
@@ -323,10 +287,7 @@ namespace ASC.CRM.Core.Dao
             if (id <= 0)
                 throw new NotImplementedException();
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_task_template").Where("id", id));
-            }
+            Db.ExecuteNonQuery(Delete("crm_task_template").Where("id", id));
         }
 
         protected TaskTemplate ToObject(object[] row)

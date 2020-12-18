@@ -1,25 +1,16 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -36,14 +27,13 @@ window.administrationManager = (function($) {
         if (isInit === false) {
             isInit = true;
 
-            serviceManager.bind(window.Teamlab.events.getMailServerFreeDns, onGetMailServerFreeDns);
-            serviceManager.bind(window.Teamlab.events.addMailDomain, onAddMailDomain);
-            serviceManager.bind(window.Teamlab.events.getMailServerFullInfo, onGetMailServerFullInfo);
-            serviceManager.bind(window.Teamlab.events.addMailbox, onAddMailbox);
-            serviceManager.bind(window.Teamlab.events.removeMailbox, onRemoveMailbox);
-            serviceManager.bind(window.Teamlab.events.addMailGroup, onAddMailGroup);
-            serviceManager.bind(window.Teamlab.events.removeMailGroup, onRemoveMailGroup);
-            serviceManager.bind(window.Teamlab.events.removeMailDomain, onRemoveMailDomain);
+            window.Teamlab.bind(window.Teamlab.events.getMailServerFreeDns, onGetMailServerFreeDns);
+            window.Teamlab.bind(window.Teamlab.events.addMailDomain, onAddMailDomain);
+            window.Teamlab.bind(window.Teamlab.events.getMailServerFullInfo, onGetMailServerFullInfo);
+            window.Teamlab.bind(window.Teamlab.events.addMailbox, onAddMailbox);
+            window.Teamlab.bind(window.Teamlab.events.addMailGroup, onAddMailGroup);
+            window.Teamlab.bind(window.Teamlab.events.removeMailGroup, onRemoveMailGroup);
+            window.Teamlab.bind(window.Teamlab.events.removeMailDomain, onRemoveMailDomain);
             editMailboxModal.events.bind('onupdatemailbox', onUpdateMailbox);
             editMailGroupModal.events.bind('onupdategroup', onUpdateMailgroup);
 
@@ -52,7 +42,6 @@ window.administrationManager = (function($) {
     };
 
     function onGetMailServerFullInfo(params, serverFullInfo) {
-        messagePage.hide();
         mailBox.hidePages();
         mailBox.hideContentDivs();
         mailBox.hideLoadingMask();
@@ -113,6 +102,17 @@ window.administrationManager = (function($) {
         events.trigger('onadddomain', serverDomain);
     }
 
+    function removeDomain(id) {
+        for (var i = 0; i < domains.length; i++) {
+            if (domains[i].id == id) {
+                var domain = domains[i];
+                domains.splice(i, 1);
+                events.trigger('onremovedomain', domain);
+                break;
+            }
+        }
+    }
+
     function onAddMailbox(params, serverMailbox) {
         var mailbox = convertServerMailbox(serverMailbox);
         mailboxes.push(mailbox);
@@ -122,7 +122,7 @@ window.administrationManager = (function($) {
         events.trigger('onaddmailbox', mailbox);
     }
 
-    function onRemoveMailbox(params, id) {
+    function removeMailbox(id) {
         for (var i = 0; i < mailboxes.length; i++) {
             if (mailboxes[i].id == id) {
                 var mailbox = mailboxes[i];
@@ -390,6 +390,9 @@ window.administrationManager = (function($) {
         getDomain: getDomain,
         getServerInfo: getServerInfo,
         getMailgroupsByDomain: getMailgroupsByDomain,
+
+        removeMailbox: removeMailbox,
+        removeDomain: removeDomain,
 
         events: events
     };

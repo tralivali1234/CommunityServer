@@ -1,33 +1,24 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System.Globalization;
 using ASC.Common.Caching;
 using ASC.Common.Security.Authentication;
 using ASC.Common.Threading.Progress;
-using ASC.Common.Web;
 using ASC.Core;
 using ASC.Core.Users;
 using ASC.CRM.Core;
@@ -40,17 +31,17 @@ using ASC.Web.CRM.Services.NotifyService;
 using ASC.Web.Files.Utils;
 using ASC.Web.Studio.Utility;
 using Ionic.Zip;
-using log4net;
 using Newtonsoft.Json.Linq;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Data;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Web;
+using ASC.Common.Logging;
+using ASC.Web.CRM.Core;
+using Autofac;
 
 namespace ASC.Web.CRM.Classes
 {
@@ -58,46 +49,42 @@ namespace ASC.Web.CRM.Classes
     {
         public static readonly ICache Cache = AscCache.Default;
 
-        public static String GetStateCacheKey()
+        public static String GetStateCacheKey(string key)
         {
-            return String.Format("{0}:crm:queue:exporttocsv", TenantProvider.CurrentTenantID.ToString());
+            return String.Format("{0}:crm:queue:exporttocsv", key);
         }
 
-        public static String GetCancelCacheKey()
+        public static String GetCancelCacheKey(string key)
         {
-            return String.Format("{0}:crm:queue:exporttocsv:cancel", TenantProvider.CurrentTenantID.ToString());
+            return String.Format("{0}:crm:queue:exporttocsv:cancel", key);
         }
 
-        public static ExportDataOperation Get()
+        public static ExportDataOperation Get(string key)
         {
-            return Cache.Get<ExportDataOperation>(GetStateCacheKey());
+            return Cache.Get<ExportDataOperation>(GetStateCacheKey(key));
         }
 
-        public static void Insert(ExportDataOperation data)
+        public static void Insert(string key, ExportDataOperation data)
         {
-            Cache.Insert(GetStateCacheKey(), data, TimeSpan.FromMinutes(1));
+            Cache.Insert(GetStateCacheKey(key), data, TimeSpan.FromMinutes(1));
         }
 
-        public static bool CheckCancelFlag()
+        public static bool CheckCancelFlag(string key)
         {
-            var fromCache = Cache.Get<String>(GetCancelCacheKey());
+            var fromCache = Cache.Get<String>(GetCancelCacheKey(key));
 
-            if (!String.IsNullOrEmpty(fromCache))
-                return true;
-
-            return false;
-
+            return !String.IsNullOrEmpty(fromCache);
         }
 
-        public static void SetCancelFlag()
+        public static void SetCancelFlag(string key)
         {
-            Cache.Insert(GetCancelCacheKey(), true, TimeSpan.FromMinutes(1));
+            Cache.Insert(GetCancelCacheKey(key), "true", TimeSpan.FromMinutes(1));
         }
 
-        public static void ResetAll()
+        public static void ResetAll(string key)
         {
-            Cache.Remove(GetStateCacheKey());
-            Cache.Remove(GetCancelCacheKey());
+            Cache.Remove(GetStateCacheKey(key));
+            Cache.Remove(GetCancelCacheKey(key));
         }
     }
 
@@ -105,20 +92,26 @@ namespace ASC.Web.CRM.Classes
     {
         #region Constructor
 
-        public ExportDataOperation(ICollection externalData)
+        public ExportDataOperation(FilterObject filterObject, string fileName)
         {
+            _tenantId = TenantProvider.CurrentTenantID;
             _author = SecurityContext.CurrentAccount;
             _dataStore = Global.GetStore();
-            _tenantID = TenantProvider.CurrentTenantID;
-            _daoFactory = Global.DaoFactory;
             _notifyClient = NotifyClient.Instance;
+            _filterObject = filterObject;
             _log = LogManager.GetLogger("ASC.CRM");
-            Id = TenantProvider.CurrentTenantID;
-            _externalData = externalData;
+
+            Id = ExportToCsv.GetKey(filterObject != null);
+            Status = ProgressStatus.Queued;
+            Error = null;
+            Percentage = 0;
+            IsCompleted = false;
+            FileName = fileName ?? string.Format("{0}_{1}.{2}", CRMSettingResource.Export, DateTime.UtcNow.Ticks, filterObject == null ? "zip" : "csv");
+            FileUrl = null;
         }
 
         public ExportDataOperation()
-            : this(null)
+            : this(null, null)
         {
         }
 
@@ -126,47 +119,49 @@ namespace ASC.Web.CRM.Classes
 
         #region Members
 
-        private readonly ILog _log;
-
-        private readonly IDataStore _dataStore;
+        private readonly int _tenantId;
 
         private readonly IAccount _author;
 
-        private readonly int _tenantID;
-
-        private readonly DaoFactory _daoFactory;
+        private readonly IDataStore _dataStore;
 
         private readonly NotifyClient _notifyClient;
 
-        private readonly ICollection _externalData;
+        private readonly FilterObject _filterObject;
 
-        private double _totalCount;
+        private readonly ILog _log;
+
+        private int _totalCount;
 
         #endregion
 
         public override bool Equals(object obj)
         {
             if (obj == null) return false;
-            if (!(obj is ExportDataOperation)) return false;
-            if (_tenantID == ((ExportDataOperation)obj)._tenantID) return true;
 
-            return base.Equals(obj);
+            var exportDataOperation = obj as ExportDataOperation;
+
+            if (exportDataOperation == null) return false;
+
+            return Id == exportDataOperation.Id;
         }
 
         public override int GetHashCode()
         {
-            return _tenantID.GetHashCode();
+            return Id.GetHashCode();
         }
 
         public object Clone()
         {
             var cloneObj = new ExportDataOperation
                 {
-                    Error = Error,
                     Id = Id,
-                    IsCompleted = IsCompleted,
+                    Status = Status,
+                    Error = Error,
                     Percentage = Percentage,
-                    Status = Status
+                    IsCompleted = IsCompleted,
+                    FileName = FileName,
+                    FileUrl = FileUrl
                 };
 
             return cloneObj;
@@ -184,16 +179,20 @@ namespace ASC.Web.CRM.Classes
 
         public bool IsCompleted { get; set; }
 
+        public string FileName { get; set; }
+
+        public string FileUrl { get; set; }
+
         #endregion
 
         #region Private Methods
 
         private static String WrapDoubleQuote(String value)
         {
-            return "\"" + value.Trim().Replace("\"", "\"\"").Replace(Environment.NewLine, "") + "\"";
+            return "\"" + value.Trim().Replace("\"", "\"\"") + "\"";
         }
 
-        private static String DataTableToCSV(DataTable dataTable)
+        private static String DataTableToCsv(DataTable dataTable)
         {
             var result = new StringBuilder();
 
@@ -231,76 +230,74 @@ namespace ASC.Web.CRM.Classes
 
         public void RunJob()
         {
-            CoreContext.TenantManager.SetCurrentTenant(_tenantID);
-
-            SecurityContext.AuthenticateMe(_author);
-
-            var userCulture = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).GetCulture();
-
-            System.Threading.Thread.CurrentThread.CurrentCulture = userCulture;
-            System.Threading.Thread.CurrentThread.CurrentUICulture = userCulture;
-
-
-            _log.Debug("Start Export Data");
-
-            ExportDataCache.Insert((ExportDataOperation)Clone());
-
-            //Fake http context allows fearlessly use shared DbManager.
-            bool fakeContext = HttpContext.Current == null;
-
             try
             {
-                if (fakeContext)
+                Status = ProgressStatus.Started;
+                
+                CoreContext.TenantManager.SetCurrentTenant(_tenantId);
+                SecurityContext.AuthenticateMe(_author);
+
+                using (var scope = DIHelper.Resolve())
                 {
-                    HttpContext.Current = new HttpContext(
-                        new HttpRequest("fake", CommonLinkUtility.GetFullAbsolutePath(PathProvider.BaseAbsolutePath), string.Empty),
-                        new HttpResponse(new StringWriter()));
+                    var daoFactory = scope.Resolve<DaoFactory>();
+                    var userCulture = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).GetCulture();
+
+                    System.Threading.Thread.CurrentThread.CurrentCulture = userCulture;
+                    System.Threading.Thread.CurrentThread.CurrentUICulture = userCulture;
+
+                    _log.Debug("Start Export Data");
+
+                    ExportDataCache.Insert((string) Id, (ExportDataOperation) Clone());
+
+                    if (_filterObject == null)
+                        ExportAllData(daoFactory);
+                    else
+                        ExportPartData(daoFactory);
                 }
 
-                if (_externalData == null)
-                    ExportAllData();
-                else
-                    ExportPartData();
+                Complete(100, ProgressStatus.Done, null);
 
+                _log.Debug("Export is completed");
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ocex)
             {
+                Complete(0, ProgressStatus.Failed, ocex.Message);
+
                 _log.Debug("Export is cancel");
+            }
+            catch (Exception ex)
+            {
+                Complete(0, ProgressStatus.Failed, ex.Message);
+
+                _log.Error(ex);
             }
             finally
             {
-                System.Threading.Thread.Sleep(10000);
-                ExportDataCache.ResetAll();
-                if (fakeContext && HttpContext.Current != null)
-                {
-                    new DisposableHttpContext(HttpContext.Current).Dispose();
-                    HttpContext.Current = null;
-                }
+                ExportDataCache.ResetAll((string) Id);
             }
         }
 
-        private void Complete()
+        private void Complete(double percentage, ProgressStatus status, object error)
         {
             IsCompleted = true;
+            Percentage = percentage;
+            Status = status;
+            Error = error;
 
-            Percentage = 100;
-
-            _log.Debug("Export is completed");
-
-            ExportDataCache.Insert((ExportDataOperation)Clone());
+            ExportDataCache.Insert((string) Id, (ExportDataOperation)Clone());
         }
 
-        private void ExportAllData()
+        private void ExportAllData(DaoFactory daoFactory)
         {
             using (var stream = TempStream.Create())
             {
-                var contactDao = _daoFactory.GetContactDao();
-                var contactInfoDao = _daoFactory.GetContactInfoDao();
-                var dealDao = _daoFactory.GetDealDao();
-                var casesDao = _daoFactory.GetCasesDao();
-                var taskDao = _daoFactory.GetTaskDao();
-                var historyDao = _daoFactory.GetRelationshipEventDao();
-                var invoiceItemDao = _daoFactory.GetInvoiceItemDao();
+                var contactDao = daoFactory.ContactDao;
+                var contactInfoDao = daoFactory.ContactInfoDao;
+                var dealDao = daoFactory.DealDao;
+                var casesDao = daoFactory.CasesDao;
+                var taskDao = daoFactory.TaskDao;
+                var historyDao = daoFactory.RelationshipEventDao;
+                var invoiceItemDao = daoFactory.InvoiceItemDao;
 
                 _totalCount += contactDao.GetAllContactsCount();
                 _totalCount += dealDao.GetDealsCount();
@@ -311,7 +308,10 @@ namespace ASC.Web.CRM.Classes
 
                 using (var zipStream = new ZipOutputStream(stream, true))
                 {
-                    zipStream.PutNextEntry("contacts.csv");
+                    zipStream.AlternateEncoding = Encoding.UTF8;
+                    zipStream.AlternateEncodingUsage = ZipOption.Always;
+
+                    zipStream.PutNextEntry(CRMContactResource.Contacts + ".csv");
                     var contactData = contactDao.GetAllContacts();
                     var contactInfos = new StringDictionary();
                     contactInfoDao.GetAll()
@@ -328,33 +328,45 @@ namespace ASC.Web.CRM.Classes
                                                    }
                                                });
 
-                    var zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportContactsToCSV(contactData, contactInfos)));
-                    zipEntryData.StreamCopyTo(zipStream);
+                    using (var zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportContactsToCsv(contactData, contactInfos, daoFactory))))
+                    {
+                        zipEntryData.StreamCopyTo(zipStream);
+                    }
 
-                    zipStream.PutNextEntry("oppotunities.csv");
+                    zipStream.PutNextEntry(CRMCommonResource.DealModuleName + ".csv");
                     var dealData = dealDao.GetAllDeals();
-                    zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportDealsToCSV(dealData)));
-                    zipEntryData.StreamCopyTo(zipStream);
+                    using (var zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportDealsToCsv(dealData, daoFactory))))
+                    {
+                        zipEntryData.StreamCopyTo(zipStream);
+                    }
 
-                    zipStream.PutNextEntry("cases.csv");
+                    zipStream.PutNextEntry(CRMCommonResource.CasesModuleName + ".csv");
                     var casesData = casesDao.GetAllCases();
-                    zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportCasesToCSV(casesData)));
-                    zipEntryData.StreamCopyTo(zipStream);
+                    using (var zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportCasesToCsv(casesData, daoFactory))))
+                    {
+                        zipEntryData.StreamCopyTo(zipStream);
+                    }
 
-                    zipStream.PutNextEntry("tasks.csv");
+                    zipStream.PutNextEntry(CRMCommonResource.TaskModuleName + ".csv");
                     var taskData = taskDao.GetAllTasks();
-                    zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportTasksToCSV(taskData)));
-                    zipEntryData.StreamCopyTo(zipStream);
+                    using (var zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportTasksToCsv(taskData, daoFactory))))
+                    {
+                        zipEntryData.StreamCopyTo(zipStream);
+                    }
 
-                    zipStream.PutNextEntry("history.csv");
+                    zipStream.PutNextEntry(CRMCommonResource.History + ".csv");
                     var historyData = historyDao.GetAllItems();
-                    zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportHistoryToCSV(historyData)));
-                    zipEntryData.StreamCopyTo(zipStream);
+                    using (var zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportHistoryToCsv(historyData, daoFactory))))
+                    {
+                        zipEntryData.StreamCopyTo(zipStream);
+                    }
 
-                    zipStream.PutNextEntry("products_services.csv");
+                    zipStream.PutNextEntry(CRMCommonResource.ProductsAndServices + ".csv");
                     var invoiceItemData = invoiceItemDao.GetAll();
-                    zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportInvoiceItemsToCSV(invoiceItemData)));
-                    zipEntryData.StreamCopyTo(zipStream);
+                    using (var zipEntryData = new MemoryStream(Encoding.UTF8.GetBytes(ExportInvoiceItemsToCsv(invoiceItemData, daoFactory))))
+                    {
+                        zipEntryData.StreamCopyTo(zipStream);
+                    }
 
                     zipStream.Flush();
                     zipStream.Close();
@@ -362,65 +374,84 @@ namespace ASC.Web.CRM.Classes
                     stream.Position = 0;
                 }
 
-                var assignedURI = _dataStore.SavePrivate(String.Empty, "exportdata.zip", stream, DateTime.Now.AddDays(1));
-                Status = assignedURI;
-                _notifyClient.SendAboutExportCompleted(_author.ID, assignedURI);
-                Complete();
+                if (_dataStore.IsDirectory("temp", "export"))
+                {
+                    _dataStore.DeleteFiles("temp", "export", "*.*", true);
+                }
+
+                FileUrl = CommonLinkUtility.GetFullAbsolutePath(_dataStore.SavePrivate("temp", Path.Combine("export", FileName), stream, DateTime.Now.AddDays(1)));
+
+                _notifyClient.SendAboutExportCompleted(_author.ID, FileName, FileUrl);
             }
         }
 
-        private void ExportPartData()
+        private void ExportPartData(DaoFactory daoFactory)
         {
-            _totalCount = _externalData.Count;
+            var items = _filterObject.GetItemsByFilter(daoFactory);
+
+            string fileContent;
+
+            _totalCount = items.Count;
 
             if (_totalCount == 0)
                 throw new ArgumentException(CRMErrorsResource.ExportToCSVDataEmpty);
 
-            if (_externalData is List<Contact>)
+            if (items is List<Contact>)
             {
-                var contactInfoDao = _daoFactory.GetContactInfoDao();
+                var contactInfoDao = daoFactory.ContactInfoDao;
 
-                var contacts = (List<Contact>)_externalData;
+                var contacts = (List<Contact>) items;
 
                 var contactInfos = new StringDictionary();
 
                 contactInfoDao.GetAll(contacts.Select(item => item.ID).ToArray())
                               .ForEach(item =>
-                                           {
-                                               var contactInfoKey = String.Format("{0}_{1}_{2}", item.ContactID,
-                                                                                  (int)item.InfoType,
-                                                                                  item.Category);
+                                  {
+                                      var contactInfoKey = String.Format("{0}_{1}_{2}", item.ContactID,
+                                                                         (int) item.InfoType,
+                                                                         item.Category);
 
-                                               if (contactInfos.ContainsKey(contactInfoKey))
-                                                   contactInfos[contactInfoKey] += "," + item.Data;
-                                               else
-                                                   contactInfos.Add(contactInfoKey, item.Data);
-                                           });
+                                      if (contactInfos.ContainsKey(contactInfoKey))
+                                          contactInfos[contactInfoKey] += "," + item.Data;
+                                      else
+                                          contactInfos.Add(contactInfoKey, item.Data);
+                                  });
 
-                Status = ExportContactsToCSV(contacts, contactInfos);
+                fileContent = ExportContactsToCsv(contacts, contactInfos, daoFactory);
             }
-            else if (_externalData is List<Deal>)
-                Status = ExportDealsToCSV((List<Deal>)_externalData);
-            else if (_externalData is List<ASC.CRM.Core.Entities.Cases>)
-                Status = ExportCasesToCSV((List<ASC.CRM.Core.Entities.Cases>)_externalData);
-            else if (_externalData is List<RelationshipEvent>)
-                Status = ExportHistoryToCSV((List<RelationshipEvent>)_externalData);
-            else if (_externalData is List<Task>)
-                Status = ExportTasksToCSV((List<Task>)_externalData);
-            else if (_externalData is List<InvoiceItem>)
-                Status = ExportInvoiceItemsToCSV((List<InvoiceItem>)_externalData);
+            else if (items is List<Deal>)
+            {
+                fileContent = ExportDealsToCsv((List<Deal>) items, daoFactory);
+            }
+            else if (items is List<ASC.CRM.Core.Entities.Cases>)
+            {
+                fileContent = ExportCasesToCsv((List<ASC.CRM.Core.Entities.Cases>) items, daoFactory);
+            }
+            else if (items is List<RelationshipEvent>)
+            {
+                fileContent = ExportHistoryToCsv((List<RelationshipEvent>) items, daoFactory);
+            }
+            else if (items is List<Task>)
+            {
+                fileContent = ExportTasksToCsv((List<Task>) items, daoFactory);
+            }
+            else if (items is List<InvoiceItem>)
+            {
+                fileContent = ExportInvoiceItemsToCsv((List<InvoiceItem>) items, daoFactory);
+            }
             else
                 throw new ArgumentException();
 
-            Complete();
+            FileUrl = SaveCsvFileInMyDocument(FileName, fileContent);
         }
 
-        private String ExportContactsToCSV(IEnumerable<Contact> contacts, StringDictionary contactInfos)
+        private String ExportContactsToCsv(IReadOnlyCollection<Contact> contacts, StringDictionary contactInfos, DaoFactory daoFactory)
         {
-            var listItemDao = _daoFactory.GetListItemDao();
-            var tagDao = _daoFactory.GetTagDao();
-            var customFieldDao = _daoFactory.GetCustomFieldDao();
-            var contactDao = _daoFactory.GetContactDao();
+            var key = (string) Id;
+            var listItemDao = daoFactory.ListItemDao;
+            var tagDao = daoFactory.TagDao;
+            var customFieldDao = daoFactory.CustomFieldDao;
+            var contactDao = daoFactory.ContactDao;
 
             var dataTable = new DataTable();
 
@@ -543,14 +574,14 @@ namespace ASC.Web.CRM.Classes
 
             foreach (var contact in contacts)
             {
-                if (ExportDataCache.CheckCancelFlag())
+                if (ExportDataCache.CheckCancelFlag(key))
                 {
-                    ExportDataCache.ResetAll();
+                    ExportDataCache.ResetAll(key);
 
                     throw new OperationCanceledException();                   
                 }
 
-                ExportDataCache.Insert((ExportDataOperation)Clone());
+                ExportDataCache.Insert(key, (ExportDataOperation) Clone());
 
                 Percentage += 1.0 * 100 / _totalCount;
                 
@@ -561,7 +592,7 @@ namespace ASC.Web.CRM.Classes
                 var contactTags = String.Empty;
 
                 if (tags.ContainsKey(contact.ID))
-                    contactTags = String.Join(",", tags[contact.ID].ToArray());
+                    contactTags = String.Join(",", tags[contact.ID].OrderBy(x => x));
 
                 String firstName;
                 String lastName;
@@ -588,10 +619,8 @@ namespace ASC.Web.CRM.Classes
 
                     if (people.CompanyID > 0)
                     {
-                        var personCompany = contacts.SingleOrDefault(item => item.ID == people.CompanyID);
-
-                        if (personCompany == null)
-                            personCompany = contactDao.GetByID(people.CompanyID);
+                        var personCompany = contacts.SingleOrDefault(item => item.ID == people.CompanyID) ??
+                                            contactDao.GetByID(people.CompanyID);
 
                         if (personCompany != null)
                             companyName = personCompany.GetTitle();
@@ -671,15 +700,16 @@ namespace ASC.Web.CRM.Classes
                     customFieldEntity[contact.ID].ForEach(item => dataRow["customField_" + item.ID] = item.Value);
             }
 
-            return DataTableToCSV(dataTable);
+            return DataTableToCsv(dataTable);
         }
 
-        private String ExportDealsToCSV(IEnumerable<Deal> deals)
+        private String ExportDealsToCsv(IEnumerable<Deal> deals, DaoFactory daoFactory)
         {
-            var tagDao = _daoFactory.GetTagDao();
-            var customFieldDao = _daoFactory.GetCustomFieldDao();
-            var dealMilestoneDao = _daoFactory.GetDealMilestoneDao();
-            var contactDao = _daoFactory.GetContactDao();
+            var key = (string) Id;
+            var tagDao = daoFactory.TagDao;
+            var customFieldDao = daoFactory.CustomFieldDao;
+            var dealMilestoneDao = daoFactory.DealMilestoneDao;
+            var contactDao = daoFactory.ContactDao;
 
             var dataTable = new DataTable();
 
@@ -784,21 +814,21 @@ namespace ASC.Web.CRM.Classes
 
             foreach (var deal in deals)
             {
-                if (ExportDataCache.CheckCancelFlag())
+                if (ExportDataCache.CheckCancelFlag(key))
                 {
-                    ExportDataCache.ResetAll();
+                    ExportDataCache.ResetAll(key);
 
                     throw new OperationCanceledException();
                 }
 
-                ExportDataCache.Insert((ExportDataOperation)Clone());
+                ExportDataCache.Insert(key, (ExportDataOperation) Clone());
 
                 Percentage += 1.0 * 100 / _totalCount;
 
                 var contactTags = String.Empty;
 
                 if (tags.ContainsKey(deal.ID))
-                    contactTags = String.Join(",", tags[deal.ID].ToArray());
+                    contactTags = String.Join(",", tags[deal.ID].OrderBy(x => x));
 
                 String bidType;
 
@@ -833,21 +863,21 @@ namespace ASC.Web.CRM.Classes
                 if (deal.ContactID != 0)
                     contactTitle = contactDao.GetByID(deal.ContactID).GetTitle();
 
-                var dataRow = dataTable.Rows.Add(new[]
+                var dataRow = dataTable.Rows.Add(new object[]
                     {
                         deal.Title,
                         contactTitle,
                         deal.Description,
                         deal.BidCurrency,
-                        deal.BidValue.ToString(),
+                        deal.BidValue.ToString(CultureInfo.InvariantCulture),
                         bidType,
-                        deal.PerPeriodValue == 0 ? "" : deal.PerPeriodValue.ToString(),
+                        deal.PerPeriodValue == 0 ? "" : deal.PerPeriodValue.ToString(CultureInfo.InvariantCulture),
                         deal.ExpectedCloseDate.Date == DateTime.MinValue.Date ? "" : deal.ExpectedCloseDate.ToString(DateTimeExtension.DateFormatPattern),
                         deal.ActualCloseDate.Date == DateTime.MinValue.Date ? "" : deal.ActualCloseDate.ToString(DateTimeExtension.DateFormatPattern),
                         CoreContext.UserManager.GetUsers(deal.ResponsibleID).DisplayUserName(false),
                         currentDealMilestone.Title,
                         currentDealMilestoneStatus,
-                        deal.DealMilestoneProbability.ToString(),
+                        deal.DealMilestoneProbability.ToString(CultureInfo.InvariantCulture),
                         contactTags
                     });
 
@@ -855,13 +885,14 @@ namespace ASC.Web.CRM.Classes
                     customFieldEntity[deal.ID].ForEach(item => dataRow["customField_" + item.ID] = item.Value);
             }
 
-            return DataTableToCSV(dataTable);
+            return DataTableToCsv(dataTable);
         }
 
-        private String ExportCasesToCSV(IEnumerable<ASC.CRM.Core.Entities.Cases> cases)
+        private String ExportCasesToCsv(IEnumerable<ASC.CRM.Core.Entities.Cases> cases, DaoFactory daoFactory)
         {
-            var tagDao = _daoFactory.GetTagDao();
-            var customFieldDao = _daoFactory.GetCustomFieldDao();
+            var key = (string) Id;
+            var tagDao = daoFactory.TagDao;
+            var customFieldDao = daoFactory.CustomFieldDao;
 
             var dataTable = new DataTable();
 
@@ -906,23 +937,23 @@ namespace ASC.Web.CRM.Classes
 
             foreach (var item in cases)
             {
-                if (ExportDataCache.CheckCancelFlag())
+                if (ExportDataCache.CheckCancelFlag(key))
                 {
-                    ExportDataCache.ResetAll();
+                    ExportDataCache.ResetAll(key);
 
                     throw new OperationCanceledException();
                 }
 
-                ExportDataCache.Insert((ExportDataOperation)Clone());
+                ExportDataCache.Insert(key, (ExportDataOperation) Clone());
 
                 Percentage += 1.0 * 100 / _totalCount;
 
                 var contactTags = String.Empty;
 
                 if (tags.ContainsKey(item.ID))
-                    contactTags = String.Join(",", tags[item.ID].ToArray());
+                    contactTags = String.Join(",", tags[item.ID].OrderBy(x => x));
 
-                var dataRow = dataTable.Rows.Add(new[]
+                var dataRow = dataTable.Rows.Add(new object[]
                     {
                         item.Title,
                         contactTags
@@ -932,15 +963,16 @@ namespace ASC.Web.CRM.Classes
                     customFieldEntity[item.ID].ForEach(row => dataRow["customField_" + row.ID] = row.Value);
             }
 
-            return DataTableToCSV(dataTable);
+            return DataTableToCsv(dataTable);
         }
 
-        private String ExportHistoryToCSV(IEnumerable<RelationshipEvent> events)
+        private String ExportHistoryToCsv(IEnumerable<RelationshipEvent> events, DaoFactory daoFactory)
         {
-            var listItemDao = _daoFactory.GetListItemDao();
-            var dealDao = _daoFactory.GetDealDao();
-            var casesDao = _daoFactory.GetCasesDao();
-            var contactDao = _daoFactory.GetContactDao();
+            var key = (string) Id;
+            var listItemDao = daoFactory.ListItemDao;
+            var dealDao = daoFactory.DealDao;
+            var casesDao = daoFactory.CasesDao;
+            var contactDao = daoFactory.ContactDao;
 
             var dataTable = new DataTable();
 
@@ -980,14 +1012,14 @@ namespace ASC.Web.CRM.Classes
 
             foreach (var item in events)
             {
-                if (ExportDataCache.CheckCancelFlag())
+                if (ExportDataCache.CheckCancelFlag(key))
                 {
-                    ExportDataCache.ResetAll();
+                    ExportDataCache.ResetAll(key);
 
                     throw new OperationCanceledException();
                 }
 
-                ExportDataCache.Insert((ExportDataOperation)Clone());
+                ExportDataCache.Insert(key, (ExportDataOperation) Clone());
 
                 Percentage += 1.0 * 100 / _totalCount;
 
@@ -1039,26 +1071,27 @@ namespace ASC.Web.CRM.Classes
                 else if (item.CategoryID == (int)HistoryCategorySystem.MailMessage)
                     categoryTitle = HistoryCategorySystem.MailMessage.ToLocalizedString();
 
-                dataTable.Rows.Add(new[]
+                dataTable.Rows.Add(new object[]
                     {
                         item.Content,
                         categoryTitle,
                         contactTitle,
                         entityTitle,
                         CoreContext.UserManager.GetUsers(item.CreateBy).DisplayUserName(false),
-                        item.CreateOn.ToString(DateTimeExtension.DateFormatPattern)
+                        item.CreateOn.ToShortString()
                     });
             }
 
-            return DataTableToCSV(dataTable);
+            return DataTableToCsv(dataTable);
         }
 
-        private String ExportTasksToCSV(IEnumerable<Task> tasks)
+        private String ExportTasksToCsv(IEnumerable<Task> tasks, DaoFactory daoFactory)
         {
-            var listItemDao = _daoFactory.GetListItemDao();
-            var dealDao = _daoFactory.GetDealDao();
-            var casesDao = _daoFactory.GetCasesDao();
-            var contactDao = _daoFactory.GetContactDao();
+            var key = (string) Id;
+            var listItemDao = daoFactory.ListItemDao;
+            var dealDao = daoFactory.DealDao;
+            var casesDao = daoFactory.CasesDao;
+            var contactDao = daoFactory.ContactDao;
 
             var dataTable = new DataTable();
 
@@ -1113,14 +1146,14 @@ namespace ASC.Web.CRM.Classes
 
             foreach (var item in tasks)
             {
-                if (ExportDataCache.CheckCancelFlag())
+                if (ExportDataCache.CheckCancelFlag(key))
                 {
-                    ExportDataCache.ResetAll();
+                    ExportDataCache.ResetAll(key);
 
                     throw new OperationCanceledException();
                 }
 
-                ExportDataCache.Insert((ExportDataOperation)Clone());
+                ExportDataCache.Insert(key, (ExportDataOperation) Clone());
 
                 Percentage += 1.0 * 100 / _totalCount;
 
@@ -1153,7 +1186,7 @@ namespace ASC.Web.CRM.Classes
                         contactTitle = contact.GetTitle();
                 }
 
-                dataTable.Rows.Add(new[]
+                dataTable.Rows.Add(new object[]
                     {
                         item.Title,
                         item.Description,
@@ -1167,16 +1200,17 @@ namespace ASC.Web.CRM.Classes
                             : CRMTaskResource.TaskStatus_Open,
                         listItemDao.GetByID(item.CategoryID).Title,
                         entityTitle,
-                        item.AlertValue.ToString()
+                        item.AlertValue.ToString(CultureInfo.InvariantCulture)
                     });
             }
 
-            return DataTableToCSV(dataTable);
+            return DataTableToCsv(dataTable);
         }
 
-        private String ExportInvoiceItemsToCSV(IEnumerable<InvoiceItem> invoiceItems)
+        private String ExportInvoiceItemsToCsv(IEnumerable<InvoiceItem> invoiceItems, DaoFactory daoFactory)
         {
-            var taxes = _daoFactory.GetInvoiceTaxDao().GetAll();
+            var key = (string) Id;
+            var taxes = daoFactory.InvoiceTaxDao.GetAll();
             var dataTable = new DataTable();
 
             dataTable.Columns.AddRange(new[]
@@ -1200,11 +1234,6 @@ namespace ASC.Web.CRM.Classes
                         {
                             Caption = (CRMInvoiceResource.InvoiceItemPrice),
                             ColumnName = "price"
-                        },
-                    new DataColumn
-                        {
-                            Caption = (CRMInvoiceResource.FormInvoiceItemQuantity),
-                            ColumnName = "quantity"
                         },
                     new DataColumn
                         {
@@ -1248,72 +1277,94 @@ namespace ASC.Web.CRM.Classes
 
             foreach (var item in invoiceItems)
             {
-                if (ExportDataCache.CheckCancelFlag())
+                if (ExportDataCache.CheckCancelFlag(key))
                 {
-                    ExportDataCache.ResetAll();
+                    ExportDataCache.ResetAll(key);
 
                     throw new OperationCanceledException();
                 }
 
-                ExportDataCache.Insert((ExportDataOperation)Clone());
+                ExportDataCache.Insert(key, (ExportDataOperation) Clone());
 
                 Percentage += 1.0 * 100 / _totalCount;
 
                 var tax1 = item.InvoiceTax1ID != 0 ? taxes.Find(t => t.ID == item.InvoiceTax1ID) : null;
                 var tax2 = item.InvoiceTax2ID != 0 ? taxes.Find(t => t.ID == item.InvoiceTax2ID) : null;
 
-                dataTable.Rows.Add(new[]
+                dataTable.Rows.Add(new object[]
                     {
                         item.Title,
                         item.Description,
                         item.StockKeepingUnit,
-                        item.Price.ToString(),
-                        item.Quantity.ToString(),
-                        item.StockQuantity.ToString(),
+                        item.Price.ToString(CultureInfo.InvariantCulture),
+                        item.StockQuantity.ToString(CultureInfo.InvariantCulture),
                         item.TrackInventory.ToString(),
                         item.Currency,
                         tax1 != null ? tax1.Name : "",
-                        tax1 != null ? tax1.Rate.ToString() : "",
+                        tax1 != null ? tax1.Rate.ToString(CultureInfo.InvariantCulture) : "",
                         tax2 != null ? tax2.Name : "",
-                        tax2 != null ? tax2.Rate.ToString() : ""
+                        tax2 != null ? tax2.Rate.ToString(CultureInfo.InvariantCulture) : ""
                     });
             }
 
-            return DataTableToCSV(dataTable);
+            return DataTableToCsv(dataTable);
+        }
+
+        private static String SaveCsvFileInMyDocument(String title, String data)
+        {
+            string fileUrl;
+
+            using (var memStream = new MemoryStream(Encoding.UTF8.GetBytes(data)))
+            {
+                var file = FileUploader.Exec(Files.Classes.Global.FolderMy.ToString(), title, memStream.Length, memStream, true);
+
+                if (FileUtility.CanWebView(title) || FileUtility.CanWebEdit(title))
+                {
+                    fileUrl = FilesLinkUtility.GetFileWebEditorUrl((int)file.ID);
+                    fileUrl += string.Format("&options={{\"delimiter\":{0},\"codePage\":{1}}}",
+                                     (int)FileUtility.CsvDelimiter.Comma,
+                                     Encoding.UTF8.CodePage);
+                }
+                else
+                {
+                    fileUrl = FilesLinkUtility.GetFileDownloadUrl((int)file.ID);
+                }
+            }
+
+            return fileUrl;
         }
     }
 
-    public class ExportToCSV
+    public class ExportToCsv
     {
         #region Members
 
-        private static readonly Object _syncObj = new Object();
+        private static readonly object Locker = new object();
 
-        private static readonly ProgressQueue _exportQueue = new ProgressQueue(1, TimeSpan.FromSeconds(60), true);
+        private static readonly ProgressQueue Queue = new ProgressQueue(1, TimeSpan.FromSeconds(60), true);
 
         #endregion
 
         #region Public Methods
 
-        public static IProgressItem GetStatus()
+        public static IProgressItem GetStatus(bool partialDataExport)
         {
-            var result = _exportQueue.GetStatus(TenantProvider.CurrentTenantID);
+            var key = GetKey(partialDataExport);
 
-            if (result == null)
-                result = ExportDataCache.Get();
-
-            return result;
+            return Queue.GetStatus(key) ?? ExportDataCache.Get(key);
         }
 
-        public static IProgressItem Start()
+        public static IProgressItem Start(FilterObject filterObject, string fileName)
         {
-            lock (_syncObj)
+            lock (Locker)
             {
-                var operation = _exportQueue.GetStatus(TenantProvider.CurrentTenantID);
+                var key = GetKey(filterObject != null);
+
+                var operation = Queue.GetStatus(key);
 
                 if (operation == null )
                 {
-                    var fromCache = ExportDataCache.Get();
+                    var fromCache = ExportDataCache.Get(key);
 
                     if (fromCache != null)
                         return fromCache;
@@ -1321,100 +1372,52 @@ namespace ASC.Web.CRM.Classes
 
                 if (operation == null)
                 {
-                    operation = new ExportDataOperation();
+                    ExportDataCache.ResetAll(key);
 
-                    _exportQueue.Add(operation);
+                    operation = new ExportDataOperation(filterObject, fileName);
+
+                    Queue.Add(operation);
                 }
 
-                if (!_exportQueue.IsStarted)
-                    _exportQueue.Start(x => x.RunJob());
+                if (!Queue.IsStarted)
+                    Queue.Start(x => x.RunJob());
 
                 return operation;
             }
         }
 
-        private static String ExportEntityData(ICollection externalData, bool recieveURL, String fileName)
+        public static void Cancel(bool partialDataExport)
         {
-            var operation = new ExportDataOperation(externalData);
+            lock (Locker)
+            {
+                var key = GetKey(partialDataExport);
+
+                var findedItem = Queue.GetItems().FirstOrDefault(elem => (string)elem.Id == key);
+
+                if (findedItem != null)
+                {
+                    Queue.Remove(findedItem);
+                }
+
+                ExportDataCache.SetCancelFlag(key);
+            }
+        }
+
+        public static string GetKey(bool partialDataExport)
+        {
+            return string.Format("{0}_{1}", TenantProvider.CurrentTenantID,
+                                 partialDataExport ? SecurityContext.CurrentAccount.ID : Guid.Empty);
+        }
+
+        public static String ExportItems(FilterObject filterObject, string fileName)
+        {
+            var operation = new ExportDataOperation(filterObject, fileName);
 
             operation.RunJob();
 
-            var data = (String)operation.Status;
-
-            if (recieveURL) return SaveCSVFileInMyDocument(fileName, data);
-
-            return data;
-        }
-
-        private static String SaveCSVFileInMyDocument(String title, String data)
-        {
-            string fileURL;
-
-            using (var memStream = new MemoryStream(Encoding.UTF8.GetBytes(data)))
-            {
-                var file = FileUploader.Exec(Files.Classes.Global.FolderMy.ToString(), title, data.Length, memStream, true);
-
-                fileURL = FilesLinkUtility.GetFileWebEditorUrl((int)file.ID);
-            }
-            fileURL += string.Format("&options={{\"delimiter\":{0},\"codePage\":{1}}}",
-                                     (int)FileUtility.CsvDelimiter.Comma,
-                                     Encoding.UTF8.CodePage);
-
-            return fileURL;
-        }
-
-        public static String ExportContactsToCSV(List<Contact> contacts, bool recieveURL)
-        {
-            return ExportEntityData(contacts, recieveURL, "contacts.csv");
-        }
-
-        public static String ExportDealsToCSV(List<Deal> deals, bool recieveURL)
-        {
-            return ExportEntityData(deals, recieveURL, "opportunity.csv");
-        }
-
-        public static String ExportHistoryToCSV(List<RelationshipEvent> events, bool recieveURL)
-        {
-            return ExportEntityData(events, recieveURL, "history.csv");
-        }
-
-        public static String ExportCasesToCSV(List<ASC.CRM.Core.Entities.Cases> cases, bool recieveURL)
-        {
-            return ExportEntityData(cases, recieveURL, "cases.csv");
-        }
-
-        public static String ExportTasksToCSV(List<Task> tasks, bool recieveURL)
-        {
-            return ExportEntityData(tasks, recieveURL, "tasks.csv");
-        }
-
-        public static String ExportInvoiceItemsToCSV(List<InvoiceItem> invoiceItems, bool recieveURL)
-        {
-            return ExportEntityData(invoiceItems, recieveURL, "products_services.csv");
-        }
-
-        public static void Cancel()
-        {
-            lock (_syncObj)
-            {
-                var findedItem = _exportQueue.GetItems().Where(elem => (int)elem.Id == TenantProvider.CurrentTenantID);
-
-                if (findedItem.Any())
-                {
-                    _exportQueue.Remove(findedItem.ElementAt(0));
-
-                    ExportDataCache.ResetAll();
-
-                }
-                else
-                {
-                    ExportDataCache.SetCancelFlag();
-                }
-            }
+            return operation.FileUrl;
         }
 
         #endregion
-
-
     }
 }

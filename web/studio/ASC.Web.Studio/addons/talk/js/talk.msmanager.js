@@ -1,4 +1,21 @@
-﻿window.ASC = window.ASC || {};
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+window.ASC = window.ASC || {};
 
 window.ASC.TMTalk = window.ASC.TMTalk || {};
 
@@ -237,6 +254,9 @@ window.ASC.TMTalk.msManager = (function () {
       eventManager.call(customEvents.openList, window, [list.id, list]);
 
       var contacts = list.contacts;
+      if (contacts.length > 0) {
+          jQuery('div#talkRoomsContainer ul.rooms li.room.current').addClass('minimized');
+      }
       for (var i = 0, n = contacts.length; i < n; i++) {
         eventManager.call(customEvents.addContact, window, [list.id, contacts[i].jid]);
       }

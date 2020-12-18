@@ -1,16 +1,43 @@
-﻿if (!ASC.Controls.TalkNavigationItem) {
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+if (!ASC.Controls.TalkNavigationItem) {
     ASC.Controls.TalkNavigationItem = {
         checkMessagesTimeout: 1000,
         currentValue: -1,
         init: function (timeout) {
+
+            if (jq("#studioPageContent li.talk").length == 0)
+                return;
+
             if (isFinite(+timeout)) {
                 this.checkMessagesTimeout = +timeout * 1000;
-                setTimeout(this.checkNewMessages, 3000);
-                if (+timeout > 0) {
-                    setInterval(this.checkNewMessages, this.checkMessagesTimeout);
-                }
+
+                StudioManager.addPendingRequest(function () {
+                    ASC.Controls.TalkNavigationItem.checkNewMessages();
+                    if (+timeout > 0) {
+                        setInterval(ASC.Controls.TalkNavigationItem.checkNewMessages, ASC.Controls.TalkNavigationItem.checkMessagesTimeout);
+                    }
+                });
             }
+            
             Teamlab.bind(Teamlab.events.getTalkUnreadMessages, ASC.Controls.TalkNavigationItem.getResponce);
+
+            
         },
         updateValue: function (value) {
             if (this.currentValue === value) {
@@ -36,16 +63,35 @@
     };
 }
 
+jq(document).ready(function () {
+    if (ASC.SocketIO && !ASC.SocketIO.disabled()) {
+        ASC.SocketIO.Factory.counters
+            .on('getNewMessagesCount',
+                function(counts) {
+                    ASC.Controls.TalkNavigationItem.updateValue(counts.me);
+                })
+            .on('sendMessagesCount',
+                function(counts) {
+                    ASC.Controls.TalkNavigationItem.updateValue(counts);
+                });
+    }
+});
+
 if (!ASC.Controls.JabberClient) {
     ASC.Controls.JabberClient = {
         username: null,
         jid: null,
         winName: 'ASCJabberClient' + location.hostname,
         helperId: 'JabberClientHelper-' + Math.floor(Math.random() * 1000000),
-        params: 'ontouchend' in document ? '' : 'width=900,height=600,status=no,toolbar=no,menubar=no,resizable=yes,scrollbars=no',
+        params: '', //in new tab
+        //params: 'ontouchend' in document ? '' : 'width=900,height=600,status=no,toolbar=no,menubar=no,resizable=yes,scrollbars=no,target=_blank', //in new window
         pathCmdHandler: '',
         pathWebTalk: '',
         init: function (name, talkpath, cmdpath) {
+
+            if (jq("#studioPageContent li.talk").length == 0)
+                return;
+
             if (typeof name === 'string' && name.length > 0) {
                 this.username = name.toLowerCase();
             }
@@ -58,8 +104,14 @@ if (!ASC.Controls.JabberClient) {
             var a = this.winName.match(/\w+/g);
             this.winName = a ? a.join('') : this.winName;
         },
-        extendChat: function() {
+        extendChat: function () {
             ASC.Controls.JabberClient.open();
+        },
+        redirectMain: function () {
+            try {
+                window.open('/');
+            } catch (err) {
+            }
         },
         open: function (jid) {
             var hWnd = null,
@@ -103,9 +155,8 @@ if (!ASC.Controls.JabberClient) {
 
             try {
                 ASC.Controls.TalkNavigationItem.updateValue(0);
-                if (ASC.Resources.Master.Hub.Url) {
-                    // SendMessagesCount
-                    jq.connection.ch.server.smec(0);
+                if (ASC.SocketIO && !ASC.SocketIO.disabled()) {
+                    ASC.SocketIO.Factory.counters.emit('sendMessagesCount', 0);
                 }
             } catch (e) {
                 console.error(e.message);

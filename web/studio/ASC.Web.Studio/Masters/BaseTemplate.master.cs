@@ -1,42 +1,32 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
-using System.Collections.Generic;
 using System.Configuration;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Web;
 using System.Web.UI;
 using ASC.Core;
-using ASC.Core.Billing;
 using ASC.Core.Tenants;
 using ASC.Core.Users;
 using ASC.Web.Core;
+using ASC.Web.Core.Client.Bundling;
+using ASC.Web.Core.Client.HttpHandlers;
 using ASC.Web.Core.Mobile;
 using ASC.Web.Core.Utility;
 using ASC.Web.Core.Utility.Settings;
@@ -44,11 +34,12 @@ using ASC.Web.Core.WebZones;
 using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Core.Users;
 using ASC.Web.Studio.UserControls.Common;
-using ASC.Web.Studio.UserControls.Common.Banner;
+using ASC.Web.Studio.UserControls.Common.ThirdPartyBanner;
 using ASC.Web.Studio.UserControls.Management;
 using ASC.Web.Studio.UserControls.Statistics;
 using ASC.Web.Studio.Utility;
 using Resources;
+using ASC.Web.Core.Utility.Skins;
 
 namespace ASC.Web.Studio.Masters
 {
@@ -57,14 +48,11 @@ namespace ASC.Web.Studio.Masters
         /// <summary>
         /// Block side panel
         /// </summary>
-        /// 
-        protected Tuple<string, string> TariffNotify;
-
-        public bool DisableTariffNotify { get; set; }
-
         public bool DisabledSidePanel { get; set; }
 
         public bool DisabledTopStudioPanel { get; set; }
+
+        public bool DisabledLayoutMedia { get; set; }
 
         private bool? _enableWebChat;
 
@@ -80,30 +68,29 @@ namespace ASC.Web.Studio.Masters
 
         public TopStudioPanel TopStudioPanel;
 
-        protected bool DisablePartnerPanel { get; set; }
-        private bool? IsAuthorizedPartner { get; set; }
-        protected Partner Partner { get; set; }
-
         protected override void OnInit(EventArgs e)
         {
             base.OnInit(e);
             TopStudioPanel = (TopStudioPanel)LoadControl(TopStudioPanel.Location);
             MetaKeywords.Content = Resource.MetaKeywords;
             MetaDescription.Content = Resource.MetaDescription.HtmlEncode();
+            MetaDescriptionOG.Content = Resource.MetaDescription.HtmlEncode();
+            MetaTitleOG.Content = (String.IsNullOrEmpty(Page.Title) ? Resource.MainPageTitle : Page.Title).HtmlEncode();
+            CanonicalURLOG.Content = HttpContext.Current.Request.Url.Scheme + "://" + Request.GetUrlRewriter().Host;
+            MetaImageOG.Content = WebImageSupplier.GetAbsoluteWebPath("onlyoffice_logo/fb_icon_325x325.jpg");
         }
 
         protected void Page_Load(object sender, EventArgs e)
         {
             InitScripts();
-            HubUrl = ConfigurationManager.AppSettings["web.hub"] ?? string.Empty;
+
+            HubUrl = ConfigurationManagerExtension.AppSettings["web.hub"] ?? string.Empty;
 
             if (!_enableWebChat.HasValue || _enableWebChat.Value)
             {
                 EnabledWebChat = Convert.ToBoolean(ConfigurationManager.AppSettings["web.chat"] ?? "false") &&
-                             WebItemManager.Instance.GetItems(WebZoneType.CustomProductList, ItemAvailableState.Normal).
-                                            Any(id => id.ID == WebItemManager.TalkProductID) &&
-                             !(Request.Browser != null && Request.Browser.Browser == "IE" &&
-                               (Request.Browser.MajorVersion == 8 || Request.Browser.MajorVersion == 9 || Request.Browser.MajorVersion == 10));
+                                 WebItemManager.Instance.GetItems(WebZoneType.CustomProductList, ItemAvailableState.Normal).Any(id => id.ID == WebItemManager.TalkProductID) &&
+                                 !(Request.Browser != null && Request.Browser.Browser == "IE" && Request.Browser.MajorVersion < 11);
             }
 
             IsMobile = MobileDetector.IsMobile;
@@ -113,7 +100,7 @@ namespace ASC.Web.Studio.Masters
                 SmallChatHolder.Controls.Add(LoadControl(UserControls.Common.SmallChat.SmallChat.Location));
             }
 
-            if (!DisabledSidePanel)
+            if (!DisabledSidePanel && !CoreContext.Configuration.Personal)
             {
                 /** InvitePanel popup **/
                 InvitePanelHolder.Controls.Add(LoadControl(InvitePanel.Location));
@@ -122,7 +109,7 @@ namespace ASC.Web.Studio.Masters
             if ((!DisabledSidePanel || !DisabledTopStudioPanel) && !TopStudioPanel.DisableSettings &&
                 HubUrl != string.Empty && SecurityContext.IsAuthenticated)
             {
-                AddBodyScripts(ResolveUrl, "~/js/third-party/jquery/jquery.signalr.js", "~/js/asc/plugins/jquery.hubs.js");
+                AddBodyScripts(ResolveUrl, "~/js/third-party/socket.io.js", "~/js/asc/core/asc.socketio.js");
             }
 
             if (!DisabledTopStudioPanel)
@@ -130,53 +117,26 @@ namespace ASC.Web.Studio.Masters
                 TopContent.Controls.Add(TopStudioPanel);
             }
 
-            if (!EmailActivated && !CoreContext.Configuration.Personal && SecurityContext.IsAuthenticated)
+            if (!EmailActivated && !CoreContext.Configuration.Personal && SecurityContext.IsAuthenticated && EmailActivationSettings.LoadForCurrentUser().Show)
             {
                 activateEmailPanel.Controls.Add(LoadControl(ActivateEmailPanel.Location));
             }
 
-            if (AffiliateHelper.BannerAvailable || CoreContext.Configuration.Personal)
+            if (ThirdPartyBanner.Display && !Request.DesktopApp())
             {
-                BannerHolder.Controls.Add(LoadControl(Banner.Location));
+                BannerHolder.Controls.Add(LoadControl(ThirdPartyBanner.Location));
             }
 
             var curUser = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
 
-            if (DisabledSidePanel)
+            if (!DisabledSidePanel)
             {
-                DisableTariffNotify = true;
-                DisablePartnerPanel = true;
-            }
-            else
-            {
-                if (!SecurityContext.IsAuthenticated || !TenantExtra.EnableTarrifSettings || CoreContext.Configuration.Personal
-                    || curUser.IsVisitor())
-                {
-                    DisableTariffNotify = true;
-                }
-                else
-                {
-                    TariffNotify = GetTariffNotify();
-                    if (TariffNotify == null)
-                        DisableTariffNotify = true;
-                }
-
-                if (CoreContext.Configuration.PartnerHosted)
-                {
-                    IsAuthorizedPartner = false;
-                    var partner = CoreContext.PaymentManager.GetApprovedPartner();
-                    if (partner != null)
-                    {
-                        IsAuthorizedPartner = !string.IsNullOrEmpty(partner.AuthorizedKey);
-                        Partner = partner;
-                    }
-                }
-                DisablePartnerPanel = !(IsAuthorizedPartner.HasValue && !IsAuthorizedPartner.Value);
+                TariffNotifyHolder.Controls.Add(LoadControl(TariffNotify.Location));
             }
 
             if (curUser.IsVisitor() && !curUser.IsOutsider())
             {
-                var collaboratorPopupSettings = SettingsManager.Instance.LoadSettingsFor<CollaboratorSettings>(curUser.ID);
+                var collaboratorPopupSettings = CollaboratorSettings.LoadForCurrentUser();
                 if (collaboratorPopupSettings.FirstVisit)
                 {
                     AddBodyScripts(ResolveUrl, "~/js/asc/core/collaborators.js");
@@ -186,145 +146,34 @@ namespace ASC.Web.Studio.Masters
 
             #region third-party scripts
 
-            var GoogleTagManagerScriptLocation = "~/UserControls/Common/ThirdPartyScripts/GoogleTagManagerScript.ascx";
-            if (File.Exists(HttpContext.Current.Server.MapPath(GoogleTagManagerScriptLocation)) &&
-                !CoreContext.Configuration.Standalone && !CoreContext.Configuration.Personal && SetupInfo.CustomScripts.Length != 0)
+            if (TenantExtra.Saas)
             {
-                GoogleTagManagerPlaceHolder.Controls.Add(LoadControl(GoogleTagManagerScriptLocation));
-            } else {
-                GoogleTagManagerPlaceHolder.Visible = false;
+                if (SetupInfo.CustomScripts.Length != 0)
+                {
+                    if (CoreContext.Configuration.Personal)
+                    {
+                        if (TenantAnalyticsSettings.LoadForCurrentUser().Analytics)
+                        {
+                            GoogleAnalyticsScriptPlaceHolder.Controls.Add(LoadControl("~/UserControls/Common/ThirdPartyScripts/GoogleAnalyticsScriptPersonal.ascx"));
+                        }
+                    }
+                    else
+                    {
+                        if (TenantAnalyticsSettings.Load().Analytics)
+                        {
+                            GoogleAnalyticsScriptPlaceHolder.Controls.Add(LoadControl("~/UserControls/Common/ThirdPartyScripts/GoogleAnalyticsScript.ascx"));
+                        }
+                    }
+                }
             }
-
-            var GoogleAnalyticsScriptLocation = "~/UserControls/Common/ThirdPartyScripts/GoogleAnalyticsScript.ascx";
-            if (File.Exists(HttpContext.Current.Server.MapPath(GoogleAnalyticsScriptLocation)) &&
-                !CoreContext.Configuration.Standalone && !CoreContext.Configuration.Personal && SetupInfo.CustomScripts.Length != 0
-                && ASC.Core.SecurityContext.IsAuthenticated)
+            else if (TenantExtra.Opensource
+                     && WizardSettings.Load().Analytics
+                     && SecurityContext.IsAuthenticated)
             {
-                GoogleAnalyticsScriptPlaceHolder.Controls.Add(LoadControl(GoogleAnalyticsScriptLocation));
-            } else {
-                GoogleAnalyticsScriptPlaceHolder.Visible = false;
+                GoogleAnalyticsScriptPlaceHolder.Controls.Add(LoadControl("~/UserControls/Common/ThirdPartyScripts/GoogleAnalyticsScriptOpenSource.ascx"));
             }
-            
-
-            var YandexMetrikaScriptLocation = "~/UserControls/Common/ThirdPartyScripts/YandexMetrikaScript.ascx";
-            if (File.Exists(HttpContext.Current.Server.MapPath(YandexMetrikaScriptLocation)) &&
-                !CoreContext.Configuration.Standalone && CoreContext.Configuration.Personal && SetupInfo.CustomScripts.Length != 0)
-            {
-                YandexMetrikaScriptPlaceHolder.Controls.Add(LoadControl(YandexMetrikaScriptLocation));
-            }
-            else
-            {
-                YandexMetrikaScriptPlaceHolder.Visible = false;
-            }
-
-
-            var GoogleConversionPersonScriptLocation = "~/UserControls/Common/ThirdPartyScripts/GoogleConversionPersonScript.ascx";
-            if (File.Exists(HttpContext.Current.Server.MapPath(GoogleConversionPersonScriptLocation)) &&
-                !CoreContext.Configuration.Standalone && CoreContext.Configuration.Personal && SetupInfo.CustomScripts.Length != 0)
-            {
-                GoogleConversionPersonScriptPlaceHolder.Controls.Add(LoadControl(GoogleConversionPersonScriptLocation));
-            }
-            else
-            {
-                GoogleConversionPersonScriptPlaceHolder.Visible = false;
-            }
-
 
             #endregion
-        }
-
-        private static Tuple<string, string> GetTariffNotify()
-        {
-            var tariff = TenantExtra.GetCurrentTariff();
-
-            var count = tariff.DueDate.Date.Subtract(DateTime.Today).Days;
-            if (tariff.State == TariffState.Trial)
-            {
-                if (count <= 5)
-                {
-                    var text = String.Format(CoreContext.Configuration.Standalone ? Resource.TariffLinkStandalone : Resource.TrialPeriodInfoText,
-                                             "<a href=\"" + TenantExtra.GetTariffPageLink() + "\">", "</a>");
-
-                    if (count <= 0)
-                        return new Tuple<string, string>(Resource.TrialPeriodExpired, text);
-
-                    var end = GetNumeralResourceByCount(count, Resource.Day, Resource.DaysOne, Resource.DaysTwo);
-                    return new Tuple<string, string>(string.Format(Resource.TrialPeriod, count, end), text);
-                }
-
-                if (CoreContext.Configuration.Standalone)
-                {
-                    return new Tuple<string, string>(Resource.TrialPeriodInfoTextLicense, string.Empty);
-                }
-            }
-
-            if (tariff.State == TariffState.Paid)
-            {
-                if (CoreContext.Configuration.Standalone)
-                {
-                    if (count < 10)
-                    {
-                        var text = String.Format(Resource.TariffLinkStandalone,
-                                                 "<a href=\"" + TenantExtra.GetTariffPageLink() + "\">", "</a>");
-                        if (count <= 0)
-                            return new Tuple<string, string>(Resource.PaidPeriodExpiredStandalone, text);
-
-                        var end = GetNumeralResourceByCount(count, Resource.Day, Resource.DaysOne, Resource.DaysTwo);
-                        return new Tuple<string, string>(string.Format(Resource.PaidPeriodStandalone, count, end), text);
-                    }
-
-                    if (tariff.QuotaId.Equals(Tenant.DEFAULT_TENANT) && TenantExtra.EnableTarrifSettings)
-                    {
-                        var text = String.Format(Resource.TariffLinkStandalone,
-                                                 "<a href=\"" + TenantExtra.GetTariffPageLink() + "\">", "</a>");
-                        return new Tuple<string, string>(Resource.TariffOverdueStandalone, text);
-                    }
-                }
-                else
-                {
-                    var quota = TenantExtra.GetTenantQuota();
-                    long notifySize;
-                    long.TryParse(ConfigurationManager.AppSettings["web.tariff-notify.storage"] ?? "314572800", out notifySize); //300 MB
-                    if (notifySize > 0 && quota.MaxTotalSize - TenantStatisticsProvider.GetUsedSize() < notifySize)
-                    {
-                        var head = string.Format(Resource.TariffExceedLimit, FileSizeComment.FilesSizeToString(quota.MaxTotalSize));
-                        var text = String.Format(Resource.TariffExceedLimitInfoText, "<a href=\"" + TenantExtra.GetTariffPageLink() + "\">", "</a>");
-                        return new Tuple<string, string>(head, text);
-                    }
-                }
-            }
-
-            if (tariff.State == TariffState.Delay)
-            {
-                var text = String.Format(Resource.TariffPaymentDelayText,
-                                         "<a href=\"" + TenantExtra.GetTariffPageLink() + "\">", "</a>",
-                                         tariff.DelayDueDate.Date.ToLongDateString());
-                return new Tuple<string, string>(Resource.TariffPaymentDelay, text);
-            }
-
-            return null;
-        }
-
-        public static string GetNumeralResourceByCount(int count, string resource, string resourceOne, string resourceTwo)
-        {
-            var num = count % 100;
-            if (num >= 11 && num <= 19)
-            {
-                return resourceTwo;
-            }
-
-            var i = count % 10;
-            switch (i)
-            {
-                case (1):
-                    return resource;
-                case (2):
-                case (3):
-                case (4):
-                    return resourceOne;
-                default:
-                    return resourceTwo;
-            }
         }
 
         protected string RenderStatRequest()
@@ -352,7 +201,7 @@ namespace ASC.Web.Studio.Masters
             get
             {
                 var usr = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
-                return usr.CreateDate.Date <= DateTime.UtcNow.Date || usr.ActivationStatus == EmployeeActivationStatus.Activated;
+                return usr.CreateDate.Date == DateTime.UtcNow.Date || usr.ActivationStatus == EmployeeActivationStatus.Activated;
             }
         }
 
@@ -363,126 +212,134 @@ namespace ASC.Web.Studio.Masters
 
         #region Operations
 
+
         private void InitScripts()
         {
-            AddStyles("~/skins/<theme_folder>/main.less");
+            AddStyles(r => r, "~/skins/<theme_folder>/main.less");
 
-            AddClientScript(typeof (MasterResources.MasterSettingsResources));
-            AddClientScript(typeof (MasterResources.MasterUserResources));
-            AddClientScript(typeof (MasterResources.MasterFileUtilityResources));
-            AddClientScript(typeof (MasterResources.MasterCustomResources));
+            AddClientScript(
+                new MasterResources.MasterSettingsResources(),
+                new MasterResources.MasterUserResources(),
+                new MasterResources.MasterFileUtilityResources(),
+                new MasterResources.MasterCustomResources(),
+                new MasterResources.MasterLocalizationResources()
+                );
 
             InitProductSettingsInlineScript();
             InitStudioSettingsInlineScript();
-
-            AddClientLocalizationScript(typeof (MasterResources.MasterLocalizationResources));
-            AddClientLocalizationScript(typeof (MasterResources.MasterTemplateResources));
         }
 
         private void InitStudioSettingsInlineScript()
         {
-            var showPromotions = SettingsManager.Instance.LoadSettings<PromotionsSettings>(TenantProvider.CurrentTenantID).Show;
-            var showTips = SettingsManager.Instance.LoadSettingsFor<TipsSettings>(SecurityContext.CurrentAccount.ID).Show;
+            var paid = !TenantStatisticsProvider.IsNotPaid();
+            var showPromotions = paid && PromotionsSettings.Load().Show;
+            var showTips = !Request.DesktopApp() && paid && TipsSettings.LoadForCurrentUser().Show;
 
             var script = new StringBuilder();
             script.AppendFormat("window.ASC.Resources.Master.ShowPromotions={0};", showPromotions.ToString().ToLowerInvariant());
             script.AppendFormat("window.ASC.Resources.Master.ShowTips={0};", showTips.ToString().ToLowerInvariant());
 
-            Page.RegisterInlineScript(script.ToString(), true, false);
+            RegisterInlineScript(script.ToString(), true, false);
         }
 
         private void InitProductSettingsInlineScript()
         {
             var isAdmin = WebItemSecurity.IsProductAdministrator(CommonLinkUtility.GetProductID(), SecurityContext.CurrentAccount.ID);
 
-            var script = new StringBuilder();
-            script.AppendFormat("window.ASC.Resources.Master.IsProductAdmin={0};", isAdmin.ToString().ToLowerInvariant());
+            if (!isAdmin)
+            {
+                isAdmin = WebItemSecurity.IsProductAdministrator(CommonLinkUtility.GetAddonID(), SecurityContext.CurrentAccount.ID);
+            }
 
-            Page.RegisterInlineScript(script.ToString(), true, false);
+            RegisterInlineScript(string.Format("window.ASC.Resources.Master.IsProductAdmin={0};", isAdmin.ToString().ToLowerInvariant()), true, false);
         }
 
         #region Style
 
-        public void AddStyles(params string[] src)
+        public BaseTemplate AddStyles(Func<string, string> converter, params string[] src)
         {
             foreach (var s in src)
             {
-                AddStyles(s);
+                if (s.Contains(ColorThemesSettings.ThemeFolderTemplate))
+                {
+                    if (ThemeStyles == null) continue;
+
+                    ThemeStyles.AddSource(r => ResolveUrl(ColorThemesSettings.GetThemeFolderName(converter(r))), s);
+                }
+                else
+                {
+                    if (HeadStyles == null) continue;
+
+                    HeadStyles.AddSource(converter, s);
+                }
             }
+
+            return this;
         }
 
-        public void AddStyles(Func<string, string> converter, params string[] src)
-        {
-            AddStyles(src.Select(converter).ToArray());
-        }
-
-        public void AddStyles(string src)
-        {
-            if (src.Contains(ColorThemesSettings.ThemeFolderTemplate))
-            {
-                if (ThemeStyles == null) return;
-
-                ThemeStyles.Styles.Add(ResolveUrl(ColorThemesSettings.GetThemeFolderName(src)));
-            }
-            else
-            {
-                if (HeadStyles == null) return;
-
-                HeadStyles.Styles.Add(src);
-            }
-        }
 
         #endregion
 
         #region Scripts
 
-        public void AddBodyScripts(params string[] src)
+        public BaseTemplate AddBodyScripts(Func<string, string> converter, params string[] src)
         {
-            if (BodyScripts == null) return;
-            BodyScripts.Scripts.AddRange(src);
+            if (BodyScripts == null) return this;
+            BodyScripts.AddSource(converter, src);
+
+            return this;
         }
 
-        public void AddBodyScripts(Func<string, string> converter, params string[] src)
+        public BaseTemplate AddStaticBodyScripts(ScriptBundleData bundleData)
         {
-            AddBodyScripts(src.Select(converter).ToArray());
+            StaticScript.SetData(bundleData);
+
+            return this;
         }
 
-
-        public void RegisterInlineScript(string script, bool beforeBodyScripts, bool onReady)
+        public BaseTemplate AddStaticStyles(StyleBundleData bundleData)
         {
+            StaticStyle.SetData(bundleData);
+
+            return this;
+        }
+
+        public BaseTemplate RegisterInlineScript(string script, bool beforeBodyScripts = false, bool onReady = true)
+        {
+            var tuple = new Tuple<string, bool>(script, onReady);
             if (!beforeBodyScripts)
-                InlineScript.Scripts.Add(new Tuple<string, bool>(script, onReady));
+                InlineScript.Scripts.Add(tuple);
             else
-                InlineScriptBefore.Scripts.Add(new Tuple<string, bool>(script, onReady));
-        }
+                InlineScriptBefore.Scripts.Add(tuple);
 
-        #endregion
-
-        #region Content
-
-        public void AddBodyContent(Control control)
-        {
-            PageContent.Controls.Add(control);
-        }
-
-        public void SetBodyContent(Control control)
-        {
-            PageContent.Controls.Clear();
-            AddBodyContent(control);
+            return this;
         }
 
         #endregion
 
         #region ClientScript
 
-        public void AddClientScript(Type type)
+        public BaseTemplate AddClientScript(ClientScript clientScript)
         {
-            baseTemplateMasterScripts.Includes.Add(type);
+            var localizationScript = clientScript as ClientScriptLocalization;
+            if (localizationScript != null)
+            {
+                clientLocalizationScript.AddScript(clientScript);
+                return this;
+            }
+
+            baseTemplateMasterScripts.AddScript(clientScript);
+            return this;
         }
 
-        public void AddClientLocalizationScript(Type type)
+        public BaseTemplate AddClientScript(params ClientScript[] clientScript)
         {
-            clientLocalizationScript.Includes.Add(type);
+            foreach (var script in clientScript)
+            {
+                AddClientScript(script);
+            }
+
+            return this;
         }
 
         #endregion

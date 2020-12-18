@@ -1,23 +1,26 @@
 ﻿<%@ Control Language="C#" AutoEventWireup="true" CodeBehind="UserProfileControl.ascx.cs" Inherits="ASC.Web.Studio.UserControls.Users.UserProfileControl" %>
+<%@ Import Namespace="ASC.ActiveDirectory.Base.Settings" %>
 <%@ Import Namespace="ASC.Core.Users" %>
+<%@ Import Namespace="ASC.Web.Core.Sms" %>
+<%@ Import Namespace="ASC.Web.Studio.Core.TFA" %>
 <%@ Import Namespace="ASC.Web.Studio.Core.Users" %>
 <%@ Import Namespace="ASC.Web.Studio.UserControls.Users.UserProfile" %>
 <%@ Import Namespace="ASC.Web.Studio.Utility" %>
 <%@ Import Namespace="Resources" %>
 <%@ Register TagPrefix="sc" Namespace="ASC.Web.Studio.Controls.Common" Assembly="ASC.Web.Studio" %>
 
-<div id="studio_userProfileCardInfo" data-id="<%= UserInfo.ID %>" data-email="<%= UserInfo.Email %>"></div>
+<div id="studio_userProfileCardInfo" data-id="<%= UserInfo.ID %>" data-email="<%= UserInfo.Email.HtmlEncode() %>"></div>
 <div class="userProfileCard clearFix<%= (UserInfo.ActivationStatus == EmployeeActivationStatus.Pending) ? " pending" : "" %>">
     <div class="additionInfo">
-        <div class="profile-user-photo">
+        <div class="profile-user-photo <%= (UserInfo.IsMe() || IsAdmin) ? "" : "readonly" %>">
             <div id="userProfilePhoto" class="profile-action-usericon">
                 <img alt="" src="<%= MainImgUrl %>" />
             </div>
-            <% if (UserInfo.IsMe() || IsAdmin)
+            <% if ((UserInfo.IsMe() || IsAdmin) && (!UserInfo.IsLDAP() || (UserInfo.HasAvatar() || !LdapSettings.GetImportedFields.Contains(LdapSettings.MappingFields.AvatarAttribute))))
                { %>
             <div id="loadPhotoImage" class="action-block grey-phone">
                 <span class="bold">
-                    <%= Resource.EditImage %>
+                    <%= Resource.EditPhoto %>
                 </span>
             </div>
             <% } %>
@@ -30,26 +33,17 @@
                 </div>
             </div>
 
-            <% if (UserInfo.ActivationStatus == EmployeeActivationStatus.Pending || UserInfo.ActivationStatus == EmployeeActivationStatus.NotActivated)
+            <% if (UserInfo.ActivationStatus == EmployeeActivationStatus.Pending)
                { %>
 
             <div class="profile-status pending" data-visible="<%= UserInfo.Status == EmployeeStatus.Terminated ? "hidden" : "" %>">
-                <% if (UserInfo.ActivationStatus == EmployeeActivationStatus.Pending)
-                   { %>
                 <div id="imagePendingActivation">
                     <%= Resource.PendingTitle %>
                 </div>
-                <% }
-                   else if (UserInfo.ActivationStatus == EmployeeActivationStatus.NotActivated)
-                   { %>
-                <div id="imageNotActivatedActivation">
-                    <%= Resource.PendingTitle %>
                 </div>
-                <% } %>
-            </div>
 
             <% } %>
-            <% if (IsAdmin)
+            <% if (Role != null)
                { %>
             <div class="profile-role <%= Role.Class %>" title="<%= Role.Title%>"></div>
             <% } %>
@@ -62,58 +56,69 @@
                 <tr>
                     <td>
                         <div class="left-column">
-                            <% if(!isPersonal){ %>
+                            <% if (!IsPersonal)
+                               { %>
                             <div class="field">
                                 <span class="field-title describe-text"><%= Resource.UserType %>:</span>
                                 <span id="typeUserProfile" class="field-value"><%= CustomNamingPeople.Substitute<Resource>(UserInfo.IsVisitor() ? "Guest" : "User").HtmlEncode() %></span>
                             </div>
                             <%} %>
+
+                            <% if (UserInfo.IsLDAP())
+                               { %>
+                            <div class="field">
+                                <span class="field-title describe-text"><%= Resource.Login%>:</span>
+                                <span id="loginUserProfile" class="field-value"><%=HttpUtility.HtmlEncode(UserInfo.UserName.ToLower())%></span>
+                            </div>
+                            <% } %>
+
                             <asp:PlaceHolder ID="_phEmailControlsHolder" runat="server"></asp:PlaceHolder>
 
-                             <% if(!isPersonal){ %>
-                            <asp:Repeater ID="DepartmentsRepeater" runat="server">
-                                <HeaderTemplate>
-                                    <div class="field">
-                                        <span class="field-title describe-text"><%= CustomNamingPeople.Substitute<Resource>("Department").HtmlEncode() %>:</span>
-                                        <span id="groupsUserProfile" class="field-value">
-                                </HeaderTemplate>
-                                <ItemTemplate>
-                                    <%if (IsVisitor)
-                                      { %>
-                                    <span><%# ((ASC.Core.Users.GroupInfo)Container.DataItem).Name.HtmlEncode() %></span>
-                                    <%}
-                                      else
-                                      { %>
-                                    <a class="link dotline" href="<%# CommonLinkUtility.GetDepartment(((ASC.Core.Users.GroupInfo)Container.DataItem).ID) %>"><%# ((ASC.Core.Users.GroupInfo)Container.DataItem).Name.HtmlEncode() %></a>
-                                    <%} %>
-                                </ItemTemplate>
-                                <SeparatorTemplate>, </SeparatorTemplate>
-                                <FooterTemplate>
-                                    </span>
-                                    </div>
-                                </FooterTemplate>
-                            </asp:Repeater>
-                            <%} %>
+                            <% if (!IsPersonal && Groups != null && Groups.Any())
+                               { %>
+                            <div class="field">
+                                <span class="field-title describe-text"><%= CustomNamingPeople.Substitute<Resource>("Department").HtmlEncode() %>:</span>
+                                <span id="groupsUserProfile" class="field-value">
+                                    <% for (var i = 0; i < Groups.Count; i++)
+                                       {
+                                           var group = Groups[i]; %>
 
-                            <% if (!String.IsNullOrEmpty(UserInfo.Title) && !isPersonal)
+                                    <% if (IsVisitor)
+                                       { %>
+                                    <span><%= group.Name.HtmlEncode() %></span>
+                                    <% }
+                                       else
+                                       { %>
+                                    <a class="link dotline" href="<%= CommonLinkUtility.GetDepartment(group.ID) %>"><%= group.Name.HtmlEncode() %></a>
+                                    <% } %>
+
+                                    <%= i < Groups.Count - 1 ? ", " : "" %>
+
+                                    <% } %>
+                                </span>
+                            </div>
+                            <% } %>
+
+                            <% if (!String.IsNullOrEmpty(UserInfo.Title) && !IsPersonal)
                                { %>
                             <div class="field">
                                 <span class="field-title describe-text"><%= CustomNamingPeople.Substitute<Resource>("UserPost").HtmlEncode() %>:</span>
                                 <span id="titleUserProfile" class="field-value"><%= HttpUtility.HtmlEncode(UserInfo.Title) %></span>
                             </div>
                             <% } %>
-                            
-                            <% if (Actions.AllowEdit && UserInfo.Status != EmployeeStatus.Terminated && UserInfo.ActivationStatus == EmployeeActivationStatus.Activated)
+
+                            <% if (Actions.AllowEdit && UserInfo.Status != EmployeeStatus.Terminated && UserInfo.ActivationStatus == EmployeeActivationStatus.Activated && !UserInfo.IsLDAP() && !UserInfo.IsSSO())
                                { %>
                             <div class="field">
                                 <span class="field-title describe-text"><%= Resource.Password %>:</span>
                                 <span id="passwordUserProfile" class="field-value">********</span>
-                                <a onclick="PasswordTool.ShowPwdReminderDialog('1','<%= UserInfo.Email %>'); return false;" class="baseLinkAction">&nbsp;</a>
+                                <a onclick="PasswordTool.ShowPwdReminderDialog('1','<%= UserInfo.Email.HtmlEncode() %>'); return false;" class="baseLinkAction">&nbsp;</a>
                             </div>
+                            <% } %>
+
                             <% if (UserInfo.IsMe())
                                { %>
                             <asp:PlaceHolder ID="_phLanguage" runat="server"></asp:PlaceHolder>
-                            <% } %>
                             <% } %>
 
                             <% if (ShowPrimaryMobile)
@@ -123,9 +128,9 @@
                                 <span id="phoneUserProfile" class="field-value">
                                     <% if (!String.IsNullOrEmpty(UserInfo.MobilePhone))
                                        { %>
-                                    <span class="primarymobile">+<%= ASC.Web.Studio.Core.SMS.SmsManager.GetPhoneValueDigits(UserInfo.MobilePhone) %></span>
+                                    <span class="primarymobile">+<%= SmsSender.GetPhoneValueDigits(UserInfo.MobilePhone) %></span>
                                     <% } %>
-                                    <% if (UserInfo.IsMe() || Actions.AllowAddOrDelete)
+                                    <% if (Actions.AllowEdit && (!UserInfo.IsLDAP() || UserInfo.IsLDAP() && !LdapFields.Contains(LdapSettings.MappingFields.MobilePhoneAttribute)))
                                        { %>
                                     <a onclick="ASC.Controls.UserMobilePhoneManager.openDialog();" class="baseLinkAction" title="<%= Resource.MobilePhoneChange %>"></a>
                                     <% } %>
@@ -143,7 +148,7 @@
                                 <span id="sexUserProfile" class="field-value"><%= (UserInfo.Sex.HasValue ? UserInfo.Sex.Value ? Resource.MaleSexStatus : Resource.FemaleSexStatus : string.Empty) %></span>
                             </div>
                             <% } %>
-                            <% if (UserInfo.WorkFromDate.HasValue && !isPersonal)
+                            <% if (UserInfo.WorkFromDate.HasValue && !IsPersonal)
                                { %>
                             <div class="field">
                                 <span class="field-title describe-text"><%= CustomNamingPeople.Substitute<Resource>("WorkFromDate").HtmlEncode() %>:</span>
@@ -160,9 +165,9 @@
                                 <span class="birthday-fest">
                                     <%= BirthDayText %>
                                 </span>
-                                <% if ((HappyBirthday == 0) && !UserInfo.IsMe() && (UserInfo.ActivationStatus == EmployeeActivationStatus.Activated) && (UserInfo.Status == EmployeeStatus.Active))
+                                <% if ((HappyBirthday == 0) && !UserInfo.IsMe() && (UserInfo.ActivationStatus.HasFlag(EmployeeActivationStatus.Activated)) && (UserInfo.Status == EmployeeStatus.Active))
                                    { %>
-                                <a target="_blank" href="<%= VirtualPathUtility.ToAbsolute("~/addons/mail/#composeto/email=" + UserInfo.Email.ToLower()) %>"
+                                <a target="_blank" href="<%= VirtualPathUtility.ToAbsolute("~/addons/mail/#composeto/email=" + HttpUtility.UrlEncode(UserInfo.Email)) %>"
                                     class="button gray"><%= Resource.CongratulateBirthday %></a>
                                 <% }
                                    } %>
@@ -175,7 +180,8 @@
                                 <span id="locationUserProfile" class="field-value"><%= HttpUtility.HtmlEncode(UserInfo.Location) %></span>
                             </div>
                             <% } %>
-                            <% if (AffiliateHelper.ButtonAvailable(UserInfo) && !isPersonal){ %>
+                            <% if (false && AffiliateHelper.ButtonAvailable(UserInfo) && !IsPersonal)
+                               { %>
 
                             <div class="field">
                                 <span class="field-title describe-text"><%= Resource.AffilliateStatus %>:</span>
@@ -195,21 +201,50 @@
                 </tr>
             </table>
         </div>
-        <% if (ShowSocialLogins && AccountLinkControl.IsNotEmpty && !isPersonal)
-           { %>
-        <div class="user-block social-logins">
-            <div class="tabs-section">
-                <span class="header-base"><%= Resource.LoginSocialNetworks %></span>
-                <span id="switcherAccountLinks" class="toggle-button"
-                    data-switcher="0" data-showtext="<%= Resource.Show %>" data-hidetext="<%= Resource.Hide %>">
-                    <%= Resource.Hide %>
-                </span>
-            </div>
-            <asp:PlaceHolder runat="server" ID="_accountPlaceholder"></asp:PlaceHolder>
-        </div>
-        <% } %>
     </div>
 </div>
+
+<% if (ShowTfaAppSettings)
+    { %>
+<div class="user-block">
+    <div class="tabs-section">
+        <span class="header-base"><%= Resource.LoginSettings %></span>
+        <span id="switcherLoginSettings" class="toggle-button"
+            data-switcher="0" data-showtext="<%= Resource.Show %>" data-hidetext="<%= Resource.Hide %>">
+            <%= Resource.Hide %>
+        </span>
+    </div>
+    <div id="loginSettingsContainer">
+        <%= string.Format(Resource.LoginSettingsDescription, "<b>", "</b>") %>
+        <br>
+        <br>
+        <% if (UserInfo.IsMe() || IsAdmin)
+        { %>
+        <a id="tfaAppResetApp" class="baseLinkAction"><%= Resource.TfaAppResetApp %></a>
+        <% } %>
+        <% if (UserInfo.IsMe()) { %>
+            <span class="splitter-buttons"></span>
+            <a id="showBackupCodesButton" class="baseLinkAction"><%= Resource.TfaAppShowBackupCodes %></a> <span class="gray-text"><%= string.Format(Resource.TfaAppBackupCodesRemaining, "<span class=\"codesremain\">" + TfaAppUserSettings.BackupCodes.Where(x=>!x.IsUsed).Count() + "</span>") %></span>
+        <% } %>
+    </div>
+
+    <asp:PlaceHolder runat="server" ID="_backupCodesPlaceholder"></asp:PlaceHolder>
+</div>
+<% } %>
+
+<% if (ShowSocialLogins && AccountLinkControl.IsNotEmpty && !IsPersonal)
+    { %>
+<div class="user-block social-logins">
+    <div class="tabs-section">
+        <span class="header-base"><%= Resource.LoginSocialNetworks %></span>
+        <span id="switcherAccountLinks" class="toggle-button"
+            data-switcher="0" data-showtext="<%= Resource.Show %>" data-hidetext="<%= Resource.Hide %>">
+            <%= Resource.Hide %>
+        </span>
+    </div>
+    <asp:PlaceHolder runat="server" ID="_accountPlaceholder"></asp:PlaceHolder>
+</div>
+<% } %>
 
 <% if (!String.IsNullOrEmpty(UserInfo.Notes.HtmlEncode()))
    { %>
@@ -313,7 +348,7 @@
         <Body>
             <div id="remove_content">
                 <div><%: Resource.DeleteProfileInfo %></div>
-                <a target="_blank" href="<%=VirtualPathUtility.ToAbsolute("~/addons/mail/#composeto/email=" + UserInfo.Email.ToLower())%>" class="link blue underline email"><%= UserInfo.Email %></a>
+                <a target="_blank" href="<%=VirtualPathUtility.ToAbsolute("~/addons/mail/#composeto/email=" + HttpUtility.UrlEncode(UserInfo.Email))%>" class="link blue underline email"><%= UserInfo.Email.HtmlEncode() %></a>
             </div>
             <div class="clearFix middle-button-container">
                 <a href="javascript:void(0);" class="button blue middle" onclick="SendInstrunctionsToRemoveProfile();"><%= Resource.SendButton %></a>
@@ -323,4 +358,5 @@
         </Body>
     </sc:Container>
 </div>
+
 <asp:PlaceHolder ID="loadPhotoWindow" runat="server"></asp:PlaceHolder>

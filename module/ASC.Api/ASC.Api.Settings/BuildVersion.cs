@@ -1,14 +1,31 @@
-﻿using System;
-using System.Net;
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+using System;
+using System.Configuration;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Web.Configuration;
 
+using ASC.Common.Logging;
 using ASC.Core;
+using ASC.Core.Notify.Jabber;
+using ASC.Mail.Core;
+using ASC.Web.Core;
 using ASC.Web.Core.Files;
-
-using Newtonsoft.Json.Linq;
+using ASC.Web.Files.Services.DocumentService;
 
 namespace ASC.Api.Settings
 {
@@ -24,47 +41,67 @@ namespace ASC.Api.Settings
         [DataMember(EmitDefaultValue = false)]
         public string MailServer { get; set; }
 
+        [DataMember(EmitDefaultValue = false)]
+        public string XmppServer { get; set; }
+
         public static BuildVersion GetCurrentBuildVersion()
         {
-            var result = new BuildVersion
-                             {
-                                 CommunityServer = WebConfigurationManager.AppSettings["version.number"] ?? "8.5.0"
-                             };
+            return new BuildVersion
+            {
+                CommunityServer = GetCommunityVersion(),
+                DocumentServer = GetDocumentVersion(),
+                MailServer = GetMailServerVersion(),
+                XmppServer = GetXmppServerVersion()
+            };
+        }
 
+        private static string GetCommunityVersion()
+        {
+            return ConfigurationManagerExtension.AppSettings["version.number"] ?? "8.5.0";
+        }
+
+        private static string GetDocumentVersion()
+        {
+            if (string.IsNullOrEmpty(FilesLinkUtility.DocServiceApiUrl))
+                return null;
+
+            return DocumentServiceConnector.GetVersion();
+        }
+
+        private static string GetMailServerVersion()
+        {
             try
             {
-                using (var client = new WebClient())
-                {
-                    var data = Encoding.UTF8.GetString(client.DownloadData(FilesLinkUtility.DocServiceApiUrl));
-                    var matches = Regex.Matches(data, @"DocsAPI.DocEditor.version = function\(\) \{
-        return '(\S+)';
-    \};");
-                    if (matches.Count > 0 && matches[0].Groups.Count > 1)
-                        result.DocumentServer = matches[0].Groups[1].Value;
-                }
+                var engineFactory = new EngineFactory(
+                    CoreContext.TenantManager.GetCurrentTenant().TenantId,
+                    SecurityContext.CurrentAccount.ID.ToString());
+
+                var version = engineFactory.ServerEngine.GetServerVersion();
+                return version;
             }
-            catch (Exception)
+            catch (Exception e)
             {
-
+                LogManager.GetLogger("ASC").Warn(e.Message, e);
             }
 
+            return null;
+        }
+
+        private static string GetXmppServerVersion()
+        {
             try
             {
-                var serverDal = new Mail.Server.Dal.ServerDal(CoreContext.TenantManager.GetCurrentTenant().TenantId);
-                var requestUrl = serverDal.GetTenantServer().ApiVersionUrl;
+                if (ConfigurationManagerExtension.AppSettings["web.talk"] != "true")
+                    return null;
 
-                using (var client = new WebClient())
-                {
-                    var response = Encoding.UTF8.GetString(client.DownloadData(requestUrl));
-                    result.MailServer = JObject.Parse(response)["global_vars"]["value"].ToString();
-                }
+                return new JabberServiceClient().GetVersion();
             }
-            catch (Exception)
+            catch (Exception e)
             {
-
+                LogManager.GetLogger("ASC").Warn(e.Message, e);
             }
 
-            return result;
+            return null;
         }
     }
 }

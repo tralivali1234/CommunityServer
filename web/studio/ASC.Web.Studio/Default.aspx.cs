@@ -1,40 +1,32 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
-using System.Web;
+using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
+using System.Web;
 using ASC.Core;
 using ASC.Core.Users;
 using ASC.Web.Core;
 using ASC.Web.Core.Files;
-using ASC.Web.Core.Utility.Settings;
-using ASC.Web.Studio.Utility;
 using ASC.Web.Studio.Core;
-using System.Collections.Generic;
+using ASC.Web.Studio.Utility;
+using Resources;
 
 namespace ASC.Web.Studio
 {
@@ -50,10 +42,18 @@ namespace ASC.Web.Studio
             if (CoreContext.Configuration.Personal)
                 Context.Response.Redirect(FilesLinkUtility.FilesBaseAbsolutePath);
         }
+
+
         protected bool? IsAutorizePartner { get; set; }
         protected Partner Partner { get; set; }
 
         protected List<IWebItem> defaultListProducts;
+
+        protected IEnumerable<CustomNavigationItem> CustomNavigationItems { get; set; }
+
+        protected int ProductsCount { get; set; }
+
+        protected string ResetCacheKey;
 
         protected void Page_Load(object sender, EventArgs e)
         {
@@ -61,29 +61,37 @@ namespace ASC.Web.Studio
 
             Page.RegisterStyle("~/skins/page_default.less");
 
-            var defaultPageSettings = SettingsManager.Instance.LoadSettings<StudioDefaultPageSettings>(TenantProvider.CurrentTenantID);
+            var defaultPageSettings = StudioDefaultPageSettings.Load();
             if (defaultPageSettings != null && defaultPageSettings.DefaultProductID != Guid.Empty)
             {
                 if (defaultPageSettings.DefaultProductID == defaultPageSettings.FeedModuleID && !CurrentUser.IsOutsider())
-                    Context.Response.Redirect("feed.aspx");
-
-                var products = WebItemManager.Instance.GetItemsAll<IProduct>();
-                foreach (var p in products)
                 {
-                    if (p.ID.Equals(defaultPageSettings.DefaultProductID))
+                    Response.Redirect("Feed.aspx", true);
+                }
+
+                var webItem = WebItemManager.Instance[defaultPageSettings.DefaultProductID];
+                if (webItem != null && webItem.Visible)
+                {
+                    var securityInfo = WebItemSecurity.GetSecurityInfo(defaultPageSettings.DefaultProductID.ToString());
+                    if (securityInfo.Enabled && WebItemSecurity.IsAvailableForMe(defaultPageSettings.DefaultProductID))
                     {
-                        var productInfo = WebItemSecurity.GetSecurityInfo(p.ID.ToString());
-                        if (productInfo.Enabled && WebItemSecurity.IsAvailableForUser(p.ID.ToString(), CurrentUser.ID))
+                        var url = webItem.StartURL;
+                        if (Request.DesktopApp())
                         {
-                            Context.Response.Redirect(p.StartURL);
+                            url += "?desktop=true";
+                            if (!string.IsNullOrEmpty(Request["first"]))
+                            {
+                                url += "&first=true";
+                            }
                         }
+                        Response.Redirect(url, true);
                     }
                 }
             }
 
             Master.DisabledSidePanel = true;
 
-            Title = Resources.Resource.MainPageTitle.HtmlEncode();
+            Title = Resource.MainPageTitle;
             defaultListProducts = WebItemManager.Instance.GetItems(Web.Core.WebZones.WebZoneType.StartProductList);
             _showDocs = (Product)defaultListProducts.Find(r => r.ID == WebItemManager.DocumentsProductID);
             if (_showDocs != null)
@@ -91,33 +99,99 @@ namespace ASC.Web.Studio
                 defaultListProducts.RemoveAll(r => r.ID == _showDocs.ProductID);
             }
 
-
             var mailProduct = WebItemManager.Instance[WebItemManager.MailProductID];
             if (mailProduct != null && !mailProduct.IsDisabled()) {
-                mailProduct.Context.LargeIconFileName = "product_logolarge.png";
                 defaultListProducts.Add(mailProduct);
             }
 
-            var  priority = new Dictionary<Guid, Int32>()
-	        {
-	            {WebItemManager.ProjectsProductID, 0},
-	            {WebItemManager.CRMProductID, 1},
-	            {WebItemManager.MailProductID, 2},
-	            {WebItemManager.PeopleProductID, 3},
-                {WebItemManager.CommunityProductID, 4}
-	        };
-
-            defaultListProducts = defaultListProducts.OrderBy(p => (priority.Keys.Contains(p.ID) ? priority[p.ID] : 10)).ToList();
-
-            if (CoreContext.Configuration.PartnerHosted)
+            var calendarProduct = WebItemManager.Instance[WebItemManager.CalendarProductID];
+            if (calendarProduct != null && !calendarProduct.IsDisabled())
             {
-                IsAutorizePartner = false;
-                var partner = CoreContext.PaymentManager.GetApprovedPartner();
-                if (partner != null)
+                defaultListProducts.Add(calendarProduct);
+            }
+
+            var talkProduct = WebItemManager.Instance[WebItemManager.TalkProductID];
+            if (talkProduct != null && !talkProduct.IsDisabled())
+            {
+                defaultListProducts.Add(talkProduct);
+            }
+
+            var priority = GetStartProductsPriority();
+
+            defaultListProducts = defaultListProducts
+                .Where(p => priority.Keys.Contains(p.ID))
+                .OrderBy(p => priority[p.ID])
+                .ToList();
+
+            CustomNavigationItems = CustomNavigationSettings.Load().Items.Where(x => x.ShowOnHomePage);
+
+            ProductsCount = defaultListProducts.Count() + CustomNavigationItems.Count() + (TenantExtra.EnableControlPanel ? 1 : 0);
+
+            ResetCacheKey = ConfigurationManagerExtension.AppSettings["web.client.cache.resetkey"] ?? "";
+        }
+
+        private static Dictionary<Guid, Int32> GetStartProductsPriority()
+        {
+            var priority = new Dictionary<Guid, Int32>
+                    {
+                        {WebItemManager.ProjectsProductID, 0},
+                        {WebItemManager.CRMProductID, 1},
+                        {WebItemManager.MailProductID, 2},
+                        {WebItemManager.PeopleProductID, 3},
+                        {WebItemManager.CommunityProductID, 4},
+                        {WebItemManager.SampleProductID, 5}
+                    };
+
+            if (!string.IsNullOrEmpty(SetupInfo.StartProductList))
+            {
+                var products = SetupInfo.StartProductList.Split(',');
+
+                if (products.Any())
                 {
-                    IsAutorizePartner = !string.IsNullOrEmpty(partner.AuthorizedKey);
-                    Partner = partner;
+                    priority = new Dictionary<Guid, int>();
+
+                    for (var i = 0; i < products.Length; i++)
+                    {
+                        var productId = GetProductId(products[i]);
+                        if (productId != Guid.Empty)
+                            priority.Add(productId, i);
+                    }
                 }
+            }
+
+            return priority;
+        }
+
+        private static Guid GetProductId(string productName)
+        {
+            Guid productId;
+
+            if (Guid.TryParse(productName, out productId))
+            {
+                var product = WebItemManager.Instance[productId];
+                if (product != null) return productId;
+            }
+
+            switch (productName.ToLowerInvariant())
+            {
+                case "documents":
+                    return WebItemManager.DocumentsProductID;
+                case "projects":
+                    return WebItemManager.ProjectsProductID;
+                case "crm":
+                    return WebItemManager.CRMProductID;
+                case "people":
+                    return WebItemManager.PeopleProductID;
+                case "community":
+                    return WebItemManager.CommunityProductID;
+                case "mail":
+                    return WebItemManager.MailProductID;
+                case "calendar":
+                    return WebItemManager.CalendarProductID;
+                case "talk":
+                    return WebItemManager.TalkProductID;
+                default:
+                    return Guid.Empty;
             }
         }
     }

@@ -1,35 +1,20 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Common.Caching;
-using ASC.Common.Data.Sql;
-using ASC.Common.Data.Sql.Expressions;
-using ASC.Core.Data;
-using ASC.Core.Tenants;
-using log4net;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -39,9 +24,16 @@ using System.ServiceModel.Configuration;
 using System.Text;
 using System.Threading.Tasks;
 
+using ASC.Common.Caching;
+using ASC.Common.Data.Sql;
+using ASC.Common.Data.Sql.Expressions;
+using ASC.Common.Logging;
+using ASC.Core.Data;
+using ASC.Core.Tenants;
+
 namespace ASC.Core.Billing
 {
-    class TariffService : DbBaseService, ITariffService
+    public class TariffService : DbBaseService, ITariffService
     {
         private const int DEFAULT_TRIAL_PERIOD = 30;
         private static readonly TimeSpan DEFAULT_CACHE_EXPIRATION = TimeSpan.FromMinutes(5);
@@ -51,7 +43,7 @@ namespace ASC.Core.Billing
         private readonly static ICacheNotify notify;
         private readonly static bool billingConfigured = false;
 
-        private static readonly ILog log = LogManager.GetLogger(typeof(TariffService));
+        private static readonly ILog log = LogManager.GetLogger("ASC");
         private readonly IQuotaService quotaService;
         private readonly ITenantService tenantService;
         private readonly CoreConfiguration config;
@@ -75,7 +67,7 @@ namespace ASC.Core.Billing
 
             try
             {
-                var section = (ClientSection)ConfigurationManager.GetSection("system.serviceModel/client");
+                var section = (ClientSection)ConfigurationManagerExtension.GetSection("system.serviceModel/client");
                 if (section != null)
                 {
                     billingConfigured = section.Endpoints.Cast<ChannelEndpointElement>()
@@ -96,8 +88,8 @@ namespace ASC.Core.Billing
             this.tenantService = tenantService;
             config = new CoreConfiguration(tenantService);
             CacheExpiration = DEFAULT_CACHE_EXPIRATION;
-            test = ConfigurationManager.AppSettings["core.payment-test"] == "true";
-            int.TryParse(ConfigurationManager.AppSettings["core.payment-delay"], out paymentDelay);
+            test = ConfigurationManagerExtension.AppSettings["core.payment-test"] == "true";
+            int.TryParse(ConfigurationManagerExtension.AppSettings["core.payment-delay"], out paymentDelay);
         }
 
 
@@ -131,36 +123,22 @@ namespace ASC.Core.Billing
                         {
                             using (var client = GetBillingClient())
                             {
-                                try
+                                var p = client.GetLastPayment(GetPortalId(tenantId));
+                                var quota = quotaService.GetTenantQuotas().SingleOrDefault(q => q.AvangateId == p.ProductId);
+                                if (quota == null)
                                 {
-                                    var p = client.GetLastPayment(GetPortalId(tenantId));
-                                    var quota = quotaService.GetTenantQuotas().SingleOrDefault(q => q.AvangateId == p.ProductId);
-                                    if (quota == null)
-                                    {
-                                        throw new InvalidOperationException(string.Format("Quota with id {0} not found for portal {1}.", p.ProductId, GetPortalId(tenantId)));
-                                    }
-                                    var asynctariff = Tariff.CreateDefault();
-                                    asynctariff.QuotaId = quota.Id;
-                                    asynctariff.Autorenewal = p.Autorenewal;
-                                    asynctariff.DueDate = 9999 <= p.EndDate.Year ? DateTime.MaxValue : p.EndDate;
-
-                                    if (SaveBillingInfo(tenantId, Tuple.Create(asynctariff.QuotaId, asynctariff.DueDate)))
-                                    {
-                                        asynctariff = CalculateTariff(tenantId, asynctariff);
-                                        ClearCache(tenantId);
-                                        cache.Insert(key, asynctariff, DateTime.UtcNow.Add(GetCacheExpiration()));
-                                    }
+                                    throw new InvalidOperationException(string.Format("Quota with id {0} not found for portal {1}.", p.ProductId, GetPortalId(tenantId)));
                                 }
-                                finally
+                                var asynctariff = Tariff.CreateDefault();
+                                asynctariff.QuotaId = quota.Id;
+                                asynctariff.Autorenewal = p.Autorenewal;
+                                asynctariff.DueDate = 9999 <= p.EndDate.Year ? DateTime.MaxValue : p.EndDate;
+
+                                if (SaveBillingInfo(tenantId, Tuple.Create(asynctariff.QuotaId, asynctariff.DueDate), false))
                                 {
-                                    if (config.Standalone)
-                                    {
-                                        var po = client.GetPaymentOffice(GetPortalId(tenantId));
-                                        if (!string.IsNullOrEmpty(po.Key2) && !Equals(config.SKey, po.Key2))
-                                        {
-                                            config.SKey = po.Key2;
-                                        }
-                                    }
+                                    asynctariff = CalculateTariff(tenantId, asynctariff);
+                                    ClearCache(tenantId);
+                                    cache.Insert(key, asynctariff, DateTime.UtcNow.Add(GetCacheExpiration()));
                                 }
                             }
                         }
@@ -259,11 +237,15 @@ namespace ASC.Core.Billing
             return payments;
         }
 
-        public Uri GetShoppingUri(int? tenant, int plan, string affiliateId)
+        public Uri GetShoppingUri(int? tenant, int quotaId, string affiliateId, string currency = null, string language = null, string customerId = null)
         {
+            var quota = quotaService.GetTenantQuota(quotaId);
+            if (quota == null) return null;
+
             var key = tenant.HasValue
-                ? GetBillingUrlCacheKey(tenant.Value)
-                : String.Format("notenant{0}", !string.IsNullOrEmpty(affiliateId) ? "_" + affiliateId : "");
+                          ? GetBillingUrlCacheKey(tenant.Value)
+                          : String.Format("notenant{0}", !string.IsNullOrEmpty(affiliateId) ? "_" + affiliateId : "");
+            key += quota.Visible ? "" : "0";
             var urls = cache.Get<Dictionary<string, Tuple<Uri, Uri>>>(key) as IDictionary<string, Tuple<Uri, Uri>>;
             if (urls == null)
             {
@@ -273,14 +255,15 @@ namespace ASC.Core.Billing
                     try
                     {
                         var products = quotaService.GetTenantQuotas()
+                                                   .Where(q => !string.IsNullOrEmpty(q.AvangateId) && q.Visible == quota.Visible)
                                                    .Select(q => q.AvangateId)
-                                                   .Where(id => !string.IsNullOrEmpty(id))
                                                    .ToArray();
+
                         using (var client = GetBillingClient())
                         {
                             urls = tenant.HasValue ?
-                                client.GetPaymentUrls(GetPortalId(tenant.Value), products, GetAffiliateId(tenant.Value)) :
-                                client.GetPaymentUrls(null, products, !string.IsNullOrEmpty(affiliateId) ? affiliateId : null);
+                                       client.GetPaymentUrls(GetPortalId(tenant.Value), products, GetAffiliateId(tenant.Value), GetCampaign(tenant.Value), "__Currency__", "__Language__", "__CustomerID__") :
+                                       client.GetPaymentUrls(null, products, !string.IsNullOrEmpty(affiliateId) ? affiliateId : null, null, "__Currency__", "__Language__", "__CustomerID__");
                         }
                     }
                     catch (Exception error)
@@ -293,16 +276,22 @@ namespace ASC.Core.Billing
 
             ResetCacheExpiration();
 
-            var quota = quotaService.GetTenantQuota(plan);
             Tuple<Uri, Uri> tuple;
-            if (quota != null && !string.IsNullOrEmpty(quota.AvangateId) && urls.TryGetValue(quota.AvangateId, out tuple))
+            if (!string.IsNullOrEmpty(quota.AvangateId) && urls.TryGetValue(quota.AvangateId, out tuple))
             {
+                var result = tuple.Item2;
+
                 var tariff = tenant.HasValue ? GetTariff(tenant.Value) : null;
-                if (tariff == null || tariff.QuotaId == plan || tariff.State >= TariffState.Delay || tuple.Item2 == null)
+                if (result == null || tariff == null || tariff.QuotaId == quotaId || tariff.State >= TariffState.Delay)
                 {
-                    return tuple.Item1;
+                    result = tuple.Item1;
                 }
-                return tuple.Item2;
+
+                result = new Uri(result.ToString()
+                                       .Replace("__Currency__", currency ?? "")
+                                       .Replace("__Language__", (language ?? "").ToLower())
+                                       .Replace("__CustomerID__", customerId ?? ""));
+                return result;
             }
             return null;
         }
@@ -392,7 +381,7 @@ namespace ASC.Core.Billing
                 .SingleOrDefault();
         }
 
-        private bool SaveBillingInfo(int tenant, Tuple<int, DateTime> bi)
+        private bool SaveBillingInfo(int tenant, Tuple<int, DateTime> bi, bool renewal = true)
         {
             var inserted = false;
             if (!Equals(bi, GetBillingInfo(tenant)))
@@ -402,7 +391,7 @@ namespace ASC.Core.Billing
                 {
                     // last record is not the same
                     var q = new SqlQuery("tenants_tariff").SelectCount().Where("tenant", tenant).Where("tariff", bi.Item1).Where("stamp", bi.Item2);
-                    if (bi.Item2 == DateTime.MaxValue || db.ExecuteScalar<int>(q) == 0)
+                    if (bi.Item2 == DateTime.MaxValue || renewal || db.ExecuteScalar<int>(q) == 0)
                     {
                         var i = new SqlInsert("tenants_tariff")
                             .InColumnValue("tenant", tenant)
@@ -492,9 +481,21 @@ namespace ASC.Core.Billing
 
                 if (config.Standalone)
                 {
-                    var licenseDate = tariff.DueDate;
-                    tariff = Tariff.CreateDefault();
-                    tariff.LicenseDate = licenseDate;
+                    if (q != null)
+                    {
+                        var defaultQuota = quotaService.GetTenantQuota(Tenant.DEFAULT_TENANT);
+                        defaultQuota.Name = "overdue";
+
+                        defaultQuota.Features = q.Features;
+                        defaultQuota.Support = false;
+
+                        quotaService.SaveTenantQuota(defaultQuota);
+                    }
+
+                    var unlimTariff = Tariff.CreateDefault();
+                    unlimTariff.LicenseDate = tariff.DueDate;
+
+                    tariff = unlimTariff;
                 }
             }
 
@@ -539,6 +540,11 @@ namespace ASC.Core.Billing
         private string GetAffiliateId(int tenant)
         {
             return config.GetAffiliateId(tenant);
+        }
+
+        private string GetCampaign(int tenant)
+        {
+            return config.GetCampaign(tenant);
         }
 
         private TimeSpan GetCacheExpiration()

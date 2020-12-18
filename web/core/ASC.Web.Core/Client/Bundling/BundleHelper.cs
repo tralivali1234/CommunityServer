@@ -1,37 +1,34 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
-using System.Collections.Generic;
+using System.Configuration;
+using System.IO;
 using System.Linq;
 using System.Web;
 using System.Web.Optimization;
 
 using ASC.Core;
 using ASC.Data.Storage;
+using ASC.Data.Storage.Configuration;
+using ASC.Data.Storage.GoogleCloud;
+using ASC.Data.Storage.RackspaceCloud;
+using ASC.Data.Storage.S3;
+using ASC.Data.Storage.Selectel;
 
 namespace ASC.Web.Core.Client.Bundling
 {
@@ -40,65 +37,54 @@ namespace ASC.Web.Core.Client.Bundling
         public const string BUNDLE_VPATH = "/bundle/";
         public const string CLIENT_SCRIPT_VPATH = "/clientscript/";
 
-
-        public static ASCStyleBundle GetCssBundle(string path)
+        public static string AddBundle(BundleData bundleData)
         {
-            return (ASCStyleBundle)BundleTable.Bundles.GetBundleFor(ToVirtualPath(path));
+            var path = bundleData.GetBundleVirtualPath(BUNDLE_VPATH, ClientSettings.ResetCacheKey);
+            var virtualPath = ToVirtualPath(path);
+            var bundle = (ASCBundle)BundleTable.Bundles.GetBundleFor(virtualPath);
+            if (bundle == null)
+            {
+                bundle = bundleData.CreateAscBundle(virtualPath);
+                foreach (var script in bundleData.GetSource())
+                {
+                    bundle.Include(script);
+                }
+                AddBundle(bundle);
+            }
+
+            return bundle.GetLink(path);
         }
 
-        public static ASCJsBundle GetJsBundle(string path)
-        {
-            return (ASCJsBundle)BundleTable.Bundles.GetBundleFor(ToVirtualPath(path));
-        }
+
 
         public static void AddBundle(Bundle bundle)
         {
             BundleTable.Bundles.Add(bundle);
-            if (((ASCBundle)bundle).UseDisc)
+            if (DiscTransform.SuccessInitialized || StaticUploader.CanUpload())
             {
                 bundle.GenerateBundleResponse(new BundleContext(new HttpContextWrapper(HttpContext.Current), BundleTable.Bundles, bundle.Path));
             }
         }
 
-        public static ASCStyleBundle CssBundle(string virtualPath)
-        {
-            return new ASCStyleBundle(ToVirtualPath(virtualPath));
-        }
-
-        public static ASCJsBundle JsBundle(string virtualPath)
-        {
-            return new ASCJsBundle(ToVirtualPath(virtualPath));
-        }
-
-        public static string HtmlLink(string uri)
-        {
-            return HtmlLink(uri, true);
-        }
-
-        public static string HtmlScript(string uri)
-        {
-            return HtmlScript(uri, true, false);
-        }
-
-        public static string HtmlLink(string uri, bool resolve)
+        public static string GetCssLink(string uri, bool resolve = true)
         {
             return string.Format("<link type='text/css' href='{0}' rel='stylesheet' />", GetUrl(uri, resolve));
         }
 
-        public static string HtmlScript(string uri, bool resolve, bool notobfuscate)
+        public static string GetJavascriptLink(string uri, bool resolve = true)
         {
-            return string.Format("<script type='text/javascript' src='{0}'{1}></script>", GetUrl(uri, resolve), notobfuscate ? " notobfuscate='true'" : string.Empty);
+            return string.Format("<script type='text/javascript' src='{0}'></script>", GetUrl(uri, resolve));
         }
 
-        public static string GetUrl(string path, bool resolve)
+        private static string GetUrl(string uri, bool resolve)
         {
-            var resolved = path;
+            var resolved = uri;
             if (resolve)
             {
-                resolved = BundleTable.Bundles.ResolveBundleUrl(ToVirtualPath(path), false);
-                if (path.Contains('?'))
+                resolved = BundleTable.Bundles.ResolveBundleUrl(ToVirtualPath(uri), false);
+                if (uri.Contains('?'))
                 {
-                    resolved += path.Substring(path.LastIndexOf('?'));
+                    resolved += uri.Substring(uri.LastIndexOf('?'));
                 }
             }
 
@@ -114,7 +100,7 @@ namespace ASC.Web.Core.Client.Bundling
             return resolved;
         }
 
-        public static string ToVirtualPath(string uri)
+        private static string ToVirtualPath(string uri)
         {
             if (uri.Contains('?'))
             {
@@ -146,7 +132,6 @@ namespace ASC.Web.Core.Client.Bundling
         internal class ASCBundle : Bundle
         {
             protected virtual string ContentType { get { return ""; } }
-            public bool UseDisc;
 
             protected ASCBundle(string virtualPath, params IBundleTransform[] transforms)
                 : base(virtualPath, transforms)
@@ -155,16 +140,66 @@ namespace ASC.Web.Core.Client.Bundling
 
                 if (!BundleTable.Bundles.UseCdn) return;
 
-                if (CoreContext.Configuration.Standalone)
+                bool isCDN = false;
+
+                var section = (StorageConfigurationSection)ConfigurationManagerExtension.GetSection("storage");
+
+                foreach (HandlerConfigurationElement h in section.Handlers)
                 {
-                    UseDisc = true;
-                    Transforms.Add(new DiscTransform());
-                    CdnPath = DiscTransform.GetUri(Path, ContentType);
+                    if (String.Compare(h.Name, "cdn", true) != 0) continue;
+
+                    if (h.Type.Equals(typeof(SelectelStorage)))
+                    {
+                        Transforms.Add(new SelectelStorageTransform());
+                    }
+                    else if (h.Type.Equals(typeof(S3Storage)))
+                    {
+                        Transforms.Add(new CloudFrontTransform());
+                    }
+                    else if (h.Type.Equals(typeof(GoogleCloudStorage)))
+                    {
+                        Transforms.Add(new GoogleCloudStorageTransform());
+                    }
+                    else if (h.Type.Equals(typeof(RackspaceCloudStorage)))
+                    {
+                        Transforms.Add(new RackspaceCloudStorageTransform());
+                    }
+                    else
+                    {
+                        throw new Exception("unknown argument");
+                    }
+
+                    isCDN = true;
+
+                    break;
                 }
-                else
+
+                if (!isCDN)
                 {
-                    Transforms.Add(new CdnTransform());
+                    if (CoreContext.Configuration.Standalone)
+                    {
+                        if (DiscTransform.SuccessInitialized)
+                        {
+                            Transforms.Add(new DiscTransform());
+                            CdnPath = DiscTransform.GetUri(Path, ContentType);
+                        }
+                        else
+                        {
+                            Transforms.Add(new StorageTransform());
+                        }
+                    }
                 }
+
+            }
+
+            public virtual Bundle Include(string path)
+            {
+                throw new NotImplementedException();
+            }
+
+            internal virtual string GetLink(string uri)
+            {
+                return uri;
             }
         }
 
@@ -173,19 +208,35 @@ namespace ASC.Web.Core.Client.Bundling
             protected override string ContentType { get { return "text/css"; } }
 
             public ASCStyleBundle(string virtualPath)
-                : base(virtualPath, new CssMinify())
+                : base(virtualPath, new CssTransform())
             {
             }
 
-            public Bundle Include(string path)
+            public override Bundle Include(string path)
             {
-                return Include(ToVirtualPath(path), new CssTransform(UseDisc ? CdnPath : Path));
+                var minify = true;
+                if (HttpContext.Current != null)
+                {
+                    var filePath = HttpContext.Current.Server.MapPath(path);
+                    if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath.Replace(".css", ".min.css").Replace(".less", ".min.css")))
+                    {
+                        minify = false;
+                        path = path.Replace(".css", ".min.css").Replace(".less", ".min.css");
+                    }
+                }
+
+                return Include(ToVirtualPath(path), new CssTransform(DiscTransform.SuccessInitialized ? CdnPath : Path, minify));
+            }
+
+            internal override string GetLink(string uri)
+            {
+                return GetCssLink(uri);
             }
         }
 
         internal class ASCJsBundle : ASCBundle
         {
-            public bool UseCache {  get; set; }
+            public bool UseCache { get; set; }
             protected override string ContentType { get { return "text/javascript"; } }
             public override IBundleOrderer Orderer { get { return new NullOrderer(); } }
 
@@ -196,9 +247,9 @@ namespace ASC.Web.Core.Client.Bundling
                 UseCache = true;
             }
 
-            public ASCJsBundle Include(string path, bool obfuscate)
+            public override Bundle Include(string path)
             {
-                return (ASCJsBundle)Include(ToVirtualPath(path), new JsTransform(obfuscate));
+                return Include(ToVirtualPath(path), new JsTransform());
             }
 
             public override void UpdateCache(BundleContext context, BundleResponse response)
@@ -212,6 +263,11 @@ namespace ASC.Web.Core.Client.Bundling
             public override BundleResponse CacheLookup(BundleContext context)
             {
                 return UseCache ? base.CacheLookup(context) : null;
+            }
+
+            internal override string GetLink(string uri)
+            {
+                return GetJavascriptLink(uri);
             }
         }
     }

@@ -1,29 +1,21 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System.Web;
 using ASC.Core.Configuration;
 using ASC.Core.Tenants;
 using System;
@@ -38,6 +30,8 @@ namespace ASC.Core
         private readonly ITenantService tenantService;
         private bool? standalone;
         private bool? personal;
+        private bool? customMode;
+        private long? personalMaxSpace;
         private string basedomain;
 
 
@@ -48,34 +42,63 @@ namespace ASC.Core
 
         public bool Standalone
         {
-            get { return standalone ?? (bool)(standalone = ConfigurationManager.AppSettings["core.base-domain"] == "localhost"); }
+            get { return standalone ?? (bool)(standalone = ConfigurationManagerExtension.AppSettings["core.base-domain"] == "localhost"); }
         }
 
         public bool Personal
         {
-            get { return personal ?? (bool)(personal = ConfigurationManager.AppSettings["core.personal"] == "true"); }
+            get
+            {
+                //todo: should replace only frotend
+                if (CustomMode && HttpContext.Current != null && HttpContext.Current.Request.SailfishApp()) return true;
+
+                return personal ?? (bool)(personal = ConfigurationManagerExtension.AppSettings["core.personal"] == "true");
+            }
         }
 
-        public bool PartnerHosted
+        public bool CustomMode
         {
-            get { return ConfigurationManager.AppSettings["core.payment-partners-hosted"] == "true"; }
+            get { return customMode ?? (bool)(customMode = ConfigurationManagerExtension.AppSettings["core.custom-mode"] == "true"); }
+        }
+
+        public long PersonalMaxSpace
+        {
+            get
+            {
+                var quotaSettings = PersonalQuotaSettings.LoadForCurrentUser();
+
+                if (quotaSettings.MaxSpace != long.MaxValue)
+                    return quotaSettings.MaxSpace;
+                
+                if (personalMaxSpace.HasValue)
+                    return personalMaxSpace.Value;
+
+                long value;
+
+                if (!long.TryParse(ConfigurationManagerExtension.AppSettings["core.personal.maxspace"], out value))
+                    value = long.MaxValue;
+
+                personalMaxSpace = value;
+
+                return personalMaxSpace.Value;
+            }
         }
 
         public SmtpSettings SmtpSettings
         {
             get
             {
-                bool isDefaultSettings = false;
+                var isDefaultSettings = false;
                 var tenant = CoreContext.TenantManager.GetCurrentTenant(false);
 
                 if (tenant != null)
                 {
 
-                    string settingsValue = GetSetting("SmtpSettings", tenant.TenantId);
+                    var settingsValue = GetSetting("SmtpSettings", tenant.TenantId);
                     if (string.IsNullOrEmpty(settingsValue))
                     {
                         isDefaultSettings = true;
-                        settingsValue = GetSetting("SmtpSettings", Tenant.DEFAULT_TENANT);
+                        settingsValue = GetSetting("SmtpSettings");
                     }
                     var settings = SmtpSettings.Deserialize(settingsValue);
                     settings.IsDefaultSettings = isDefaultSettings;
@@ -83,7 +106,7 @@ namespace ASC.Core
                 }
                 else
                 {
-                    string settingsValue = GetSetting("SmtpSettings", Tenant.DEFAULT_TENANT);
+                    var settingsValue = GetSetting("SmtpSettings");
 
                     var settings = SmtpSettings.Deserialize(settingsValue);
                     settings.IsDefaultSettings = true;
@@ -93,28 +116,13 @@ namespace ASC.Core
             set { SaveSetting("SmtpSettings", value != null ? value.Serialize() : null, CoreContext.TenantManager.GetCurrentTenant().TenantId); }
         }
 
-        public string SKey
-        {
-            get
-            {
-                return GetSetting("DocKey") ?? ConfigurationManager.AppSettings["files.docservice.key"];
-            }
-            set
-            {
-                if (Standalone)
-                {
-                    SaveSetting("DocKey", value);
-                }
-            }
-        }
-
         public string BaseDomain
         {
             get
             {
                 if (basedomain == null)
                 {
-                    basedomain = ConfigurationManager.AppSettings["core.base-domain"] ?? string.Empty;
+                    basedomain = ConfigurationManagerExtension.AppSettings["core.base-domain"] ?? string.Empty;
                 }
 
                 string result;
@@ -193,13 +201,7 @@ namespace ASC.Core
                 if (t != null && !string.IsNullOrWhiteSpace(t.PaymentId))
                     return t.PaymentId;
 
-                var prefix = string.Empty;
-                if (t != null && !string.IsNullOrEmpty(t.PartnerId) &&
-                    PartnerHosted)
-                {
-                    prefix = t.PartnerId + "h";
-                }
-                return prefix + ConfigurationManager.AppSettings["core.payment-region"] + tenant;
+                return ConfigurationManagerExtension.AppSettings["core.payment-region"] + tenant;
             }
         }
 
@@ -208,6 +210,15 @@ namespace ASC.Core
             var t = tenantService.GetTenant(tenant);
             if (t != null && !string.IsNullOrWhiteSpace(t.AffiliateId))
                 return t.AffiliateId;
+
+            return null;
+        }
+
+        public string GetCampaign(int tenant)
+        {
+            var t = tenantService.GetTenant(tenant);
+            if (t != null && !string.IsNullOrWhiteSpace(t.Campaign))
+                return t.Campaign;
 
             return null;
         }

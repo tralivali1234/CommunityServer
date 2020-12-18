@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,11 +20,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using ASC.Api.Attributes;
-using ASC.Api.Mail.DataContracts;
-using ASC.Api.Mail.Extensions;
-using ASC.Api.Mail.Resources;
-using ASC.Mail.Aggregator;
-using ASC.Mail.Aggregator.Common;
+using ASC.Mail.Data.Contracts;
+using ASC.Mail.Extensions;
+using ASC.Web.Mail.Resources;
 
 namespace ASC.Api.Mail
 {
@@ -48,7 +37,7 @@ namespace ASC.Api.Mail
         [Read(@"tags")]
         public IEnumerable<MailTagData> GetTags()
         {
-            return MailBoxManager.GetTags(TenantId, Username, false).ToList().ToTagData();
+            return MailEngineFactory.TagEngine.GetTags().ToTagData();
         }
 
         /// <summary>
@@ -64,16 +53,17 @@ namespace ASC.Api.Mail
         [Create(@"tags")]
         public MailTagData CreateTag(string name, string style, IEnumerable<string> addresses)
         {
+            //TODO: Is it necessary?
             Thread.CurrentThread.CurrentCulture = CurrentCulture;
             Thread.CurrentThread.CurrentUICulture = CurrentCulture;
 
-            if (String.IsNullOrEmpty(name))
+            if (string.IsNullOrEmpty(name))
                 throw new ArgumentException(MailApiResource.ErrorTagNameCantBeEmpty);
 
-            if(MailBoxManager.TagExists(TenantId, Username, name))
+            if (MailEngineFactory.TagEngine.IsTagExists(name))
                 throw new ArgumentException(MailApiResource.ErrorTagNameAlreadyExists.Replace("%1", "\"" + name + "\""));
 
-            return MailBoxManager.SaveMailTag(TenantId, Username, new MailTag(0, name, addresses.ToList(), style, 0)).ToTagData();
+            return MailEngineFactory.TagEngine.CreateTag(name, style, addresses).ToTagData();
 
         }
 
@@ -94,27 +84,27 @@ namespace ASC.Api.Mail
             if (id < 0)
                 throw new ArgumentException(@"Invalid tag id", "id");
 
+            //TODO: Is it necessary?
             Thread.CurrentThread.CurrentCulture = CurrentCulture;
             Thread.CurrentThread.CurrentUICulture = CurrentCulture;
 
-            if (String.IsNullOrEmpty(name))
+            if (string.IsNullOrEmpty(name))
                 throw new ArgumentException(MailApiResource.ErrorTagNameCantBeEmpty);
 
-            var tag = MailBoxManager.GetMailTag(TenantId, Username, id);
-            if (tag == null)
-                throw new ArgumentException();
+            try
+            {
+                var tag = MailEngineFactory.TagEngine.UpdateTag(id, name, style, addresses);
 
-            //Check exsisting label
-            var t = MailBoxManager.GetMailTag(TenantId, Username, name);
-            if(t != null && t.Id != id) throw new ArgumentException(MailApiResource.ErrorTagNameAlreadyExists.Replace("%1", "\"" + name + "\""));
-                          
+                return tag.ToTagData();
+            }
+            catch (ArgumentException ex)
+            {
+                if (ex.Message.Equals("Tag name already exists"))
+                    throw new ArgumentException(MailApiResource.ErrorTagNameAlreadyExists.Replace("%1",
+                        "\"" + name + "\""));
 
-            tag.Name = name;
-            tag.Style = style;
-            tag.Addresses = new MailTag.AddressesList<string>(addresses);
-            MailBoxManager.SaveMailTag(TenantId, Username, tag);
-
-            return tag.ToTagData();
+                throw;
+            }
         }
 
         /// <summary>
@@ -131,7 +121,9 @@ namespace ASC.Api.Mail
             if (id < 0)
                 throw new ArgumentException(@"Invalid tag id", "id");
 
-            MailBoxManager.DeleteTag(TenantId, Username, id);
+            if (!MailEngineFactory.TagEngine.DeleteTag(id))
+                throw new Exception("DeleteTag failed");
+
             return id;
         }
 
@@ -150,7 +142,8 @@ namespace ASC.Api.Mail
             if (!messages.Any())
                 throw new ArgumentException(@"Messages are empty", "messages");
 
-            MailBoxManager.SetMessagesTag(TenantId, Username, id, messages);
+            MailEngineFactory.TagEngine.SetMessagesTag(messages, id);
+
             return id;
         }
 
@@ -169,7 +162,8 @@ namespace ASC.Api.Mail
             if (!messages.Any())
                 throw new ArgumentException(@"Messages are empty", "messages");
 
-            MailBoxManager.UnsetMessagesTag(TenantId, Username, id, messages);
+            MailEngineFactory.TagEngine.UnsetMessagesTag(messages, id);
+
             return id;
         }
     }

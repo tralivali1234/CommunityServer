@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,7 +18,111 @@
 if (typeof jq == "undefined")
     var jq = jQuery.noConflict();
 
+// Production steps of ECMA-262, Edition 6, 22.1.2.1
+if (!Array.from) {
+    Array.from = (function () {
+        var toStr = Object.prototype.toString;
+        var isCallable = function (fn) {
+            return typeof fn === 'function' || toStr.call(fn) === '[object Function]';
+        };
+        var toInteger = function (value) {
+            var number = Number(value);
+            if (isNaN(number)) { return 0; }
+            if (number === 0 || !isFinite(number)) { return number; }
+            return (number > 0 ? 1 : -1) * Math.floor(Math.abs(number));
+        };
+        var maxSafeInteger = Math.pow(2, 53) - 1;
+        var toLength = function (value) {
+            var len = toInteger(value);
+            return Math.min(Math.max(len, 0), maxSafeInteger);
+        };
+
+        // The length property of the from method is 1.
+        return function from(arrayLike/*, mapFn, thisArg */) {
+            // 1. Let C be the this value.
+            var C = this;
+
+            // 2. Let items be ToObject(arrayLike).
+            var items = Object(arrayLike);
+
+            // 3. ReturnIfAbrupt(items).
+            if (arrayLike == null) {
+                throw new TypeError('Array.from requires an array-like object - not null or undefined');
+            }
+
+            // 4. If mapfn is undefined, then let mapping be false.
+            var mapFn = arguments.length > 1 ? arguments[1] : void undefined;
+            var T;
+            if (typeof mapFn !== 'undefined') {
+                // 5. else
+                // 5. a If IsCallable(mapfn) is false, throw a TypeError exception.
+                if (!isCallable(mapFn)) {
+                    throw new TypeError('Array.from: when provided, the second argument must be a function');
+                }
+
+                // 5. b. If thisArg was supplied, let T be thisArg; else let T be undefined.
+                if (arguments.length > 2) {
+                    T = arguments[2];
+                }
+            }
+
+            // 10. Let lenValue be Get(items, "length").
+            // 11. Let len be ToLength(lenValue).
+            var len = toLength(items.length);
+
+            // 13. If IsConstructor(C) is true, then
+            // 13. a. Let A be the result of calling the [[Construct]] internal method 
+            // of C with an argument list containing the single item len.
+            // 14. a. Else, Let A be ArrayCreate(len).
+            var A = isCallable(C) ? Object(new C(len)) : new Array(len);
+
+            // 16. Let k be 0.
+            var k = 0;
+            // 17. Repeat, while k < len… (also steps a - h)
+            var kValue;
+            while (k < len) {
+                kValue = items[k];
+                if (mapFn) {
+                    A[k] = typeof T === 'undefined' ? mapFn(kValue, k) : mapFn.call(T, kValue, k);
+                } else {
+                    A[k] = kValue;
+                }
+                k += 1;
+            }
+            // 18. Let putStatus be Put(A, "length", len, true).
+            A.length = len;
+            // 20. Return A.
+            return A;
+        };
+    }());
+}
+
+//ie11
+if (!Array.prototype.find) {
+    Array.prototype.find = function (predicate) {
+        if (this == null) {
+            throw new TypeError('Array.prototype.find called on null or undefined');
+        }
+        if (typeof predicate !== 'function') {
+            throw new TypeError('predicate must be a function');
+        }
+        var list = Object(this);
+        var length = list.length >>> 0;
+        var thisArg = arguments[1];
+        var value;
+
+        for (var i = 0; i < length; i++) {
+            value = list[i];
+            if (predicate.call(thisArg, value, i, list)) {
+                return value;
+            }
+        }
+        return undefined;
+    };
+}
+
 toastr.options.hideDuration = 100;
+toastr.options.timeOut = 8000;
 
 jQuery.extend(
     jQuery.expr[":"],
@@ -59,11 +154,12 @@ jQuery.fn.colorFade = function(color, tiemout, cb) {
         }));
 };
 
-// google analitics track
-var trackingGoogleAnalitics = function (ctg, act, lbl) {
+// google analytics track
+var trackingGoogleAnalytics = function (ctg, act, lbl) {
     try {
         if (window.ga) {
-            window.ga('send', 'event', ctg, act, lbl);
+            window.ga('www.send', 'event', ctg, act, lbl);
+            window.ga('testTracker.send', 'event', ctg, act, lbl);
         }
     } catch (err) {
     }
@@ -74,26 +170,51 @@ jQuery.fn.trackEvent = function (category, action, label, typeAction) { // only 
     switch (typeAction) {
         case "click":
             jq(this).on("click", function () {
-                trackingGoogleAnalitics(category, action, label);
+                trackingGoogleAnalytics(category, action, label);
                 return true;
             });
             break;
         case "enter":
             jq(this).keypress(function (e) {
                 if (e.which == 13) {
-                    trackingGoogleAnalitics(category, action, label);
+                    trackingGoogleAnalytics(category, action, label);
                 }
                 return true;
             });
             break;
         default:
             jq(this).on("click", function () {
-                trackingGoogleAnalitics(category, action, label);
+                trackingGoogleAnalytics(category, action, label);
                 return true;
             });
             break;
     }
 };
+
+if (!jQuery.fn.zIndex) {
+    jQuery.fn.zIndex = function(value) {
+        if (value) {
+            return this.css("z-index", value);
+        }
+        if (this.length) {
+            for (var item = jQuery(this[0]); item.length && item[0] !== document;) {
+                var position = item.css("position");
+                var zIndex = parseInt(item.css("z-index"), 10);
+                if (("absolute" === position || "relative" === position || "fixed" === position) && (!isNaN(zIndex) && 0 !== zIndex)) {
+                    return zIndex;
+                }
+                item = item.parent();
+            }
+        }
+        return 0;
+    };
+}
+
+if (!jQuery.fn.andSelf) {
+    jQuery.fn.andSelf = function () {
+        return this.add(this.prevObject);
+    };
+}
 
 jQuery.extend({
     loadTemplates: function(templateUrl) {
@@ -133,7 +254,7 @@ jQuery.extend({
 
     linksParser: function(val) {
         var replaceUrl = function(str) {
-            return '<a target="_new" href="' + (/^http/.test(str) ? str : 'http://' + str) + '">' + str + '</a>';
+            return '<a target="_blank" href="' + (/^http/.test(str) ? str : 'http://' + str) + '">' + str + '</a>';
         };
         var regUrl = /(\b(((https?|ftp|file):\/\/)|(www.))[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
         return val.replace(regUrl, replaceUrl);
@@ -149,11 +270,11 @@ jQuery.extend({
         });
     },
 
-    getURLParam: function(strParamName) {
+    getURLParam: function(strParamName, urlToParse) {
         strParamName = strParamName.toLowerCase();
 
         var strReturn = "";
-        var strHref = window.location.href.toLowerCase();
+        var strHref = urlToParse ? urlToParse : window.location.href.toLowerCase();
         var bFound = false;
 
         var cmpstring = strParamName + "=";
@@ -187,30 +308,32 @@ jQuery.extend({
             ms, // date in milliseconds
             month, day, year; // (integer) month, day and year
 
-        var dateFormat = Teamlab.constants.dateFormats.date;
+        var dateFormat = Teamlab.constants.dateFormats.date.replace(/ /g, '');
         var separator = "/";
-        var dateFormatComponent = dateFormat.split(separator);
+        var dateFormatComponent = dateFormat.replace(/[^dDmMyY\/]/g, '').split(separator);
         if (dateFormatComponent.length == 1) {
             separator = ".";
-            dateFormatComponent = dateFormat.split(separator);
+            dateFormatComponent = dateFormat.replace(/[^dDmMyY.]/g, '').split(separator);
             if (dateFormatComponent.length == 1) {
                 separator = "-";
-                dateFormatComponent = dateFormat.split(separator);
+                dateFormatComponent = dateFormat.replace(/[^dDmMyY-]/g, '').split(separator);
                 if (dateFormatComponent.length == 1) {
-                    separator = ". ";       // for czech language
-                    dateFormatComponent = dateFormat.split(separator);
-                    if (dateFormatComponent.length == 1) {
-                        return "Unknown format date";
-                    }
+                    return "Unknown format date";
                 }
             }
         }
 
+        dateFormatComponent = dateFormatComponent.filter(function (el) { return el; });
+
+        var regex = new RegExp('[^\\[0-9\\]' + separator + ']', 'g');
+
         // split input date to month, day and year
-        aoDate = txtDate.split(separator);
+        aoDate = txtDate.replace(regex, '').split(separator);
+
+        aoDate = aoDate.filter(function (el) { return el; });
+
         // array length should be exactly 3 (no more no less)
-        // the second condition for format dd.mm.yyyy. (for example in Latvia)
-        if (aoDate.length !== 3 && txtDate.charAt(txtDate.length - 1) !== separator) {
+        if (aoDate.length !== 3) {
             return false;
         }
         // define month, day and year from array (expected format is m/d/yyyy)
@@ -250,11 +373,9 @@ jQuery.extend({
     },
 
     isValidEmail: function(email) {
-        var reg = new RegExp(ASC.Resources.Master.EmailRegExpr, "i");
-        if (reg.test(email) == true) {
-            return true;
-        }
-        return false;
+        return (ASC.Mail && ASC.Mail.Utility && ASC.Mail.Utility.IsValidEmail) ?
+            ASC.Mail.Utility.IsValidEmail(email) :
+            new RegExp(ASC.Resources.Master.EmailRegExpr, "i").test(email);
     },
 
     switcherAction: function(el, block) {
@@ -302,7 +423,7 @@ jQuery.extend({
         return e;
     },
 
-    showDropDownByContext: function (evt, target, dropdownItem) {
+    showDropDownByContext: function (evt, target, dropdownItem, showFunction) {
         var ddiHeight = dropdownItem.innerHeight(),
             ddiWidth = dropdownItem.innerWidth(),
 
@@ -313,34 +434,58 @@ jQuery.extend({
         if (target.is(".entity-menu") || target.is(".menu-small")) {
             target.addClass("active");
 
-            var
-                baseTop = target.offset().top + target.outerHeight() - 2,
-                correctionY =
-                    ddiHeight > target.offset().top
+            var position = jq.browser.mobile ? target.position() : target.offset();
+            var baseTop = position.top + target.outerHeight() - 2;
+            var correctionY =
+                ddiHeight > position.top
                     ? 0
                     : (scrHeight + scrScrollTop - baseTop > ddiHeight ? 0 : ddiHeight);
 
+            var top = baseTop - correctionY + (correctionY == 0 ? 2 : -target.outerHeight() - 2);
+            var bottom = "auto";
+
+            if (top + ddiHeight > document.body.clientHeight + scrScrollTop) {
+                top = "auto";
+                bottom = "0";
+            }
+
             dropdownItem.css({
-                "top": baseTop - correctionY + (correctionY == 0 ? 2 : -target.outerHeight() - 2),
-                "left": target.offset().left + target.outerWidth() - ddiWidth + 10,
-                "right": "auto"
+                "top": top,
+                "left": position.left + target.outerWidth() - ddiWidth + 10,
+                "right": "auto",
+                "bottom": bottom
             });
         } else {
-            var
-                correctionX = document.body.clientWidth - (evt.pageX - pageXOffset + ddiWidth) > 0 ? 0 : ddiWidth,
-                correctionY =
-                    ddiHeight > evt.pageY
+            var correctionX = document.body.clientWidth - (evt.pageX - pageXOffset + ddiWidth) > 0 ? 0 : ddiWidth;
+            correctionY =
+                ddiHeight > evt.pageY
                     ? 0
                     : (scrHeight + scrScrollTop - evt.pageY > ddiHeight ? 0 : ddiHeight);
 
+            var top = evt.pageY - correctionY;
+            var bottom = "auto";
+
+            if (top + ddiHeight > document.body.clientHeight + scrScrollTop) {
+                top = "auto";
+                bottom = "0";
+            }
+
             dropdownItem.css(
                 {
-                    "top": evt.pageY - correctionY,
+                    "top": top,
                     "left": evt.pageX - correctionX,
                     "right": "auto",
+                    "bottom": bottom,
                     "margin": "0"
                 });
         }
+
+        if (typeof showFunction === "function") {
+            if (showFunction(evt) === false) {
+                return;
+            }
+        }
+
         dropdownItem.show();
     }
 });
@@ -362,33 +507,22 @@ String.prototype.removeAt = function (start, length) {
 }
 
 StudioBlockUIManager = {
-    blockUI: function (obj, width, height, top, position, opts) {
+    blockUI: function (obj, width, opts) {
         try {
-            width = width | 0;
-            height = height | 0;
-            left = width > 0 ? (-width / 2 | 0) : -200;
-            top = ((top || -height / 2) | 0) + (position ? jq(window).scrollTop() : 0);
-            top = -Math.min(-top, jq(window).height() / 2);
-            position = position ? position : "fixed";
-            opts = opts || {};
-
             var defaultOptions = {
                 message: jq(obj),
                 css: {
                     backgroundColor: "transparent",
                     border: "none",
                     cursor: "default",
-                    height: height > 0 ? height + "px" : "auto",
                     left: "50%",
-                    marginLeft: left + "px",
-                    marginTop: top + "px",
                     opacity: "1",
                     overflow: "visible",
                     padding: "0px",
-                    position: position,
+                    position: "fixed",
                     textAlign: "left",
-                    top: "50%",
-                    width: width > 0 ? width + "px" : "auto",
+                    width: (typeof width == "number" && width > 0) ? width + "px" : "auto",
+                    transform: "translate(-50%, -50%)"
                 },
 
                 overlayCSS: {
@@ -401,10 +535,21 @@ StudioBlockUIManager = {
                 baseZ: 666,
 
                 fadeIn: 0,
-                fadeOut: 0
+                fadeOut: 0,
+
+                onBlock: function () {
+                    var matrix = this.css("transform").match(/-?\d+\.?\d*/g);
+                    this.css("transform", "");
+                    this.css("margin-left", parseInt(matrix[4]) + "px");
+                    this.css("margin-top", parseInt(matrix[5]) + "px");
+
+                    if (jq.browser.mobile) {
+                        jq(obj).get(0).scrollIntoView({ block: "start", inline: "start" });
+                    }
+                }
             };
 
-            jq.blockUI(jq.extend(true, defaultOptions, opts));
+            jq.blockUI(jq.extend(true, defaultOptions, opts || {}));
         } catch (e) {
         }
     }
@@ -452,8 +597,7 @@ var FCKCommentsController = new function () {
 var PopupKeyUpActionProvider = new function () {
     //close dialog by esc
     jq(document).keyup(function (event) {
-
-        if (!jq('.popupContainerClass').is(':visible'))
+        if (!PopupKeyUpActionProvider.ForceBinding && !jq('.popupContainerClass').is(':visible'))
             return;
 
         var code;
@@ -471,8 +615,13 @@ var PopupKeyUpActionProvider = new function () {
                 eval(PopupKeyUpActionProvider.CtrlEnterAction);
             }
         } else if (code == 13) {
-            if (e.target.nodeName.toLowerCase() !== 'textarea' && PopupKeyUpActionProvider.EnterAction != null && PopupKeyUpActionProvider.EnterAction != '')
-                eval(PopupKeyUpActionProvider.EnterAction);
+            if (e.target.nodeName.toLowerCase() !== 'textarea' && PopupKeyUpActionProvider.EnterAction != null && PopupKeyUpActionProvider.EnterAction != '') {
+                if (typeof PopupKeyUpActionProvider.EnterAction === "string") {
+                    eval(PopupKeyUpActionProvider.EnterAction);
+                } else if (typeof PopupKeyUpActionProvider.EnterAction === "function") {
+                    PopupKeyUpActionProvider.EnterAction();
+                }
+            }
             if (e.target.nodeName.toLowerCase() !== 'textarea' && PopupKeyUpActionProvider.EnterActionCallback != null && PopupKeyUpActionProvider.EnterActionCallback != '')
                 eval(PopupKeyUpActionProvider.EnterActionCallback);
         }
@@ -485,7 +634,6 @@ var PopupKeyUpActionProvider = new function () {
         if (PopupKeyUpActionProvider.CloseDialogAction != null && PopupKeyUpActionProvider.CloseDialogAction != '') {
             eval(PopupKeyUpActionProvider.CloseDialogAction);
         }
-
         PopupKeyUpActionProvider.ClearActions();
     };
 
@@ -494,6 +642,7 @@ var PopupKeyUpActionProvider = new function () {
     this.EnterActionCallback = '';
     this.CtrlEnterAction = '';
     this.EnableEsc = true;
+    this.ForceBinding = false;
 
     this.ClearActions = function () {
         this.CloseDialogAction = '';
@@ -501,6 +650,10 @@ var PopupKeyUpActionProvider = new function () {
         this.EnterActionCallback = '';
         this.CtrlEnterAction = '';
         this.EnableEsc = true;
+        this.ForceBinding = false;
+        if (typeof (TMTalk) != 'undefined') {
+            TMTalk.hideDialog();
+        }
     };
 };
 
@@ -512,22 +665,19 @@ var StudioManager = new function () {
         return ASC.Resources.Master.ImageWebPath + "/" + imageName;
     };
 
-    this.getLocationPathToModule = function (moduleName) { // example path = jq.getLocationPathToModule("projects") - http://localhost/asc/products/projects/
-        var products = "products";
-        var mass = location.href.toLowerCase().split(products);
-        var path = mass[0] + products + "/" + moduleName + "/";
-        return path;
+    this.getLocationPathToModule = function (moduleName) { // example path = jq.getLocationPathToModule("Projects") - http://localhost/Products/Projects/
+        return window.location.origin + "/Products/" + moduleName + "/";
     };
 
     this.getBasePathToModule = function () {
-        var products = "products",
+        var products = "Products",
             addons = "addons",
             mass,
             parts,
             moduleName = "",
             path = "/";
 
-        mass = location.pathname.toLowerCase().split(products);
+        mass = location.pathname.split(products);
         if (mass.length > 1) {
             parts = mass[1].split('/');
             if (parts.length > 1) {
@@ -715,7 +865,7 @@ var StudioManager = new function () {
     };
 
     this.ShowAddContentDialog = function () {
-        StudioBlockUIManager.blockUI("#studio_AddContentDialog", 400, 350, 0);
+        StudioBlockUIManager.blockUI("#studio_AddContentDialog", 400);
     };
 
     this.Disable = function (obj_id) {
@@ -727,43 +877,60 @@ var StudioManager = new function () {
     };
 
     this.initImageZoom = function (options) {
-        var setting = jq.extend({
-            type: 'image',
-            tLoading: '', // remove text from preloader
-            gallery: {
-                enabled: true,
-                tCounter: '%curr% / %total%',
-                preload: [0,0]
-            },
-            image: {
-                tError: jq.format(ASC.Resources.Master.Resource.MagnificImageError, '<a href="%url%">' ,'</a>') // Error message when image could not be loaded
-            },
-            ajax: {
-                tError: jq.format(ASC.Resources.Master.Resource.MagnificContentError, '<a href="%url%">', '</a>') // Error message when resource could not be loaded
-            }
-        }, options);
+        jq(".mediafile, .screenzoom").click(function (event) {
+            event.stopPropagation();
 
-        jq(".screenzoom").magnificPopup(setting);
+            jq(window).click();
+
+            var playlist = [];
+            var selIndex = 0;
+
+            jq(".mediafile, .screenzoom").each(function (i, v) {
+                playlist.push({ title: v.title, id: i, src: v.href });
+                if (v.href == event.currentTarget.href)
+                    selIndex = i;
+            });
+
+            ASC.Files.MediaPlayer.init(-1, {
+                playlist: playlist,
+                playlistPos: selIndex,
+                downloadAction: function (fileId) {
+                    return playlist[fileId].src;
+                }
+            });
+
+            return false;
+        });
     };
-};
 
-/**
- * EventTracker
- */
-var EventTracker = new function () {
-    this.Track = function (event) {
+    var pendingRequests = new Array();
+    var pendingRequestMade = false;
+    var pendingReqestTimer = null;
+    this.addPendingRequest = function (func) {
+        if (typeof func != "function") {
+            return;
+        }
 
-        try {
-            if (window.ga) {
-                window.ga('send', 'pageview', event);
-            }
-        } catch (err) {
+        if (pendingRequestMade) {
+            func.apply();
+            return;
+        }
+
+        pendingRequests.push(func);
+
+        if (pendingReqestTimer == null) {
+            pendingReqestTimer = setTimeout(function () {
+                pendingRequestMade = true;
+                for (var i = 0; i < pendingRequests.length; i++) {
+                    pendingRequests[i].apply();
+                }
+            }, 3600);
         }
     };
 };
 
 /*--------Error messages for required field-------*/
-function ShowRequiredError (item, withouthScroll) {
+function ShowRequiredError (item, withouthScroll, withouthFocus) {
     jq("div[class='infoPanel alert']").hide();
     jq("div[class='infoPanel alert']").empty();
     var parentBlock = jq(item).parents(".requiredField");
@@ -772,7 +939,10 @@ function ShowRequiredError (item, withouthScroll) {
     if (typeof(withouthScroll) == "undefined" || withouthScroll == false) {
         jq.scrollTo(jq(parentBlock).position().top - 50, {speed: 500});
     }
-    jq(item).focus();
+
+    if (typeof (withouthFocus) == "undefined" || withouthFocus == false) {
+        jq(item).focus();
+    }
 }
 
 function HideRequiredError () {
@@ -799,9 +969,13 @@ function SortData(a, b) {
 /**
  * EmailOperationManager
  */
-var EmailOperationManager = new function () {
-    var self = this;
-    this.SendEmailActivationInstructions = function (userEmail, userID, responseAction) {
+
+if (typeof (ASC) === 'undefined') {
+    ASC = {};
+}
+
+ASC.EmailOperationManager = (function () {
+    function sendInstructionsHelper(emailOperationServiceSendInstruction, responseAction, reload) {
         AjaxPro.onLoading = function (b) {
             if (b) {
                 LoadingBanner.showLoaderBtn("#studio_emailChangeDialog");
@@ -809,49 +983,38 @@ var EmailOperationManager = new function () {
                 LoadingBanner.hideLoaderBtn("#studio_emailChangeDialog");
             }
         };
-        EmailOperationService.SendEmailActivationInstructions(userID, userEmail, function (response) {
+        emailOperationServiceSendInstruction(function (response) {
             if (responseAction) {
                 responseAction(response);
             }
-            EmailOperationManager._EmailOperationInstructionsServerResponse(response, false);
-        });
-    };
 
-    this.SendEmailChangeInstructions = function (userEmail, userID, responseAction) {
-        AjaxPro.onLoading = function (b) {
-            if (b) {
-                LoadingBanner.showLoaderBtn("#studio_emailChangeDialog");
+            if (response.error != null) {
+                toastr.error(response.error.Message);
             } else {
-                LoadingBanner.hideLoaderBtn("#studio_emailChangeDialog");
+                PopupKeyUpActionProvider.ClearActions();
+                jq.unblockUI();
+                toastr.success(response.value);
+                if (reload)
+                    document.location.reload(true);
             }
-        };
-        EmailOperationService.SendEmailChangeInstructions(userID, userEmail, function (response) {
-            if (responseAction) {
-                responseAction(response);
-            }
-            EmailOperationManager._EmailOperationInstructionsServerResponse(response, Teamlab.profile.isAdmin);
         });
     };
 
-    this._EmailOperationInstructionsServerResponse = function (response, reload) {
-        if (response.error != null) {
-            toastr.error(response.error.Message);
-        } else {
-            PopupKeyUpActionProvider.ClearActions();
-            jq.unblockUI();
-            toastr.success(response.value);
-            if (reload)
-                setTimeout(function() { document.location.reload(true); }, 3000);
-        }
+    function sendEmailActivationInstructions(userEmail, userID, responseAction) {
+        sendInstructionsHelper(EmailOperationService.SendEmailActivationInstructions.bind(EmailOperationService, userID, userEmail), responseAction);
     };
 
-    this.ShowEmailChangeWindow = function (userEmail, userID, responseAction) {
+    function sendEmailChangeInstructions(userEmail, userID, responseAction) {
+        sendInstructionsHelper(EmailOperationService.SendEmailChangeInstructions.bind(EmailOperationService, userID, userEmail), responseAction, Teamlab.profile.isAdmin);
+    };
+
+    function showEmailChangeWindow (userEmail, userID, responseAction) {
         jq("#divEmailOperationError").html("").hide();
         jq("#studio_emailOperationResult").hide();
 
-            jq("#emailInputContainer").removeClass("display-none");
-            jq("#emailMessageContainer").addClass("display-none");
-            jq("#btEmailOperationSend").addClass("disable");
+        jq("#emailInputContainer").removeClass("display-none");
+        jq("#emailMessageContainer").addClass("display-none");
+        jq("#btEmailOperationSend").addClass("disable");
 
         jq("#resendInviteDialogPopupHeader").addClass("display-none");
         jq("#emailActivationDialogPopupHeader").addClass("display-none");
@@ -865,29 +1028,36 @@ var EmailOperationManager = new function () {
 
         jq("#emailOperation_email").val(userEmail);
         
-        self.OpenPopupDialog();
+        openPopupDialog();
         
         jq("#btEmailOperationSend").unbind("click");
 
         jq("#btEmailOperationSend").click(function () {
             if (jq(this).hasClass("disable")) return false;
             var newEmail = jq("#emailOperation_email").val();
-            EmailOperationManager.SendEmailChangeInstructions(newEmail, userID, responseAction);
+            sendEmailChangeInstructions(newEmail, userID, responseAction);
             return false;
         });
         
-        jq("#emailOperation_email").unbind("onkeyup");
-        
-        jq("#emailOperation_email").keyup(function (key) {
-            if (jq(this).val() != userEmail) {
-                var sendButton = jq("#btEmailOperationSend");
-                sendButton.removeClass("disable");
-                if (getKeyCode(key) == 13) {
-                    sendButton.click();
+        jq("#emailOperation_email").off(".emailChange");
+
+        jq("#emailOperation_email").on("keyup.emailChange paste.emailChange cut.emailChange", function (key) {
+            var checkEmail = function () {
+                if (jq("#emailOperation_email").val() != userEmail) {
+                    var sendButton = jq("#btEmailOperationSend");
+                    sendButton.removeClass("disable");
+                    if (getKeyCode(key) == 13) {
+                        sendButton.click();
+                    }
+                } else {
+                    jq("#btEmailOperationSend").addClass("disable");
                 }
-            } else {
-                jq("#btEmailOperationSend").addClass("disable");
+            };
+            if (key.type != "keyup") {
+                setTimeout(checkEmail, 1);
+                return true;
             }
+            checkEmail();
             return false;
         });
         
@@ -896,108 +1066,64 @@ var EmailOperationManager = new function () {
         };
     };
 
-    this.ShowEmailActivationWindow = function (userEmail, userID, adminMode, responseAction) {
+    function showResendInviteWindow (userEmail, userID, adminMode, responseAction) {
         jq("#divEmailOperationError").html("").hide();
-        jq("#studio_emailOperationResult").hide();
+        jq("#studio_emailOperationResult").addClass("display-none");
 
         if (adminMode == true) {
             jq("#emailInputContainer").removeClass("display-none");
-            jq("#emailMessageContainer").hide();
+            jq("#emailMessageContainer").addClass("display-none");
         } else {
             jq("#emailInputContainer").addClass("display-none");
-            jq("#emailMessageContainer").show();
+            jq("#emailMessageContainer").removeClass("display-none");
 
-            jq("#resendInviteText").hide();
-            jq("#emailActivationText").show();
-            jq("#emailChangeText").hide();
+            jq("#emailActivationText").addClass("display-none");
+            jq("#emailChangeText").addClass("display-none");
+            jq("#resendInviteText").removeClass("display-none");
 
             jq("#emailMessageContainer [name='userEmail']").attr("href", "../../addons/mail/#composeto/email=" + userEmail).html(userEmail);
         }
 
-        jq("#emailActivationDialogPopupHeader").show();
-        jq("#emailChangeDialogPopupHeader").hide();
-        jq("#resendInviteDialogPopupHeader").hide();
+        jq("#emailActivationDialogPopupHeader").addClass("display-none");
+        jq("#emailChangeDialogPopupHeader").addClass("display-none");
+        jq("#resendInviteDialogPopupHeader").removeClass("display-none");
 
         jq("#studio_emailOperationContent").removeClass("display-none");
 
-        jq("#emailChangeDialogText").hide();
-        jq("#resendInviteDialogText").hide();
-        jq("#emailActivationDialogText").show();
+        jq("#emailChangeDialogText").addClass("display-none");
+        jq("#emailActivationDialogText").addClass("display-none");
+        jq("#resendInviteDialogText").removeClass("display-none");
 
         jq("#emailOperation_email").val(userEmail);
         jq("#btEmailOperationSend").removeClass("disable");
-        jq("#emailOperation_email").unbind("onkeyup");
+        jq("#emailOperation_email").off(".emailChange");
         
-        self.OpenPopupDialog();
+        openPopupDialog();
 
         jq("#btEmailOperationSend").unbind("click");
 
         jq("#btEmailOperationSend").click(function () {
             var newEmail = jq("#emailOperation_email").val();
-            EmailOperationManager.SendEmailActivationInstructions(newEmail, userID, responseAction);
+            sendEmailActivationInstructions(newEmail, userID, responseAction);
             return false;
         });
 
     };
 
-    this.ShowResendInviteWindow = function (userEmail, userID, adminMode, responseAction) {
-        jq("#divEmailOperationError").html("").hide();
-        jq("#studio_emailOperationResult").hide();
-
-        if (adminMode == true) {
-            jq("#emailInputContainer").removeClass("display-none");
-            jq("#emailMessageContainer").hide();
-        } else {
-            jq("#emailInputContainer").addClass("display-none");
-            jq("#emailMessageContainer").show();
-
-            jq("#emailActivationText").hide();
-            jq("#emailChangeText").hide();
-            jq("#resendInviteText").show();
-
-            jq("#emailMessageContainer [name='userEmail']").attr("href", "../../addons/mail/#composeto/email=" + userEmail).html(userEmail);
-        }
-
-        jq("#emailActivationDialogPopupHeader").hide();
-        jq("#emailChangeDialogPopupHeader").hide();
-        jq("#resendInviteDialogPopupHeader").show();
-
-        jq("#studio_emailOperationContent").removeClass("display-none");
-
-        jq("#emailChangeDialogText").hide();
-        jq("#emailActivationDialogText").hide();
-        jq("#resendInviteDialogText").show();
-
-        jq("#emailOperation_email").val(userEmail);
-        jq("#btEmailOperationSend").removeClass("disable");
-        jq("#emailOperation_email").unbind("onkeyup");
-        
-        self.OpenPopupDialog();
-
-        jq("#btEmailOperationSend").unbind("click");
-
-        jq("#btEmailOperationSend").click(function () {
-            var newEmail = jq("#emailOperation_email").val();
-            EmailOperationManager.SendEmailActivationInstructions(newEmail, userID, responseAction);
-            return false;
-        });
-
-    };
-
-    this.OpenPopupDialog = function () {
-        StudioBlockUIManager.blockUI("#studio_emailChangeDialog", 425, 300, 0);
+    function openPopupDialog () {
+        StudioBlockUIManager.blockUI("#studio_emailChangeDialog", 425);
 
         PopupKeyUpActionProvider.ClearActions();
         PopupKeyUpActionProvider.EnterAction = "jq(\"#btEmailOperationSend\").click();";
     };
 
-    this.CloseEmailOperationWindow = function () {
+    function closeEmailOperationWindow () {
         PopupKeyUpActionProvider.ClearActions();
         jq.unblockUI();
         document.location.reload(true);
     };
 
-    this.SendInstructions = function (userID, userEmail) {
+    function sendInstructions (userID, userEmail) {
         if (EmailOperationService) {
             EmailOperationService.SendEmailActivationInstructions(userID, userEmail, function (res) {
                 if (res.error != null) {
@@ -1008,16 +1134,29 @@ var EmailOperationManager = new function () {
             });
         }
     };
-};
+
+    function closeActivateEmailPanel(btn) {
+        var activateEmailPanel = jq(btn).parents(".info-box");
+        Teamlab.updateEmailActivationSettings({ show: false }, function () {
+            activateEmailPanel.remove();
+        });
+    };
+
+    return {
+        sendInstructions: sendInstructions,
+        sendEmailActivationInstructions: sendEmailActivationInstructions,
+        showResendInviteWindow: showResendInviteWindow,
+        showEmailChangeWindow: showEmailChangeWindow,
+        closeEmailOperationWindow: closeEmailOperationWindow,
+        closeActivateEmailPanel: closeActivateEmailPanel
+    }
+})();
 
 /**
  * LoadingBanner
  */
 LoadingBanner = function () {
-    var animateDelay = 2000,
-        displayDelay = 500,
-        displayOpacity = 1,
-        loaderCss = "",
+    var loaderCss = "",
         loaderId = "loadingBanner",
         strLoading = "Loading...",
         strDescription = "Please wait...",
@@ -1035,9 +1174,6 @@ LoadingBanner = function () {
     };
 
     return {
-        animateDelay: animateDelay,
-        displayDelay: displayDelay,
-        displayOpacity: displayOpacity,
         loaderCss: loaderCss,
         loaderId: loaderId,
         strLoading: strLoading,
@@ -1045,7 +1181,7 @@ LoadingBanner = function () {
         successId : successId,
         strSuccess: strSuccess,
 
-        displayLoading: function (withoutDelay, withBackdrop) {
+        displayLoading: function () {
             var id = "#" + LoadingBanner.loaderId;
 
             if (jq(id).length != 0)
@@ -1054,19 +1190,10 @@ LoadingBanner = function () {
             var innerHtml = '<div id="{0}" class="loadingBanner {1}"><div class="loader-block">{2}<div>{3}</div></div></div>'
                 .format(LoadingBanner.loaderId, LoadingBanner.loaderCss, LoadingBanner.strLoading, LoadingBanner.strDescription);
 
-            if (withBackdrop)
-                jq("body").append('<div class="loadingBannerBackDrop"></div>');
-
             jq("body").append(innerHtml).addClass("loading");
 
             if (jq.browser.mobile)
                 jq(id).css("top", jq(window).scrollTop() + "px");
-
-            if (withoutDelay) return;
-
-            jq(id).animate({ opacity: 0 }, LoadingBanner.displayDelay, function() {
-                jq(id).animate({ opacity: LoadingBanner.displayOpacity }, LoadingBanner.animateDelay);
-            });
         },
 
         hideLoading: function () {
@@ -1094,11 +1221,14 @@ LoadingBanner = function () {
         showLoaderBtn: function(block) {
             hideMesInfoBtn();
 
-            var loaderHtml = "<div class=\"loader-container\">{0}</div>".format(LoadingBanner.strLoading),
-                btnContainer = jq(block).find("[class*=\"button-container\"]");
+            var btnContainer = jq(block).find("[class*=\"button-container\"]");
+
+            if (!btnContainer.length || btnContainer.find(".loader-container").length)
+                return;
+
             jq(btnContainer).siblings(".error-popup, .success-popup").each(function() {jq(this).hide();});
             btnContainer.find(".button").addClass("disable").attr("disabled" , true);
-            jq(btnContainer).append(loaderHtml);
+            jq(btnContainer).append("<div class=\"loader-container\">{0}</div>".format(LoadingBanner.strLoading));
 
         },
 
@@ -1257,6 +1387,7 @@ var LeftMenuManager = new function () {
             inPopup: true,
             addTop: 4,
             addLeft: 0,
+            rightPos: true,
             afterShowFunction: function (switcherObj, dropdownItem) {
                 jq(window).trigger("onOpenSideNavOtherActions", switcherObj, dropdownItem);
             }
@@ -1309,15 +1440,17 @@ var ScrolledGroupMenu = new function () {
 
         var $menuObj = jq(options.menuSelector),
             $boxTop = jq(options.menuAnchorSelector),
-            $menuSpacerObj = jq(options.menuSpacerSelector);
+            $menuSpacerObj = jq(options.menuSpacerSelector),
+            $groupActionsObj = jq(".studio-action-panel.group-actions"),
+            $otherActionsObj = jq(".studio-action-panel.other-actions"),
+            $otherActionsBtn = $menuObj.find(".otherFunctions");
 
         if ($menuObj.length == 0 || $boxTop.length == 0 || $menuSpacerObj.length == 0) {
             return;
         }
 
-        var newTop = $boxTop.offset().top + $boxTop.outerHeight(),
-            winScrollTop = jq(window).scrollTop(),
-            tempTop = 0;
+        var winScrollTop = jq(window).scrollTop();
+        var tempTop = 0;
 
         if ($menuSpacerObj.css("display") == "none") {
             tempTop += $menuObj.offset().top;
@@ -1340,17 +1473,23 @@ var ScrolledGroupMenu = new function () {
                     "position": "fixed",
                     "paddingTop": "8px"
                 });
-            jq(".studio-action-panel.group-actions").css(
+
+            $groupActionsObj.css(
                 {
                     "top": jq(document).scrollTop() + $menuObj.outerHeight() - 4 + "px",
                     "position": "absolute"
                 });
 
-            jq(".studio-action-panel.other-actions").css(
-                {
-                    top: $menuObj.outerHeight() - 4 + "px",
-                    position: "fixed"
-                });
+            $menuObj.offset({ left: $menuObj.parent().offset().left });
+
+            if ($otherActionsObj.length && $otherActionsBtn.length) {
+                $otherActionsObj.css(
+                    {
+                        top: $otherActionsBtn.offset().top - jq(document).scrollTop() + $otherActionsBtn.outerHeight() + 4,
+                        position: "fixed",
+                        left: $otherActionsBtn.offset().left - jq(document).scrollLeft() + $otherActionsBtn.outerWidth() - $otherActionsObj.outerWidth()
+                    });
+            }
         } else {
             $menuSpacerObj.hide();
             $menuObj.css("width", "auto");
@@ -1364,15 +1503,20 @@ var ScrolledGroupMenu = new function () {
                     "position": "static",
                     "paddingTop": 0
                 });
-            jq(".studio-action-panel.group-actions").css(
+
+            $groupActionsObj.css(
                 {
                     "top": $menuObj.offset().top + $menuObj.outerHeight() - 4 + "px"
                 });
-            jq(".studio-action-panel.other-actions").css(
-                {
-                    top: $menuObj.offset().top + $menuObj.outerHeight() - 4 + "px",
-                    position: "absolute"
-                });
+
+            if ($otherActionsObj.length && $otherActionsBtn.length) {
+                $otherActionsObj.css(
+                    {
+                        top: $otherActionsBtn.offset().top + $otherActionsBtn.outerHeight() + 4,
+                        position: "absolute",
+                        left: $otherActionsBtn.offset().left + $otherActionsBtn.outerWidth() - $otherActionsObj.outerWidth()
+                    });
+            }
         }
     };
 
@@ -1443,26 +1587,20 @@ var htmlUtility = new function () {
 
             doc.find("script").remove();
 
-            var blockedAttrs = [
-                "onload",
-                "onunload",
-                "onclick",
-                "ondblclick",
-                "onmousedown",
-                "onmouseup",
-                "onmouseover",
-                "onmousemove",
-                "onmouseout",
-                "onfocus",
-                "onblur",
-                "onkeypress",
-                "onkeydown",
-                "onkeyup",
-                "onsubmit",
-                "onreset",
-                "onselect",
-                "onchange"];
-            doc.find("[" + blockedAttrs.join("],[") + "]").removeAttr(blockedAttrs.join(" "));
+            doc.find("*").each(function () {
+                var elem = this;
+                jq.each(this.attributes, function () {
+                    var attr = this.name;
+                    var value = this.value;
+                    if (attr.indexOf("on") == 0
+                        || (typeof value == "string"
+                            && (value.trim().indexOf("javascript") == 0
+                                || value.trim().indexOf("data") == 0
+                                || value.trim().indexOf("vbscript") == 0))) {
+                        jq(elem).removeAttr(attr);
+                    }
+                });
+            });
 
             return doc.html();
         }
@@ -1479,45 +1617,219 @@ less = {}; less.env = 'development';
  * UserManager
  */
 window.UserManager = new function() {
+    var usersCache = null;
+    var usersDisabledCache = null;
+    var personCache = [];
+
+    function init() {
+        if (usersCache != null)
+            return;
+
+        var master = ASC.Resources.Master;
+        usersCache = {};
+
+        var activeUsers = master.ApiResponses_ActiveProfiles.response;
+        var activeUsersLength = activeUsers.length;
+        for (var i = 0; i < activeUsersLength; i++) {
+            var activeUserItem = activeUsers[i];
+            usersCache[activeUserItem.id] = activeUserItem;
+        }
+
+        delete master.ApiResponses_ActiveProfiles;
+
+        usersDisabledCache = {};
+        var disabledUsers = master.ApiResponses_DisabledProfiles.response;
+        var disabledUsersLength = disabledUsers.length;
+        for (var j = 0; j < disabledUsersLength; j++) {
+            var disabledUserItem = disabledUsers[j];
+            usersDisabledCache[disabledUserItem.id] = disabledUserItem;
+        }
+
+        delete master.ApiResponses_DisabledProfiles;
+    }
+
+    function getAllUsers(activeOnly) {
+        init();
+        return activeOnly ? usersCache : jq.extend({}, usersCache, usersDisabledCache);
+    }
+
     function getUser(userId) {
-        var users = ASC.Resources.Master.ApiResponses_Profiles.response;
-
-        if (!users) {
+        if (!userId)
             return null;
-        }
 
-        for (var i = 0; i < users.length; i++) {
-            if (users[i].id == userId) {
-                return users[i];
-            }
-        }
+        init();
+
+        if (usersCache[userId]) return usersCache[userId];
+
+        if (usersDisabledCache[userId]) return usersDisabledCache[userId];
 
         return null;
     }
     
-    function getUsers(ids) {
-        if (!ids || !ids.length) {
-            return [];
+    function getPerson(id, personConstructor) {
+        if (!id)
+            return null;
+
+        var result = personCache[id];
+
+        if (result) return result;
+
+        var user = getUser(id);
+        if (!user) {
+            user = getRemovedProfile();
         }
 
-        var users = ASC.Resources.Master.ApiResponses_Profiles.response;
-        if (!users) {
+        result = personConstructor(user);
+        personCache[id] = result;
+
+        return result;
+    }
+
+    function getUsers(ids) {
+        if (!ids || !ids.length)
             return [];
-        }
+
+        init();
 
         var result = [];
-        for (var i = 0; i < users.length; i++) {
-            if (~ids.indexOf(users[i].id)) {
-                result.push(users[i]);
+
+        for (var userId in usersCache) {
+            if (usersCache.hasOwnProperty(userId) && ~ids.indexOf(userId)) {
+                result.push(usersCache[userId]);
+            }
+        }
+
+        for (var disabledUserId in usersDisabledCache) {
+            if (usersDisabledCache.hasOwnProperty(disabledUserId) && ~ids.indexOf(disabledUserId)) {
+                result.push(usersDisabledCache[disabledUserId]);
             }
         }
 
         return result;
     }
 
+    function getRemovedProfile() {
+        return ASC.Resources.Master.ApiResponsesRemovedProfile.response;
+    }
+
+    function addNewUser(newUser) {
+        usersCache[newUser.id] = newUser;
+    }
+
     return {
+        getAllUsers: getAllUsers,
         getUser: getUser,
-        getUsers: getUsers
+        getPerson: getPerson,
+        getUsers: getUsers,
+        getRemovedProfile: getRemovedProfile,
+        addNewUser: addNewUser
+    };
+};
+
+/**
+ * GroupManager
+ */
+window.GroupManager = new function () {
+    var groups = null;
+    var groupItems = null;
+    var groupsCache = [];
+
+    function comparer (a, b) {
+        var compA = a.name.toLowerCase(),
+            compB = b.name.toLowerCase();
+        return (compA < compB) ? -1 : (compA > compB) ? 1 : 0;
+    }
+
+    function init() {
+        if (groups != null)
+            return;
+
+        groups = ASC.Resources.Master.ApiResponses_Groups.response.sort(comparer);
+    }
+
+    function initGroupItems() {
+        if (groupItems != null)
+            return;
+
+        init();
+
+        groupItems = {};
+
+        var i, j, k, n, groupId;
+
+        for (i = 0, j = groups.length; i < j; i++) {
+            groupId = groups[i].id;
+            groupItems[groupId] = [];
+        }
+
+        var users = window.UserManager.getAllUsers();
+
+        for (var userId in users) {
+            if (!users.hasOwnProperty(userId)) continue;
+
+            var user = users[userId];
+            for (j = 0, k = user.groups.length; j < k; j++) {
+                groupId = user.groups[j];
+                groupItems[groupId] ? groupItems[groupId].push(userId) : groupItems[groupId] = [userId];
+            }
+        }
+    }
+
+    function getAllGroups() {
+        init();
+        return groups;
+    }
+
+    function getGroup(groupId) {
+        if (!groupId)
+            return null;
+
+        var fromCache = groupsCache[groupId];
+
+        if (fromCache) return fromCache;
+
+        init();
+
+        for (var i = 0, j = groups.length; i < j; i++) {
+            var groupItem = groups[i];
+            if (groupItem.id === groupId) {
+                groupsCache[groupId] = groupItem;
+                return groupItem;
+            }
+        }
+
+        return null;
+    }
+
+    function getGroups(ids) {
+        if (!ids || !ids.length)
+            return [];
+
+        init();
+
+        var result = [];
+
+        for (var i = 0; i < groups.length; i++)
+            if (~ids.indexOf(groups[i].id))
+                result.push(groups[i]);
+
+        return result;
+    }
+
+    function getGroupItems(groupId) {
+        if (!groupId)
+            return null;
+
+        initGroupItems();
+
+        return groupItems[groupId];
+    }
+
+    return {
+        getAllGroups: getAllGroups,
+        getGroup: getGroup,
+        getGroups: getGroups,
+        getGroupItems: getGroupItems
     };
 };
 
@@ -1555,7 +1867,23 @@ window.submitForm = function (eventTarget, eventArgument) {
         form.__EVENTARGUMENT.value = eventArgument;
     }
 
+    if (ASC.Desktop && ASC.Desktop.checkpwd) {
+        ASC.Desktop.checkpwd();
+    }
+
     form.submit();
+};
+
+window.hashPassword = function (password, callback) {
+    var size = ASC.Resources.Master.PasswordHashSize;
+    var iterations = ASC.Resources.Master.PasswordHashIterations;
+    var salt = ASC.Resources.Master.PasswordHashSalt;
+
+    var bits = sjcl.misc.pbkdf2(password, salt, iterations);
+    bits = bits.slice(0, size / 32);
+    var hash = sjcl.codec.hex.fromBits(bits);
+
+    callback(hash);
 };
 
 window.TipsManager = new function() {

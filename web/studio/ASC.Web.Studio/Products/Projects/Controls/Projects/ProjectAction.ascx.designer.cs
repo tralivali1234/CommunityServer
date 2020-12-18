@@ -11,59 +11,5 @@ namespace ASC.Web.Projects.Controls.Projects {
     
     
     public partial class ProjectAction {
-        
-        /// <summary>
-        /// projectTitle control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.TextBox projectTitle;
-        
-        /// <summary>
-        /// projectDescription control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.TextBox projectDescription;
-        
-        /// <summary>
-        /// ControlPlaceHolder control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder ControlPlaceHolder;
-        
-        /// <summary>
-        /// _hintPopupDeleteProject control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::ASC.Web.Studio.Controls.Common.Container _hintPopupDeleteProject;
-        
-        /// <summary>
-        /// _hintPopupActiveTasks control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::ASC.Web.Studio.Controls.Common.Container _hintPopupActiveTasks;
-        
-        /// <summary>
-        /// _hintPopupActiveMilestones control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::ASC.Web.Studio.Controls.Common.Container _hintPopupActiveMilestones;
     }
 }

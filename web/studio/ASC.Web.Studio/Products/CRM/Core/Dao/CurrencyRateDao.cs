@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -38,93 +29,106 @@ namespace ASC.CRM.Core.Dao
 {
     public class CurrencyRateDao : AbstractDao
     {
-        public CurrencyRateDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public CurrencyRateDao(int tenantID)
+            : base(tenantID)
         {
         }
 
         public virtual List<CurrencyRate> GetAll()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetSqlQuery(null)).ConvertAll(ToCurrencyRate);
-            }
+            return Db.ExecuteList(GetSqlQuery(null)).ConvertAll(ToCurrencyRate);
         }
 
         public virtual CurrencyRate GetByID(int id)
         {
-            using (var db = GetDb())
-            {
-                var rates = db.ExecuteList(GetSqlQuery(Exp.Eq("id", id))).ConvertAll(ToCurrencyRate);
+            var rates = Db.ExecuteList(GetSqlQuery(Exp.Eq("id", id))).ConvertAll(ToCurrencyRate);
 
-                return rates.Count > 0 ? rates[0] : null;
-            }
+            return rates.Count > 0 ? rates[0] : null;
         }
 
         public CurrencyRate GetByCurrencies(string fromCurrency, string toCurrency)
         {
-            using (var db = GetDb())
-            {
-                var rates = db.ExecuteList(GetSqlQuery(Exp.Eq("from_currency", fromCurrency.ToUpper()) & Exp.Eq("to_currency", toCurrency.ToUpper())))
-                    .ConvertAll(ToCurrencyRate);
+            var rates = Db.ExecuteList(GetSqlQuery(Exp.Eq("from_currency", fromCurrency.ToUpper()) & Exp.Eq("to_currency", toCurrency.ToUpper())))
+                .ConvertAll(ToCurrencyRate);
                 
-                return rates.Count > 0 ? rates[0] : null;
-            }
+            return rates.Count > 0 ? rates[0] : null;
         }
 
         public int SaveOrUpdate(CurrencyRate currencyRate)
         {
-            using (var db = GetDb())
+            if (String.IsNullOrEmpty(currencyRate.FromCurrency) || String.IsNullOrEmpty(currencyRate.ToCurrency) || currencyRate.Rate < 0)
+                throw new ArgumentException();
+
+            if (currencyRate.ID > 0 && currencyRate.Rate == 0)
+                return Delete(currencyRate.ID);
+
+            if (Db.ExecuteScalar<int>(Query("crm_currency_rate").SelectCount().Where(Exp.Eq("id", currencyRate.ID))) == 0)
             {
-                if (String.IsNullOrEmpty(currencyRate.FromCurrency) || String.IsNullOrEmpty(currencyRate.ToCurrency) || currencyRate.Rate < 0)
-                    throw new ArgumentException();
+                var query = Insert("crm_currency_rate")
+                    .InColumnValue("id", 0)
+                    .InColumnValue("from_currency", currencyRate.FromCurrency.ToUpper())
+                    .InColumnValue("to_currency", currencyRate.ToCurrency.ToUpper())
+                    .InColumnValue("rate", currencyRate.Rate)
+                    .InColumnValue("create_by", SecurityContext.CurrentAccount.ID)
+                    .InColumnValue("create_on", DateTime.UtcNow)
+                    .InColumnValue("last_modifed_by", SecurityContext.CurrentAccount.ID)
+                    .InColumnValue("last_modifed_on", DateTime.UtcNow)
+                    .Identity(1, 0, true);
 
-                if (currencyRate.ID > 0 && currencyRate.Rate == 0)
-                    return Delete(currencyRate.ID);
-
-                if (db.ExecuteScalar<int>(Query("crm_currency_rate").SelectCount().Where(Exp.Eq("id", currencyRate.ID))) == 0)
-                {
-                    var query = Insert("crm_currency_rate")
-                        .InColumnValue("id", 0)
-                        .InColumnValue("from_currency", currencyRate.FromCurrency.ToUpper())
-                        .InColumnValue("to_currency", currencyRate.ToCurrency.ToUpper())
-                        .InColumnValue("rate", currencyRate.Rate)
-                        .InColumnValue("create_by", SecurityContext.CurrentAccount.ID)
-                        .InColumnValue("create_on", DateTime.UtcNow)
-                        .InColumnValue("last_modifed_by", SecurityContext.CurrentAccount.ID)
-                        .InColumnValue("last_modifed_on", DateTime.UtcNow)
-                        .Identity(1, 0, true);
-
-                    currencyRate.ID = db.ExecuteScalar<int>(query);
-                }
-                else
-                {
-                    db.ExecuteNonQuery(
-                        Update("crm_currency_rate")
-                            .Set("from_currency", currencyRate.FromCurrency.ToUpper())
-                            .Set("to_currency", currencyRate.ToCurrency.ToUpper())
-                            .Set("rate", currencyRate.Rate)
-                            .Set("last_modifed_on", DateTime.UtcNow)
-                            .Set("last_modifed_by", SecurityContext.CurrentAccount.ID)
-                            .Where(Exp.Eq("id", currencyRate.ID)));
-                }
-
-                return currencyRate.ID;
+                currencyRate.ID = Db.ExecuteScalar<int>(query);
             }
+            else
+            {
+                Db.ExecuteNonQuery(
+                    Update("crm_currency_rate")
+                        .Set("from_currency", currencyRate.FromCurrency.ToUpper())
+                        .Set("to_currency", currencyRate.ToCurrency.ToUpper())
+                        .Set("rate", currencyRate.Rate)
+                        .Set("last_modifed_on", DateTime.UtcNow)
+                        .Set("last_modifed_by", SecurityContext.CurrentAccount.ID)
+                        .Where(Exp.Eq("id", currencyRate.ID)));
+            }
+
+            return currencyRate.ID;
         }
 
         public int Delete(int id)
         {
             if (id <= 0) throw new ArgumentException();
 
-            using (var db = GetDb())
+            var sqlQuery = Delete("crm_currency_rate")
+                .Where(Exp.Eq("id", id));
+
+            Db.ExecuteNonQuery(sqlQuery);
+
+            return id;
+        }
+
+        public List<CurrencyRate> SetCurrencyRates(List<CurrencyRate> rates)
+        {
+            using (var tx = Db.BeginTransaction())
             {
-                var sqlQuery = Delete("crm_currency_rate")
-                    .Where(Exp.Eq("id", id));
+                Db.ExecuteNonQuery(Delete("crm_currency_rate"));
+                
+                foreach (var rate in rates)
+                {
+                    var query = Insert("crm_currency_rate")
+                        .InColumnValue("id", 0)
+                        .InColumnValue("from_currency", rate.FromCurrency.ToUpper())
+                        .InColumnValue("to_currency", rate.ToCurrency.ToUpper())
+                        .InColumnValue("rate", rate.Rate)
+                        .InColumnValue("create_by", SecurityContext.CurrentAccount.ID)
+                        .InColumnValue("create_on", DateTime.UtcNow)
+                        .InColumnValue("last_modifed_by", SecurityContext.CurrentAccount.ID)
+                        .InColumnValue("last_modifed_on", DateTime.UtcNow)
+                        .Identity(1, 0, true);
 
-                db.ExecuteNonQuery(sqlQuery);
+                    rate.ID = Db.ExecuteScalar<int>(query);
+                }
 
-                return id;
+                tx.Commit();
+
+                return rates;
             }
         }
 

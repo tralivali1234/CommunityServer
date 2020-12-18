@@ -9,7 +9,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>ASC.Core.Common</RootNamespace>
     <AssemblyName>ASC.Core.Common</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <UpgradeBackupLocation>
@@ -33,59 +33,21 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="AWSSDK">
-      <HintPath>..\..\packages\AWSSDK.2.3.5.0\lib\net45\AWSSDK.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework">
-      <HintPath>..\..\packages\Microsoft.VisualStudio.QualityTools.UnitTestFramework.11.0.50727.1\Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="StackExchange.Redis">
-      <HintPath>..\..\packages\StackExchange.Redis.10.0.0.0\lib\net45\StackExchange.Redis.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="StackExchange.Redis.Extensions.Core">
-      <HintPath>..\..\packages\StackExchange.Redis.Extensions.Core.1.3.5.0\lib\net45\StackExchange.Redis.Extensions.Core.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Runtime.Caching" />
-    <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.ServiceModel" />
-    <Reference Include="System.ServiceModel.Web" />
-    <Reference Include="System.Web" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="log4net">
-      <HintPath>..\..\packages\log4net.2.0.3\lib\net40-client\log4net.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Practices.Unity">
-      <HintPath>..\..\packages\Unity.3.0.1304.0\lib\Net45\Microsoft.Practices.Unity.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Practices.Unity.Configuration">
-      <HintPath>..\..\packages\Unity.3.0.1304.0\lib\Net45\Microsoft.Practices.Unity.Configuration.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
+    <Compile Include="BaseCommonLinkUtility.cs" />
     <Compile Include="Billing\BillingClient.cs" />
+    <Compile Include="Billing\CouponManager.cs" />
     <Compile Include="Billing\ITariffSyncService.cs" />
+    <Compile Include="Billing\License\License.cs" />
+    <Compile Include="Billing\License\LicenseException.cs" />
     <Compile Include="Billing\License\LicenseReader.cs" />
     <Compile Include="Billing\TariffSyncClient.cs" />
     <Compile Include="Billing\TariffSyncServiceSection.cs" />
     <Compile Include="Billing\Invoice.cs" />
     <Compile Include="Billing\PaymentInfo.cs" />
     <Compile Include="Billing\PaymentActive.cs" />
-    <Compile Include="Billing\PaymentOffice.cs" />
     <Compile Include="Billing\TariffService.cs" />
     <Compile Include="Billing\Tariff.cs" />
     <Compile Include="Billing\TariffState.cs" />
@@ -101,8 +63,8 @@
     <Compile Include="Configuration\ConnectionStringNameTypeConverter.cs" />
     <Compile Include="Configuration\AmiPublicDnsSyncService.cs" />
     <Compile Include="Billing\ITariffService.cs" />
+    <Compile Include="Configuration\Consumer.cs" />
     <Compile Include="Configuration\ConsumerConfigurationSection.cs" />
-    <Compile Include="Configuration\KeyStorage.cs" />
     <Compile Include="Context\Impl\AuthManager.cs" />
     <Compile Include="Context\Impl\AuthorizationManager.cs" />
     <Compile Include="Context\Impl\CoreConfiguration.cs" />
@@ -120,6 +82,7 @@
     <Compile Include="Core\PartnerStatus.cs" />
     <Compile Include="Core\PartnerType.cs" />
     <Compile Include="Core\DBResourceManager.cs" />
+    <Compile Include="Data\DbSettingsManager.cs" />
     <Compile Include="MultiRegionHostedSolution.cs" />
     <Compile Include="Core\EmployeeType.cs" />
     <Compile Include="Core\EmployeeActivationStatus.cs" />
@@ -149,6 +112,12 @@
     <Compile Include="Context\WorkContext.cs" />
     <Compile Include="Configuration\Constants.cs" />
     <Compile Include="Notify\DirectSubscriptionProvider.cs" />
+    <Compile Include="Notify\Telegram\Dao\CachedTelegramDao.cs" />
+    <Compile Include="Notify\Telegram\Dao\TelegramDao.cs" />
+    <Compile Include="Notify\Telegram\Dao\TelegramUser.cs" />
+    <Compile Include="Notify\Telegram\ITelegramLoginProvider.cs" />
+    <Compile Include="Notify\Telegram\ITelegramService.cs" />
+    <Compile Include="Notify\Senders\TelegramSender.cs" />
     <Compile Include="Notify\Signalr\ISignalrService.cs" />
     <Compile Include="Notify\Jabber\JabberServiceClient.cs" />
     <Compile Include="Notify\Jabber\IJabberService.cs" />
@@ -173,9 +142,17 @@
     <Compile Include="Notify\Senders\AWSSender.cs" />
     <Compile Include="Notify\EmailSenderSink.cs" />
     <Compile Include="Notify\Signalr\SignalrServiceClient.cs" />
-    <Compile Include="Notify\Signalr\SignalrServiceClientWcf.cs" />
+    <Compile Include="Notify\Telegram\TelegramHelper.cs" />
+    <Compile Include="Notify\Telegram\TelegramSenderSink.cs" />
+    <Compile Include="Notify\Telegram\TelegramServiceClient.cs" />
     <Compile Include="Security\Crypto.cs" />
     <Compile Include="Security\EmailValidationKeyProvider.cs" />
+    <Compile Include="Settings\ISettings.cs" />
+    <Compile Include="Settings\SettingsManager.cs" />
+    <Compile Include="Tenants\TenantControlPanelSettings.cs" />
+    <Compile Include="Tenants\TenantAnalyticsSettings.cs" />
+    <Compile Include="Tenants\TenantAuditSettings.cs" />
+    <Compile Include="Tenants\TenantCookieSettings.cs" />
     <Compile Include="Tenants\TenantDomainValidator.cs" />
     <Compile Include="Tenants\TenantIndustry.cs" />
     <Compile Include="Tenants\TenantQuotaException.cs" />
@@ -195,25 +172,6 @@
     <Compile Include="Tenants\TenantRegistrationInfo.cs" />
     <Compile Include="Tenants\TenantUtil.cs" />
     <Compile Include="Tenants\TenantVersion.cs" />
-    <Compile Include="Tests\CachedSubscriptionServiceTest.cs" />
-    <Compile Include="Tests\ClientPaymentManagerTest.cs" />
-    <Compile Include="Tests\CookieStorageTest.cs" />
-    <None Include="Tests\App.config">
-    </None>
-    <Compile Include="Tests\BillingClientTest.cs" />
-    <Compile Include="Tests\SignatureTest.cs" />
-    <Compile Include="Tests\TariffSyncServiceTest.cs" />
-    <Compile Include="Tests\HostedSolutionTest.cs" />
-    <Compile Include="Tests\EmailValidationKeyPairProvider_Test.cs" />
-    <Compile Include="Tests\TariffServiceTest.cs" />
-    <Compile Include="Tests\DbAzServiceTest.cs" />
-    <Compile Include="Tests\DbBaseTest.cs" />
-    <Compile Include="Tests\DbQuotaServiceTest.cs" />
-    <Compile Include="Tests\DbSubscriptionServiceTest.cs" />
-    <Compile Include="Tests\DbTenantServiceTest.cs" />
-    <Compile Include="Tests\DbUserServiceTest.cs" />
-    <Compile Include="Tests\TopSubscriptionProviderTest.cs" />
-    <Compile Include="Tests\UserManagerTest.cs" />
     <Compile Include="Users\DisplayUserNameFormat.cs" />
     <Compile Include="Core\EmployeeStatus.cs" />
     <Compile Include="Security\UserSecurityProvider.cs" />
@@ -222,6 +180,7 @@
     <Compile Include="Users\Constants.cs" />
     <Compile Include="Core\GroupInfo.cs" />
     <Compile Include="Core\UserInfo.cs" />
+    <Compile Include="Users\PersonalQuotaSettings.cs" />
     <Compile Include="Users\UserExtensions.cs" />
     <Compile Include="Users\UserFormatter.cs" />
   </ItemGroup>
@@ -231,6 +190,39 @@
       <Name>ASC.Common</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Autofac">
+      <Version>5.1.2</Version>
+    </PackageReference>
+    <PackageReference Include="AWSSDK.CloudFront">
+      <Version>3.3.101.126</Version>
+    </PackageReference>
+    <PackageReference Include="AWSSDK.S3">
+      <Version>3.3.110.50</Version>
+    </PackageReference>
+    <PackageReference Include="AWSSDK.SimpleEmail">
+      <Version>3.3.101.130</Version>
+    </PackageReference>
+    <PackageReference Include="MailKit">
+      <Version>2.5.2</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>12.0.3</Version>
+    </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.X509Certificates">
+      <Version>4.3.2</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Runtime.Caching" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

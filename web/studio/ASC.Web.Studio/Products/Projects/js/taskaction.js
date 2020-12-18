@@ -1,68 +1,82 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 ASC.Projects.TaskAction = (function () {
-    var isInit;
-    var updateTaskFlag = false;
-    var firstLoadFlag = true;
-    var currentTask = null;
+    var updateTaskFlagEnum = {
+        add: 0,
+        update: 1,
+        copy: 2
+    };
 
-    var taskPopup = null;
-    /*---task fields----*/
+    var isInit,
+        updateTaskFlag = updateTaskFlagEnum.add,
+        firstLoadFlag = true,
+        currentTask = null,
 
-    //text
-    var taskTitle = null;
-    var taskDescription = null;
+        $taskPopup = null,
+        $taskTitle = null,
+        $taskDescription = null,
 
-    //selectors
-    var taskProjectSelector = null;
-    var taskMilestoneSelector = null;
-    var taskResponsiblesSelector = null;
+        $taskProjectSelector = null,
+        $taskMilestoneSelector = null,
+        $taskResponsiblesSelector = null,
 
-    //dates
-    var taskStartDate = null;
-    var taskDeadlineDate = null;
+        //dates
+        $taskStartDate = null,
+        $taskDeadlineDate = null,
 
-    //other
-    var notifyCheckbox = null;
-    var priorityCheckbox = null;
-    var listTaskResponsibles = null;
-    /*---*/
+        //other
+        $notifyCheckbox = null,
+        $priorityCheckbox = null,
+        $copySubtasksCheckbox = null,
+        $copyFilesCheckbox = null,
+        $copyContainer = null,
+        $copyFilesContainerCheckbox = null,
+        $listTaskResponsibles = null,
+        $projectContaner,
+        /*---*/
 
-    var currentPage = null;
-    var currentUserId;
-    var currentProjectId;
-    var choosedProjectMilestones = [];
+        currentUserId,
+        currentProjectId,
+        choosedProjectMilestones = [],
 
-    var isInitData;
+        isInitData,
 
-    var filterProjectsIds = [];
-    var projectItems = [];
-    var milestonesItems = [];
-    var noneMilestone = { id: 0, title: ASC.Projects.Resources.TasksResource.None, deadline: "" };
+        filterProjectsIds = [],
+        projectItems = [],
+        milestonesItems = [],
+        baseObject = ASC.Projects,
+        master = baseObject.Master,
+        resources = baseObject.Resources,
+        projectsJSResource = resources.ProjectsJSResource,
+        noneMilestone = { id: 0, title: resources.TasksResource.None, deadline: "" },
+        common = baseObject.Common,
+        loadingBanner = LoadingBanner,
+        studioBlockUIManager = StudioBlockUIManager,
+        teamWithoutVisitors;
+
+    var clickEventName = "click",
+        redBorderClass = "red-border",
+        displayNone = "display-none",
+        requiredFieldErrorClass = "requiredFieldError";
+
+    var teamlab;
+    var selectedPrjId;
+    var selectedUsers = [];
 
     var init = function () {
         if (isInit) {
@@ -70,123 +84,114 @@ ASC.Projects.TaskAction = (function () {
         }
 
         isInit = true;
-
-        initTaskFormElementsAndConstants();
-
-        initEvents();
+        teamlab = Teamlab;
     };
 
     function initTaskFormElementsAndConstants () {
 
-        currentUserId = Teamlab.profile.id;
+        currentUserId = teamlab.profile.id;
         currentProjectId = jq.getURLParam('prjID');
 
-        taskPopup = jq('#addTaskPanel');
+        $taskPopup = jq('#addTaskPanel');
 
         //text
-        taskTitle = jq("#addtask_title");
-        taskDescription = jq("#addtask_description");
+        $taskTitle = $taskPopup.find("input.textEdit");
+        $taskDescription = $taskPopup.find("textarea");
 
         //selectors
-        taskProjectSelector = jq("#taskProject");
-        taskMilestoneSelector = jq("#taskMilestone");
-        taskResponsiblesSelector = jq("select#taskResponsible");
+        $projectContaner = $taskPopup.find(".projectContaner");
+        $taskProjectSelector = $projectContaner.find(".advansed-select-container");
+        $taskMilestoneSelector = jq("#taskMilestone");
+        $taskResponsiblesSelector = jq("#taskResponsible");
 
         //dates
-        taskStartDate = jq("#taskStartDate");
-        taskDeadlineDate = jq("#taskDeadline");
+        $taskStartDate = jq("#taskStartDate");
+        $taskDeadlineDate = jq("#taskDeadline");
+        $taskDeadlineDate.val("");
 
         //others
-        notifyCheckbox = jq("#notify");
-        priorityCheckbox = jq("#priority");
-        listTaskResponsibles = jq("#fullFormUserList");
+        $notifyCheckbox = jq("#notify");
+        $priorityCheckbox = jq("#priority");
+        $copySubtasksCheckbox = jq("#copySubtasks");
+        $copyContainer = jq("#copySubtasksContainer");
+        $copyFilesCheckbox = jq("#copyFiles");
+        $copyFilesContainerCheckbox = $copyContainer.find(".copy.files");
+        $listTaskResponsibles = jq("#fullFormUserList");
+        
+        jq($taskProjectSelector, $taskMilestoneSelector, $taskResponsiblesSelector).css('max-width', 300);
 
-        taskDescription.autosize();
-        jq(taskProjectSelector, taskMilestoneSelector, taskResponsiblesSelector).css('max-width', 300);
-
-        if(jq.browser.mobile)
+        if (jq.browser.mobile) {
             jq("#ui-datepicker-div").addClass("blockMsg");
+        }
 
-        var datePickers = jq(taskDeadlineDate).add(taskStartDate);
-        datePickers.mask(ASC.Resources.Master.DatePatternJQ);
+        
+        var datePickers = jq($taskDeadlineDate).add($taskStartDate);
         datePickers.datepicker({ selectDefaultDate: false });
-        datePickers.on("keydown", onDatePickerKeyDown).on("change", onDatePickerChange);
-
-        getCurrentPage();
+        datePickers.mask(ASC.Resources.Master.DatePatternJQ);
+        datePickers.on("keydown", onDatePickerKeyDown).off("change").on("change", onDatePickerChange);
+        $taskDeadlineDate.on("change",
+            function () {
+                var date = getTaskDataDate($taskDeadlineDate);
+                var dateNow = new Date();
+                dateNow.setHours(0);
+                dateNow.setMinutes(0);
+                dateNow.setSeconds(0);
+                var now = teamlab.serializeTimestamp(dateNow);
+                var threedays = teamlab.serializeTimestamp(new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate() + 3, 0, 0, 0));
+                var week = teamlab.serializeTimestamp(new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate() + 7, 0, 0, 0));
+                if (date === now) {
+                    boldDeadlineLeft(0);
+                }else if (date === threedays) {
+                    boldDeadlineLeft(3);
+                } else if (date === week) {
+                    boldDeadlineLeft(7);
+                } else {
+                    boldDeadlineLeft(-1);
+                }
+            });
     };
 
     function onDatePickerKeyDown(e) {
         if (e.keyCode === 13) {
-            jq(this).blur();
+            onDatePickerChange(e);
         }
     }
 
-    function onDatePickerChange() {
-        jq(this).blur();
+    function onDatePickerChange(e) {
+        var obj = jq(e.target);
+        var date = obj.datepicker("getDate");
+        obj.unmask().blur().mask(ASC.Resources.Master.DatePatternJQ);
+        obj.datepicker("setDate", date);
     }
 
-    function getCurrentPage () {
-        var url = document.location.href;
-        if (url.indexOf("tasks.aspx") > 0) {
-            currentPage = "tasks";
-            var projId = jq.getURLParam("prjID");
-            var id = jq.getURLParam("id");
-            if (projId && id)
-                currentPage = "taskdescription";
-        }
-
-        if (url.indexOf("milestones.aspx") > 0)
-            currentPage = "milestones";
-
-        if (url.indexOf("ganttchart.aspx") > 0)
-            currentPage = "ganttchart";
-    };
+    function boldDeadlineLeft(dataValue) {
+        var dotline = "dotline", bold = "bold";
+        $taskPopup.find('.deadline_left').removeClass(bold).removeClass(dotline).addClass(dotline);
+        $taskPopup.find("[data-value=" + dataValue + "]").removeClass(dotline).addClass(bold);
+    }
 
     function initEvents() {
-        taskResponsiblesSelector.on('change', function (evt) {
-            var self = jq(this);
-            var value = self.val();
-            if (value == -1) {
-                self.val('-1');
-                return;
-            }
-            var userName = self.find('option[value="' + value + '"]').html();
-            if (!listTaskResponsibles.find("div[data-value='" + value + "']").length) {
-                listTaskResponsibles.show().append('<div data-value="' + value + '" class="user">' + userName + '</div>');
-                jq('.userAdd .combobox-container li.option-item[data-value="' + value + '"]').hide();
-                var addedUserCount = listTaskResponsibles.find(".user").length;
-                var usersCount = taskResponsiblesSelector.find("option").length - 1;
-                if (addedUserCount == usersCount) {
-                    taskResponsiblesSelector.tlcombobox(false);
-                }
-            }
-            self.val('-1').change();
-            showOrHideNotifyCheckbox();
-            evt.stopPropagation();
-        });
-
-        taskPopup.on('click', '#fullFormUserList .user', function () {
-            var value = jq(this).attr('data-value');
-            jq(this).remove();
-            taskResponsiblesSelector.tlcombobox(true);
-            jq('.userAdd .combobox-container li.option-item[data-value="' + value + '"]').show();
-            if (!listTaskResponsibles.find(".user").length) {
-                listTaskResponsibles.hide();
+        $taskPopup.on(clickEventName, '#fullFormUserList .user', function () {
+            var $self = jq(this);
+            var removedId = $self.attr("data-value");
+            $self.remove();
+            $taskResponsiblesSelector.advancedSelector("unselect", [removedId]);
+            selectedUsers = selectedUsers.filter(function (item) { return item.id !== removedId });
+            if (!selectedUsers.length) {
+                $listTaskResponsibles.hide();
             }
             showOrHideNotifyCheckbox();
         });
 
-        taskPopup.on('click', '.deadline_left', function () {
-            taskPopup.find('.deadline_left').css('border-bottom', '1px dotted').css('font-weight', 'normal');
-            jq(this).css('border-bottom', 'none').css('font-weight', 'bold');
-            
+        $taskPopup.on(clickEventName, '.deadline_left', function () {
             var daysCount = parseInt(jq(this).attr('data-value'), 10);
             var date = new Date();
             date.setDate(date.getDate() + daysCount);
-            taskDeadlineDate.datepicker('setDate', date);
+            $taskDeadlineDate.datepicker('setDate', date);
+            boldDeadlineLeft(daysCount);
         });
 
-        jq('#saveTaskAction, #createTaskAndCreateNew').on('click', function () {
+        jq('#saveTaskAction, #createTaskAndCreateNew').on(clickEventName, function () {
             if (jq(this).hasClass("disable")) return;
 
             clearErrorMessages();
@@ -197,50 +202,109 @@ ASC.Projects.TaskAction = (function () {
 
             lockTaskForm();
 
-            var params = {
-                 saveAndView: jq(this).attr("id") == "saveTaskAction"
-            };
-
-            if (updateTaskFlag) {
+            if (updateTaskFlag === updateTaskFlagEnum.update) {
                 var block;
                 if ((currentTask.milestoneId || 0) != parseInt(data.milestoneId, 10)) {
-                    block = jq("#removeTaskLinksQuestionPopup");
+                    block = "taskLinksRemoveWarning";
                 }
 
                 var endStartLinks;
 
-                if (currentTask.links) {
+                if (currentTask.links.length) {
                     endStartLinks = currentTask.links.some(function (item) {
                         return item.linkType == 2 && item.parentTaskId == currentTask.id;
                     });
                 }
 
                 if (!data.deadline && endStartLinks) {
-                    block = jq("#removeTaskLinksQuestionPopupDeadLine");
+                    block = "taskLinksRemoveDeadlineWarning";
                 }
 
-                if (currentTask.links && block) {
-                    MoveTaskQuestionPopup.setParametrs("#addTaskPanel", currentTask.links,
-                        function () { updateTask({}, currentTask.id, data); },
-                        showTaskFormAfterQuestionPopup, block);
-                    MoveTaskQuestionPopup.showDialog();
+                if (currentTask.links.length && block) {
+                    ASC.Projects.Base.showCommonPopup(block,
+                        function () {
+                            var links = currentTask.links;
+                            for (var j = 0; j < links.length; ++j) {
+                                var dataLink = { dependenceTaskId: links[j].dependenceTaskId, parentTaskId: links[j].parentTaskId };
+                                Teamlab.removePrjTaskLink({}, links[j].dependenceTaskId, dataLink, { success: function () { } });
+                            }
+                            updateTask({}, currentTask.id, data);
+                        },
+                        showTaskFormAfterQuestionPopup);
 
                 } else {
                     updateTask({}, currentTask.id, data);
                 }
-            } else {
-                var project = taskProjectSelector.attr("data-id");
-                addTask(params, project, data);
+            } else if (updateTaskFlag === updateTaskFlagEnum.add) {
+                var project = $taskProjectSelector.attr("data-id");
+                var params = { saveAndView: jq(this).attr("id") == "saveTaskAction" };
+                teamlab.addPrjTask(params, project, data, { error: onTaskError });
+            } else if (updateTaskFlag === updateTaskFlagEnum.copy) {
+                var project = $taskProjectSelector.attr("data-id");
+                data.copyFrom = currentTask.id;
+                data.copySubtasks = $copySubtasksCheckbox.is(':checked');
+                data.copyFiles = $copyFilesCheckbox.is(':checked');
+                data.removeOld = jq(this).attr("id") == "createTaskAndCreateNew";
+
+                var params = { saveAndView: true, removeOld: data.removeOld };
+
+                teamlab.copyPrjTask(params, project, data, { error: onTaskError });
             }
         });
 
-        jq('#addTaskPanel #closeTaskAction').on('click', closeTaskForm);
+        $taskPopup.find("#closeTaskAction").on(clickEventName, closeTaskForm);
+
+        var events = teamlab.events;
+
+        teamlab.bind(events.addPrjMilestone, onAddNewMileston);
+        teamlab.bind(events.removePrjMilestone, function (params, milestone) {
+            if (selectedPrjId == milestone.projectId) {
+                getMilestones(milestone.projectId);
+            }
+        });
+        teamlab.bind(events.addPrjTask, onAddTask);
+        teamlab.bind(events.copyPrjTask, function (params, task) {
+            teamlab.call(events.addPrjTask, this, [params, task]);
+            if (params.removeOld) {
+                teamlab.call(events.removePrjTask, this, [params, currentTask]);
+            }
+        });
+
+        teamlab.bind(events.updatePrjProjectStatus, function (params, project) {
+            prjOnChange(function () {
+                return selectedPrjId === project.id && project.status === 1;
+            });
+        });
+
+        teamlab.bind(events.removePrjProjects, function (params, projects) {
+            prjOnChange(function () {
+                var remPrj = projects.find(function (item) { return item.id === selectedPrjId; });
+                return typeof remPrj !== "undefined";
+            });
+        });
+
+        teamlab.bind(events.removePrjProject, function (params, project) {
+            prjOnChange(function () {
+                return project.id === selectedPrjId;
+            });
+        });
+
+        function prjOnChange(condition) {
+            if (!isInitData) return;
+            var sortedProjects = common.getProjectsForFilter().filter(sortPrj).map(mapPrj);
+            $taskProjectSelector.projectadvancedSelector("rewriteItemList", sortedProjects, []);
+
+            if (condition() && sortedProjects.length) {
+                $taskProjectSelector.projectadvancedSelector("reset");
+                $taskProjectSelector.projectadvancedSelector("selectBeforeShow", sortedProjects[0]);
+            }
+        }
     };
 
     function showOrHideNotifyCheckbox() {
-        var notifyCheckBox = taskPopup.find('.notify');
-        var usersCount = listTaskResponsibles.find(".user").length;
-        if (!usersCount || usersCount == listTaskResponsibles.find(".user[data-value=" + currentUserId + "]").length) {
+        var notifyCheckBox = $taskPopup.find('.notify');
+        var usersCount = selectedUsers.length;
+        if (!usersCount || (usersCount === 1 && selectedUsers[0].id === currentUserId)) {
             notifyCheckBox.hide();
             return;
         }
@@ -248,39 +312,33 @@ ASC.Projects.TaskAction = (function () {
     };
 
     function clearErrorMessages() {
-        taskPopup.find('.titlePanel').removeClass('requiredFieldError');
-        taskPopup.find('.requiredErrorText').html('');
-        taskPopup.find('.requiredErrorText.project').hide();
-        taskPopup.find(".startDate-error").hide();
-        taskStartDate.removeClass("red-border");
-        taskDeadlineDate.removeClass("red-border");
+        $taskPopup.find('.titlePanel').removeClass(requiredFieldErrorClass);
+        $projectContaner.removeClass(requiredFieldErrorClass);
+        $taskPopup.find(".startDate-error").hide();
+        $taskStartDate.removeClass(redBorderClass);
+        $taskDeadlineDate.removeClass(redBorderClass);
     };
 
     function getTaskData() {
-        var self = jq(this);
         var data = {
-            title: jq.trim(taskTitle.val()),
-            description: taskDescription.val(),
-            notify: notifyCheckbox.is(':checked'),
-            milestoneId: taskMilestoneSelector.attr("data-id"),
-            priority: priorityCheckbox.is(':checked') ? 1 : 0,
-            projectId: taskProjectSelector.attr("data-id")
+            title: jq.trim($taskTitle.val()),
+            description: $taskDescription.val(),
+            notify: $notifyCheckbox.is(':checked'),
+            milestoneId: $taskMilestoneSelector.attr("data-id"),
+            priority: $priorityCheckbox.is(':checked') ? 1 : 0,
+            projectId: $taskProjectSelector.attr("data-id")
         };
 
-        var responsibles = listTaskResponsibles.find(".user");
-        if (responsibles.length) {
-            data.responsibles = [];
-            responsibles.each(function () {
-                data.responsibles.push(jq(this).attr('data-value'));
-            });
+        if (selectedUsers.length) {
+            data.responsibles = selectedUsers.map(function (item) { return item.id;});
         }
         try {
-            if (taskDeadlineDate.val().length) {
-                data.deadline = getTaskDataDate(taskDeadlineDate);
+            if ($taskDeadlineDate.val().length) {
+                data.deadline = getTaskDataDate($taskDeadlineDate);
             }
 
-            if (taskStartDate.val().length) {
-                data.startDate = getTaskDataDate(taskStartDate);
+            if ($taskStartDate.val().length) {
+                data.startDate = getTaskDataDate($taskStartDate);
             }
         } catch(e) {
 
@@ -291,21 +349,22 @@ ASC.Projects.TaskAction = (function () {
 
     function getTaskDataDate(datePicker) {
         var result = datePicker.datepicker('getDate');
+        if (!result) return "";
         result.setHours(0);
         result.setMinutes(0);
-        return Teamlab.serializeTimestamp(result);
+        result.setSeconds(0);
+        return teamlab.serializeTimestamp(result);
     }
 
     function checkError(data) {
         var isError = false;
         if (!data.title.length) {
-            taskPopup.find('.titlePanel').addClass('requiredFieldError');
-            taskPopup.find('.requiredErrorText.title').html(taskPopup.find('.requiredErrorText').attr('error'));
+            $taskPopup.find('.titlePanel').addClass(requiredFieldErrorClass);
             isError = true;
         }
 
-        if (!data.projectId && !updateTaskFlag) {
-            taskPopup.find('.requiredErrorText.project').show().html(taskPopup.find('.requiredErrorText.project').attr('error'));
+        if (!data.projectId && updateTaskFlag !== updateTaskFlagEnum.update) {
+            $projectContaner.addClass(requiredFieldErrorClass);
             isError = true;
         }
 
@@ -317,8 +376,8 @@ ASC.Projects.TaskAction = (function () {
     };
 
     function compareTaskDatesAndShowError() {
-        var taskStartDateString = taskStartDate.val().trim(),
-            taskDeadlineDateString = taskDeadlineDate.val().trim(),
+        var taskStartDateString = $taskStartDate.val().trim(),
+            taskDeadlineDateString = $taskDeadlineDate.val().trim(),
             startDate,
             deadlineDate,
             errorFlag = false;
@@ -326,23 +385,23 @@ ASC.Projects.TaskAction = (function () {
         if (taskStartDateString == "" && taskDeadlineDateString == "") return false;
         
         if (taskStartDateString && !jq.isDateFormat(taskStartDateString)) {
-            taskStartDate.addClass("red-border");
+            $taskStartDate.addClass(redBorderClass);
             errorFlag = true;
         } else {
-            startDate = taskStartDate.datepicker('getDate');
+            startDate = $taskStartDate.datepicker('getDate');
         }
         if (taskDeadlineDateString && !jq.isDateFormat(taskDeadlineDateString)) {
-            taskDeadlineDate.addClass("red-border");
+            $taskDeadlineDate.addClass(redBorderClass);
             errorFlag = true;
         } else {
-            deadlineDate = taskDeadlineDate.datepicker('getDate');
+            deadlineDate = $taskDeadlineDate.datepicker('getDate');
         }
 
         if (startDate && deadlineDate && startDate > deadlineDate) {
-            var errorStartDate = taskPopup.find(".startDate-error");
+            var errorStartDate = $taskPopup.find(".startDate-error");
             errorStartDate.text(errorStartDate.attr("error"));
             errorStartDate.show();
-            taskStartDate.addClass("red-border");
+            $taskStartDate.addClass(redBorderClass);
             errorFlag = true;
         }
 
@@ -350,25 +409,19 @@ ASC.Projects.TaskAction = (function () {
     };
 
     function initData() {
-        if (isInitData) {
-            return;
-        }
-
-        isInitData = true;
         setProjectCombobox();
         setMilestonesCombobox();
-        taskResponsiblesSelector.tlcombobox();
+        setResponsibleCombobox();
 
         if (currentProjectId) {
-            onGetTeam({}, ASC.Projects.Master.Team);
-            onGetMilestones({}, ASC.Projects.Master.Milestones);
+            onGetTeam({}, master.Team);
         }
     };
 
     function setProjectCombobox() {
-        projectItems = ASC.Projects.Common.getProjectsForFilter().filter(sortPrj).map(mapPrj);
+        projectItems = common.getProjectsForFilter().filter(sortPrj).map(mapPrj);
 
-        taskProjectSelector.projectadvancedSelector(
+        $taskProjectSelector.projectadvancedSelector(
            {
                itemsChoose: projectItems,
                onechosen: true,
@@ -377,8 +430,8 @@ ASC.Projects.TaskAction = (function () {
            }
        );
 
-        taskProjectSelector.on("showList", function (event, item) {
-            taskProjectSelector.attr("data-id", item.id).text(item.title).attr("title", item.title);
+        $taskProjectSelector.on("showList", function (event, item) {
+            $taskProjectSelector.attr("data-id", item.id).text(item.title).attr("title", item.title);
             taskProjectSelectorOnChange(item);
         });
     };
@@ -395,151 +448,142 @@ ASC.Projects.TaskAction = (function () {
         var selectorObj = {
             onechosen: true,
             inPopup: true,
-            sortMethod: ASC.Projects.Common.milestoneSort,
+            sortMethod: common.milestoneSort,
             noresults: ASC.Resources.Master.Resource.MilestoneSelectorNoResult,
             noitems: ASC.Resources.Master.Resource.MilestoneSelectorNoItems
         };
 
-        taskMilestoneSelector.projectadvancedSelector(selectorObj);
+        $taskMilestoneSelector.projectadvancedSelector(selectorObj);
 
-        taskMilestoneSelector.on("showList", function (event, item) {
-            taskMilestoneSelector.attr("data-id", item.id).text(item.title).attr("title", item.title);
+        $taskMilestoneSelector.on("showList", function (event, item) {
+            $taskMilestoneSelector.attr("data-id", item.id).text(item.title).attr("title", item.title);
         });
     };
     
+    function setResponsibleCombobox() {
+        $taskResponsiblesSelector.advancedSelector({
+            showSearch: true,
+            inPopup: true,
+            noresults: projectsJSResource.NoActiveParticipantsNote
+        }).on("showList", function (event, items) {
+            $listTaskResponsibles.empty().show();
+            selectedUsers = items;
+            $listTaskResponsibles.html(jq.tmpl("projects_taskActionUser", [selectedUsers]));
+            showOrHideNotifyCheckbox();
+            event.stopPropagation();
+        });
+    }
+
     function taskProjectSelectorOnChange(item) {
-        var selectedPrjId = item.id;
+        selectedPrjId = item.id;
         if (selectedPrjId > 0) {
             jq('.popupActionPanel').hide();
-            taskPopup.find('.requiredErrorText.project').hide();
-            jq('#pm-milestoneBlock, #pm-respBlock').removeClass("display-none");
+            $taskPopup.find('.requiredErrorText.project').hide();
+            jq('#pm-milestoneBlock, #pm-respBlock').removeClass(displayNone);
 
-            listTaskResponsibles.html('').hide();
+            resetResponsibles();
 
-            jq(taskResponsiblesSelector).tlcombobox(false);
+            getMilestones(selectedPrjId);
 
             if (selectedPrjId == currentProjectId) {
-                onGetMilestones({}, ASC.Projects.Master.Milestones);
-                onGetTeam({}, ASC.Projects.Master.Team);
+                onGetTeam({}, master.Team);
             } else {
-                getMilestones({}, selectedPrjId);
                 getTeam({}, selectedPrjId);
+            }
+
+            if (updateTaskFlag === updateTaskFlagEnum.copy && currentTask) {
+                $copyFilesCheckbox.prop("checked", false);
+
+                if (selectedPrjId !== currentTask.projectId) {
+                    $copyFilesContainerCheckbox.hide();
+                } else {
+                    $copyFilesContainerCheckbox.show();
+                }
             }
         }
     };
 
     function lockTaskForm() {
-        toggleDisabled([taskTitle, taskDescription, taskStartDate, taskDeadlineDate, notifyCheckbox, priorityCheckbox], true);
+        toggleDisabled([$taskTitle, $taskDescription, $taskStartDate, $taskDeadlineDate, $notifyCheckbox, $priorityCheckbox, $copySubtasksCheckbox, $copyFilesCheckbox], true);
 
         jq(".success-popup, .error-popup").hide();
 
-        LoadingBanner.showLoaderBtn("#addTaskPanel");
+        loadingBanner.showLoaderBtn($taskPopup);
     };
 
     function unlockTaskForm() {
-        toggleDisabled([taskTitle, taskDescription, taskStartDate, taskDeadlineDate, notifyCheckbox, priorityCheckbox]);
+        toggleDisabled([$taskTitle, $taskDescription, $taskStartDate, $taskDeadlineDate, $notifyCheckbox, $priorityCheckbox, $copySubtasksCheckbox, $copyFilesCheckbox]);
 
-        LoadingBanner.hideLoaderBtn("#addTaskPanel");
+        loadingBanner.hideLoaderBtn($taskPopup);
     };
 
     function toggleDisabled(elements, lock) {
+        var disabledAttr = "disabled";
         elements.forEach(function (item) {
             if (lock) {
-                item.attr("disabled", "disabled");
+                item.attr(disabledAttr, disabledAttr);
             } else {
-                item.removeAttr("disabled");
+                item.removeAttr(disabledAttr);
             }
         });
     }
 
-    function addTask (params, projectId, data) {
-        Teamlab.addPrjTask(params, projectId, data, { success: onAddTask, error: onTaskError });
-    };
-
     function onAddTask (params, task) {
-        getCurrentPage();
-
-        if (currentPage == "ganttchart") {
-            ASC.Projects.GantChartPage.addTaskToChart(task, true, true);
-        }
-
-        if (currentPage == "tasks" && (currentProjectId == null || task.projectOwner.id == currentProjectId)) {
-            ASC.Projects.TasksManager.onAddTask(params, task);
-        }
-
-        if (currentPage == "milestones" && (currentProjectId == null || task.projectOwner.id == currentProjectId)) {
-            ASC.Projects.AllMilestones.onAddTask(params, task);
-        }
-
-        if (currentProjectId == task.projectId && ASC.Projects.projectNavPanel) {
-            ASC.Projects.projectNavPanel.changeModuleItemsCount(ASC.Projects.projectNavPanel.projectModulesNames.tasks, "add");
-        }
-
         if (params.saveAndView) {
             closeTaskForm();
-            ASC.Projects.Common.displayInfoPanel(ASC.Projects.Resources.ProjectsJSResource.TaskAdded);
+            common.displayInfoPanel(projectsJSResource.TaskAdded);
         }
         else {
-            taskPopup.find('#taskLink').attr("href", "tasks.aspx?prjID=" + task.projectId + "&id=" + task.id);
+            $taskPopup.find('#taskLink').attr("href", "Tasks.aspx?prjID=" + task.projectId + "&id=" + task.id);
             unlockTaskForm();
             currentTask = task;
             renderTaskForm(getEmptyTask());
-            jq("#addTaskPanel .success-popup").show();
-            taskTitle.focus();
+            $taskPopup.find(".success-popup").show();
+            $taskTitle.focus();
         }
 
-        jq("#emptyListTimers .addFirstElement").removeClass("display-none");
+        var project = common.getProjectById(task.projectOwner.id);
+        if (project) {
+            project.taskCountTotal++;
+        }
+
+        common.changeTaskCountInProjectsCache(task, 0);
     };
 
     function onTaskError (params, error) {
-        var taskErrorBox = jq("#addTaskPanel .error-popup");
+        var taskErrorBox = $taskPopup.find(".error-popup");
 
-        LoadingBanner.hideLoaderBtn("#addTaskPanel");
+        loadingBanner.hideLoaderBtn($taskPopup);
         taskErrorBox.text(error[0]);
         taskErrorBox.show();
 
-        setTimeout(function () {
-            taskErrorBox.hide();
-        }, 3000);
+        setTimeout(taskErrorBox.hide, 3000);
         unlockTaskForm();
     };
 
     function updateTask (params, taskId, data) {
-        getCurrentPage();
-        var success;
-        switch (currentPage) {
-            case "tasks":
-                success = ASC.Projects.TasksManager.onUpdateTask;
-                break;
-            case "taskdescription":
-                success = ASC.Projects.TaskDescroptionPage.onUpdateTask;
-                break;
-            default:
-                success = null;
-        }
-        Teamlab.updatePrjTask(params, taskId, data, { success: success, error: onTaskError });
+        teamlab.updatePrjTask(params, taskId, data, { error: onTaskError });
     };
 
+    function getMilestones(projectId) {
+        var milestones = master.Milestones.filter(function (item) {
+            return item.status === 0 && item.projectId == projectId;
+        });
 
-    function getMilestones(params, projectId) {
-        Teamlab.getPrjMilestones(params, null, { filter: { status: 'open', projectId: projectId }, success: onGetMilestones });
-    };
-
-    function onGetMilestones(params, milestones) {
         choosedProjectMilestones = milestones;
 
         milestonesItems = milestones.map(mapMilestones);
         milestonesItems.unshift(noneMilestone);
 
-        taskMilestoneSelector.projectadvancedSelector("reset");
-        taskMilestoneSelector.projectadvancedSelector("rewriteItemList", milestonesItems, []);
+        $taskMilestoneSelector.projectadvancedSelector("reset");
+        $taskMilestoneSelector.projectadvancedSelector("rewriteItemList", milestonesItems, []);
 
         if (currentTask) {
             var taskMile = milestonesItems.find(function(item) {
                 return item.id == currentTask.milestoneId;
             });
-            taskMilestoneSelector.projectadvancedSelector("reset");
-            taskMilestoneSelector.projectadvancedSelector("selectBeforeShow", taskMile || noneMilestone);
+            $taskMilestoneSelector.projectadvancedSelector("reset");
+            $taskMilestoneSelector.projectadvancedSelector("selectBeforeShow", taskMile || noneMilestone);
         }
     };
 
@@ -548,61 +592,37 @@ ASC.Projects.TaskAction = (function () {
     }
 
     function getTeam(params, projectId) {
-        Teamlab.getPrjTeam(params, projectId, { success: onGetTeam });
+        teamlab.getPrjTeam(params, projectId, { success: onGetTeam });
     };
 
     function onGetTeam(params, team) {
-        var noActiveParticipantsTaskNote = jq("#noActiveParticipantsTaskNote");
-        var teamWithoutVisitors = ASC.Projects.Common.excludeVisitors(team);
-        teamWithoutVisitors = ASC.Projects.Common.removeBlockedUsersFromTeam(teamWithoutVisitors);
-        var teamInd = teamWithoutVisitors ? teamWithoutVisitors.length : 0;
+        teamWithoutVisitors = common.excludeVisitors(team);
+        teamWithoutVisitors = common.removeBlockedUsersFromTeam(teamWithoutVisitors);
 
-        taskResponsiblesSelector.find('option[value!=0][value!=-1]').remove();
+        resetResponsibles();
+        $taskResponsiblesSelector.advancedSelector("rewriteItemList", teamWithoutVisitors.map(
+            function (item) {
+                return { id: item.id, title: item.displayName };
+            }), []);
 
-        if (teamInd != 0) {
-            noActiveParticipantsTaskNote.addClass("display-none");
-
-            for (var i = 0; i < teamInd; i++) {
-                var user = teamWithoutVisitors[i];
-                taskResponsiblesSelector.append(jq('<option value="' + user.id + '"></option>').html(user.displayName));
-            }
-            taskResponsiblesSelector.tlcombobox();
-            taskResponsiblesSelector.tlcombobox(true);
-            listTaskResponsibles.empty();
-            setResponsibles();
-        } else {
-            noActiveParticipantsTaskNote.removeClass("display-none");
-            taskResponsiblesSelector.tlcombobox();
-            taskResponsiblesSelector.tlcombobox(false);
-        }
+        updateTaskResponsibleSelector();
     };
 
-    function setResponsibles() {
-        taskResponsiblesSelector.tlcombobox();
-        taskResponsiblesSelector.tlcombobox(true);
-        if (currentTask && currentTask.responsibles.length) {
-            listTaskResponsibles.empty();
-            jQuery.each(currentTask.responsibles, function() {
-                var elem = jq('.userAdd .combobox-container li.option-item[data-value="' + this.id + '"]');
-                if (elem.length) {
-                    var name = elem.text();
-                    listTaskResponsibles.append('<div data-value="' + this.id + '" class="user">' + Encoder.htmlEncode(name) + '</div>');
-                    elem.hide();
-                }
-            });
-            var users = listTaskResponsibles.find(".user");
-            if (jq('.userAdd .combobox-container li.option-item').length - 1 == users.length) {
-                taskResponsiblesSelector.tlcombobox(false);
-            }
-            if (users.length) {
-                listTaskResponsibles.show();
-            }
+    function updateTaskResponsibleSelector() {
+        if (currentTask && currentTask.responsibles.length && currentTask.projectId == selectedPrjId && teamWithoutVisitors) {
+            $taskResponsiblesSelector.advancedSelector("select", currentTask.responsibles.map(function (item) { return item.id; }));
+            $taskResponsiblesSelector.trigger("showList", [currentTask.responsibles.map(function(item){ return {id: item.id, title: item.displayName}})]);
         }
-        if (currentTask && !currentTask.responsibles.length && updateTaskFlag) {
-            listTaskResponsibles.empty();
+        if (currentTask && !currentTask.responsibles.length && updateTaskFlag !== updateTaskFlagEnum.add) {
+            resetResponsibles();
         }
         showOrHideNotifyCheckbox();
-    };
+    }
+
+    function resetResponsibles() {
+        $taskResponsiblesSelector.advancedSelector("reset");
+        $taskResponsiblesSelector.advancedSelector("selectBeforeShow", []);
+    }
 
     function getEmptyTask () {
         var task = {
@@ -611,10 +631,10 @@ ASC.Projects.TaskAction = (function () {
             responsibles: [],
             priority: null,
             startDate: null,
-            deadline: null,
-            milestoneId: null
+            deadline: null
         };
 
+        currentProjectId = jq.getURLParam("prjID");
         if (currentProjectId) {
             task.projectId = currentProjectId;
         }
@@ -623,190 +643,234 @@ ASC.Projects.TaskAction = (function () {
     };
 
     function isNeedChangeProject (projectId) {
-        return projectId && (firstLoadFlag || taskProjectSelector.attr("data-id") != projectId.toString());
+        return projectId && (firstLoadFlag || $taskProjectSelector.attr("data-id") != projectId.toString());
     };
 
 
     function renderTaskForm (task) {
         clearErrorMessages();
-        taskPopup.find('.success-popup, .error-popup').hide();
+        $taskPopup.find('.success-popup, .error-popup').hide();
+        $taskPopup.find('.notify');
         // task body
-        taskTitle.val(task.title);
-        taskDescription.val(task.description);
+        $taskTitle.val(task.title);
+        $taskDescription.val(task.description);
 
         if (isNeedChangeProject(task.projectId)) {
             var taskProject = projectItems.find(function (item) { return item.id == task.projectId; }) || task.projectOwner;
             if (taskProject) {
-                taskProjectSelector.projectadvancedSelector("selectBeforeShow", taskProject);
+                $taskProjectSelector.projectadvancedSelector("selectBeforeShow", taskProject);
             } else {
                 jq("#pm-milestoneBlock").hide();
-                getMilestones({}, task.projectId);
+                getMilestones(task.projectId);
                 getTeam({}, task.projectId);
             }
         } else {
             if (currentProjectId) {
-                onGetMilestones({}, ASC.Projects.Master.Milestones);
-                onGetTeam({}, ASC.Projects.Master.Team);
+                getMilestones(task.projectId);
+                onGetTeam({}, master.Team);
             }
 
             if (task.milestoneId) {
-                taskMilestoneSelector.projectadvancedSelector("reset");
+                $taskMilestoneSelector.projectadvancedSelector("reset");
                 var taskMile = milestonesItems.find(function (item) { return item.id == task.milestoneId; });
-                taskMilestoneSelector.projectadvancedSelector("selectBeforeShow", taskMile || noneMilestone);
+                $taskMilestoneSelector.projectadvancedSelector("selectBeforeShow", taskMile || noneMilestone);
             }
-
-            setResponsibles();
+            updateTaskResponsibleSelector();
         }
 
+        var setDateAction = "setDate";
         if (task.deadline) {
-            taskDeadlineDate.datepicker('setDate', task.deadline);
-            var elemDurationDays = taskDeadlineDate.siblings('.dottedLink');
-            elemDurationDays.css('border-bottom', '1px dotted');
-            elemDurationDays.css('font-weight', 'normal');
+            $taskDeadlineDate.datepicker(setDateAction, task.deadline);
+            $taskDeadlineDate.change();
         } else {
-            if (updateTaskFlag) taskDeadlineDate.datepicker('setDate', null);
+            if (updateTaskFlag !== updateTaskFlagEnum.add) {
+                $taskDeadlineDate.datepicker(setDateAction, null);
+                boldDeadlineLeft(-1);
+            }
         }
 
         if (task.startDate) {
-            taskStartDate.datepicker('setDate', task.startDate);
+            $taskStartDate.datepicker(setDateAction, task.startDate);
         } else {
-            if (updateTaskFlag) taskStartDate.datepicker('setDate', null);
+            if (updateTaskFlag !== updateTaskFlagEnum.add) $taskStartDate.datepicker(setDateAction, null);
         }
 
         if (task.priority) {
-            priorityCheckbox.prop("checked", true);
+            $priorityCheckbox.prop("checked", true);
         } else {
-            priorityCheckbox.prop("checked", false);
+            $priorityCheckbox.prop("checked", false);
         }
 
-        if (updateTaskFlag) {
+        if (updateTaskFlag === updateTaskFlagEnum.update) {
             setDescriptionHeight();
-            jq("#pm-projectBlock").hide();
+            $projectContaner.hide();
         } else {
-            taskDescription.height(60);
-            jq('#pm-projectBlock').show();
+            $taskDescription.height(60);
+            $projectContaner.show();
         }
 
         //buttons and title
-        var saveButton = taskPopup.find('#saveTaskAction');
+        var saveButton = $taskPopup.find('#saveTaskAction');
         var createNewButton = jq("#createTaskAndCreateNew");
+        var commonResource = resources.CommonResource;
 
-        if (updateTaskFlag) {
+        if (updateTaskFlag === updateTaskFlagEnum.update) {
             createNewButton.hide();
             createNewButton.siblings(".splitter-buttons").first().hide();
-            saveButton.html(saveButton.attr('update'));
-            taskPopup.find('.containerHeaderBlock table td:first').html(ASC.Projects.Resources.ProjectsJSResource.EditThisTask);
-        } else {
+
+            $copyContainer.hide();
+
+            saveButton.html(commonResource.SaveChanges);
+            $taskPopup.find('.containerHeaderBlock table td:first').html(projectsJSResource.EditThisTask);
+        } else if (updateTaskFlag === updateTaskFlagEnum.add) {
             createNewButton.show();
             createNewButton.siblings(".splitter-buttons").show();
 
-            saveButton.html(saveButton.attr('add'));
-            taskPopup.find('.containerHeaderBlock table td:first').html(ASC.Projects.Resources.ProjectsJSResource.CreateNewTask);
+            $copyContainer.hide();
+
+            saveButton.html(commonResource.Save);
+            $taskPopup.find('.containerHeaderBlock table td:first').html(projectsJSResource.CreateNewTask);
+        } else if (updateTaskFlag === updateTaskFlagEnum.copy) {
+            createNewButton.html(commonResource.Replace);
+            createNewButton.show();
+            createNewButton.siblings(".splitter-buttons").show();
+
+            $copySubtasksCheckbox.prop("checked", false);
+            $copyFilesCheckbox.prop("checked", false);
+            $copyContainer.show();
+
+            saveButton.html(commonResource.Copy);
+            $taskPopup.find('.containerHeaderBlock table td:first').html(resources.TasksResource.CopyTaskHeader);
         }
 
         if (firstLoadFlag) {
             firstLoadFlag = false;
         }
-        LoadingBanner.hideLoading();
+        loadingBanner.hideLoading();
     };
 
     function showTaskForm(task) {
         currentTask = task;
         unlockTaskForm();
         renderTaskForm(task);
-        StudioBlockUIManager.blockUI(jq("#addTaskPanel"), 550, 550, 0, "absolute");
+        studioBlockUIManager.blockUI($taskPopup, 550);
     };
 
     function showTaskFormAfterQuestionPopup () {
         unlockTaskForm();
-        StudioBlockUIManager.blockUI(jq("#addTaskPanel"), 550, 550, 0, "absolute");
+        studioBlockUIManager.blockUI($taskPopup, 550);
     };
 
-    function closeTaskForm () {
+    function closeTaskForm() {
         jq.unblockUI();
     };
 
     function setDescriptionHeight () {
-        var description = jq("#addtask_description");
+        var overflowYClass = "overflowY";
 
         //default
-        description.height(60);
-        description.css("overflowY", "auto");
+        $taskDescription.height(60);
+        $taskDescription.css(overflowYClass, "auto");
 
-        var colsCount = parseInt(description.attr("cols"), 10);
-        var text = description.val();
-        var countStr = text.split("\n").length;
+        var colsCount = parseInt($taskDescription.attr("cols"), 10),
+            text = $taskDescription.val(),
+            countStr = text.split("\n").length;
+
         if (countStr > 4) {
             if (countStr > 26) {
-                description.height(400);
-                description.css("overflowY", "scroll");
+                $taskDescription.height(400);
+                $taskDescription.css(overflowYClass, "scroll");
                 return;
             }
-            description.height(countStr * 15);
+            $taskDescription.height(countStr * 15);
         }
         var signsCount = text.length;
         if (signsCount > colsCount * 6) {
             var rows = Math.floor(signsCount / (colsCount * 2.5));
             if (rows > 27) {
-                description.height(400);
-                description.css("overflowY", "scroll");
+                $taskDescription.height(400);
+                $taskDescription.css(overflowYClass, "scroll");
             } else {
                 if (rows > countStr) {
-                    description.height(rows * 15);
+                    $taskDescription.height(rows * 15);
                 }
             }
         }
     };
 
+    function show(task, updateTaskFlagVal) {
+        if (!isInitData) {
+            var tasksResource = resources.TasksResource;
+
+            jq("#addTaskPanel")
+                .html(jq.tmpl("common_containerTmpl",
+                {
+                    options: {
+                        PopupContainerCssClass: "popupContainerClass",
+                        OnCancelButtonClick: "ASC.Projects.TaskAction.closeTaskForm();",
+                        IsPopup: true
+                    },
+                    header: {
+                        data: { title: tasksResource.AddTask },
+                        title: "projects_common_popup_header"
+                    },
+                    body: {
+                        title: "projects_task_action",
+                        data: {
+                            title: {
+                                error: tasksResource.EachTaskMustHaveTitle,
+                                header: tasksResource.TaskTitle
+                            },
+                            description: tasksResource.TaskDescription,
+                            project: {
+                                error: tasksResource.ChooseProject,
+                                header: resources.ProjectResource.Project
+                            }
+                        }
+                    }
+                }));
+
+            initTaskFormElementsAndConstants();
+            initEvents();
+            initData();
+
+            isInitData = true;
+        }
+
+        loadingBanner.displayLoading();
+        updateTaskFlag = updateTaskFlagVal;
+        showTaskForm(task);
+    }
 
     var showCreateNewTaskForm = function (taskParams) {
-        initData();
-
-        updateTaskFlag = false;
-
-        var task = getEmptyTask();
-        if (taskParams) {
-            if (taskParams.projectId) {
-                task.projectId = taskParams.projectId;
-            }
-            if (taskParams.milestoneId) {
-                task.milestoneId = taskParams.milestoneId;
-            }
-            if (taskParams.responsibles) {
-                task.responsibles = taskParams.responsibles;
-            }
-        }
-
-        showTaskForm(task);
+        show(jq.extend(getEmptyTask(), taskParams), updateTaskFlagEnum.add);
     };
 
-    var showUpdateTaskForm = function (taskId, task) {
-        initData();
-        LoadingBanner.displayLoading();
-        updateTaskFlag = true;
-        if (task) {
-            showTaskForm(task);
-        } else {
-            Teamlab.getPrjTask({}, taskId, function (params, targetTask) {
-                showTaskForm(targetTask);
-            });
-        }
+    var showUpdateTaskForm = function (task) {
+        show(task, updateTaskFlagEnum.update);
     };
 
-    var onAddNewMileston = function (milestone) {
-        if (taskProjectSelector.attr("data-id") == milestone.projectId) {
+    var showCopyTaskForm = function (task) {
+        show(task, updateTaskFlagEnum.copy);
+    };
+
+    function onAddNewMileston(params, milestone) {
+        if ($taskProjectSelector.attr("data-id") == milestone.projectId) {
             milestonesItems.push({ id: milestone.id, title: '[' + milestone.displayDateDeadline + '] ' + milestone.title, deadline: milestone.deadline });
-            taskMilestoneSelector.projectadvancedSelector("rewriteItemList", milestonesItems, []);
+            $taskMilestoneSelector.projectadvancedSelector("rewriteItemList", milestonesItems, []);
         }
     };
 
     var onUpdateTeam = function () {
-        if (currentProjectId == taskProjectSelector.attr("data-id")) {
-            onGetTeam({}, ASC.Projects.Master.Team);
+        if (!isInitData) return;
+        if (currentProjectId == $taskProjectSelector.attr("data-id")) {
+            onGetTeam({}, master.Team); 
         }
     };
 
     var filterProjectsByIdInCombobox = function (ids) {  // only for gantt chart
+        if (!isInitData) return;
+
         if (ids.length === filterProjectsIds.length) {
 
             var isEqual = true;
@@ -826,7 +890,7 @@ ASC.Projects.TaskAction = (function () {
 
         var length = filterProjectsIds.length;
 
-        var sortedProjects = ASC.Projects.Common.getProjectsForFilter();
+        var sortedProjects = common.getProjectsForFilter();
 
         function sortPrj(item) {
             return item.canCreateTask && (!length || filterProjectsIds.some(function (fitem) {
@@ -834,15 +898,16 @@ ASC.Projects.TaskAction = (function () {
             }));
         }
 
-        taskProjectSelector.projectadvancedSelector("rewriteItemList", sortedProjects.filter(sortPrj).map(mapPrj), []);
+        $taskProjectSelector.projectadvancedSelector("rewriteItemList", sortedProjects.filter(sortPrj).map(mapPrj), []);
     };
 
     return {
         init: init,
         showUpdateTaskForm: showUpdateTaskForm,
         showCreateNewTaskForm: showCreateNewTaskForm,
+        showCopyTaskForm: showCopyTaskForm,
         onUpdateProjectTeam: onUpdateTeam,
-        onAddNewMileston: onAddNewMileston,
-        filterProjectsByIdInCombobox: filterProjectsByIdInCombobox
+        filterProjectsByIdInCombobox: filterProjectsByIdInCombobox,
+        closeTaskForm: closeTaskForm
     };
 })(jQuery);

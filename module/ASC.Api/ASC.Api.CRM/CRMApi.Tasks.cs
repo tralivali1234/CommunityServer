@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -56,7 +47,7 @@ namespace ASC.Api.CRM
         {
             if (taskid <= 0) throw new ArgumentException();
 
-            var task = DaoFactory.GetTaskDao().GetByID(taskid);
+            var task = DaoFactory.TaskDao.GetByID(taskid);
             if (task == null) throw new ItemNotFoundException();
 
             if (!CRMSecurity.CanAccessTo(task))
@@ -129,7 +120,7 @@ namespace ASC.Api.CRM
             {
                 result = ToTaskListWrapper(
                     DaoFactory
-                        .GetTaskDao()
+                        .TaskDao
                         .GetTasks(
                             searchText,
                             responsibleid,
@@ -150,7 +141,7 @@ namespace ASC.Api.CRM
             else
                 result = ToTaskListWrapper(
                     DaoFactory
-                        .GetTaskDao()
+                        .TaskDao
                         .GetTasks(
                             searchText,
                             responsibleid,
@@ -173,7 +164,7 @@ namespace ASC.Api.CRM
             else
             {
                 totalCount = DaoFactory
-                    .GetTaskDao()
+                    .TaskDao
                     .GetTasksCount(
                         searchText,
                         responsibleid,
@@ -205,12 +196,12 @@ namespace ASC.Api.CRM
         {
             if (taskid <= 0) throw new ArgumentException();
 
-            DaoFactory.GetTaskDao().OpenTask(taskid);
+            DaoFactory.TaskDao.OpenTask(taskid);
 
-            var task = DaoFactory.GetTaskDao().GetByID(taskid);
-            MessageService.Send(Request, MessageAction.CrmTaskOpened, task.Title);
+            var task = DaoFactory.TaskDao.GetByID(taskid);
+            MessageService.Send(Request, MessageAction.CrmTaskOpened, MessageTarget.Create(task.ID), task.Title);
 
-            return ToTaskWrapper(DaoFactory.GetTaskDao().GetByID(taskid));
+            return ToTaskWrapper(task);
         }
 
         /// <summary>
@@ -228,12 +219,12 @@ namespace ASC.Api.CRM
         {
             if (taskid <= 0) throw new ArgumentException();
 
-            DaoFactory.GetTaskDao().CloseTask(taskid);
+            DaoFactory.TaskDao.CloseTask(taskid);
 
-            var task = DaoFactory.GetTaskDao().GetByID(taskid);
-            MessageService.Send(Request, MessageAction.CrmTaskClosed, task.Title);
+            var task = DaoFactory.TaskDao.GetByID(taskid);
+            MessageService.Send(Request, MessageAction.CrmTaskClosed, MessageTarget.Create(task.ID), task.Title);
 
-            return ToTaskWrapper(DaoFactory.GetTaskDao().GetByID(taskid));
+            return ToTaskWrapper(task);
         }
 
         /// <summary>
@@ -252,15 +243,13 @@ namespace ASC.Api.CRM
         {
             if (taskid <= 0) throw new ArgumentException();
 
-            var taskObj = DaoFactory.GetTaskDao().GetByID(taskid);
-            if (taskObj == null) throw new ItemNotFoundException();
+            var task = DaoFactory.TaskDao.GetByID(taskid);
+            if (task == null) throw new ItemNotFoundException();
 
-            var taskWrapper = ToTaskWrapper(taskObj);
+            DaoFactory.TaskDao.DeleteTask(taskid);
+            MessageService.Send(Request, MessageAction.CrmTaskDeleted, MessageTarget.Create(task.ID), task.Title);
 
-            DaoFactory.GetTaskDao().DeleteTask(taskid);
-            MessageService.Send(Request, MessageAction.CrmTaskDeleted, taskWrapper.Title);
-
-            return taskWrapper;
+            return ToTaskWrapper(task);
         }
 
         /// <summary>
@@ -302,7 +291,7 @@ namespace ASC.Api.CRM
                 || categoryId <= 0)
                 throw new ArgumentException();
 
-            var listItem = DaoFactory.GetListItemDao().GetByID(categoryId);
+            var listItem = DaoFactory.ListItemDao.GetByID(categoryId);
             if (listItem == null) throw new ItemNotFoundException(CRMErrorsResource.TaskCategoryNotFound);
 
             var task = new Task
@@ -319,7 +308,7 @@ namespace ASC.Api.CRM
                     AlertValue = alertValue
                 };
 
-            task = DaoFactory.GetTaskDao().SaveOrUpdateTask(task);
+            task = DaoFactory.TaskDao.SaveOrUpdateTask(task);
 
             if (isNotify)
             {
@@ -329,7 +318,7 @@ namespace ASC.Api.CRM
 
                 if (task.ContactID > 0)
                 {
-                    taskContact = DaoFactory.GetContactDao().GetByID(task.ContactID);
+                    taskContact = DaoFactory.ContactDao.GetByID(task.ContactID);
                 }
 
                 if (task.EntityID > 0)
@@ -337,10 +326,10 @@ namespace ASC.Api.CRM
                     switch (task.EntityType)
                     {
                         case EntityType.Case:
-                            taskCase = DaoFactory.GetCasesDao().GetByID(task.EntityID);
+                            taskCase = DaoFactory.CasesDao.GetByID(task.EntityID);
                             break;
                         case EntityType.Opportunity:
-                            taskDeal = DaoFactory.GetDealDao().GetByID(task.EntityID);
+                            taskDeal = DaoFactory.DealDao.GetByID(task.EntityID);
                             break;
                     }
                 }
@@ -348,7 +337,7 @@ namespace ASC.Api.CRM
                 NotifyClient.Instance.SendAboutResponsibleByTask(task, listItem.Title, taskContact, taskCase, taskDeal, null);
             }
 
-            MessageService.Send(Request, MessageAction.CrmTaskCreated, task.Title);
+            MessageService.Send(Request, MessageAction.CrmTaskCreated, MessageTarget.Create(task.ID), task.Title);
 
             return ToTaskWrapper(task);
         }
@@ -410,14 +399,14 @@ namespace ASC.Api.CRM
                     });
             }
 
-            tasks = DaoFactory.GetTaskDao().SaveOrUpdateTaskList(tasks).ToList();
+            tasks = DaoFactory.TaskDao.SaveOrUpdateTaskList(tasks).ToList();
 
             string taskCategory = null;
             if (isNotify)
             {
                 if (categoryId > 0)
                 {
-                    var listItem = DaoFactory.GetListItemDao().GetByID(categoryId);
+                    var listItem = DaoFactory.ListItemDao.GetByID(categoryId);
                     if (listItem == null) throw new ItemNotFoundException();
 
                     taskCategory = listItem.Title;
@@ -434,7 +423,7 @@ namespace ASC.Api.CRM
 
                 if (tasks[i].ContactID > 0)
                 {
-                    taskContact = DaoFactory.GetContactDao().GetByID(tasks[i].ContactID);
+                    taskContact = DaoFactory.ContactDao.GetByID(tasks[i].ContactID);
                 }
 
                 if (tasks[i].EntityID > 0)
@@ -442,10 +431,10 @@ namespace ASC.Api.CRM
                     switch (tasks[i].EntityType)
                     {
                         case EntityType.Case:
-                            taskCase = DaoFactory.GetCasesDao().GetByID(tasks[i].EntityID);
+                            taskCase = DaoFactory.CasesDao.GetByID(tasks[i].EntityID);
                             break;
                         case EntityType.Opportunity:
-                            taskDeal = DaoFactory.GetDealDao().GetByID(tasks[i].EntityID);
+                            taskDeal = DaoFactory.DealDao.GetByID(tasks[i].EntityID);
                             break;
                     }
                 }
@@ -455,9 +444,9 @@ namespace ASC.Api.CRM
 
             if (tasks.Any())
             {
-                var contacts = DaoFactory.GetContactDao().GetContacts(contactId);
+                var contacts = DaoFactory.ContactDao.GetContacts(contactId);
                 var task = tasks.First();
-                MessageService.Send(Request, MessageAction.ContactsCreatedCrmTasks, contacts.Select(x => x.GetTitle()), task.Title);
+                MessageService.Send(Request, MessageAction.ContactsCreatedCrmTasks, MessageTarget.Create(tasks.Select(x => x.ID)), contacts.Select(x => x.GetTitle()), task.Title);
             }
             
             return ToTaskListWrapper(tasks);
@@ -501,7 +490,7 @@ namespace ASC.Api.CRM
                  ) || categoryid <= 0)
                 throw new ArgumentException();
 
-            var listItem = DaoFactory.GetListItemDao().GetByID(categoryid);
+            var listItem = DaoFactory.ListItemDao.GetByID(categoryid);
             if (listItem == null) throw new ItemNotFoundException(CRMErrorsResource.TaskCategoryNotFound);
 
             var task = new Task
@@ -519,7 +508,7 @@ namespace ASC.Api.CRM
                 };
 
 
-            task = DaoFactory.GetTaskDao().SaveOrUpdateTask(task);
+            task = DaoFactory.TaskDao.SaveOrUpdateTask(task);
 
             if (isNotify)
             {
@@ -529,7 +518,7 @@ namespace ASC.Api.CRM
 
                 if (task.ContactID > 0)
                 {
-                    taskContact = DaoFactory.GetContactDao().GetByID(task.ContactID);
+                    taskContact = DaoFactory.ContactDao.GetByID(task.ContactID);
                 }
 
                 if (task.EntityID > 0)
@@ -537,10 +526,10 @@ namespace ASC.Api.CRM
                     switch (task.EntityType)
                     {
                         case EntityType.Case:
-                            taskCase = DaoFactory.GetCasesDao().GetByID(task.EntityID);
+                            taskCase = DaoFactory.CasesDao.GetByID(task.EntityID);
                             break;
                         case EntityType.Opportunity:
-                            taskDeal = DaoFactory.GetDealDao().GetByID(task.EntityID);
+                            taskDeal = DaoFactory.DealDao.GetByID(task.EntityID);
                             break;
                     }
                 }
@@ -548,9 +537,35 @@ namespace ASC.Api.CRM
                 NotifyClient.Instance.SendAboutResponsibleByTask(task, listItem.Title, taskContact, taskCase, taskDeal, null);
             }
 
-            MessageService.Send(Request, MessageAction.CrmTaskUpdated, task.Title);
+            MessageService.Send(Request, MessageAction.CrmTaskUpdated, MessageTarget.Create(task.ID), task.Title);
 
             return ToTaskWrapper(task);
+        }
+
+        /// <visible>false</visible>
+        [Update(@"task/{taskid:[0-9]+}/creationdate")]
+        public void SetTaskCreationDate(int taskId, ApiDateTime creationDate)
+        {
+            var dao = DaoFactory.TaskDao;
+            var task = dao.GetByID(taskId);
+
+            if (task == null || !CRMSecurity.CanAccessTo(task))
+                throw new ItemNotFoundException();
+
+            dao.SetTaskCreationDate(taskId, creationDate);
+        }
+
+        /// <visible>false</visible>
+        [Update(@"task/{taskid:[0-9]+}/lastmodifeddate")]
+        public void SetTaskLastModifedDate(int taskId, ApiDateTime lastModifedDate)
+        {
+            var dao = DaoFactory.TaskDao;
+            var task = dao.GetByID(taskId);
+
+            if (task == null || !CRMSecurity.CanAccessTo(task))
+                throw new ItemNotFoundException();
+
+            dao.SetTaskLastModifedDate(taskId, lastModifedDate);
         }
 
         private IEnumerable<TaskWrapper> ToTaskListWrapper(IEnumerable<Task> itemList)
@@ -601,7 +616,7 @@ namespace ASC.Api.CRM
                 switch (entityType)
                 {
                     case EntityType.Opportunity:
-                        DaoFactory.GetDealDao().GetDeals(entityWrappersIDs[entityType].Distinct().ToArray())
+                        DaoFactory.DealDao.GetDeals(entityWrappersIDs[entityType].Distinct().ToArray())
                                   .ForEach(item =>
                                       {
                                           if (item == null) return;
@@ -617,7 +632,7 @@ namespace ASC.Api.CRM
                                       });
                         break;
                     case EntityType.Case:
-                        DaoFactory.GetCasesDao().GetByID(entityWrappersIDs[entityType].ToArray())
+                        DaoFactory.CasesDao.GetByID(entityWrappersIDs[entityType].ToArray())
                                   .ForEach(item =>
                                       {
                                           if (item == null) return;
@@ -635,9 +650,9 @@ namespace ASC.Api.CRM
                 }
             }
 
-            var categories = DaoFactory.GetListItemDao().GetItems(categoryIDs.ToArray()).ToDictionary(x => x.ID, x => new TaskCategoryBaseWrapper(x));
-            var contacts = DaoFactory.GetContactDao().GetContacts(contactIDs.ToArray()).ToDictionary(item => item.ID, ToContactBaseWithEmailWrapper);
-            var restrictedContacts = DaoFactory.GetContactDao().GetRestrictedContacts(contactIDs.ToArray()).ToDictionary(item => item.ID, ToContactBaseWithEmailWrapper);
+            var categories = DaoFactory.ListItemDao.GetItems(categoryIDs.ToArray()).ToDictionary(x => x.ID, x => new TaskCategoryBaseWrapper(x));
+            var contacts = DaoFactory.ContactDao.GetContacts(contactIDs.ToArray()).ToDictionary(item => item.ID, ToContactBaseWithEmailWrapper);
+            var restrictedContacts = DaoFactory.ContactDao.GetRestrictedContacts(contactIDs.ToArray()).ToDictionary(item => item.ID, ToContactBaseWithEmailWrapper);
 
 
 
@@ -691,7 +706,7 @@ namespace ASC.Api.CRM
 
             if (task.ContactID > 0)
             {
-                result.Contact = ToContactBaseWithEmailWrapper(DaoFactory.GetContactDao().GetByID(task.ContactID));
+                result.Contact = ToContactBaseWithEmailWrapper(DaoFactory.ContactDao.GetByID(task.ContactID));
             }
 
             if (task.EntityID > 0)

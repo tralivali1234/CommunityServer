@@ -1,41 +1,33 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Common.Data;
-using ASC.Common.Data.Sql;
-using ASC.Common.Data.Sql.Expressions;
-using ASC.Common.Utils;
-using ASC.Core.Tenants;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
+using ASC.Common.Data;
+using ASC.Common.Data.Sql;
+using ASC.Common.Data.Sql.Expressions;
+using ASC.Common.Utils;
+using ASC.Core.Tenants;
+using ASC.Core.Users;
+using ASC.Security.Cryptography;
 
 namespace ASC.Core.Data
 {
@@ -59,26 +51,88 @@ namespace ASC.Core.Data
             }
         }
 
-        public IEnumerable<Tenant> GetTenants(DateTime from)
+        public IEnumerable<Tenant> GetTenants(DateTime from, bool active = true)
         {
-            return GetTenants(from != default(DateTime) ? Exp.Ge("last_modified", from) : Exp.Empty);
+            return GetTenants(
+                Exp.And(
+                    active
+                        ? Exp.Eq("t.status", (int)TenantStatus.Active)
+                        : Exp.Empty,
+                    from != default(DateTime)
+                        ? Exp.Ge("last_modified", from)
+                        : Exp.Empty
+                    )
+                );
         }
 
         public IEnumerable<Tenant> GetTenants(string login, string passwordHash)
         {
             if (string.IsNullOrEmpty(login)) throw new ArgumentNullException("login");
 
-            var q = TenantsQuery(Exp.Empty)
-                .InnerJoin("core_user u", Exp.EqColumns("t.id", "u.tenant"))
-                .InnerJoin("core_usersecurity s", Exp.EqColumns("u.id", "s.userid"))
-                .Where("t.status", (int)TenantStatus.Active)
-                .Where(login.Contains('@') ? "u.email" : "u.id", login)
-                .Where("u.removed", false);
-            if (passwordHash != null)
+            if (passwordHash == null)
             {
-                q.Where("s.pwdhash", passwordHash);
+                var q = TenantsQuery(Exp.Empty)
+                    .InnerJoin("core_user u", Exp.EqColumns("t.id", "u.tenant"))
+                    .InnerJoin("core_usersecurity s", Exp.EqColumns("u.id", "s.userid"))
+                    .Where("t.status", (int)TenantStatus.Active)
+                    .Where(login.Contains('@') ? "u.email" : "u.id", login)
+                    .Where("u.status", EmployeeStatus.Active)
+                    .Where("u.removed", false);
+
+                return ExecList(q).ConvertAll(ToTenant);
             }
-            return ExecList(q).ConvertAll(r => ToTenant(r));
+
+            Guid userId;
+            if (Guid.TryParse(login, out userId))
+            {
+                var q = TenantsQuery(Exp.Empty)
+                    .InnerJoin("core_user u", Exp.EqColumns("t.id", "u.tenant"))
+                    .InnerJoin("core_usersecurity s", Exp.EqColumns("u.id", "s.userid"))
+                    .Where("t.status", (int)TenantStatus.Active)
+                    .Where("u.id", userId)
+                    .Where("u.status", EmployeeStatus.Active)
+                    .Where("u.removed", false)
+                    .Where(Exp.Or(
+                            Exp.Eq("s.pwdhash", GetPasswordHash(userId, passwordHash)),
+                            Exp.Eq("s.pwdhash", Hasher.Base64Hash(passwordHash, HashAlg.SHA256)) //todo: remove old scheme
+                        ));
+
+                return ExecList(q).ConvertAll(ToTenant);
+            }
+            else
+            {
+                var q = TenantsQuery(Exp.Empty)
+                    .InnerJoin("core_user u", Exp.EqColumns("t.id", "u.tenant"))
+                    .InnerJoin("core_usersecurity s", Exp.EqColumns("u.id", "s.userid"))
+                    .Where("t.status", (int)TenantStatus.Active)
+                    .Where(login.Contains('@') ? "u.email" : "u.id", login)
+                    .Where("u.status", EmployeeStatus.Active)
+                    .Where("u.removed", false)
+                    .Where("s.pwdhash", Hasher.Base64Hash(passwordHash, HashAlg.SHA256));
+
+                //old password
+                var result = ExecList(q).ConvertAll(ToTenant);
+
+                var usersQuery = new SqlQuery("core_user u")
+                    .Select("u.id")
+                    .Where("u.email", login)
+                    .Where("u.status", EmployeeStatus.Active)
+                    .Where("u.removed", false);
+
+                var passwordHashs = ExecList(usersQuery).ConvertAll(r =>
+                        GetPasswordHash(new Guid((string)r[0]), passwordHash)
+                    );
+
+                q = TenantsQuery(Exp.Empty)
+                    .InnerJoin("core_usersecurity s", Exp.EqColumns("t.id", "s.tenant"))
+                    .Where(Exp.In("s.pwdhash", passwordHashs));
+
+                //new password
+                result = result.Concat(ExecList(q).ConvertAll(ToTenant)).ToList();
+                result.Distinct();
+
+                return result;
+            }
         }
 
         public Tenant GetTenant(int id)
@@ -94,6 +148,14 @@ namespace ASC.Core.Data
             return GetTenants(Exp.Eq("alias", domain.ToLowerInvariant()) | Exp.Eq("mappeddomain", domain.ToLowerInvariant()))
                 .OrderBy(a => a.Status == TenantStatus.Restoring ? TenantStatus.Active : a.Status)
                 .ThenByDescending(a => a.Status == TenantStatus.Restoring ? 0 : a.TenantId)
+                .FirstOrDefault();
+        }
+
+        public Tenant GetTenantForStandaloneWithoutAlias(string ip)
+        {
+            return GetTenants(Exp.Empty)
+                .OrderBy(a => a.Status)
+                .ThenByDescending(a => a.TenantId)
                 .FirstOrDefault();
         }
 
@@ -127,7 +189,7 @@ namespace ASC.Core.Data
                         .SetMaxResults(1);
                     t.Version = db.ExecuteScalar<int>(q);
 
-                    var i = new SqlInsert("tenants_tenants", true)
+                    var i = new SqlInsert("tenants_tenants")
                         .InColumnValue("id", t.TenantId)
                         .InColumnValue("alias", t.TenantAlias.ToLowerInvariant())
                         .InColumnValue("mappeddomain", !string.IsNullOrEmpty(t.MappedDomain) ? t.MappedDomain.ToLowerInvariant() : null)
@@ -145,6 +207,8 @@ namespace ASC.Core.Data
                         .InColumnValue("payment_id", t.PaymentId)
                         .InColumnValue("last_modified", t.LastModified = DateTime.UtcNow)
                         .InColumnValue("industry", (int)t.Industry)
+                        .InColumnValue("spam", t.Spam)
+                        .InColumnValue("calls", t.Calls)
                         .Identity<int>(0, t.TenantId, true);
 
 
@@ -169,12 +233,14 @@ namespace ASC.Core.Data
                         .Set("payment_id", t.PaymentId)
                         .Set("last_modified", t.LastModified = DateTime.UtcNow)
                         .Set("industry", (int)t.Industry)
+                        .Set("spam", t.Spam)
+                        .Set("calls", t.Calls)
                         .Where("id", t.TenantId);
 
                     db.ExecuteNonQuery(u);
                 }
 
-                if (string.IsNullOrEmpty(t.PartnerId) && string.IsNullOrEmpty(t.AffiliateId))
+                if (string.IsNullOrEmpty(t.PartnerId) && string.IsNullOrEmpty(t.AffiliateId) && string.IsNullOrEmpty(t.Campaign))
                 {
                     var d = new SqlDelete("tenants_partners").Where("tenant_id", t.TenantId);
                     db.ExecuteNonQuery(d);
@@ -184,7 +250,8 @@ namespace ASC.Core.Data
                     var i = new SqlInsert("tenants_partners", true)
                         .InColumnValue("tenant_id", t.TenantId)
                         .InColumnValue("partner_id", t.PartnerId)
-                        .InColumnValue("affiliate_id", t.AffiliateId);
+                        .InColumnValue("affiliate_id", t.AffiliateId)
+                        .InColumnValue("campaign", t.Campaign);
                     db.ExecuteNonQuery(i);
                 }
 
@@ -194,16 +261,18 @@ namespace ASC.Core.Data
             return t;
         }
 
-        public void RemoveTenant(int id)
+        public void RemoveTenant(int id, bool auto = false)
         {
+            var postfix = auto ? "_auto_deleted" : "_deleted";
+
             using (var db = GetDb())
             using (var tx = db.BeginTransaction())
             {
                 var alias = db.ExecuteScalar<string>(new SqlQuery("tenants_tenants").Select("alias").Where("id", id));
-                var count = db.ExecuteScalar<int>(new SqlQuery("tenants_tenants").SelectCount().Where(Exp.Like("alias", alias + "_deleted", SqlLike.StartWith)));
+                var count = db.ExecuteScalar<int>(new SqlQuery("tenants_tenants").SelectCount().Where(Exp.Like("alias", alias + postfix, SqlLike.StartWith)));
                 db.ExecuteNonQuery(
                     new SqlUpdate("tenants_tenants")
-                        .Set("alias", alias + "_deleted" + (count > 0 ? count.ToString() : ""))
+                        .Set("alias", alias + postfix + (count > 0 ? count.ToString() : ""))
                         .Set("status", TenantStatus.RemovePending)
                         .Set("statuschanged", DateTime.UtcNow)
                         .Set("last_modified", DateTime.UtcNow)
@@ -236,20 +305,19 @@ namespace ASC.Core.Data
             ExecNonQuery(i);
         }
 
-
         private IEnumerable<Tenant> GetTenants(Exp where)
         {
             var q = TenantsQuery(where);
-            return ExecList(q).ConvertAll(r => ToTenant(r));
+            return ExecList(q).ConvertAll(ToTenant);
         }
 
-        private SqlQuery TenantsQuery(Exp where)
+        private static SqlQuery TenantsQuery(Exp where)
         {
             return new SqlQuery("tenants_tenants t")
                 .Select("t.id", "t.alias", "t.mappeddomain", "t.version", "t.version_changed", "t.name", "t.language", "t.timezone", "t.owner_id")
                 .Select("t.trusteddomains", "t.trusteddomainsenabled", "t.creationdatetime", "t.status", "t.statuschanged", "t.payment_id", "t.last_modified")
-                .Select("p.partner_id", "p.affiliate_id")
-                .Select("t.industry")
+                .Select("p.partner_id", "p.affiliate_id", "p.campaign")
+                .Select("t.industry", "t.spam", "t.calls")
                 .LeftOuterJoin("tenants_partners p", Exp.EqColumns("t.id", "p.tenant_id"))
                 .Where(where);
         }
@@ -273,7 +341,10 @@ namespace ASC.Core.Data
                 LastModified = (DateTime)r[15],
                 PartnerId = (string)r[16],
                 AffiliateId = (string)r[17],
-                Industry = r[18] != null ? (TenantIndustry)Convert.ToInt32(r[18]) : TenantIndustry.Other
+                Campaign = (string)r[18],
+                Industry = r[18] != null ? (TenantIndustry)Convert.ToInt32(r[19]) : TenantIndustry.Other,
+                Spam = Convert.ToBoolean(r[20]),
+                Calls = Convert.ToBoolean(r[21]),
             };
             tenant.SetTrustedDomains((string)r[9]);
 
@@ -300,20 +371,23 @@ namespace ASC.Core.Data
                             {
                                 id = File.ReadAllText("/etc/timezone").Trim();
                             }
-                            else if (File.Exists("/etc/localtime"))
+
+                            if(string.IsNullOrEmpty(id))
                             {
                                 var psi = new ProcessStartInfo
                                 {
-                                    FileName = "file",
-                                    Arguments = "/etc/localtime",
+                                    FileName = "/bin/bash",
+                                    Arguments = "date +%Z",
                                     RedirectStandardOutput = true,
                                     UseShellExecute = false,
                                 };
-                                var p = Process.Start(psi);
-                                if (p.WaitForExit(1000))
+                                using (var p = Process.Start(psi))
                                 {
-                                    var s = p.StandardOutput.ReadToEnd();
-                                    id = Regex.Match(s, "/usr/share/zoneinfo/(.+)'").Groups[1].Value;
+                                    if (p.WaitForExit(1000))
+                                    {
+                                        id = p.StandardOutput.ReadToEnd();
+                                    }
+                                    p.Close();
                                 }
                             }
                             if (!string.IsNullOrEmpty(id))

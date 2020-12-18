@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -46,6 +37,10 @@ namespace ASC.Api.Calendar.BusinessObjects
         public static bool IsiCalStream(this BaseCalendar calendar)
         {
             return (calendar is BusinessObjects.Calendar && !String.IsNullOrEmpty((calendar as BusinessObjects.Calendar).iCalUrl));
+        }
+        public static bool IsExistTodo(this BaseCalendar calendar)
+        {
+            return (calendar is BusinessObjects.Calendar && (calendar as BusinessObjects.Calendar).IsTodo != 0);
         }
 
         public static BaseCalendar GetUserCalendar(this BaseCalendar calendar, UserViewSettings userViewSettings)
@@ -93,6 +88,31 @@ namespace ASC.Api.Calendar.BusinessObjects
 
             return result;
         }
+        public static List<TodoWrapper> GetTodoWrappers(this BaseCalendar calendar, Guid userId, ApiDateTime startDate, ApiDateTime endDate)
+        {
+            var result = new List<TodoWrapper>();
+            if (calendar != null)
+            {
+                using (var provider = new DataProvider())
+                {
+                    var cal = provider.GetCalendarById(Convert.ToInt32(calendar.Id));
+                    if (cal != null)
+                    {
+                        var todos = provider.LoadTodos(Convert.ToInt32(calendar.Id), userId, cal.TenantId, startDate,endDate)
+                                .Cast<ITodo>()
+                                .ToList();
+                        foreach (var t in todos)
+                        {
+                            var wrapper = new TodoWrapper(t, userId, calendar.TimeZone);
+                            var listWrapper = wrapper.GetList();
+                            result.AddRange(listWrapper);
+                        }
+                        return result;
+                    }
+                }
+            }
+            return null;
+        }
     }
 
 
@@ -100,7 +120,8 @@ namespace ASC.Api.Calendar.BusinessObjects
     public class Calendar : BaseCalendar,  ISecurityObject
     {
         public static string DefaultTextColor { get { return "#000000";} }
-        public static string DefaultBackgroundColor { get { return "#9bb845";} }
+        public static string DefaultBackgroundColor { get { return "#9bb845"; } }
+        public static string DefaultTodoBackgroundColor { get { return "#ffb45e"; } }
 
         public Calendar()
         {
@@ -114,6 +135,10 @@ namespace ASC.Api.Calendar.BusinessObjects
         public List<UserViewSettings> ViewSettings { get; set; }
 
         public string iCalUrl { get; set; }
+
+        public string calDavGuid { get; set; }
+
+        public int IsTodo { get; set; }
 
         #region ISecurityObjectId Members
 
@@ -173,10 +198,12 @@ namespace ASC.Api.Calendar.BusinessObjects
                     return new List<IEvent>();
                 }
             }
-            else
+
+            using (var provider = new DataProvider())
             {
-                var provider = new DataProvider();
-                return provider.LoadEvents(Convert.ToInt32(this.Id), userId, TenantId, utcStartDate, utcEndDate).Cast<IEvent>().ToList();
+                return provider.LoadEvents(Convert.ToInt32(this.Id), userId, TenantId, utcStartDate, utcEndDate)
+                        .Cast<IEvent>()
+                        .ToList();
             }
         }
     }    

@@ -1,42 +1,38 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
+using System.Configuration;
+using System.Reflection;
 using System.Runtime.Serialization;
+
 using ASC.Core;
+using ASC.Core.Common.Settings;
 using ASC.Core.Users;
-using ASC.Web.Core.Utility.Settings;
 
 namespace ASC.Web.Core.Users
 {
     [Serializable]
     [DataContract]
-    public class DisplayUserSettings : ISettings
+    public class DisplayUserSettings : BaseSettings<DisplayUserSettings>
     {
-        public Guid ID
+        private static readonly string RemovedProfileName = ConfigurationManagerExtension.AppSettings["web.removed-profile-name"] ?? "profile removed";
+
+        public override Guid ID
         {
             get { return new Guid("2EF59652-E1A7-4814-BF71-FEB990149428"); }
         }
@@ -45,30 +41,20 @@ namespace ASC.Web.Core.Users
         public bool IsDisableGettingStarted { get; set; }
 
 
-        public ISettings GetDefault()
+        public override ISettings GetDefault()
         {
             return new DisplayUserSettings
-                {
-                    IsDisableGettingStarted = false,
-                };
+            {
+                IsDisableGettingStarted = false,
+            };
         }
 
-        public static string GetFullUserName(Guid userID)
-        {
-            return GetFullUserName(CoreContext.UserManager.GetUsers(userID));
-        }
-
-        public static string GetFullUserName(Guid userID, bool withHtmlEncode)
+        public static string GetFullUserName(Guid userID, bool withHtmlEncode = true)
         {
             return GetFullUserName(CoreContext.UserManager.GetUsers(userID), withHtmlEncode);
         }
 
-        public static string GetFullUserName(UserInfo userInfo)
-        {
-            return GetFullUserName(userInfo, DisplayUserNameFormat.Default, true);
-        }
-
-        public static string GetFullUserName(UserInfo userInfo, bool withHtmlEncode)
+        public static string GetFullUserName(UserInfo userInfo, bool withHtmlEncode = true)
         {
             return GetFullUserName(userInfo, DisplayUserNameFormat.Default, withHtmlEncode);
         }
@@ -81,7 +67,18 @@ namespace ASC.Web.Core.Users
             }
             if (!userInfo.ID.Equals(Guid.Empty) && !CoreContext.UserManager.UserExists(userInfo.ID))
             {
-                return "profile removed";
+                try
+                {
+                    var resourceType = Type.GetType("Resources.Resource, ASC.Web.Studio");
+                    var resourceProperty = resourceType.GetProperty("ProfileRemoved", BindingFlags.Static | BindingFlags.Public);
+                    var resourceValue = (string)resourceProperty.GetValue(null);
+
+                    return string.IsNullOrEmpty(resourceValue) ? RemovedProfileName : resourceValue;
+                }
+                catch (Exception)
+                {
+                    return RemovedProfileName;
+                }
             }
             var result = UserFormatter.GetUserName(userInfo, format);
             return withHtmlEncode ? result.HtmlEncode() : result;

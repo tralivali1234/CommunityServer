@@ -118,7 +118,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="AccessRightsSettings" xml:space="preserve">
-    <value>Portal. Acess rights.</value>
+    <value>Portal Access Rights</value>
   </data>
   <data name="Announcement" xml:space="preserve">
     <value>Announcement</value>
@@ -126,22 +126,28 @@
   <data name="Announcements" xml:space="preserve">
     <value>Announcements</value>
   </data>
+  <data name="BirthdayCongratulateLinkTitle" xml:space="preserve">
+    <value>Send Your Greetings</value>
+  </data>
+  <data name="BirthdayRemindLinkTitle" xml:space="preserve">
+    <value>Remind about the birthday</value>
+  </data>
+  <data name="BirthdayRemindReadyLinkTitle" xml:space="preserve">
+    <value>Reminder enabled</value>
+  </data>
   <data name="Birthdays" xml:space="preserve">
-    <value>Дни рождения</value>
+    <value>Birthdays</value>
+  </data>
+  <data name="BirthdaysEmptyUpcomingTitle" xml:space="preserve">
+    <value>No birthdays for the nearest dates</value>
+  </data>
+  <data name="BirthdaysTodayTitle" xml:space="preserve">
+    <value>Today is the birthday</value>
+  </data>
+  <data name="BirthdaysUpcomingTitle" xml:space="preserve">
+    <value>Nearest dates</value>
   </data>
   <data name="Blogs" xml:space="preserve">
-    <value>Blogs</value>
-  </data>
-  <data name="BlogsModuleFirstLine" xml:space="preserve">
-    <value>Share your ideas and experiences with others</value>
-  </data>
-  <data name="BlogsModuleLink1" xml:space="preserve">
-    <value>Add post</value>
-  </data>
-  <data name="BlogsModuleSecondLine" xml:space="preserve">
-    <value>Read and comment the thoughts of other users</value>
-  </data>
-  <data name="BlogsModuleTitle" xml:space="preserve">
     <value>Blogs</value>
   </data>
   <data name="Bookmark" xml:space="preserve">
@@ -156,22 +162,13 @@
   <data name="CreateNew" xml:space="preserve">
     <value>Create New</value>
   </data>
-  <data name="DashboardTitle" xml:space="preserve">
-    <value>Business Collaboration tools</value>
+  <data name="Dashboard" xml:space="preserve">
+    <value>Dashboard</value>
+  </data>
+  <data name="Employees" xml:space="preserve">
+    <value>{!Users}</value>
   </data>
   <data name="Events" xml:space="preserve">
-    <value>Events</value>
-  </data>
-  <data name="EventsModuleFirstLine" xml:space="preserve">
-    <value>Share the latest news and learn opinions of other users</value>
-  </data>
-  <data name="EventsModuleLink" xml:space="preserve">
-    <value>Add event</value>
-  </data>
-  <data name="EventsModuleSecondLine" xml:space="preserve">
-    <value>Post important announcements for your colleagues</value>
-  </data>
-  <data name="EventsModuleTitle" xml:space="preserve">
     <value>Events</value>
   </data>
   <data name="Favorites" xml:space="preserve">
@@ -184,7 +181,7 @@
     <value>Forum</value>
   </data>
   <data name="ForumEditor" xml:space="preserve">
-    <value>Forum editor</value>
+    <value>Forum Editor</value>
   </data>
   <data name="Forums" xml:space="preserve">
     <value>Forums</value>
@@ -192,29 +189,32 @@
   <data name="Help" xml:space="preserve">
     <value>Help</value>
   </data>
-  <data name="HelpModuleFirstLine" xml:space="preserve">
-    <value>Find answers to most frequently asked questions</value>
-  </data>
-  <data name="HelpModuleLink" xml:space="preserve">
-    <value>Visit our help center</value>
-  </data>
-  <data name="HelpModuleSecondLine" xml:space="preserve">
-    <value>Read user guides, tips and tricks, watch video</value>
-  </data>
-  <data name="HelpModuleTitle" xml:space="preserve">
-    <value>Help Center</value>
-  </data>
   <data name="Index" xml:space="preserve">
     <value>Index</value>
   </data>
   <data name="InForParentPage" xml:space="preserve">
     <value>in</value>
   </data>
+  <data name="Logout" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="MainPageTitle" xml:space="preserve">
+    <value>Community</value>
+  </data>
+  <data name="Messages" xml:space="preserve">
+    <value>Messages</value>
+  </data>
+  <data name="MyProfile" xml:space="preserve">
+    <value>My Profile</value>
+  </data>
   <data name="NewPages" xml:space="preserve">
-    <value>New pages</value>
+    <value>New Pages</value>
   </data>
   <data name="News" xml:space="preserve">
     <value>News</value>
+  </data>
+  <data name="Online" xml:space="preserve">
+    <value>Online</value>
   </data>
   <data name="Order" xml:space="preserve">
     <value>Order</value>
@@ -235,22 +235,22 @@
     <value>Post</value>
   </data>
   <data name="ProductAdminOpportunities" xml:space="preserve">
-    <value>Делать все то же, что и пользователь|Редактировать любой пост в блоге, вики-статью, сообщение на форуме и т.д.</value>
+    <value>Do the same as a user|Edit any post in Blogs, Wiki, Forum messages, etc.</value>
   </data>
   <data name="ProductDescription" xml:space="preserve">
-    <value>View user details, create posts in blogs and forums. Share photos, bookmarks and Wiki pages.</value>
+    <value>Create events and posts in blogs. Organize polls. Make bookmarks and share them with other users.</value>
   </data>
   <data name="ProductDescriptionExt" xml:space="preserve">
-    <value>View user details, create posts in blogs and forums. Share photos, bookmarks and Wiki pages.</value>
+    <value>Create events and posts in blogs. Organize polls. Make bookmarks and share them with other users.</value>
   </data>
   <data name="ProductName" xml:space="preserve">
     <value>Community</value>
   </data>
   <data name="ProductUserOpportunities" xml:space="preserve">
-    <value>Создавать и редактировать свой пост в блоге, вики-статью, сообщение на форуме и т.д.</value>
+    <value>Create and edit own posts in Blogs, share news, etc.</value>
   </data>
   <data name="RecentlyEdited" xml:space="preserve">
-    <value>Recently edited</value>
+    <value>Recently Edited</value>
   </data>
   <data name="Settings" xml:space="preserve">
     <value>Settings</value>
@@ -258,22 +258,58 @@
   <data name="Subscribed" xml:space="preserve">
     <value>subscribed</value>
   </data>
+  <data name="Tags" xml:space="preserve">
+    <value>Tags</value>
+  </data>
   <data name="Topic" xml:space="preserve">
     <value>Topic</value>
   </data>
   <data name="Wiki" xml:space="preserve">
     <value>Wiki</value>
   </data>
-  <data name="WikiModuleFirstLine" xml:space="preserve">
-    <value>Create and store all your bookmarks in one place</value>
+  <data name="ProductDescriptionShort" xml:space="preserve">
+    <value>Create events and posts in blogs. Organize polls. Make bookmarks and share them with other users.</value>
   </data>
-  <data name="WikiModuleLink2" xml:space="preserve">
-    <value>Add bookmark</value>
+  <data name="DashboardCreateWelcomePost" xml:space="preserve">
+    <value>Create welcome post</value>
   </data>
-  <data name="WikiModuleSecondLine" xml:space="preserve">
-    <value>Share interesting bookmarks you have with others</value>
+  <data name="DashboardDiscussWithTeam" xml:space="preserve">
+    <value>Discuss with team</value>
   </data>
-  <data name="WikiModuleTitle" xml:space="preserve">
-    <value>Bookmarks</value>
+  <data name="DashboardDiscussWithTeamFirstLine" xml:space="preserve">
+    <value>Create corporate blogs and forums.</value>
+  </data>
+  <data name="DashboardDiscussWithTeamSecondLine" xml:space="preserve">
+    <value>Add polls and surveys.</value>
+  </data>
+  <data name="DashboardDiscussWithTeamThirdLine" xml:space="preserve">
+    <value>Exchange instant messages using Talk.</value>
+  </data>
+  <data name="DashboardKeepYourTeamPosted" xml:space="preserve">
+    <value>Keep your team posted</value>
+  </data>
+  <data name="DashboardKeepYourTeamPostedFirstLine" xml:space="preserve">
+    <value>Create a group chat or a mass mailings in Talk.</value>
+  </data>
+  <data name="DashboardKeepYourTeamPostedSecondLine" xml:space="preserve">
+    <value>Configure notifications about shared docs, deadlines and teammates' birthdays.</value>
+  </data>
+  <data name="DashboardKeepYourTeamPostedThirdLine" xml:space="preserve">
+    <value>Use Firebase to never miss a message again.</value>
+  </data>
+  <data name="DashboardShareNewsAndKnowledge" xml:space="preserve">
+    <value>Share news &amp; knowledge</value>
+  </data>
+  <data name="DashboardShareNewsAndKnowledgeFirstLine" xml:space="preserve">
+    <value>Create corporate news board.</value>
+  </data>
+  <data name="DashboardShareNewsAndKnowledgeSecondLine" xml:space="preserve">
+    <value>Add and share bookmarks to useful web resources.</value>
+  </data>
+  <data name="DashboardShareNewsAndKnowledgeThirdLine" xml:space="preserve">
+    <value>Maintain corporate wiki.</value>
+  </data>
+  <data name="ForumPost" xml:space="preserve">
+    <value>Forum post</value>
   </data>
 </root>

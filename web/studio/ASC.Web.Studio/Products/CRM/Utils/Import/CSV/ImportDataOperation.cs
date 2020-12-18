@@ -1,33 +1,27 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Linq;
+using System.Globalization;
+
 using ASC.Common.Caching;
 using ASC.Common.Security.Authentication;
 using ASC.Common.Threading.Progress;
-using ASC.Common.Web;
 using ASC.Core;
 using ASC.CRM.Core;
 using ASC.CRM.Core.Dao;
@@ -35,11 +29,9 @@ using ASC.Data.Storage;
 using ASC.Web.CRM.Resources;
 using ASC.Web.CRM.Services.NotifyService;
 using ASC.Web.Studio.Utility;
-using log4net;
-using System;
-using System.IO;
-using System.Linq;
-using System.Web;
+using ASC.Common.Logging;
+using ASC.Web.CRM.Core;
+using Autofac;
 
 namespace ASC.Web.CRM.Classes
 {
@@ -47,14 +39,24 @@ namespace ASC.Web.CRM.Classes
     {
         public static readonly ICache Cache = AscCache.Default;
 
-        public static String GetStateCacheKey(EntityType entityType)
+        public static String GetStateCacheKey(EntityType entityType, int tenantId = -1)
         {
-            return String.Format("{0}:crm:queue:importtocsv:{1}", TenantProvider.CurrentTenantID.ToString(), entityType.ToString());
+            if (tenantId == -1)
+            {
+                tenantId = TenantProvider.CurrentTenantID;
+            }
+
+            return String.Format("{0}:crm:queue:importtocsv:{1}", tenantId.ToString(CultureInfo.InvariantCulture), entityType.ToString());
         }
 
-        public static String GetCancelCacheKey(EntityType entityType)
+        public static String GetCancelCacheKey(EntityType entityType, int tenantId = -1)
         {
-            return String.Format("{0}:crm:queue:importtocsv:{1}:cancel", TenantProvider.CurrentTenantID.ToString(), entityType.ToString());
+            if (tenantId == -1)
+            {
+                tenantId = TenantProvider.CurrentTenantID;
+            }
+
+            return String.Format("{0}:crm:queue:importtocsv:{1}:cancel", tenantId.ToString(CultureInfo.InvariantCulture), entityType.ToString());
         }
 
         public static ImportDataOperation Get(EntityType entityType)
@@ -83,10 +85,10 @@ namespace ASC.Web.CRM.Classes
             Cache.Insert(GetCancelCacheKey(entityType), true, TimeSpan.FromMinutes(1));
         }
 
-        public static void ResetAll(EntityType entityType)
+        public static void ResetAll(EntityType entityType, int tenantId = -1)
         {
-            Cache.Remove(GetStateCacheKey(entityType));
-            Cache.Remove(GetCancelCacheKey(entityType));
+            Cache.Remove(GetStateCacheKey(entityType, tenantId));
+            Cache.Remove(GetCancelCacheKey(entityType, tenantId));
         }
     }
 
@@ -104,7 +106,6 @@ namespace ASC.Web.CRM.Classes
             _CSVFileURI = CSVFileURI;
             _dataStore = Global.GetStore();
             _tenantID = TenantProvider.CurrentTenantID;
-            _daoFactory = Global.DaoFactory;
             _entityType = entityType;
             _author = SecurityContext.CurrentAccount;
 
@@ -131,8 +132,6 @@ namespace ASC.Web.CRM.Classes
         private readonly NotifyClient _notifyClient;
 
         private readonly int _tenantID;
-
-        private readonly DaoFactory _daoFactory;
 
         private readonly String _CSVFileURI;
 
@@ -216,45 +215,38 @@ namespace ASC.Web.CRM.Classes
 
         public void RunJob()
         {
-            CoreContext.TenantManager.SetCurrentTenant(_tenantID);
-
-            SecurityContext.AuthenticateMe(_author);
-
-            var userCulture = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).GetCulture();
-
-            System.Threading.Thread.CurrentThread.CurrentCulture = userCulture;
-            System.Threading.Thread.CurrentThread.CurrentUICulture = userCulture;
-
-            //Fake http context allows fearlessly use shared DbManager.
-            bool fakeContext = HttpContext.Current == null;
-
-            ImportDataCache.Insert(_entityType,(ImportDataOperation)Clone());
-
             try
             {
-                if (fakeContext)
-                {
-                    HttpContext.Current = new HttpContext(
-                        new HttpRequest("fake", CommonLinkUtility.GetFullAbsolutePath(PathProvider.BaseAbsolutePath), string.Empty),
-                        new HttpResponse(new StringWriter()));
-                }
+                CoreContext.TenantManager.SetCurrentTenant(_tenantID);
+                SecurityContext.AuthenticateMe(_author);
 
-                switch (_entityType)
+                using (var scope = DIHelper.Resolve())
                 {
-                    case EntityType.Contact:
-                        ImportContactsData();
-                        break;
-                    case EntityType.Opportunity:
-                        ImportOpportunityData();
-                        break;
-                    case EntityType.Case:
-                        ImportCaseData();
-                        break;
-                    case EntityType.Task:
-                        ImportTaskData();
-                        break;
-                    default:
-                        throw new ArgumentException(CRMErrorsResource.EntityTypeUnknown);
+                    var daoFactory = scope.Resolve<DaoFactory>();
+                    var userCulture = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).GetCulture();
+
+                    System.Threading.Thread.CurrentThread.CurrentCulture = userCulture;
+                    System.Threading.Thread.CurrentThread.CurrentUICulture = userCulture;
+
+                    ImportDataCache.Insert(_entityType, (ImportDataOperation) Clone());
+
+                    switch (_entityType)
+                    {
+                        case EntityType.Contact:
+                            ImportContactsData(daoFactory);
+                            break;
+                        case EntityType.Opportunity:
+                            ImportOpportunityData(daoFactory);
+                            break;
+                        case EntityType.Case:
+                            ImportCaseData(daoFactory);
+                            break;
+                        case EntityType.Task:
+                            ImportTaskData(daoFactory);
+                            break;
+                        default:
+                            throw new ArgumentException(CRMErrorsResource.EntityTypeUnknown);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -263,13 +255,7 @@ namespace ASC.Web.CRM.Classes
             }
             finally
             {
-                ImportDataCache.ResetAll(_entityType);
-
-                if (fakeContext && HttpContext.Current != null)
-                {
-                    new DisposableHttpContext(HttpContext.Current).Dispose();
-                    HttpContext.Current = null;
-                }
+                ImportDataCache.ResetAll(_entityType, _tenantID);
             }
         }
     }

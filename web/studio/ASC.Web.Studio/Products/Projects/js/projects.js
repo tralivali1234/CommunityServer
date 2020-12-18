@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,540 +20,444 @@ if (typeof ASC === "undefined")
 if (typeof ASC.Projects === "undefined")
     ASC.Projects = {};
 
+ASC.Projects.Description = (function () {
+    var project, teamlab, handler, allProjects;
+
+    function init() {
+        teamlab = Teamlab;
+        allProjects = ASC.Projects.AllProject;
+
+        if (project) {
+            show();
+            return;
+        }
+
+        handler = teamlab.bind(teamlab.events.getPrjProject, function (params, currentproject) {
+            if (!document.location.pathname.toLowerCase().endsWith("projects.aspx")) return;
+            project = currentproject;
+            show();
+        });
+    }
+    function formatDescription(descr) {
+        var formatDescr = descr.replace(/</ig, '&lt;').replace(/>/ig, '&gt;').replace(/\n/ig, '<br/>');
+        return formatDescr.replace('&amp;', '&');
+    };
+
+    function show() {
+        var baseProjects = ASC.Projects,
+            resources = baseProjects.Resources,
+            projectResource = resources.ProjectResource,
+            projectsJSResource = resources.ProjectsJSResource;
+
+        baseProjects.ProjectsAdvansedFilter.hide();
+        baseProjects.Base.clearTables();
+
+        function cancelChangeStatus() {
+            ASC.Projects.DescriptionTab.resetStatus(project.status);
+            jq.unblockUI();
+        }
+
+        function onChangeStatus(status) {
+            if (status === 1 && allProjects.showQuestionWindow(project, cancelChangeStatus)) {
+                return;
+            }
+            teamlab.updatePrjProjectStatus({},
+                project.id,
+                { id: project.id, status: status },
+                {
+                    success: function() {
+                        location.reload();
+                    }
+                });
+
+        }
+
+        var tags = project.tags.length ? project.tags.reduce(function (previousValue, currentValue) {
+                return previousValue + ", " + currentValue;
+            }) : "";
+
+        var statuses = [
+            {
+                title: projectsJSResource.StatusOpenProject,
+                id: 0,
+                handler: onChangeStatus.bind(null, 0)
+            },
+            {
+                title: projectsJSResource.StatusSuspendProject,
+                id: 2,
+                handler: onChangeStatus.bind(null, 2)
+            },
+            {
+                title: projectsJSResource.StatusClosedProject,
+                id: 1,
+                handler: onChangeStatus.bind(null, 1)
+            }
+        ];
+
+        var currentStatusId = project.status;
+        var currentStatus = statuses.find(function (item) { return item.id === currentStatusId });
+
+        baseProjects.DescriptionTab
+            .init()
+            .push(resources.CommonResource.ProjectName, formatDescription(project.title))
+            .push(projectResource.ProjectLeader, project.responsible.displayName)
+            .push(resources.ProjectsFilterResource.ByCreateDate, project.displayDateCrtdate)
+            .push(resources.CommonResource.Description, jq.linksParser(formatDescription(project.description)))
+            .push(projectResource.Tags, formatDescription(tags))
+            .setStatuses(statuses)
+            .setCurrentStatus(currentStatus)
+            .setStatusRight(project.canEdit)
+            .tmpl();
+
+        jq("#descriptionTab").show();
+    }
+
+    function unbindListEvents() {
+        teamlab.unbind(handler);
+        project = null;
+    }
+
+    return {
+        init: init,
+        unbindListEvents: unbindListEvents
+    };
+})();
+
 ASC.Projects.AllProject = (function () {
     var isInit = false,
-        overProjDescrPanel = false,
-        projDescribeTimeout = 0,
-        moduleLocationPath = StudioManager.getLocationPathToModule("projects"),
-        linkViewProject = moduleLocationPath + 'tasks.aspx?prjID=',
-        linkViewMilestones = moduleLocationPath + 'milestones.aspx?prjID=',
-        linkViewTasks = moduleLocationPath + 'tasks.aspx?prjID=',
-        linkViewParticipants = moduleLocationPath + 'projectTeam.aspx?prjID=',
-        prjEmptyScreenForFilter = jq("#prjEmptyScreenForFilter"),
-        emptyListProjects = jq("#emptyListProjects"),
         projectsAdvansedFilter,
-        projectsTable = null,
-        describePanel = null,
-            self;
+        $projectsTable = null,
+        self,
+        baseObject,
+        resources,
+        prjResources,
+        $projectsTableBody,
+        currentUserId,
+        isSimpleView,
+        filterProjCount = 0,
+        currentListProjects,
+        loadingBanner;
 
-    var currentUserId;
-
-    var isSimpleView;
-    var filterProjCount = 0;
-
-    // object for list statuses
-    var statusListObject = { listId: "projectsStatusList" };
-
-    var initActionPanels = function () {
-        if (!describePanel) {
-            self.$commonListContainer.append(jq.tmpl("projects_panelFrame", { panelId: "projectDescrPanel" })); // description panel
-            describePanel = jq("#projectDescrPanel");
-        }
-        if (isSimpleView) return;
-        var resources = ASC.Projects.Resources.ProjectsJSResource;
-        statusListObject.statuses = [
-            { cssClass: "open", text: resources.StatusOpenProject },
-            { cssClass: "paused", text: resources.StatusSuspendProject },
-            { cssClass: "closed", text: resources.StatusClosedProject }
-        ];
-        jq("#" + statusListObject.listId).remove();
-        self.$commonListContainer.append(jq.tmpl("projects_statusChangePanel", statusListObject));
-    };
+    var clickEvent = "click",
+        clickProjectsInitEvent = "click.projectsInit",
+        projectsTmplName = "projects_projectTmpl",
+        teamlab;
     
-    //filter Set
     var init = function (isSimpleViewFlag) {
-        self = this;
+        isSimpleView = isSimpleViewFlag;
+
         if (isInit === false) {
             isInit = true;
-            self.cookiePagination = "projectsKeyForPagination";
+
+            var res = ASC.Projects.Resources;
+            teamlab = Teamlab;
+            loadingBanner = LoadingBanner;
+
+            $projectsTable = jq("#tableListProjects");
+            var groupMenu;
+
+            if (!isSimpleView) {
+                var actions = [
+                    {
+                        id: "gaDelete",
+                        title: res.CommonResource.Delete,
+                        handler: gaRemoveHandler,
+                        checker: function(project) {
+                            return project.canDelete;
+                        }
+                    }
+                ];
+                var projectsFilterResource = res.ProjectsFilterResource;
+                groupMenu = {
+                    actions: actions,
+                    getItemByCheckbox: getProjectByTarget,
+                    getLineByCondition: function (condition) {
+                        return currentListProjects
+                            .filter(condition)
+                            .map(function (item) {
+                                return $projectsTableBody.find("tr[id=" + item.id + "]");
+                            });
+                    },
+                    multiSelector: [
+                    {
+                        id: "gasOpen",
+                        title: projectsFilterResource.StatusOpenProject,
+                        condition: function (item) {
+                            return item.status === 0;
+                        }
+                    },
+                    {
+                        id: "gasPaused",
+                        title: projectsFilterResource.StatusSuspend,
+                        condition: function (item) {
+                            return item.status === 2;
+                        }
+                    },
+                    {
+                        id: "gasClosed",
+                        title: projectsFilterResource.StatusClosedProject,
+                        condition: function (item) {
+                            return item.status === 1;
+                        }
+                    }]
+                }
+            }
+
+            self = this;
+            self.showOrHideData = self.showOrHideData.bind(self, {
+                $container: $projectsTable.find("tbody"), 
+                tmplName: projectsTmplName, 
+                baseEmptyScreen: {
+                    img: "projects",
+                    header: res ? res.ProjectResource.EmptyListProjHeader : "",
+                    description: res
+                                    ? teamlab.profile.isVisitor
+                                        ? res.ProjectResource.EmptyListProjDescribeVisitor
+                                        : res.ProjectResource.EmptyListProjDescribe
+                                    : "",
+                    button: {
+                        title: res ? res.ProjectResource.CreateFirstProject : "",
+                        onclick: function () {
+                            location.href = "Projects.aspx?action=add";
+                        },
+                        canCreate: function() {
+                            return ASC.Projects.Master.CanCreateProject;
+                        }
+                    }
+                },
+                filterEmptyScreen: {
+                    header: res ? res.CommonResource.Filter_NoProjects : "",
+                    description: res ? res.ProjectResource.DescrEmptyListProjFilter : ""
+                },
+                groupMenu: groupMenu
+            });
+
+            self.getData = self.getData.bind(self, teamlab.getPrjProjects, onGetListProject);
         }
-        
-        
-        self.isFirstLoad = true;
-        self.showLoader();
-        projectsTable = jq("#tableListProjects");
 
-        isSimpleView = isSimpleViewFlag;
-        currentUserId = Teamlab.profile.id;
-
-        initActionPanels();
+        
+        currentUserId = teamlab.profile.id;
         
         if (!isSimpleView) {
-            projectsAdvansedFilter = createAdvansedFilter();
-            this.setDocumentTitle(ASC.Projects.Resources.ProjectsJSResource.ProjectsModule);
-            this.checkElementNotFound(ASC.Projects.Resources.ProjectsJSResource.ProjectNotFound);
-            
-            ASC.Projects.PageNavigator.init(self);
+            baseObject = ASC.Projects,
+                resources = baseObject.Resources.ProjectsFilterResource,
+                prjResources = baseObject.Resources.ProjectsJSResource;
 
-            projectsTable.on('click', "td.responsible span.userLink", function () {
-                var responsibleId = jq(this).attr('id');
-                if (responsibleId != "4a515a15-d4d6-4b8e-828e-e0586f18f3a3") {
-                    var path = jq.changeParamValue(ASC.Controls.AnchorController.getAnchor(), 'project_manager', responsibleId);
-                    path = jq.removeParam('team_member', path);
-                    ASC.Controls.AnchorController.move(path);
+            projectsAdvansedFilter = baseObject.ProjectsAdvansedFilter;
+            projectsAdvansedFilter.createAdvansedFilterForProjects(self);
+
+            self.baseInit({
+                moduleTitle: prjResources.ProjectsModule,
+                elementNotFoundError: prjResources.ProjectNotFound
+            },
+            {
+                pagination: "projectsKeyForPagination"
+            },
+            {
+                handler: changeStatus,
+                getItem: getProjectByTarget,
+                statuses: [
+                    { cssClass: "open", text: prjResources.StatusOpenProject, id: 0 },
+                    { cssClass: "paused", text: prjResources.StatusSuspendProject, id: 2 },
+                    { cssClass: "closed", text: prjResources.StatusClosedProject, id: 1 }
+                ]
+            },
+            undefined,
+            [
+                ASC.Projects.Event(teamlab.events.addPrjTask, onAddTask)
+            ],
+            {
+                getItem: getProjectByTarget,
+                selector: '.nameProject a',
+                getLink: function (item) {
+                    return "Projects.aspx?prjID=" + item.id + "#";
                 }
             });
 
-            // popup handlers
-            self.$commonPopupContainer.on("click", ".gray", function () {
-                jq.unblockUI();
-                return false;
-            });
-            self.$commonListContainer.on("click", "#statusList .dropdown-item", function () {
-                changeStatus(this);
+            $projectsTable.on(clickEvent, ".nameProject a", baseObject.Common.goToWithoutReload);
+            $projectsTable.on(clickEvent, ".taskCount a", baseObject.Common.goToWithoutReload);
+            $projectsTable.on(clickEvent, ".responsible .participants", baseObject.Common.goToWithoutReload);
+
+            $projectsTable.on(clickEvent, "td.responsible span.userLink", function () {
+                var $self = jq(this);
+                if ($self.hasClass("not-action")) return;
+                var project = getProjectById($self.parents("#tableListProjects tr").attr("id"));
+                ASC.Projects.ProjectsAdvansedFilter.addUser('project_manager', project.responsible.id, ['team_member']);
             });
         }
-        // discribe panel
-        projectsTable.on("mouseenter", ".nameProject a", function (event) {
-            projDescribeTimeout = setTimeout(function () {
-                var targetObject = event.target,
-                    panelContent = describePanel.find(".panel-content"),
-                    createdAttr = jq(targetObject).attr('created'),
-                    description = jq(targetObject).siblings('.description').text(),
-                    descriptionObj = {};
-
-                panelContent.empty();
-
-                if (typeof createdAttr != 'undefined' && jq.trim(createdAttr) != "") {
-                    descriptionObj.creationDate = createdAttr;
-                }
-
-                if (jq.trim(description) != '') {
-                    descriptionObj.description = description;
-                    if (description.indexOf("\n") > 2 || description.length > 80) {
-                        descriptionObj.readMore = "projects.aspx?prjID=" + jq(targetObject).attr('projectid');
-                    }
-                }
-                if (descriptionObj.creationDate || descriptionObj.description) {
-                    panelContent.append(jq.tmpl("projects_descriptionPanelContent", descriptionObj));
-                    showProjDescribePanel(targetObject);
-                    overProjDescrPanel = true;
-                }
-            }, 500, this);
-        });
-        projectsTable.on('mouseleave', '.nameProject a', function () {
-            clearTimeout(projDescribeTimeout);
-            overProjDescrPanel = false;
-            hideDescrPanel();
-        });
-
-        describePanel.on('mouseenter', function () {
-            overProjDescrPanel = true;
-        });
-
-        describePanel.on('mouseleave', function () {
-            overProjDescrPanel = false;
-            hideDescrPanel();
-        });
-
-        /*--------events--------*/
-
-
-
-        jq('body').on("click.projectsInit", function (event) {
-            var elt = (event.target) ? event.target : event.srcElement;
-            var isHide = true;
-            var $elt = jq(elt);
-
-            if ($elt.is('#' + statusListObject.listId)) isHide = false;
-            if (isHide) {
-                jq('#' + statusListObject.listId).hide();
-                jq('.statusContainer').removeClass('openList');
-            }
-        });
-
-        self.$commonListContainer.on('click', 'td.action .canEdit', function (event) {
-            showListStatus(statusListObject.listId, this);
-            return false;
-        });        
     };
+
+    function gaRemoveHandler(projectids) {
+        self.showCommonPopup("projectsRemoveWarning", function () {
+            teamlab.removePrjProjects({ projectids: projectids },
+            {
+                before: function () {
+                    loadingBanner.displayLoading();
+                },
+                success: function (params, data) {
+                    for (var i = 0; i < data.length; i++) {
+                        onRemovePrj(data[i]);
+                    }
+                    self.showOrHideData(currentListProjects, filterProjCount);
+                    loadingBanner.hideLoading();
+                    baseObject.Common.displayInfoPanel(prjResources.ProjectsRemoved);
+                }
+            });
+            jq.unblockUI();
+        });
+        return false;
+    }
 
     var unbindListEvents = function () {
         if (!isInit) return;
-        projectsTable.unbind();
-        describePanel.unbind();
-        self.$commonListContainer.unbind();
-        self.$commonPopupContainer.unbind();
+        $projectsTable.unbind();
+        self.unbindEvents();
+        jq("body").off(clickProjectsInitEvent);
     };
-
-    var createAdvansedFilter = function () {
-        var resources = ASC.Projects.Resources.ProjectsFilterResource;
-        if (typeof self.filters == "undefined") {
-            var filters =
-            [
-                // Project manager
-                {
-                    type: "person",
-                    id: "me_project_manager",
-                    title: resources.Me,
-                    filtertitle: resources.ProjectMenager + ":",
-                    group: resources.ProjectMenager,
-                    hashmask: "person/{0}",
-                    groupby: "managerid",
-                    bydefault: { id: currentUserId }
-                },
-                {
-                    type: "person",
-                    id: "project_manager",
-                    filtertitle: resources.ProjectMenager + ":",
-                    title: resources.OtherUsers,
-                    group: resources.ProjectMenager,
-                    hashmask: "person/{0}",
-                    groupby: "managerid"
-                },
-                // Team member
-                {
-                    type: "person",
-                    id: "me_team_member",
-                    title: resources.Me,
-                    filtertitle: resources.TeamMember + ":",
-                    group: resources.TeamMember,
-                    hashmask: "person/{0}",
-                    groupby: "userid",
-                    bydefault: { id: currentUserId }
-                },
-                {
-                    type: "person",
-                    id: "team_member",
-                    filtertitle: resources.TeamMember + ":",
-                    title: resources.OtherUsers,
-                    group: resources.TeamMember,
-                    hashmask: "person/{0}",
-                    groupby: "userid"
-                },
-                {
-                    type: "group",
-                    id: "group",
-                    title: resources.Groups,
-                    filtertitle: resources.Group + ":",
-                    group: resources.TeamMember,
-                    hashmask: "group/{0}",
-                    groupby: "userid"
-                },
-                //Status
-                {
-                    type: "combobox",
-                    id: "open",
-                    title: resources.StatusOpenProject,
-                    filtertitle: resources.ByStatus + ":",
-                    group: resources.ByStatus,
-                    hashmask: "combobox/{0}",
-                    groupby: "status",
-                    options:
-                    [
-                        { value: "open", title: resources.StatusOpenProject, def: true },
-                        { value: "paused", title: resources.StatusSuspend },
-                        { value: "closed", title: resources.StatusClosedProject }
-                    ]
-                },
-                {
-                    type: "combobox",
-                    id: "paused",
-                    title: resources.StatusSuspend,
-                    filtertitle: resources.ByStatus + ":",
-                    group: resources.ByStatus,
-                    hashmask: "combobox/{0}",
-                    groupby: "status",
-                    options:
-                    [
-                        { value: "open", title: resources.StatusOpenProject },
-                        { value: "paused", title: resources.StatusSuspend, def: true },
-                        { value: "closed", title: resources.StatusClosedProject }
-                    ]
-                },
-                {
-                    type: "combobox",
-                    id: "closed",
-                    title: resources.StatusClosedProject,
-                    filtertitle: resources.ByStatus + ":",
-                    group: resources.ByStatus,
-                    hashmask: "combobox/{0}",
-                    groupby: "status",
-                    options:
-                    [
-                        { value: "open", title: resources.StatusOpenProject },
-                        { value: "paused", title: resources.StatusSuspend },
-                        { value: "closed", title: resources.StatusClosedProject, def: true }
-                    ]
-                },
-                // Other
-                {
-                    type: "flag",
-                    id: "followed",
-                    title: resources.FollowProjects,
-                    group: resources.Other,
-                    hashmask: "followed"
-                }
-            ];
-
-            var tags = ASC.Projects.ProjectsAdvansedFilter.getTagsForFilter();
-
-            if (tags.length) {
-                filters.push({
-                    type: "combobox",
-                    id: "tag",
-                    title: resources.ByTag,
-                    filtertitle: resources.Tag + ":",
-                    group: resources.Other,
-                    hashmask: "combobox/{0}",
-                    options: tags,
-                    defaulttitle: resources.Select
-                });
-            }
-            self.filters = filters;
-        }
-
-        if (typeof self.sorters == "undefined") {
-            var sorters =
-            [
-                { id: "title", title: resources.ByTitle, sortOrder: "ascending", def: true },
-                { id: "create_on", title: resources.ByCreateDate, sortOrder: "descending" }
-            ];
-            self.sorters = sorters;
-        }
-
-        self.colCount = 2;
-
-        return ASC.Projects.ProjectsAdvansedFilter.init(self);
-    };
-
 
     var renderListProjects = function (listProjects) {
         onGetListProject({}, listProjects);
     };
 
     var addProjectsToSimpleList = function (projectItem) {
-        $projectsTableBody = projectsTable.find('tbody');
-
-        clearTimeout(projDescribeTimeout);
-        overProjDescrPanel = false;
-        
-
+        $projectsTableBody = $projectsTable.find('tbody');
         projectItem = getProjTmpl(projectItem);
-        jq.tmpl("projects_projectTmpl", projectItem).prependTo($projectsTableBody);
-        projectsTable.show();
+        jq.tmpl(projectsTmplName, projectItem).prependTo($projectsTableBody);
+        $projectsTable.show();
     };
 
+    var moduleLocationPath = StudioManager.getLocationPathToModule("Projects");
 
-    var hideDescrPanel = function () {
-        setTimeout(function () {
-            if (!overProjDescrPanel) describePanel.hide(100);
-        }, 200);
-    };
-
-    var getProjTmpl = function (proj) {
-        return {
-            title: proj.title,
-            id: proj.id,
-            created: proj.displayDateCrtdate,
-            createdBy: proj.createdBy ? proj.createdBy.displayName : "",
-            projLink: linkViewProject + proj.id,
-            description: proj.description,
-            milestones: proj.milestoneCount,
-            linkMilest: linkViewMilestones + proj.id + '#sortBy=deadline&sortOrder=ascending&status=open',
-            tasks: proj.taskCount,
-            linkTasks: linkViewTasks + proj.id + '#sortBy=deadline&sortOrder=ascending&status=open',
-            responsible: proj.responsible.displayName,
-            responsibleId: proj.responsible.id,
+    function getProjTmpl(proj) {
+        return jq.extend(proj, {
+            projLink: jq.format('{0}Tasks.aspx?prjID={1}', moduleLocationPath, proj.id),
+            linkMilest: jq.format('{0}Milestones.aspx?prjID={1}#sortBy=deadline&sortOrder=ascending&status=open', moduleLocationPath, proj.id),
+            linkTasks: jq.format('{0}Tasks.aspx?prjID={1}#sortBy=deadline&sortOrder=ascending&status=open', moduleLocationPath, proj.id),
             participants: proj.participantCount ? proj.participantCount - 1 : "",
-            linkParticip: linkViewParticipants + proj.id,
-            privateProj: proj.isPrivate,
-            canEdit: proj.canEdit,
-            isSimpleView: isSimpleView,
-            canLinkContact: proj.canLinkContact,
-            status: proj.status == 0 ? 'open' : (proj.status == 2 ? 'paused' :'closed')
-        };
-    };
-
-    var showProjDescribePanel = function (targetObject) {
-        var x = jq(targetObject).offset().left + 10;
-        var y = jq(targetObject).offset().top + 20;
-        describePanel.css({ left: x, top: y });
-        describePanel.show();
-
-        jq('body')
-            .off("click.projectsShowProjDescribePanel")
-            .on("click.projectsShowProjDescribePanel", function (event) {
-            var elt = (event.target) ? event.target : event.srcElement;
-            var isHide = true;
-            if (jq(elt).is('[id="#projectDescrPanel"]') || jq(elt).parents('#projectDescrPanel').length) {
-                isHide = false;
-            }
-
-            if (isHide)
-                jq(elt).parents().each(function () {
-                    if (jq(this).is('[id="#projectDescrPanel"]')) {
-                        isHide = false;
-                        return false;
-                    }
-                });
-
-            if (isHide) {
-                describePanel.hide();
-            }
+            linkParticip: jq.format('{0}ProjectTeam.aspx?prjID={1}', moduleLocationPath, proj.id),
+            isSimpleView: isSimpleView || false
         });
     };
 
-    var getData = function () {
-        self.showLoader();
-        self.currentFilter.Count = ASC.Projects.PageNavigator.entryCountOnPage;
-        self.currentFilter.StartIndex = ASC.Projects.PageNavigator.entryCountOnPage * ASC.Projects.PageNavigator.currentPage;
-        Teamlab.getPrjProjects({}, { filter: self.currentFilter, success: onGetListProject });
-    };
+    function onGetListProject(params, listProj) {
+        currentListProjects = listProj;
+        $projectsTableBody = $projectsTable.find('tbody');
 
-    var onGetListProject = function (params, listProj) {
-        $projectsTableBody = projectsTable.find('tbody');
-
-        if (typeof (isSimpleView) != "undefined" && isSimpleView === false) {
+        if (!isSimpleView) {
             filterProjCount = params.__total != undefined ? params.__total : 0;
         }
-        
-        clearTimeout(projDescribeTimeout);
-        overProjDescrPanel = false;
 
-        if (listProj.length != 0) {
-            $projectsTableBody.html(jq.tmpl("projects_projectTmpl", listProj.map(getProjTmpl)));
-
-            prjEmptyScreenForFilter.hide();
-            projectsTable.show();
-        }
-        else {
-            ASC.Projects.PageNavigator.hide();
-            projectsTable.hide();
-            if (ASC.Projects.ProjectsAdvansedFilter.baseFilter) {
-                prjEmptyScreenForFilter.hide();
-                emptyListProjects.show();
-                projectsAdvansedFilter.hide();
-            } else {
-                prjEmptyScreenForFilter.show();
-                emptyListProjects.hide();
-                projectsAdvansedFilter.show();
-            }
-        }
-
-        if (typeof (isSimpleView) != "undefined" && isSimpleView == false) {
-            ASC.Projects.PageNavigator.update(filterProjCount);
-            self.hideLoader();
-        }
+        self.showOrHideData(currentListProjects.map(getProjTmpl), filterProjCount);
     };
 
-    var changeStatus = function (item) {
-        if (!jq(item).hasClass('current')) {
-            var projId = jq(item).parents('#' + statusListObject.listId).attr('objid').split('_')[1];
-            var newStatus = jq(item).attr('class').split(" ")[0];
-            if (newStatus == 'closed') {
-                var flag = showQuestionWindow(projId);
-                if (flag) return;
-            }
-            var newtitle = jq(item).text().trim();
-            var data = { id: projId, status: newStatus };
-            Teamlab.updatePrjProjectStatus({}, projId, data);
+    function onRemovePrj(project) {
+        var projectId = project.id;
+        var removedProject = $projectsTableBody.find("tr[id=" + projectId + "]");
+        removedProject.yellowFade();
+        removedProject.remove();
 
-            changeCboxStatus(newStatus, projId, newtitle);
+        filterProjCount--;
+        currentListProjects = currentListProjects.filter(function (item) { return item.id !== project.id });
+    }
+
+    function onAddTask(params, task) {
+        var project = getProjectById(task.projectOwner.id);
+        var $project = getProjectItem(task.projectOwner.id);
+
+        if (!project || !$project.length) return;
+
+        project.taskCount++;
+        $project.find("td.taskCount a").text(project.taskCount);
+    }
+
+    function changeStatus(id, status) {
+        if (status === 1 && showQuestionWindow(id)) {
+            return;
         }
-    };
-
-    var changeCboxStatus = function (status, projId, title) {
-        jq('#statusCombobox_' + projId + ' span:first-child').attr('class', status).attr('title', title);
-        if (status != 'open') {
-            jq('tr#' + projId).addClass('noActiveProj');
-        } else {
-            jq('tr#' + projId).removeClass('noActiveProj');
-        }
-        projectsTable.find("tr").removeClass("openList");
-    };
-
-    var showQuestionWindow = function (projId) {
-        var proj = jq('#tableListProjects tr#' + projId),
-            tasks = proj.find('td.taskCount').text().trim();
-
-        if (!tasks.length) {
-            var milestones = jq.trim(proj.find('td.taskCount').data("milestones"));
-            if (milestones.length && milestones != 0) {
-                self.showCommonPopup("projects_projectOpenMilestoneWarning", 400, 200, 0);
-                var milUrl = linkViewMilestones + projId + '#sortBy=deadline&sortOrder=ascending&status=open';
-                jq('#linkToMilestines').attr('href', milUrl);
-            }
-            else {
-                return false;
-            }
-        } else {
-            self.showCommonPopup("projects_projectOpenTaskWarning", 400, 200, 0);
-            var tasksUrl = linkViewTasks + projId + '#sortBy=deadline&sortOrder=ascending&status=open';
-            jq('#linkToTasks').attr('href', tasksUrl);
-        }
-        return true;
-    };
-
-
-    var showListStatus = function (panelId, obj, event) {
-        var objid = '';
-        var x, y, statusList;
-        objid = jq(obj).attr('id');
-
-        x = jq(obj).offset().left;
-        y = jq(obj).offset().top + 28;
-        statusList = jq('#' + statusListObject.listId);
-
-        statusList.attr('objid', objid);
-        jq(obj).parents('tr').addClass('openList');
-
-        statusList.css({ left: x, top: y });
-
-        var status = jq(obj).children('span').attr('class');
-        statusList.find('li').show().removeClass('current');
-        switch (status) {
-            case 'closed':
-                {
-                    statusList.find('.closed').addClass('current');
-                    statusList.find('.paused').hide();
-                    break;
+        var data = { id: id, status: status };
+        teamlab.updatePrjProjectStatus({}, id, data, {
+            success: function (params, project) {
+                setProject(project);
+                changeCboxStatus(project);
+                if (status == 1 || status == 2) {
+                    teamlab.getPrjTeam({}, id,
+                        function (params, team) {
+                            teamlab.removeCaldavProjectCalendar(id, jq.map(team, function (user) { return user.id; }));
+                        }
+                    );
+                } else if (status == 0) {
+                    teamlab.getCalendarCaldavUrl("Project_" + id);
                 }
-            case 'paused':
-                {
-                    statusList.find('.paused').addClass('current');
-                    break;
-                }
-            default:
-                {
-                    statusList.find('.open').addClass('current');
-                    break;
-                }
-        }
-
-        statusList.show();
-
-        jq('body').off("click.projectsShowListStatus");
-        jq('body').on("click.projectsShowListStatus", function (event) {
-            var elt = (event.target) ? event.target : event.srcElement;
-            var isHide = true;
-            if (jq(elt).is('[id="' + statusListObject.listId + '"]')) {
-                isHide = false;
-            }
-
-            if (isHide)
-                jq(elt).parents().each(function () {
-                    if (jq(this).is('[id="' + statusListObject.listId + '"]')) {
-                        isHide = false;
-                        return false;
-                    }
-                });
-
-            if (isHide) {
-                statusList.hide();
-                projectsTable.find("tr").removeClass('openList');
             }
         });
+    };
+
+    function changeCboxStatus(project) {
+        var $project = $projectsTable.find('tr#' + project.id);
+
+        $project.find('span:first-child').attr('class', ASC.Projects.StatusList.getById(project.status).cssClass);
+        if (project.isPrivate) {
+            $project.find('span:first-child').addClass('private');
+        }
+
+        if (project.status !== 0) {
+            $project.addClass('noActiveProj');
+            $project.find(".linkHeaderMedium").addClass("gray-text");
+        } else {
+            $project.removeClass('noActiveProj');
+            $project.find(".linkHeaderMedium").removeClass("gray-text");
+        }
+        $project.removeClass("openList");
+    };
+
+    function showQuestionWindow(projId, cancel) {
+        self = typeof self === "undefined" ? this : self;
+        var project = typeof projId === "number" ? getProjTmpl(getProjectById(projId)) : getProjTmpl(projId);
+
+        if (project.taskCount) {
+            self.showCommonPopup("projectOpenTaskWarning", function () {
+                location.href = project.linkTasks;
+            }, cancel);
+            return true;
+        }
+        if (project.milestoneCount) {
+            self.showCommonPopup("projectOpenMilestoneWarning", function () {
+                location.href = project.linkMilest;
+            }, cancel);
+            return true;
+        }
+
+        return false;
+    };
+
+    function getProjectById(id) {
+        return currentListProjects.find(function(item) { return item.id == id });
+    };
+
+    function getProjectByTarget($targetObject) {
+        return getProjectById(jq($targetObject).parents("#tableListProjects tr").attr("id"));
+    }
+
+    function getProjectItem(id) {
+        return $projectsTable.find(jq.format("tr#{0}", id));
+    }
+
+    function setProject(project) {
+        for (var i = 0, max = currentListProjects.length; i < max; i++) {
+            if (currentListProjects[i].id === project.id) {
+                currentListProjects[i] = project;
+                break;
+            }
+        }
     };
 
     return jq.extend({
+        addProjectsToSimpleList: addProjectsToSimpleList,
+        basePath: 'sortBy=create_on&sortOrder=ascending',
         init: init,
         renderListProjects: renderListProjects,
-        addProjectsToSimpleList: addProjectsToSimpleList,
-        getData: getData,
-        createAdvansedFilter: createAdvansedFilter,
         unbindListEvents: unbindListEvents,
-        basePath: 'sortBy=create_on&sortOrder=ascending'
+        showQuestionWindow: showQuestionWindow
     }, ASC.Projects.Base);
 })(jQuery);
 

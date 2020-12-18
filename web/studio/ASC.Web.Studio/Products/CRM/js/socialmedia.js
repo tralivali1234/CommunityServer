@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -36,6 +27,17 @@ ASC.CRM.SocialMedia = (function() {
     var CallbackMethods = {
         addAndSaveTwitter: function(params, twitter) {
             ASC.CRM.SocialMedia.LoadContactActivity();
+
+            var tagsContainer = jq("#contactTagsTR");
+
+            if (tagsContainer.length) {
+                $currentPrimaryContainer = jq.tmpl("collectionContainerTmpl",
+                    { Type: twitter.infoTypeName })
+                    .insertBefore("#contactTagsTR")
+                    .children(".collectionItemsTD");
+
+                jq.tmpl("collectionTmpl", twitter).appendTo($currentPrimaryContainer);
+            }
         },
 
         getContactTweets: function (params, response) {
@@ -76,7 +78,7 @@ ASC.CRM.SocialMedia = (function() {
 
         LoadingBanner.hideLoading();
         PopupKeyUpActionProvider.EnableEsc = false;
-        StudioBlockUIManager.blockUI("#divLoadPhotoWindow", 520, 550, 0);
+        StudioBlockUIManager.blockUI("#divLoadPhotoWindow", 520);
     };
 
     _FindTwitterProfilesResponse = function (target, addTop, addLeft, response) {
@@ -91,15 +93,6 @@ ASC.CRM.SocialMedia = (function() {
         _CalculateProfilesWindowHeight();
 
         ASC.CRM.SocialMedia.TwitterTargetTextbox = jq(target).parent().parent().children('table').find('input');
-        _ShowProfilesWindow();
-    };
-
-    _FindFacebookProfilesResponse = function(target, addTop, addLeft, response) {
-        _RenderSMProfiles(response, "FacebookProfileTmpl");
-        jq("#divSMProfilesWindow .divWait").hide();
-        _CalculateProfilesWindowHeight();
-
-        ASC.CRM.SocialMedia.FacebookTargetTextbox = jq(target).parent().parent().children('table').find('input');
         _ShowProfilesWindow();
     };
 
@@ -192,7 +185,7 @@ ASC.CRM.SocialMedia = (function() {
             ASC.CRM.SocialMedia.socialNetworks = new Array();
         },
 
-        initTab: function (isCompany) {
+        initTab: function (isCompany, canEdit) {
 
             jq.tmpl("twitterMessageListPanelTmpl").appendTo("#divSocialMediaContent");
 
@@ -202,13 +195,13 @@ ASC.CRM.SocialMedia = (function() {
                 ImgSrc: ASC.CRM.Data.EmptyScrImgs["empty_screen_twitter"],
                 Header: ASC.CRM.Resources.CRMSocialMediaResource.EmptyContentTwitterAccountsHeader,
                 Describe: ASC.CRM.Resources.CRMSocialMediaResource.EmptyContentTwitterAccountsDescribe,
-                ButtonHTML: ["<a class='link dotline plus' href='javascript:void(0);'",
+                ButtonHTML: canEdit ? ["<a class='link dotline plus' href='javascript:void(0);'",
                               "onclick='ASC.CRM.SocialMedia.FindTwitterProfiles(jq(this),\"",
                               isCompany ? "company" : "people",
                               "\", 1, 9);'>",
                               ASC.CRM.Resources.CRMSocialMediaResource.LinkTwitterAccount,
                               "</a>"]
-                        .join(''),
+                        .join('') : "",
                 CssClass: "display-none"
             }).appendTo("#divSocialMediaContent");
         },
@@ -303,7 +296,7 @@ ASC.CRM.SocialMedia = (function() {
                     ASC.CRM.SocialMedia.GetContactImageList();
                 } else {
                     PopupKeyUpActionProvider.EnableEsc = false;
-                    StudioBlockUIManager.blockUI("#divLoadPhotoWindow", 520, 550, 0);
+                    StudioBlockUIManager.blockUI("#divLoadPhotoWindow", 520);
                 }
             }
         },
@@ -327,6 +320,9 @@ ASC.CRM.SocialMedia = (function() {
             var uploadOnly = jq("#divImagesHolder").attr("data-uploadOnly") == "true",
                 data = { contactId: contactId, socialNetwork: socialNetwork, userIdentity: userIdentity, uploadOnly: uploadOnly };
 
+            if (jq("#uploadPhotoPath").length == 1) {
+                data.tmpDirName = jq("#uploadPhotoPath").val();
+            }
 
             Teamlab.updateCrmContactAvatar({}, contactId, data, { 
                 success: function (params, response) {
@@ -335,9 +331,9 @@ ASC.CRM.SocialMedia = (function() {
                         LoadingBanner.hideLoading();
 
                         var now = new Date();
-                        jq("img.contact_photo").attr("src", response + '?' + now.getTime());
+                        jq("img.contact_photo").attr("src", response.url + '?' + now.getTime());
                         if (jq("#uploadPhotoPath").length == 1) {
-                            jq("#uploadPhotoPath").val(response);
+                            jq("#uploadPhotoPath").val(response.path);
                         }
                     },
                 error: function (params, errors) {
@@ -370,12 +366,12 @@ ASC.CRM.SocialMedia = (function() {
                     var now = new Date();
                     jq("img.contact_photo").attr("src",
                         [
-                            response != "" ? response : ASC.CRM.SocialMedia.defaultAvatarSrc,
+                            ASC.CRM.SocialMedia.defaultAvatarSrc,
                             '?',
                             now.getTime()]
                         .join(''));
                     if (jq("#uploadPhotoPath").length == 1) {
-                        jq("#uploadPhotoPath").val(response);
+                        jq("#uploadPhotoPath").val("");
                     }
                 },
                 error: function (params, errors) {
@@ -428,44 +424,6 @@ ASC.CRM.SocialMedia = (function() {
             });
         },
 
-        FindFacebookProfiles: function(target, contactType, addTop, addLeft) {
-            _HideProfilesWindow();
-            jq("#divSMProfilesWindow .divNoProfiles").css("display", "none");
-            jq("#sm_tbl_UserList").html("");
-            jq("#divSMProfilesWindow .divSMProfilesWindowBody .errorBox").remove();
-
-            var searchText,
-                isUser = true;
-
-            //contact type can be "company" or "people"
-            if (contactType == "company") {
-                isUser = false;
-                searchText = jq("[name='baseInfo_companyName']").val();
-            }
-            if (contactType == "people") {
-                searchText = jq("[name='baseInfo_firstName']").val() + " " + jq("[name='baseInfo_lastName']").val();
-            }
-
-            if (searchText === undefined || jq.trim(searchText).length == 0) {
-                return;
-            }
-
-            _CalculateProfilesWindowPosition(jq(target), addTop, addLeft);
-            _ShowWaitProfilesWindow(searchText);
-
-            Teamlab.getCrmContactFacebookProfiles({}, searchText, isUser, {
-                max_request_attempts: 1,
-                success: function (params, response) {
-                    _FindFacebookProfilesResponse(target, addTop, addLeft, response);
-                },
-                error: function (params, errors) {
-                    var err = errors[0];
-                    jq("#divSMProfilesWindow .divWait").hide();
-                    jq("#divSMProfilesWindow .divSMProfilesWindowBody").prepend(jq("<div></div>").addClass("errorBox").text(err));
-                }
-            });
-        },
-
         AddAndSaveTwitterProfileToContact: function(twitterScreenName, contactID) {
             var params = {},
                 data = {
@@ -484,11 +442,6 @@ ASC.CRM.SocialMedia = (function() {
 
         AddTwitterProfileToContact: function(twitterScreenName) {
             jq(ASC.CRM.SocialMedia.TwitterTargetTextbox).val(twitterScreenName);
-            _HideProfilesWindow();
-        },
-
-        AddFacebookProfileToContact: function(profileId) {
-            jq(ASC.CRM.SocialMedia.FacebookTargetTextbox).val(profileId);
             _HideProfilesWindow();
         }
     };

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -96,6 +87,10 @@ window.ASC.Files.FileSelector = (function () {
             });
 
             jq("#closeFileSelector").click(function () { ASC.Files.FileSelector.onCancel(); });
+            
+            if (window.location.href.indexOf("compact") != -1) {
+                jq("body").addClass("file-selector-compact");
+            }
         }
         ASC.Files.FileSelector.onInit();
     };
@@ -145,9 +140,12 @@ window.ASC.Files.FileSelector = (function () {
                 count: ASC.Files.Constants.COUNT_ON_PAGE,
                 append: isAppend === true,
                 filter: filterSettings.filter,
-                subject: filterSettings.subject,
-                text: filterSettings.text,
+                subjectGroup: false,
+                subjectId: filterSettings.subject,
+                search: filterSettings.text,
                 orderBy: filterSettings.sorter,
+                searchInContent: false,
+                withSubfolders: false,
                 currentFolderId: ASC.Files.Folders && ASC.Files.Folders.currentFolder ? ASC.Files.Folders.currentFolder.id : null,
                 expandTree: expandTree
             }, { orderBy: filterSettings.sorter });
@@ -169,7 +167,7 @@ window.ASC.Files.FileSelector = (function () {
         jq("#fileSelectorDialog").toggleClass("only-folder", isFolderSelector);
 
         if (jq("#fileSelectorDialog").hasClass("popup-modal")) {
-            ASC.Files.UI.blockUI("#fileSelectorDialog", isFolderSelector ? 440 : 1030, 650);
+            ASC.Files.UI.blockUI("#fileSelectorDialog", isFolderSelector ? 440 : 1030);
         }
 
         PopupKeyUpActionProvider.EnterAction = "jq(\"#submitFileSelector\").click();";
@@ -185,18 +183,27 @@ window.ASC.Files.FileSelector = (function () {
         folderId = folderId || ASC.Files.FileSelector.fileSelectorTree.getDefaultFolderId();
         ASC.Files.FileSelector.fileSelectorTree.setCurrent(folderId);
 
+        ASC.Files.FileSelector.fileSelectorTree.clickOnFolder(folderId);
+
         if (!isFolderSelector) {
             ASC.Files.UI.filesSelectedHandler = selectFile;
 
-            selectFolder(folderId);
+            jq("#submitFileSelector").toggleClass("disable",
+                !isFolderSelector || !ASC.Files.Common.isCorrectId(ASC.Files.FileSelector.fileSelectorTree.selectedFolderId));
         }
-
-        jq("#submitFileSelector").toggleClass("disable",
-            !isFolderSelector || !ASC.Files.Common.isCorrectId(ASC.Files.FileSelector.fileSelectorTree.selectedFolderId));
     };
 
     var setTitle = function (newTitle) {
         jq("#fileSelectorTitle").text((newTitle || "").trim());
+    };
+
+    var showThirdPartyOnly = function (providerKey) {
+        jq("#fileSelectorTree>ul>li.third-party-entry").each(function(i, treeNode) {
+            var entryData = ASC.Files.UI.getObjectData(treeNode);
+            if (entryData.provider_key != providerKey) {
+                jq(treeNode).hide();
+            }
+        });
     };
 
     var createThirdPartyTree = function (callback) {
@@ -209,7 +216,7 @@ window.ASC.Files.FileSelector = (function () {
             return;
         }
 
-        if (jsonData.length > 0) {
+        if (jsonData && jsonData.length > 0) {
             var stringXml = ASC.Files.Common.jsonToXml({ folderList: { entry: jsonData } });
 
             var htmlXml = ASC.Files.TemplateManager.translateFromString(stringXml);
@@ -226,6 +233,10 @@ window.ASC.Files.FileSelector = (function () {
     var onGetFolderItemsTree = function (xmlData, params, errorMessage) {
         ASC.Files.EventHandler.onGetFolderItems(xmlData, params, errorMessage);
 
+        if (typeof errorMessage != "undefined" || typeof xmlData == "undefined") {
+            return;
+        }
+
         if (params.expandTree) {
             ASC.Files.FileSelector.fileSelectorTree.expandFolder(params.currentFolderId, true, true);
         }
@@ -240,6 +251,7 @@ window.ASC.Files.FileSelector = (function () {
 
         toggleThirdParty: toggleThirdParty,
         createThirdPartyTree: createThirdPartyTree,
+        showThirdPartyOnly: showThirdPartyOnly,
 
         fileSelectorTree: fileSelectorTree,
         filesFilter: filesFilter,
@@ -254,6 +266,9 @@ window.ASC.Files.FileSelector = (function () {
 
 (function ($) {
     $(function () {
+        if (jq("#fileSelectorDialog").length == 0)
+            return;
+
         ASC.Files.FileSelector.init();
     });
 })(jQuery);

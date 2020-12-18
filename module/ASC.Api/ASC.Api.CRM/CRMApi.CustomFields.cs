@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -34,7 +25,9 @@ using ASC.Api.Collections;
 using ASC.Api.Exceptions;
 using ASC.CRM.Core;
 using ASC.CRM.Core.Entities;
+using ASC.ElasticSearch;
 using ASC.MessagingSystem;
+using ASC.Web.CRM.Core.Search;
 
 namespace ASC.Api.CRM
 {
@@ -53,7 +46,7 @@ namespace ASC.Api.CRM
         [Read(@"{entityType:(contact|person|company|opportunity|case)}/customfield/definitions")]
         public IEnumerable<CustomFieldWrapper> GetCustomFieldDefinitions(string entityType)
         {
-            return DaoFactory.GetCustomFieldDao().GetFieldsDescription(ToEntityType(entityType)).ConvertAll(ToCustomFieldWrapper).ToSmartList();
+            return DaoFactory.CustomFieldDao.GetFieldsDescription(ToEntityType(entityType)).ConvertAll(ToCustomFieldWrapper).ToSmartList();
         }
 
         /// <summary>
@@ -67,7 +60,7 @@ namespace ASC.Api.CRM
         [Read(@"{entityType:(contact|person|company|opportunity|case)}/{entityid:[0-9]+}/customfield")]
         public IEnumerable<CustomFieldBaseWrapper> GetCustomFieldForSubject(string entityType, int entityid)
         {
-            return DaoFactory.GetCustomFieldDao().GetEnityFields(ToEntityType(entityType), entityid, false).ConvertAll(ToCustomFieldBaseWrapper).ToItemList();
+            return DaoFactory.CustomFieldDao.GetEnityFields(ToEntityType(entityType), entityid, false).ConvertAll(ToCustomFieldBaseWrapper).ToItemList();
         }
 
         /// <summary>
@@ -85,14 +78,14 @@ namespace ASC.Api.CRM
         [Create(@"{entityType:(contact|person|company|opportunity|case)}/{entityid:[0-9]+}/customfield/{fieldid:[0-9]+}")]
         public CustomFieldBaseWrapper SetEntityCustomFieldValue(string entityType, int entityid, int fieldid, string fieldValue)
         {
-            var customField = DaoFactory.GetCustomFieldDao().GetFieldDescription(fieldid);
+            var customField = DaoFactory.CustomFieldDao.GetFieldDescription(fieldid);
 
             var entityTypeStr = ToEntityType(entityType);
 
             customField.EntityID = entityid;
             customField.Value = fieldValue;
 
-            DaoFactory.GetCustomFieldDao().SetFieldValue(entityTypeStr, entityid, fieldid, fieldValue);
+            DaoFactory.CustomFieldDao.SetFieldValue(entityTypeStr, entityid, fieldid, fieldValue);
 
             return ToCustomFieldBaseWrapper(customField);
         }
@@ -194,13 +187,13 @@ namespace ASC.Api.CRM
         {
             if (!(CRMSecurity.IsAdmin)) throw CRMSecurity.CreateSecurityException();
             var entityTypeObj = ToEntityType(entityType);
-            var fieldID = DaoFactory.GetCustomFieldDao().CreateField(entityTypeObj, label, (CustomFieldType)fieldType, mask);
-            var wrapper = DaoFactory.GetCustomFieldDao().GetFieldDescription(fieldID);
+            var fieldID = DaoFactory.CustomFieldDao.CreateField(entityTypeObj, label, (CustomFieldType)fieldType, mask);
+            var wrapper = DaoFactory.CustomFieldDao.GetFieldDescription(fieldID);
 
             var messageAction = GetCustomFieldCreatedAction(entityTypeObj);
-            MessageService.Send(Request, messageAction, wrapper.Label);
+            MessageService.Send(Request, messageAction, MessageTarget.Create(wrapper.ID), wrapper.Label);
 
-            return ToCustomFieldWrapper(DaoFactory.GetCustomFieldDao().GetFieldDescription(fieldID));
+            return ToCustomFieldWrapper(DaoFactory.CustomFieldDao.GetFieldDescription(fieldID));
         }
 
         /// <summary>
@@ -231,7 +224,7 @@ namespace ASC.Api.CRM
         public CustomFieldWrapper UpdateCustomFieldValue(int id, string entityType, string label, int fieldType, int position, string mask)
         {
             if (id <= 0) throw new ArgumentException();
-            if (!DaoFactory.GetCustomFieldDao().IsExist(id)) throw new ItemNotFoundException();
+            if (!DaoFactory.CustomFieldDao.IsExist(id)) throw new ItemNotFoundException();
 
             var entityTypeObj = ToEntityType(entityType);
 
@@ -245,14 +238,14 @@ namespace ASC.Api.CRM
                     Position = position
                 };
 
-            DaoFactory.GetCustomFieldDao().EditItem(customField);
+            DaoFactory.CustomFieldDao.EditItem(customField);
 
-            var wrapper = ToCustomFieldWrapper(DaoFactory.GetCustomFieldDao().GetFieldDescription(id));
+            customField = DaoFactory.CustomFieldDao.GetFieldDescription(id);
 
             var messageAction = GetCustomFieldUpdatedAction(entityTypeObj);
-            MessageService.Send(Request, messageAction, wrapper.Label);
+            MessageService.Send(Request, messageAction, MessageTarget.Create(customField.ID), customField.Label);
 
-            return wrapper;
+            return ToCustomFieldWrapper(customField);
         }
 
         /// <summary>
@@ -273,14 +266,16 @@ namespace ASC.Api.CRM
             if (!(CRMSecurity.IsAdmin)) throw CRMSecurity.CreateSecurityException();
             if (fieldid <= 0) throw new ArgumentException();
 
-            var customField = DaoFactory.GetCustomFieldDao().GetFieldDescription(fieldid);
+            var customField = DaoFactory.CustomFieldDao.GetFieldDescription(fieldid);
             if (customField == null) throw new ItemNotFoundException();
 
             var result = ToCustomFieldWrapper(customField);
-            DaoFactory.GetCustomFieldDao().DeleteField(fieldid);
+            DaoFactory.CustomFieldDao.DeleteField(fieldid);
+
+            FactoryIndexer<FieldsWrapper>.DeleteAsync(customField);
 
             var messageAction = GetCustomFieldDeletedAction(ToEntityType(entityType));
-            MessageService.Send(Request, messageAction, result.Label);
+            MessageService.Send(Request, messageAction, MessageTarget.Create(customField.ID), result.Label);
 
             return result;
         }
@@ -303,21 +298,19 @@ namespace ASC.Api.CRM
             if (fieldids == null) throw new ArgumentException();
             if (!(CRMSecurity.IsAdmin)) throw CRMSecurity.CreateSecurityException();
 
-            var result = new List<CustomFieldBaseWrapper>();
+            var customFields = new List<CustomField>();
             foreach (var id in fieldids)
             {
-                if (!DaoFactory.GetCustomFieldDao().IsExist(id)) throw new ItemNotFoundException();
-
-                var userFieldWrapper = ToCustomFieldBaseWrapper(DaoFactory.GetCustomFieldDao().GetFieldDescription(id));
-                result.Add(userFieldWrapper);
+                if (!DaoFactory.CustomFieldDao.IsExist(id)) throw new ItemNotFoundException();
+                customFields.Add(DaoFactory.CustomFieldDao.GetFieldDescription(id));
             }
 
-            DaoFactory.GetCustomFieldDao().ReorderFields(fieldids.ToArray());
+            DaoFactory.CustomFieldDao.ReorderFields(fieldids.ToArray());
 
             var messageAction = GetCustomFieldsUpdatedOrderAction(ToEntityType(entityType));
-            MessageService.Send(Request, messageAction, result.Select(x => x.Label));
- 
-            return result;
+            MessageService.Send(Request, messageAction, MessageTarget.Create(fieldids), customFields.Select(x => x.Label));
+
+            return customFields.Select(ToCustomFieldBaseWrapper);
         }
 
         private static CustomFieldBaseWrapper ToCustomFieldBaseWrapper(CustomField customField)
@@ -329,7 +322,7 @@ namespace ASC.Api.CRM
         {
             var result = new CustomFieldWrapper(customField)
                 {
-                    RelativeItemsCount = DaoFactory.GetCustomFieldDao().GetContactLinkCount(customField.EntityType, customField.ID)
+                    RelativeItemsCount = DaoFactory.CustomFieldDao.GetContactLinkCount(customField.EntityType, customField.ID)
                 };
             return result;
         }

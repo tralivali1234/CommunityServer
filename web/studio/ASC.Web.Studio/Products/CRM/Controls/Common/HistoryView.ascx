@@ -18,7 +18,7 @@
             <td id="categorySelectorContainer"></td>
             <td style="white-space:nowrap;padding-right: 15px;">
                 <%= CRMCommonResource.Date %>:
-                <input type="text" class="textEditCalendar"/>
+                <input type="text" class="textEditCalendar" autocomplete="off"/>
             </td>
             <td style="white-space:nowrap;">
                 <div id="eventLinkToPanel" class="empty-select"></div>
@@ -73,7 +73,7 @@
         <br />
 
         <div id="eventsList">
-            <table id="eventsTable" class="table-list" cellpadding="10" cellspacing="0">
+            <table id="eventsTable" class="table-list padding10" cellpadding="0" cellspacing="0">
                 <tbody>
                 </tbody>
             </table>

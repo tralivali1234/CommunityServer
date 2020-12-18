@@ -1,5 +1,22 @@
-﻿
-(function ($, win, doc, body) {
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+(function ($) {
+    var resources = ASC.Resources.Master.Resource, teamlab = Teamlab;
 
     var useradvancedSelector = function (element, options) {
         this.$element = $(element);
@@ -27,17 +44,17 @@
 
             opts.newoptions =
                     [
-                        { title: ASC.Resources.Master.Resource.SelectorType, type: "choice", tag: "type", items: [
-                                        { type: "user", title: ASC.Resources.Master.Resource.SelectorUser },
-                                        { type: "visitor", title: ASC.Resources.Master.Resource.SelectorVisitor }
+                        { title: resources.SelectorType, type: "choice", tag: "type", items: [
+                                        { type: "user", title: resources.SelectorUser },
+                                        { type: "visitor", title: resources.SelectorVisitor }
                             ]
                         },
-                        { title: ASC.Resources.Master.Resource.SelectorFirstName, type: "input", tag: "first-name" },
-                        { title: ASC.Resources.Master.Resource.SelectorLastName, type: "input", tag: "last-name" },
-                        { title: ASC.Resources.Master.Resource.SelectorEmail, type: "input", tag: "email" },
-                        { title: ASC.Resources.Master.Resource.SelectorGroup, type: "select", tag: "group" }
+                        { title: resources.SelectorFirstName, type: "input", tag: "first-name" },
+                        { title: resources.SelectorLastName, type: "input", tag: "last-name" },
+                        { title: resources.SelectorEmail, type: "input", tag: "email" },
+                        { title: resources.SelectorGroup, type: "select", tag: "group" }
                     ],
-            opts.newbtn = ASC.Resources.Master.Resource.InviteButton;
+            opts.newbtn = resources.InviteButton;
 
             that.displayAddItemBlock.call(that, opts);
             that.initDataSimpleSelector.call(that, { tag: "group", items: itemsSimpleSelect });
@@ -45,7 +62,7 @@
             var $addPanel = that.$advancedSelector.find(".advanced-selector-add-new-block");
 
             if (that.options.withGuests) {
-                Teamlab.getQuotas({}, {
+                teamlab.getQuotas({}, {
                     success: function (params, data) {
                         if (data.availableUsersCount == 0) {
                             $addPanel.find(".type select").val("visitor").attr("disabled", "disabled");
@@ -60,11 +77,29 @@
 
         initAdvSelectorData: function () {
             var that = this,
-                data = ASC.Resources.Master.ApiResponses_Profiles.response;
-            if (!that.options.withGuests) {
-                data = $.grep(data, function (el) { return el.isVisitor == false });
+                data = [];
+
+            var dataItems = window.UserManager.getAllUsers(!that.options.showDisabled);
+
+            for (var dataItemId in dataItems) {
+                if (!dataItems.hasOwnProperty(dataItemId)) continue;
+
+                var dataItem = dataItems[dataItemId];
+                
+                if(!that.options.withGuests && dataItem.isVisitor)
+                    continue;
+
+                var newObj = {
+                    title: dataItem.displayName,
+                    id: dataItem.id,
+                    status: dataItem.isPending || dataItem.isActivated === false ? ASC.Resources.Master.Resource.UserPending : "",
+                    groups: window.GroupManager.getGroups(dataItem.groups)
+                };
+
+                data.push(newObj);
             }
-            that.rewriteObjectItem.call(that, data);
+
+            that.rewriteObjectItem.call(that, data.sort(SortData));
 
             // var   filter = {
             //        employeeStatus: 1,
@@ -73,7 +108,7 @@
             //if (!that.options.withGuests) {
             //    filter.employeeType = 1;
             //}
-            //Teamlab.getProfilesByFilter({}, {
+            //teamlab.getProfilesByFilter({}, {
             //    before: function () {
             //        that.showLoaderListAdvSelector.call(that, 'items');
             //    },
@@ -91,13 +126,13 @@
         },
 
         initAdvSelectorGroupsData: function () {
-            var that = this,
-                data = ASC.Resources.Master.ApiResponses_Groups.response;
+            var that = this;
 
-            that.rewriteObjectGroup.call(that, data);
+            that.rewriteObjectGroup.call(that, window.GroupManager.getAllGroups());
+
             if (that.options.isAdmin) {
-                var groups = [],
-                    dataIds = [];
+                var groups = [];
+
                 that.$groupsListSelector.find(".advanced-selector-list li").hide();
                 that.items.forEach(function (e) {
                     groups = groups.concat(e.groups).unique();
@@ -108,7 +143,7 @@
                 });
             }
 
-            //Teamlab.getGroups({}, {
+            //teamlab.getGroups({}, {
             //    before: function () {
             //        that.showLoaderListAdvSelector.call(that, 'groups');
             //    },
@@ -138,29 +173,9 @@
 
         rewriteObjectItem: function (data) {
             var that = this;
-            that.items = [];
 
-            for (var i = 0, length = data.length; i < length; i++) {
-                var newObj = {};
-                newObj.title = data[i].displayName || data[i].title;
-                newObj.id = data[i].id;
-                newObj.isVisitor = data[i].isVisitor;
-                newObj.profileUrl = data[i].profileUrl;
-                if (data[i].hasOwnProperty("isPending")) {
-                    newObj.status = data[i].isPending ? "pending" : "";
-                }
-                if (data[i].hasOwnProperty("groups")) {
-                    newObj.groups = data[i].groups;
-                    if (data[i].groups && data[i].groups.length && !data[i].groups[0].id) {
-                        newObj.groups.map(function (el) {
-                            el.id = el.ID;
-                        })
-                    }
-                }
-                that.items.push(newObj);
-            }
+            that.items = data;
 
-            that.items = that.items.sort(SortData);
             that.$element.data('items', that.items);
             that.showItemsListAdvSelector.call(that);
         },
@@ -195,27 +210,27 @@
             };
 
             if (!newUser.firstname) {
-                that.showErrorField.call(that, { field: $addPanel.find(".first-name"), error: ASC.Resources.Master.Resource.ErrorEmptyUserFirstName });
+                that.showErrorField.call(that, { field: $addPanel.find(".first-name"), error: resources.ErrorEmptyUserFirstName });
                 isError = true;
             }
             if (!newUser.lastname) {
-                that.showErrorField.call(that, { field: $addPanel.find(".last-name"), error: ASC.Resources.Master.Resource.ErrorEmptyUserLastName });
+                that.showErrorField.call(that, { field: $addPanel.find(".last-name"), error: resources.ErrorEmptyUserLastName });
                 isError = true;
             }
             if (newUser.firstname && newUser.firstname.length > 64) {
-                that.showErrorField.call(that, { field: $addPanel.find(".first-name"), error: ASC.Resources.Master.Resource.ErrorMesLongField64 });
+                that.showErrorField.call(that, { field: $addPanel.find(".first-name"), error: resources.ErrorMesLongField64 });
                 isError = true;
             }
             if (newUser.lastname && newUser.lastname.length > 64) {
-                that.showErrorField.call(that, { field: $addPanel.find(".last-name"), error: ASC.Resources.Master.Resource.ErrorMesLongField64 });
+                that.showErrorField.call(that, { field: $addPanel.find(".last-name"), error: resources.ErrorMesLongField64 });
                 isError = true;
             }
             if (!jq.isValidEmail(newUser.email)) {
-                that.showErrorField.call(that, { field: $addPanel.find(".email"), error: ASC.Resources.Master.Resource.ErrorNotCorrectEmail });
+                that.showErrorField.call(that, { field: $addPanel.find(".email"), error: resources.ErrorNotCorrectEmail });
                 isError = true;
             }
             if (!newUser.department.length && $addPanel.find(".group input").val()) {
-                that.showErrorField.call(that, { field: $addPanel.find(".group"), error: ASC.Resources.Master.Resource.ErrorGroupNotExist });
+                that.showErrorField.call(that, { field: $addPanel.find(".group"), error: resources.ErrorGroupNotExist });
                 isError = true;
             }
 
@@ -224,16 +239,16 @@
                 return;
             }
 
-            Teamlab.getQuotas({}, {
+            teamlab.getQuotas({}, {
                 success: function (params, data) {
                     if (data.availableUsersCount == 0 && !newUser.isVisitor) {
-                        that.showServerError.call(that, { field: $btn, error: ASC.Resources.Master.Resource.UserSelectorErrorLimitUsers + data.maxUsersCount });
+                        that.showServerError.call(that, { field: $btn, error: resources.UserSelectorErrorLimitUsers + data.maxUsersCount });
                         return;
                     }
 
-                    Teamlab.addProfile({}, newUser, {
+                    teamlab.addProfile({}, newUser, {
                         before: function () {
-                            that.displayLoadingBtn.call(that, { btn: $btn, text: ASC.Resources.Master.Resource.LoadingProcessing });
+                            that.displayLoadingBtn.call(that, { btn: $btn, text: resources.LoadingProcessing });
                         },
                         success: function (params, profile) {
                             profile = this.__responses[0];
@@ -242,11 +257,15 @@
                                 id: profile.id,
                                 title: profile.displayName,
                                 isVisitor: profile.isVisitor,
-                                status: "pending",
+                                status: ASC.Resources.Master.Resource.UserPending,
                                 groups: []
                             };
 
-                            toastr.success(ASC.Resources.Master.Resource.UserSelectorAddSuccess.format("<b>" + newuser.title + "</b>"));
+                            var copy = Object.assign({}, profile);
+                            copy.groups = (profile.groups || []).map(function (group) { return group.id; });
+                            UserManager.addNewUser(copy);
+
+                            toastr.success(resources.UserSelectorAddSuccess.format("<b>" + newuser.title + "</b>"));
                             that.actionsAfterCreateItem.call(that, { newitem: newuser, response: profile, nameProperty: "groups" });
                         },
                         error: function () {
@@ -266,7 +285,7 @@
                 id: item.id,
                 title: item.displayName,
                 isVisitor: item.isVisitor,
-                status: item.isPending ? "pending" : "",
+                status: item.isPending || item.isActivated === false ? ASC.Resources.Master.Resource.UserPending : "",
                 groups: []
             };
             this.actionsAfterCreateItem.call(this, { newitem: newuser, response: item, nameProperty: "groups" });
@@ -290,15 +309,16 @@
   }
     $.fn.useradvancedSelector.defaults = $.extend({}, $.fn.advancedSelector.defaults, {
         showme: true,
-        addtext: ASC.Resources.Master.Resource.UserSelectorAddText,
-        noresults: ASC.Resources.Master.Resource.UserSelectorNoResults,
-        noitems: ASC.Resources.Master.Resource.UserSelectorNoItems,
-        nogroups: ASC.Resources.Master.Resource.UserSelectorNoGroups,
-        emptylist: ASC.Resources.Master.Resource.UserSelectorEmptyList,
+        addtext: resources.UserSelectorAddText,
+        noresults: resources.UserSelectorNoResults,
+        noitems: resources.UserSelectorNoItems,
+        nogroups: resources.UserSelectorNoGroups,
+        emptylist: resources.UserSelectorEmptyList,
         isAdmin: false,
         withGuests: true,
+        showDisabled: false,
         isInitializeItems: true
     });
 
 
-})(jQuery, window, document, document.body);
+})(jQuery);

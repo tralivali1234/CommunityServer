@@ -1,34 +1,30 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Web;
 using System.Web.UI;
+using ASC.Common.Data;
+using ASC.Common.Data.Sql;
+using ASC.Core.Users;
+using ASC.Web.Studio.Core;
 using AjaxPro;
 using ASC.Core;
 using ASC.Notify.Model;
@@ -48,14 +44,17 @@ namespace ASC.Web.Studio.UserControls.Users
             get { return "~/UserControls/Users/UserSubscriptions/UserSubscriptions.ascx"; }
         }
 
+        protected UserInfo CurrentUser;
+
+        protected bool IsAdmin;
+
         protected void Page_Load(object sender, EventArgs e)
         {
             AjaxPro.Utility.RegisterTypeForAjax(GetType());
-        }
 
-        protected bool IsAdmin()
-        {
-            return CoreContext.UserManager.IsUserInGroup(SecurityContext.CurrentAccount.ID, ASC.Core.Users.Constants.GroupAdmin.ID);
+            CurrentUser = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
+
+            IsAdmin = CurrentUser.IsAdmin();
         }
 
         #region Init Notify by comboboxes
@@ -65,12 +64,9 @@ namespace ASC.Web.Studio.UserControls.Users
             base.OnInit(e);
             try
             {
-                Page.RegisterBodyScripts("~/usercontrols/users/usersubscriptions/js/subscription_manager.js");
-
-                Page.RegisterInlineScript("CommonSubscriptionManager.InitNotifyByComboboxes();");
-
-                //styles
-                Page.RegisterStyle("~/usercontrols/users/usersubscriptions/css/subscriptions.less");
+                Page.RegisterBodyScripts("~/UserControls/Users/UserSubscriptions/js/subscription_manager.js")
+                    .RegisterInlineScript("CommonSubscriptionManager.InitNotifyByComboboxes();")
+                    .RegisterStyle("~/UserControls/Users/UserSubscriptions/css/subscriptions.less");
             }
             catch
             {
@@ -108,6 +104,8 @@ namespace ASC.Web.Studio.UserControls.Users
             var types = new List<object>();
             var itemType = 1;
 
+            var recipient = GetCurrentRecipient();
+
             var productSubscriptionManager = webItem.Context.SubscriptionManager as IProductSubscriptionManager;
             if (productSubscriptionManager.GroupByType == GroupByType.Modules)
             {
@@ -140,7 +138,7 @@ namespace ASC.Web.Studio.UserControls.Users
                                 Id = type.ID,
                                 Name = type.Name.HtmlEncode(),
                                 Single = type.Single,
-                                IsSubscribed = type.CanSubscribe ? subItem.Context.SubscriptionManager.SubscriptionProvider.IsSubscribed(type.NotifyAction, GetCurrentRecipient(), null) : true
+                                IsSubscribed = type.CanSubscribe ? subItem.Context.SubscriptionManager.SubscriptionProvider.IsSubscribed(type.NotifyAction, recipient, null) : true
                             };
                         if (t.IsSubscribed)
                             canUnsubscribe = true;
@@ -180,7 +178,7 @@ namespace ASC.Web.Studio.UserControls.Users
                                     Id = type.ID,
                                     Name = type.Name.HtmlEncode(),
                                     Single = type.Single,
-                                    IsSubscribed = type.CanSubscribe ? productSubscriptionManager.SubscriptionProvider.IsSubscribed(type.NotifyAction, GetCurrentRecipient(), null) : true
+                                    IsSubscribed = type.CanSubscribe ? productSubscriptionManager.SubscriptionProvider.IsSubscribed(type.NotifyAction, recipient, null) : true
                                 };
 
                             if (t.IsSubscribed)
@@ -211,7 +209,7 @@ namespace ASC.Web.Studio.UserControls.Users
                                 Id = type.ID,
                                 Name = type.Name.HtmlEncode(),
                                 Single = type.Single,
-                                IsSubscribed = !type.CanSubscribe || !productSubscriptionManager.SubscriptionProvider.IsUnsubscribe((IDirectRecipient)GetCurrentRecipient(), type.NotifyAction, null)
+                                IsSubscribed = !type.CanSubscribe || !productSubscriptionManager.SubscriptionProvider.IsUnsubscribe((IDirectRecipient)recipient, type.NotifyAction, null)
                             };
                         if (t.IsSubscribed)
                             canUnsubscribe = true;
@@ -303,7 +301,7 @@ namespace ASC.Web.Studio.UserControls.Users
 
         protected string RenderWhatsNewSubscriptionState()
         {
-            return RenderWhatsNewSubscriptionState(StudioWhatsNewService.Instance.IsSubscribeToWhatsNew(SecurityContext.CurrentAccount.ID));
+            return RenderWhatsNewSubscriptionState(StudioNotifyHelper.IsSubscribedToNotify(CurrentUser, Actions.SendWhatsNew));
         }
 
         protected string RenderWhatsNewSubscriptionState(bool isSubscribe)
@@ -312,25 +310,13 @@ namespace ASC.Web.Studio.UserControls.Users
                 return "<a class=\"on_off_button on\" href=\"javascript:CommonSubscriptionManager.SubscribeToWhatsNew();\" title=\"" + Resources.Resource.UnsubscribeButton + "\"></a>";
             else
                 return "<a class=\"on_off_button off\" href=\"javascript:CommonSubscriptionManager.SubscribeToWhatsNew();\" title=\"" + Resources.Resource.SubscribeButton + "\"></a>";
-
         }
 
         protected string RenderWhatsNewNotifyByCombobox()
         {
-            var subscriptionManager = StudioSubscriptionManager.Instance;
+            var notifyBy = ConvertToNotifyByValue(StudioSubscriptionManager.Instance, Actions.SendWhatsNew);
 
-            var notifyBy = ConvertToNotifyByValue(subscriptionManager, Constants.ActionSendWhatsNew);
-
-            return string.Format(@"
-<select id='NotifyByCombobox_WhatsNew' class='comboBox notify-by-combobox' onchange='CommonSubscriptionManager.SetWhatsNewNotifyByMethod(jq(this).val());'>
-	<option class='optionItem' value='0'{3}>{0}</option>
-	<option class='optionItem' value='1'{4}>{1}</option>
-	<option class='optionItem' value='2'{5}>{2}</option>
-</select>",
-                                 Resources.Resource.NotifyByEmail, Resources.Resource.NotifyByTMTalk, Resources.Resource.NotifyByEmailAndTMTalk,
-                                 0 == notifyBy ? " selected='selected'" : string.Empty,
-                                 1 == notifyBy ? " selected='selected'" : string.Empty,
-                                 2 == notifyBy ? " selected='selected'" : string.Empty);
+            return string.Format("<span class=\"subsSelector subs-notice-text\" data-notify=\"{0}\" data-function=\"SetWhatsNewNotifyByMethod\"></span>", (int)notifyBy);
         }
 
         [AjaxMethod(HttpSessionStateRequirement.ReadWrite)]
@@ -339,8 +325,8 @@ namespace ASC.Web.Studio.UserControls.Users
             try
             {
                 var resp = new AjaxResponse();
-                var notifyByList = ConvertToNotifyByList(notifyBy);
-                SetNotifyBySubsriptionTypes(notifyByList, StudioSubscriptionManager.Instance, Constants.ActionSendWhatsNew);
+                var notifyByList = ConvertToNotifyByList((NotifyBy)notifyBy);
+                SetNotifyBySubsriptionTypes(notifyByList, StudioSubscriptionManager.Instance, Actions.SendWhatsNew);
                 return resp;
             }
             catch
@@ -355,10 +341,13 @@ namespace ASC.Web.Studio.UserControls.Users
             var resp = new AjaxResponse { rs1 = "0" };
             try
             {
-                var isSubscribe = StudioWhatsNewService.Instance.IsSubscribeToWhatsNew(SecurityContext.CurrentAccount.ID);
+                var recipient = StudioNotifyHelper.ToRecipient(SecurityContext.CurrentAccount.ID);
 
-                StudioWhatsNewService.Instance.SubscribeToWhatsNew(SecurityContext.CurrentAccount.ID, !isSubscribe);
-                resp.rs2 = RenderWhatsNewSubscriptionState(!isSubscribe);
+                var isSubscribed = StudioNotifyHelper.IsSubscribedToNotify(recipient, Actions.SendWhatsNew);
+
+                StudioNotifyHelper.SubscribeToNotify(recipient, Actions.SendWhatsNew, !isSubscribed);
+
+                resp.rs2 = RenderWhatsNewSubscriptionState(!isSubscribed);
 
                 resp.rs1 = "1";
             }
@@ -373,11 +362,150 @@ namespace ASC.Web.Studio.UserControls.Users
 
         #endregion
 
+        #region tips&tricks
+
+        protected string RenderTipsAndTricksSubscriptionState()
+        {
+            return RenderTipsAndTricksSubscriptionState(StudioNotifyHelper.IsSubscribedToNotify(CurrentUser, Actions.PeriodicNotify));
+        }
+
+        protected string RenderTipsAndTricksSubscriptionState(bool isSubscribe)
+        {
+            if (isSubscribe)
+                return "<a class=\"on_off_button on\" href=\"javascript:CommonSubscriptionManager.SubscribeToTipsAndTricks();\" title=\"" + Resources.Resource.UnsubscribeButton + "\"></a>";
+            else
+                return "<a class=\"on_off_button off\" href=\"javascript:CommonSubscriptionManager.SubscribeToTipsAndTricks();\" title=\"" + Resources.Resource.SubscribeButton + "\"></a>";
+        }
+
+        [AjaxMethod(HttpSessionStateRequirement.ReadWrite)]
+        public AjaxResponse SubscribeToTipsAndTricks()
+        {
+            var resp = new AjaxResponse { rs1 = "0" };
+            try
+            {
+                var recipient = StudioNotifyHelper.ToRecipient(SecurityContext.CurrentAccount.ID);
+
+                var isSubscribe = StudioNotifyHelper.IsSubscribedToNotify(recipient, Actions.PeriodicNotify);
+
+                StudioNotifyHelper.SubscribeToNotify(recipient, Actions.PeriodicNotify, !isSubscribe);
+
+                resp.rs2 = RenderTipsAndTricksSubscriptionState(!isSubscribe);
+
+                resp.rs1 = "1";
+            }
+            catch (Exception e)
+            {
+                resp.rs2 = e.Message.HtmlEncode();
+            }
+
+            return resp;
+        }
+
+        #endregion
+
+        #region spam
+
+        protected bool IsVisibleSpamSubscription()
+        {
+            return TenantExtra.Saas && SetupInfo.IsVisibleSettings("SpamSubscription");
+        }
+
+        private const string TeamlabSiteDbId = "teamlabsite";
+
+        private const string TemplateUnsubscribeTable = "template_unsubscribe";
+
+        private static IDbManager GetDb()
+        {
+            return DbManager.FromHttpContext(TeamlabSiteDbId);
+        }
+
+        private static void UnsubscribeFromSpam(string email)
+        {
+            using (var db = GetDb())
+            {
+                var query = new SqlInsert(TemplateUnsubscribeTable, true)
+                    .InColumnValue("email", email.ToLowerInvariant());
+
+                db.ExecuteScalar<int>(query);
+            }
+        }
+
+        private static void SubscribeToSpam(string email)
+        {
+            using (var db = GetDb())
+            {
+                db.ExecuteScalar<int>(new SqlDelete(TemplateUnsubscribeTable).Where("email", email.ToLowerInvariant()));
+            }
+        }
+
+        private static bool IsSubscribedToSpam(string email)
+        {
+            using (var db = GetDb())
+            {
+                var query = new SqlQuery(TemplateUnsubscribeTable)
+                    .SelectCount()
+                    .Where("email", email);
+
+                return db.ExecuteScalar<int>(query) == 0;
+            }
+        }
+
+        protected string RenderSpamSubscriptionState()
+        {
+            var isSubscribed = IsSubscribedToSpam(CurrentUser.Email);
+
+            return RenderSpamSubscriptionState(isSubscribed);
+        }
+
+        protected string RenderSpamSubscriptionState(bool isSubscribed)
+        {
+            if (isSubscribed)
+                return "<a class=\"on_off_button on\" href=\"javascript:CommonSubscriptionManager.SubscribeToSpam();\" title=\"" + Resources.Resource.UnsubscribeButton + "\"></a>";
+            else
+                return "<a class=\"on_off_button off\" href=\"javascript:CommonSubscriptionManager.SubscribeToSpam();\" title=\"" + Resources.Resource.SubscribeButton + "\"></a>";
+        }
+
+        [AjaxMethod(HttpSessionStateRequirement.ReadWrite)]
+        public AjaxResponse SubscribeToSpam()
+        {
+            var resp = new AjaxResponse { rs1 = "0" };
+            try
+            {
+                if (!IsVisibleSpamSubscription())
+                    throw new MissingMethodException();
+
+                var user = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
+
+                var isSubscribed = IsSubscribedToSpam(user.Email);
+
+                if (isSubscribed)
+                {
+                    UnsubscribeFromSpam(user.Email);
+                }
+                else
+                {
+                    SubscribeToSpam(user.Email);
+                }
+
+                resp.rs2 = RenderTipsAndTricksSubscriptionState(!isSubscribed);
+
+                resp.rs1 = "1";
+            }
+            catch (Exception e)
+            {
+                resp.rs2 = e.Message.HtmlEncode();
+            }
+
+            return resp;
+        }
+
+        #endregion
+
         #region admin notifies
 
         protected string RenderAdminNotifySubscriptionState()
         {
-            return RenderAdminNotifySubscriptionState(StudioNotifyService.Instance.IsSubscribeToAdminNotify(SecurityContext.CurrentAccount.ID));
+            return RenderAdminNotifySubscriptionState(StudioNotifyHelper.IsSubscribedToNotify(CurrentUser, Actions.AdminNotify));
         }
 
         protected string RenderAdminNotifySubscriptionState(bool isSubscribe)
@@ -386,25 +514,13 @@ namespace ASC.Web.Studio.UserControls.Users
                 return "<a class=\"on_off_button on\" href=\"javascript:CommonSubscriptionManager.SubscribeToAdminNotify();\" title=\"" + Resources.Resource.UnsubscribeButton + "\"></a>";
             else
                 return "<a class=\"on_off_button off\" href=\"javascript:CommonSubscriptionManager.SubscribeToAdminNotify();\" title=\"" + Resources.Resource.SubscribeButton + "\"></a>";
-
         }
 
         protected string RenderAdminNotifyNotifyByCombobox()
         {
-            var subscriptionManager = StudioSubscriptionManager.Instance;
+            var notifyBy = ConvertToNotifyByValue(StudioSubscriptionManager.Instance, Actions.AdminNotify);
 
-            var notifyBy = ConvertToNotifyByValue(subscriptionManager, Constants.ActionAdminNotify);
-
-            return string.Format(@"
-<select id='NotifyByCombobox_AdminNotify' class='comboBox notify-by-combobox' onchange='CommonSubscriptionManager.SetAdminNotifyNotifyByMethod(jq(this).val());'>
-	<option class='optionItem' value='0'{3}>{0}</option>
-	<option class='optionItem' value='1'{4}>{1}</option>
-	<option class='optionItem' value='2'{5}>{2}</option>
-</select>",
-                                 Resources.Resource.NotifyByEmail, Resources.Resource.NotifyByTMTalk, Resources.Resource.NotifyByEmailAndTMTalk,
-                                 0 == notifyBy ? " selected='selected'" : string.Empty,
-                                 1 == notifyBy ? " selected='selected'" : string.Empty,
-                                 2 == notifyBy ? " selected='selected'" : string.Empty);
+            return string.Format("<span class=\"subsSelector subs-notice-text\" data-notify=\"{0}\" data-function=\"SetAdminNotifyNotifyByMethod\"></span>", (int)notifyBy);
         }
 
         [AjaxMethod(HttpSessionStateRequirement.ReadWrite)]
@@ -413,8 +529,8 @@ namespace ASC.Web.Studio.UserControls.Users
             try
             {
                 var resp = new AjaxResponse();
-                var notifyByList = ConvertToNotifyByList(notifyBy);
-                SetNotifyBySubsriptionTypes(notifyByList, StudioSubscriptionManager.Instance, Constants.ActionAdminNotify);
+                var notifyByList = ConvertToNotifyByList((NotifyBy)notifyBy);
+                SetNotifyBySubsriptionTypes(notifyByList, StudioSubscriptionManager.Instance, Actions.AdminNotify);
                 return resp;
             }
             catch
@@ -429,9 +545,12 @@ namespace ASC.Web.Studio.UserControls.Users
             var resp = new AjaxResponse { rs1 = "0" };
             try
             {
-                var isSubscribe = StudioNotifyService.Instance.IsSubscribeToAdminNotify(SecurityContext.CurrentAccount.ID);
+                var recipient = StudioNotifyHelper.ToRecipient(SecurityContext.CurrentAccount.ID);
 
-                StudioNotifyService.Instance.SubscribeToAdminNotify(SecurityContext.CurrentAccount.ID, !isSubscribe);
+                var isSubscribe = StudioNotifyHelper.IsSubscribedToNotify(recipient, Actions.AdminNotify);
+
+                StudioNotifyHelper.SubscribeToNotify(recipient, Actions.AdminNotify, !isSubscribe);
+
                 resp.rs2 = RenderAdminNotifySubscriptionState(!isSubscribe);
 
                 resp.rs1 = "1";
@@ -627,7 +746,7 @@ namespace ASC.Web.Studio.UserControls.Users
             var resp = new AjaxResponse { rs2 = productID.ToString() };
             try
             {
-                var notifyByList = ConvertToNotifyByList(notifyBy);
+                var notifyByList = ConvertToNotifyByList((NotifyBy)notifyBy);
 
                 var productSubscriptionManager = WebItemManager.Instance[productID].Context.SubscriptionManager as IProductSubscriptionManager;
                 if (productSubscriptionManager.GroupByType == GroupByType.Modules)
@@ -654,23 +773,44 @@ namespace ASC.Web.Studio.UserControls.Users
             return null;
         }
 
-        private static IList<string> ConvertToNotifyByList(int notifyBy)
+        private static IList<string> ConvertToNotifyByList(NotifyBy notifyBy)
         {
             IList<string> notifyByList = new List<string>();
-            switch (notifyBy)
-            {
-                case 0:
-                    notifyByList.Add(ASC.Core.Configuration.Constants.NotifyEMailSenderSysName);
-                    break;
-                case 1:
-                    notifyByList.Add(ASC.Core.Configuration.Constants.NotifyMessengerSenderSysName);
-                    break;
-                case 2:
-                    notifyByList.Add(ASC.Core.Configuration.Constants.NotifyEMailSenderSysName);
-                    notifyByList.Add(ASC.Core.Configuration.Constants.NotifyMessengerSenderSysName);
-                    break;
-            }
+
+            NotifyByBindings.Keys.Where(n => notifyBy.HasFlag(n)).ToList().ForEach(n => notifyByList.Add(NotifyByBindings[n]));
+
             return notifyByList;
+        }
+
+        [Flags]
+        public enum NotifyBy
+        {
+            None = 0,
+            Email = 1,
+            TMTalk = 2,
+            Push = 4,
+            Telegram = 8,
+            SignalR = 16
+        }
+
+        protected static readonly Dictionary<NotifyBy, string> NotifyByBindings = new Dictionary<NotifyBy, string>()
+        {
+            { NotifyBy.Email, ASC.Core.Configuration.Constants.NotifyEMailSenderSysName },
+            { NotifyBy.TMTalk, ASC.Core.Configuration.Constants.NotifyMessengerSenderSysName },
+            { NotifyBy.Telegram, ASC.Core.Configuration.Constants.NotifyTelegramSenderSysName }
+        };
+        protected static readonly Dictionary<string, NotifyBy> NotifyByBindingsReverse = NotifyByBindings.ToDictionary(kv => kv.Value, kv => kv.Key);
+
+        protected string GetNotifyLabel(NotifyBy notify)
+        {
+            try
+            {
+                return Resources.Resource.ResourceManager.GetString("NotifyBy" + notify.ToString());
+            }
+            catch
+            {
+                return "Unknown";
+            }
         }
 
         private void SetNotifyBySubsriptionTypes(IList<string> notifyByList, ISubscriptionManager subscriptionManager)
@@ -693,7 +833,7 @@ namespace ASC.Web.Studio.UserControls.Users
                     notifyByList.ToArray());
         }
 
-        private int GetNotifyByMethod(Guid itemID)
+        private NotifyBy GetNotifyByMethod(Guid itemID)
         {
             var productSubscriptionManager = WebItemManager.Instance[itemID].Context.SubscriptionManager as IProductSubscriptionManager;
             if (productSubscriptionManager == null)
@@ -719,33 +859,20 @@ namespace ASC.Web.Studio.UserControls.Users
             return 0;
         }
 
-        private int ConvertToNotifyByValue(ISubscriptionManager subscriptionManager, SubscriptionType s)
+        private NotifyBy ConvertToNotifyByValue(ISubscriptionManager subscriptionManager, SubscriptionType s)
         {
             return ConvertToNotifyByValue(subscriptionManager, s.NotifyAction);
         }
 
-        private int ConvertToNotifyByValue(ISubscriptionManager subscriptionManager, INotifyAction action)
+        private NotifyBy ConvertToNotifyByValue(ISubscriptionManager subscriptionManager, INotifyAction action)
         {
-            var notifyByArray = subscriptionManager.SubscriptionProvider.GetSubscriptionMethod(action, GetCurrentRecipient());
-            if (notifyByArray.Length == 1)
-            {
-                if (notifyByArray.Contains(ASC.Core.Configuration.Constants.NotifyEMailSenderSysName))
-                {
-                    return 0;
-                }
-                if (notifyByArray.Contains(ASC.Core.Configuration.Constants.NotifyMessengerSenderSysName))
-                {
-                    return 1;
-                }
-            }
-            if (notifyByArray.Length == 2)
-            {
-                if (notifyByArray.Contains(ASC.Core.Configuration.Constants.NotifyEMailSenderSysName) && notifyByArray.Contains(ASC.Core.Configuration.Constants.NotifyMessengerSenderSysName))
-                {
-                    return 2;
-                }
-            }
-            return 0;
+            var notifyByArray = subscriptionManager.SubscriptionProvider.GetSubscriptionMethod(action, GetCurrentRecipient()).ToList();
+
+            var notify = NotifyBy.None;
+
+            notifyByArray.ForEach(n => notify |= NotifyByBindingsReverse[n]);
+
+            return notify;
         }
     }
 }

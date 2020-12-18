@@ -13,7 +13,7 @@
                     <input class="small_chat_search_field textEdit" type="text" placeholder="<%= ChatResource.Search %>"/>
                     <div class="search_icon search_icon_image" title="<%= ChatResource.Search %>"></div>
                 </td>
-                <td class="small_chat_status_menu_container">
+               <!-- <td class="small_chat_status_menu_container">
                     <div class="small_chat_status_menu" title="<%= ChatResource.StatusOnline %>">
                         <div class="small_chat_text_status unselect_text image_online"><%= ChatResource.StatusOnline %></div>
                         <div class="studio-action-panel" id="smallChatPopupID">
@@ -29,7 +29,7 @@
                             </ul>
                         </div>
                     </div>
-                </td>
+                </td> -->
             </tr>
         </tbody>
     </table>
@@ -120,7 +120,7 @@
         <div class="small_chat_card">
             <div class="small_chat_character">
                 <span class="characteristic"><%= Resource.Name%>:</span>
-                <a class="small_chat_user link" href="/products/people/profile.aspx?user=${UserName}" title="${ShowUserName}">${ShowUserName}</a>
+                <a class="small_chat_user link" href="/Products/People/Profile.aspx?user=${UserName}" title="${ShowUserName}">${ShowUserName}</a>
             </div>
             {{if Title != "" && Title != undefined}}
             <div class="small_chat_character">
@@ -140,7 +140,7 @@
             <div class="small_chat_character">
                 <span class="characteristic"><%= CustomNamingPeople.Substitute<Resource>("Department").HtmlEncode()%>:</span>
                 {{each(ID, DepartmentName) Departments}}
-                <a class="small_chat_deps link" href="/products/people/#group=${ID}">${Encoder.htmlEncode(DepartmentName)}</a>
+                <a class="small_chat_deps link" href="/Products/People/#group=${ID}">${Encoder.htmlEncode(DepartmentName)}</a>
                 {{/each}}
             </div>
             {{/if}}

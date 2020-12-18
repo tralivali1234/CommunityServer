@@ -1,63 +1,56 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using ASC.Files.Core;
 using ASC.MessagingSystem;
 using ASC.Web.Files.Helpers;
 using ASC.Web.Files.Resources;
 using ASC.Web.Files.Utils;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ASC.Web.Files.Services.WCFService.FileOperations
 {
     class FileDeleteOperation : FileOperation
     {
-        private object trashId;
-        private readonly bool ignoreException;
-        private readonly Dictionary<string, string> headers;
+        private object _trashId;
+        private readonly bool _ignoreException;
+        private readonly bool _immediately;
+        private readonly Dictionary<string, string> _headers;
 
         public override FileOperationType OperationType
         {
             get { return FileOperationType.Delete; }
         }
 
-        
-        public FileDeleteOperation(List<object> folders, List<object> files, bool ignoreException = false, Dictionary<string, string> headers = null)
-            : base(folders, files)
+
+        public FileDeleteOperation(List<object> folders, List<object> files, bool ignoreException = false, bool holdResult = true, bool immediately = false, Dictionary<string, string> headers = null)
+            : base(folders, files, holdResult)
         {
-            this.ignoreException = ignoreException;
-            this.headers = headers;
+            _ignoreException = ignoreException;
+            _immediately = immediately;
+            _headers = headers;
         }
 
-        
+
         protected override void Do()
         {
-            trashId = FolderDao.GetFolderIDTrash(true);
+            _trashId = FolderDao.GetFolderIDTrash(true);
             Folder root = null;
             if (0 < Folders.Count)
             {
@@ -76,108 +69,119 @@ namespace ASC.Web.Files.Services.WCFService.FileOperations
             DeleteFolders(Folders);
         }
 
-        private void DeleteFolders(List<object> folderIds)
+        private void DeleteFolders(IEnumerable<object> folderIds)
         {
             foreach (var folderId in folderIds)
             {
                 CancellationToken.ThrowIfCancellationRequested();
 
                 var folder = FolderDao.GetFolder(folderId);
+                object canCalculate = null;
                 if (folder == null)
                 {
                     Error = FilesCommonResource.ErrorMassage_FolderNotFound;
                 }
-                else if (!ignoreException && !FilesSecurity.CanDelete(folder))
+                else if (folder.FolderType != FolderType.DEFAULT && folder.FolderType != FolderType.BUNCH)
                 {
+                    Error = FilesCommonResource.ErrorMassage_SecurityException_DeleteFolder;
+                }
+                else if (!_ignoreException && !FilesSecurity.CanDelete(folder))
+                {
+                    canCalculate = FolderDao.CanCalculateSubitems(folderId) ? null : folderId;
+
                     Error = FilesCommonResource.ErrorMassage_SecurityException_DeleteFolder;
                 }
                 else
                 {
+                    canCalculate = FolderDao.CanCalculateSubitems(folderId) ? null : folderId;
+
                     FileMarker.RemoveMarkAsNewForAll(folder);
                     if (folder.ProviderEntry && folder.ID.Equals(folder.RootFolderId))
                     {
-                        ProviderDao.RemoveProviderInfo(folder.ProviderId);
+                        if (ProviderDao != null)
+                        {
+                            ProviderDao.RemoveProviderInfo(folder.ProviderId);
+                            FilesMessageService.Send(folder, _headers, MessageAction.ThirdPartyDeleted, folder.ID.ToString(), folder.ProviderKey);
+                        }
+
                         ProcessedFolder(folderId);
                     }
                     else
                     {
-                        if (FolderDao.UseTrashForRemove(folder))
+                        var immediately = _immediately || !FolderDao.UseTrashForRemove(folder);
+                        if (immediately && FolderDao.UseRecursiveOperation(folder.ID, null))
                         {
-                            var files = FileDao.GetFiles(folder.ID);
-                            if (!ignoreException && files.Exists(FileTracker.IsEditing))
+                            DeleteFiles(FileDao.GetFiles(folder.ID));
+                            DeleteFolders(FolderDao.GetFolders(folder.ID).Select(f => f.ID).ToList());
+
+                            if (FolderDao.IsEmpty(folder.ID))
                             {
-                                Error = FilesCommonResource.ErrorMassage_SecurityException_DeleteEditingFolder;
-                            }
-                            else
-                            {
-                                FolderDao.MoveFolder(folder.ID, trashId);
-                                FilesMessageService.Send(folder, headers, MessageAction.FolderMovedToTrash, folder.Title);
+                                FolderDao.DeleteFolder(folder.ID);
+                                FilesMessageService.Send(folder, _headers, MessageAction.FolderDeleted, folder.Title);
 
                                 ProcessedFolder(folderId);
                             }
                         }
                         else
                         {
-                            if (FolderDao.UseRecursiveOperation(folder.ID, null))
+                            var files = FileDao.GetFiles(folder.ID, new OrderBy(SortedByType.AZ, true), FilterType.FilesOnly, false, Guid.Empty, string.Empty, false, true);
+                            string tmpError;
+                            if (!_ignoreException && WithError(files, true, out tmpError))
                             {
-                                DeleteFiles(FileDao.GetFiles(folder.ID));
-                                DeleteFolders(FolderDao.GetFolders(folder.ID).Select(f => f.ID).ToList());
-
-                                if (FolderDao.IsEmpty(folder.ID))
-                                {
-                                    FolderDao.DeleteFolder(folder.ID);
-                                    ProcessedFolder(folderId);
-                                }
+                                Error = tmpError;
                             }
                             else
                             {
-                                FolderDao.DeleteFolder(folder.ID);
+                                if (immediately)
+                                {
+                                    FolderDao.DeleteFolder(folder.ID);
+                                    FilesMessageService.Send(folder, _headers, MessageAction.FolderDeleted, folder.Title);
+                                }
+                                else
+                                {
+                                    FolderDao.MoveFolder(folder.ID, _trashId, CancellationToken);
+                                    FilesMessageService.Send(folder, _headers, MessageAction.FolderMovedToTrash, folder.Title);
+                                }
+
                                 ProcessedFolder(folderId);
                             }
                         }
                     }
                 }
-                ProgressStep(FolderDao.CanCalculateSubitems(folderId) ? null : folderId);
+                ProgressStep(canCalculate);
             }
         }
 
-        private void DeleteFiles(List<object> fileIds)
+        private void DeleteFiles(IEnumerable<object> fileIds)
         {
             foreach (var fileId in fileIds)
             {
                 CancellationToken.ThrowIfCancellationRequested();
 
                 var file = FileDao.GetFile(fileId);
+                string tmpError;
                 if (file == null)
                 {
                     Error = FilesCommonResource.ErrorMassage_FileNotFound;
                 }
-                else if (!ignoreException && EntryManager.FileLockedForMe(file.ID))
+                else if (!_ignoreException && WithError(new[] { file }, false, out tmpError))
                 {
-                    Error = FilesCommonResource.ErrorMassage_LockedFile;
-                }
-                else if (!ignoreException && FileTracker.IsEditing(file.ID))
-                {
-                    Error = FilesCommonResource.ErrorMassage_SecurityException_DeleteEditingFile;
-                }
-                else if (!ignoreException && !FilesSecurity.CanDelete(file))
-                {
-                    Error = FilesCommonResource.ErrorMassage_SecurityException_DeleteFile;
+                    Error = tmpError;
                 }
                 else
                 {
                     FileMarker.RemoveMarkAsNewForAll(file);
-                    if (FileDao.UseTrashForRemove(file))
+                    if (!_immediately && FileDao.UseTrashForRemove(file))
                     {
-                        FileDao.MoveFile(file.ID, trashId);
-                        FilesMessageService.Send(file, headers, MessageAction.FileMovedToTrash, file.Title);
+                        FileDao.MoveFile(file.ID, _trashId);
+                        FilesMessageService.Send(file, _headers, MessageAction.FileMovedToTrash, file.Title);
                     }
                     else
                     {
                         try
                         {
                             FileDao.DeleteFile(file.ID);
-                            FileDao.DeleteFolder(file.ID);
+                            FilesMessageService.Send(file, _headers, MessageAction.FileDeleted, file.Title);
                         }
                         catch (Exception ex)
                         {
@@ -189,6 +193,30 @@ namespace ASC.Web.Files.Services.WCFService.FileOperations
                 }
                 ProgressStep(fileId: FolderDao.CanCalculateSubitems(fileId) ? null : fileId);
             }
+        }
+
+        private bool WithError(IEnumerable<File> files, bool folder, out string error)
+        {
+            error = null;
+            foreach (var file in files)
+            {
+                if (!FilesSecurity.CanDelete(file))
+                {
+                    error = FilesCommonResource.ErrorMassage_SecurityException_DeleteFile;
+                    return true;
+                }
+                if (EntryManager.FileLockedForMe(file.ID))
+                {
+                    error = FilesCommonResource.ErrorMassage_LockedFile;
+                    return true;
+                }
+                if (FileTracker.IsEditing(file.ID))
+                {
+                    error = folder ? FilesCommonResource.ErrorMassage_SecurityException_DeleteEditingFolder : FilesCommonResource.ErrorMassage_SecurityException_DeleteEditingFile;
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

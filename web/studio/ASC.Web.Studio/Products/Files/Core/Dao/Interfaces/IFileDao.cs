@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -66,6 +57,14 @@ namespace ASC.Files.Core
         File GetFile(object parentId, String title);
 
         /// <summary>
+        ///     Receive last file without forcesave
+        /// </summary>
+        /// <param name="fileId">file id</param>
+        /// <param name="fileVersion"></param>
+        /// <returns></returns>
+        File GetFileStable(object fileId, int fileVersion = -1);
+
+        /// <summary>
         ///  Returns all versions of the file
         /// </summary>
         /// <param name="fileId"></param>
@@ -80,6 +79,18 @@ namespace ASC.Files.Core
         List<File> GetFiles(object[] fileIds);
 
         /// <summary>
+        ///     Gets the file (s) by ID (s) for share
+        /// </summary>
+        /// <param name="fileIds">id file</param>
+        /// <param name="filterType"></param>
+        /// <param name="subjectGroup"></param>
+        /// <param name="subjectID"></param>
+        /// <param name="searchText"></param>
+        /// <param name="searchInContent"></param>
+        /// <returns></returns>
+        List<File> GetFilesFiltered(object[] fileIds, FilterType filterType, bool subjectGroup, Guid subjectID, string searchText, bool searchInContent);
+
+        /// <summary>
         /// 
         /// </summary>
         /// <param name="parentId"></param>
@@ -91,15 +102,17 @@ namespace ASC.Files.Core
         /// </summary>
         /// <param name="parentId">folder id</param>
         /// <param name="orderBy"></param>
-        /// <param name="subjectID"></param>
         /// <param name="filterType">filterType type</param>
+        /// <param name="subjectGroup"></param>
+        /// <param name="subjectID"></param>
         /// <param name="searchText"> </param>
+        /// <param name="searchInContent"></param>
         /// <param name="withSubfolders"> </param>
         /// <returns>list of files</returns>
         /// <remarks>
         ///    Return only the latest versions of files of a folder
         /// </remarks>
-        List<File> GetFiles(object parentId, OrderBy orderBy, FilterType filterType, Guid subjectID, string searchText, bool withSubfolders = false);
+        List<File> GetFiles(object parentId, OrderBy orderBy, FilterType filterType, bool subjectGroup, Guid subjectID, string searchText, bool searchInContent, bool withSubfolders = false);
 
         /// <summary>
         /// Get stream of file
@@ -146,6 +159,14 @@ namespace ASC.Files.Core
         /// Save in all other cases
         /// </remarks>
         File SaveFile(File file, Stream fileStream);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="file"></param>
+        /// <param name="fileStream"></param>
+        /// <returns></returns>
+        File ReplaceFileVersion(File file, Stream fileStream);
 
         /// <summary>
         ///   Deletes a file including all previous versions
@@ -224,36 +245,32 @@ namespace ASC.Files.Core
         #region Only in TMFileDao
 
         /// <summary>
+        /// Set created by
+        /// </summary>
+        /// <param name="fileIds"></param>
+        /// <param name="newOwnerId"></param>
+        void ReassignFiles(object[] fileIds, Guid newOwnerId);
+
+        /// <summary>
         /// Search files in SharedWithMe & Projects
         /// </summary>
         /// <param name="parentIds"></param>
+        /// <param name="filterType"></param>
+        /// <param name="subjectGroup"></param>
+        /// <param name="subjectID"></param>
         /// <param name="searchText"></param>
-        /// <param name="searchSubfolders"></param>
+        /// <param name="searchInContent"></param>
         /// <returns></returns>
-        List<File> GetFiles(object[] parentIds, string searchText = "", bool searchSubfolders = false);
+        List<File> GetFiles(object[] parentIds, FilterType filterType, bool subjectGroup, Guid subjectID, string searchText, bool searchInContent);
 
         /// <summary>
         /// Search the list of files containing text
         /// Only in TMFileDao
         /// </summary>
         /// <param name="text">search text</param>
-        /// <param name="folderType">type of parent folder</param>
+        /// <param name="bunch"></param>
         /// <returns>list of files</returns>
-        IEnumerable<File> Search(String text, FolderType folderType);
-
-        /// <summary>
-        /// Delete streama of file
-        /// Only in TMFileDao
-        /// </summary>
-        /// <param name="fileId"></param>
-        void DeleteFileStream(object fileId);
-
-        /// <summary>
-        /// Delete parent folder on storage
-        /// Only in TMFileDao
-        /// </summary>
-        /// <param name="fileId"></param>
-        void DeleteFolder(object fileId);
+        IEnumerable<File> Search(String text, bool bunch = false);
 
         /// <summary>
         ///   Checks whether file exists on storage
@@ -267,6 +284,8 @@ namespace ASC.Files.Core
         List<EditHistory> GetEditHistory(object fileId, int fileVersion = 0);
 
         Stream GetDifferenceStream(File file);
+
+        bool ContainChanges(object fileId, int fileVersion);
 
         #endregion
     }

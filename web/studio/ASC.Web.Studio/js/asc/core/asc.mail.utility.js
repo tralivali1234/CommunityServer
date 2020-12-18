@@ -1,25 +1,16 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -34,6 +25,7 @@ if (typeof ASC.Mail === "undefined") {
 }
 if (typeof ASC.Mail.Utility === "undefined") {
     ASC.Mail.Utility = (function () {
+        var resources = ASC.Resources.Master.Resource;
         var parseErrorTypes = {
                 None: 0,
                 EmptyRecipients: 1,
@@ -65,6 +57,16 @@ if (typeof ASC.Mail.Utility === "undefined") {
         }
 
         function checkAccounts(params, accounts) {
+            function getDefaultAccount(accs) {
+                var def = jq.grep(accs, function (a) { return a.is_default === true }),
+                    acc = (def.length > 0 ? def[0] : accs[0]);
+
+                return new ASC.Mail.Address(
+                    acc.name,
+                    acc.email,
+                    true);
+            }
+
             var d = jq.Deferred();
 
             try {
@@ -77,16 +79,6 @@ if (typeof ASC.Mail.Utility === "undefined") {
 
                 if (accounts.length === 0) {
                     throw "No accounts.";
-                }
-
-                function getDefaultAccount(accs) {
-                    var def = jq.grep(accs, function(a) { return a.is_default === true }),
-                        acc = (def.length > 0 ? def[0] : accs[0]);
-
-                    return new ASC.Mail.Address(
-                        acc.name,
-                        acc.email,
-                        true);
                 }
 
                 if (!message.from) {
@@ -139,6 +131,43 @@ if (typeof ASC.Mail.Utility === "undefined") {
             return d.promise();
         }
 
+        function saveTemplate(params) {
+            var d = jq.Deferred();
+
+            if (params.skipSave) {
+                d.resolve(params, { messageUrl: null, saveSkipped: true });
+                return d.promise();
+            }
+
+            var message = params.message;
+
+            window.Teamlab.saveMailTemplate(
+                params,
+                message,
+                {
+                    success: d.resolve,
+                    error: d.reject
+                });
+
+            return d.promise();
+        }
+
+        function afterTemplateSave(params, savedMessage) {
+            var d = jq.Deferred();
+
+            if (params.skipSave) {
+                d.resolve(params, { messageUrl: null, saveSkipped: true });
+                return d.promise();
+            }
+
+            var message = params.message;
+            message.id = savedMessage.id;
+
+            d.resolve(params, { messageUrl: "/addons/mail/#templateitem/" + message.id });
+
+            return d.promise();
+        }
+
         function afterSave(params, savedMessage) {
             var d = jq.Deferred();
 
@@ -156,6 +185,34 @@ if (typeof ASC.Mail.Utility === "undefined") {
         }
 
         function addDocuments(params, saveResult) {
+            function addDoc(fileId) {
+                var dfd = jq.Deferred();
+
+                var data = {
+                    fileId: fileId,
+                    version: ""
+                };
+
+                window.Teamlab.addMailDocument(
+                    {
+                        message: message,
+                        documentId: fileId,
+                        sendImmediately: params.sendImmediately
+                    },
+                    message.id,
+                    data,
+                    {
+                        success: function (params, attachedDocument) {
+                            message.attachments.push(attachedDocument);
+                            message.RemoveDocumentAfterSave(params.documentId);
+                            dfd.resolve(params, saveResult);
+                        },
+                        error: dfd.reject
+                    });
+
+                return dfd.promise();
+            }
+
             var d = jq.Deferred();
 
             if (params.skipSave) {
@@ -167,35 +224,6 @@ if (typeof ASC.Mail.Utility === "undefined") {
 
             if (message.HasDocumentsForSave()) {
                 var documentIds = message.GetDocumentsForSave();
-
-                function addDoc(fileId) {
-                    var dfd = jq.Deferred();
-
-                    var data = {
-                        fileId: fileId,
-                        version: "",
-                        shareLink: ""
-                    };
-
-                    window.Teamlab.addMailDocument(
-                        {
-                            message: message,
-                            documentId: fileId,
-                            sendImmediately: params.sendImmediately
-                        },
-                        message.id,
-                        data,
-                        {
-                            success: function (params, attachedDocument) {
-                                message.attachments.push(attachedDocument);
-                                message.RemoveDocumentAfterSave(params.documentId);
-                                dfd.resolve(params, saveResult);
-                            },
-                            error: dfd.reject
-                        });
-
-                    return dfd.promise();
-                }
 
                 var addarray = [];
                 for (var i = 0, len = documentIds.length; i < len; i++) {
@@ -246,7 +274,9 @@ if (typeof ASC.Mail.Utility === "undefined") {
             { messageUrl: null, sendSkipped: true } :
             { messageUrl: "/addons/mail/#conversation/" + messageId };
 
-            if (!params.skipSend && (!jq.connection || jq.connection.hub && jq.connection.hub.state !== jq.connection.connectionState.connected)) {
+            var socket = ASC.SocketIO && !ASC.SocketIO.disabled() ? ASC.SocketIO.Factory.counters : null;
+
+            if (!params.skipSend && (!socket || !socket.connected())) {
                 var state = 0;
                 if (params.method === "REQUEST")
                     state = 1;
@@ -345,10 +375,11 @@ if (typeof ASC.Mail.Utility === "undefined") {
                 switch (params.method) {
                     case "REQUEST":
                     case "REPLY":
-                        if (comp.getFirstPropertyValue("method") !== "REQUEST" && 
+                        if (comp.getFirstPropertyValue("method") !== "REQUEST" &&
                             comp.getFirstPropertyValue("method") !== "REPLY" &&
                             comp.getFirstPropertyValue("method") !== "PUBLISH")
                             throw "Allow only REQUEST";
+                        break;
                     case "CANCEL":
                         break;
 
@@ -386,7 +417,7 @@ if (typeof ASC.Mail.Utility === "undefined") {
                     var cancelAttendees = jq.grep(event.attendees, function (a) {
                         var exists = false;
                         for (var i = 0, len = params.attendeesEmails.length; i < len; i++) {
-                            if (ASC.Mail.Utility.IsEqualEmail(a.getFirstValue().toLowerCase().replace("mailto:", ""), params.attendeesEmails[i])) {
+                            if (ASC.Mail.Utility.IsEqualEmail(a.getFirstValue().toLowerCase().replace("mailto:", ""), params.attendeesEmails[i].toLowerCase())) {
                                 exists = true;
                                 break;
                             }
@@ -442,7 +473,8 @@ if (typeof ASC.Mail.Utility === "undefined") {
                 orgName: iCalInfo.organizerAddress.name,
                 orgEmail: iCalInfo.organizerAddress.email,
                 mailToHref: "mailto:" + iCalInfo.organizerAddress.email,
-                mapUrl: iCalInfo.event.location ? getMapUrl(iCalInfo.event.location) : null
+                mapUrl: iCalInfo.event.location ? getMapUrl(iCalInfo.event.location) : null,
+                description: iCalInfo.event.description
             };
 
             info.dateEvent = ASC.Mail.Utility.ToCalendarDateString(dtStart, dtEnd, dateStartAllDay, dateEndAllDay);
@@ -452,8 +484,8 @@ if (typeof ASC.Mail.Utility === "undefined") {
             switch (params.method) {
                 case "REQUEST":
                     info.action = params.isUpdate ?
-                        ASC.Resources.Master.Resource.MailIcsUpdateDescription :
-                        ASC.Resources.Master.Resource.MailIcsRequestDescription.format(
+                        resources.MailIcsUpdateDescription :
+                        resources.MailIcsRequestDescription.format(
                         (iCalInfo.organizerAddress.name || iCalInfo.organizerAddress.email) ||
                         (iCalInfo.currentAttendeeAddress.name || iCalInfo.currentAttendeeAddress.email));
                     break;
@@ -461,13 +493,13 @@ if (typeof ASC.Mail.Utility === "undefined") {
                     var res;
                     switch (params.replyDecision) {
                         case "ACCEPTED":
-                            res = ASC.Resources.Master.Resource.MailIcsReplyYesDescription;
+                            res = resources.MailIcsReplyYesDescription;
                             break;
                         case "TENTATIVE":
-                            res = ASC.Resources.Master.Resource.MailIcsReplyMaybeDescription;
+                            res = resources.MailIcsReplyMaybeDescription;
                             break;
                         case "DECLINED":
-                            res = ASC.Resources.Master.Resource.MailIcsReplyNoDescription;
+                            res = resources.MailIcsReplyNoDescription;
                             break;
                         default:
                             throw "Unsupported attendee partstart";
@@ -476,7 +508,7 @@ if (typeof ASC.Mail.Utility === "undefined") {
                         iCalInfo.currentAttendeeAddress.email);
                     break;
                 case "CANCEL":
-                    info.action = ASC.Resources.Master.Resource.MailIcsCancelDescription;
+                    info.action = resources.MailIcsCancelDescription;
                     break;
                 default:
                     break;
@@ -532,8 +564,8 @@ if (typeof ASC.Mail.Utility === "undefined") {
                 var fromAddress = iCalInfo.organizerAddress;
 
                 var subject = params.isUpdate ?
-                    ASC.Resources.Master.Resource.MailIcsUpdateSubject.format(iCalInfo.event.summary) :
-                    ASC.Resources.Master.Resource.MailIcsRequestSubject.format(iCalInfo.event.summary);
+                    resources.MailIcsUpdateSubject.format(iCalInfo.event.summary) :
+                    resources.MailIcsRequestSubject.format(iCalInfo.event.summary);
 
                 message.from = fromAddress;
                 message.to = toAddresses;
@@ -573,13 +605,13 @@ if (typeof ASC.Mail.Utility === "undefined") {
                 var subject;
                 switch (params.replyDecision) {
                     case "ACCEPTED":
-                        subject = ASC.Resources.Master.Resource.MailIcsReplyYesDescription;
+                        subject = resources.MailIcsReplyYesDescription;
                         break;
                     case "TENTATIVE":
-                        subject = ASC.Resources.Master.Resource.MailIcsReplyMaybeDescription;
+                        subject = resources.MailIcsReplyMaybeDescription;
                         break;
                     case "DECLINED":
-                        subject = ASC.Resources.Master.Resource.MailIcsReplyNoDescription;
+                        subject = resources.MailIcsReplyNoDescription;
                         break;
                     default:
                         throw "Unsupported attendee partstart";
@@ -596,7 +628,7 @@ if (typeof ASC.Mail.Utility === "undefined") {
 
                 message.from = fromAddress;
                 message.to = [toAddress];
-                message.subject = ASC.Resources.Master.Resource.MailIcsReplySubject.format(subject);
+                message.subject = resources.MailIcsReplySubject.format(subject);
                 message.body = createBoby(params, iCalInfo);
                 message.calendarIcs = iCalInfo.comp.toString();
 
@@ -648,7 +680,7 @@ if (typeof ASC.Mail.Utility === "undefined") {
 
             message.from = fromAddress;
             message.to = toAddresses;
-            message.subject = ASC.Resources.Master.Resource.MailIcsCancelSubject.format(iCalInfo.event.summary);
+            message.subject = resources.MailIcsCancelSubject.format(iCalInfo.event.summary);
             message.body = createBoby(params, iCalInfo);
             message.calendarIcs = iCalInfo.comp.toString();
 
@@ -742,12 +774,18 @@ if (typeof ASC.Mail.Utility === "undefined") {
 
                 function parseAndAppend(s) {
                     s = obj2Contact(contact2Obj(s));
+                    if (!s)
+                        return;
                     var parsed = emailAddresses.parseOneAddress(s);
                     if (parsed) {
                         var isValid = true;
-                        if (parsed.domain.indexOf(".") === -1) {
+                        if (parsed.domain.indexOf(".") === -1 || !/(^((?!-)[a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,63}\.?$)/.test(parsed.domain)) {
                             isValid = false;
                             parsedObjs.errors.push({ message: "Incorrect domain", type: parseErrorTypes.IncorrectEmail, errorItem: s });
+                        }
+
+                        if (parsed.domain.indexOf('[') === 0 && parsed.domain.indexOf(']') === parsed.domain.length - 1) {
+                            parsedObjs.errors.push({ message: "Domains as ip adress are not suppoted", type: parseErrorTypes.IncorrectEmail, errorItem: s });
                         }
 
                         if (!/^[\x00-\x7F]+$/.test(punycode.toUnicode(parsed.domain))) {
@@ -755,10 +793,19 @@ if (typeof ASC.Mail.Utility === "undefined") {
                             parsedObjs.errors.push({ message: "Punycode domains are not suppoted", type: parseErrorTypes.IncorrectEmail, errorItem: s });
                         }
 
-                        if (!/^[\x00-\x7F]+$/.test(parsed.local))
-                        {
+                        if (!/^[\x00-\x7F]+$/.test(parsed.local) || !/^([a-zA-Z0-9]+)([_\-\.\+][a-zA-Z0-9]+)*$/.test(parsed.local)) {
                             isValid = false;
                             parsedObjs.errors.push({ message: "Incorrect localpart", type: parseErrorTypes.IncorrectEmail, errorItem: s });
+                        }
+
+                        if (/\s+/.test(parsed.local) || parsed.local !== parsed.parts.local.tokens) {
+                            isValid = false;
+                            parsedObjs.errors.push({ message: "Incorrect, localpart contains spaces", type: parseErrorTypes.IncorrectEmail, errorItem: s });
+                        }
+
+                        if (/\s+/.test(parsed.domain) || parsed.domain !== parsed.parts.domain.tokens) {
+                            isValid = false;
+                            parsedObjs.errors.push({ message: "Incorrect, domain contains spaces", type: parseErrorTypes.IncorrectEmail, errorItem: s });
                         }
 
                         parsedObjs.addresses.push(new ASC.Mail.Address(parsed.name || "", parsed.address, isValid));
@@ -814,8 +861,22 @@ if (typeof ASC.Mail.Utility === "undefined") {
              * @param {String}/{ASC.Mail.Address} email
              * @return {Bool} result
              */
-            IsValidEmail: function (email) {
-                return ASC.Mail.Utility.ParseAddress(email).isValid;
+            IsValidEmail: function (email, options) {
+                options = options || {
+                    nameExistance: false
+                }
+
+                if (!options.hasOwnProperty('nameExistance')) {
+                    options.nameExistance = false;
+                }
+
+                var parsed = ASC.Mail.Utility.ParseAddress(email);
+
+                if (!options.nameExistance && parsed.name)
+                    return false;
+                    
+
+                return parsed.isValid;
             },
             /**
              * Check domain validity
@@ -860,6 +921,10 @@ if (typeof ASC.Mail.Utility === "undefined") {
                         throw "Unsupported message format";
                     }
 
+                    if (message.body.length > ASC.Resources.Master.MailMaximumMessageBodySize) {
+                        throw "Message body exceeded limit";
+                    }
+
                     if (!params.hasOwnProperty("skipAccountsCheck") || !message.from)
                         params.skipAccountsCheck = false;
 
@@ -879,12 +944,78 @@ if (typeof ASC.Mail.Utility === "undefined") {
                 return d.promise();
             },
             /**
+            * Save message to Mail Templates
+            * @param {ASC.Mail.Message} message
+            * @param {Object} params (Example: { skipAccountsCheck: true, skipSave: true });
+            * @return {Object} result with messageUrl;
+            */
+            SaveMessageInTemplates: function (message, params) {
+                var d = jq.Deferred();
+
+                params = params || { skipAccountsCheck: true };
+
+                try {
+
+                    if (!(message instanceof ASC.Mail.Message)) {
+                        throw "Unsupported message format";
+                    }
+
+                    if (message.body.length > ASC.Resources.Master.MailMaximumMessageBodySize) {
+                        throw "Message body exceeded limit";
+                    }
+
+                    if (!params.hasOwnProperty("skipAccountsCheck") || !message.from)
+                        params.skipAccountsCheck = false;
+
+                    params.message = message;
+
+                    getAccounts(params)
+                        .then(checkAccounts, d.reject)
+                        .then(saveTemplate, d.reject)
+                        .then(afterTemplateSave, d.reject)
+                        .then(addDocuments, d.reject)
+                        .then(d.resolve, d.reject);
+
+                } catch (e) {
+                    d.reject(params, e);
+                }
+
+                return d.promise();
+            },
+            /**
              * Send message
              * @param {ASC.Mail.Message} message
              * @param {Object} params (Example: { skipAccountsCheck: true, skipSave: true });
              * @return {Object} result with messageUrl;
              */
             SendMessage: function (message, params) {
+                function improveAddresses(addresses) {
+                    var result = { addresses: [], hasBad: false };
+
+                    if (!addresses || !addresses.length)
+                        return result;
+
+                    if (!jq.isArray(addresses) && ("string" === typeof addresses)) {
+                        var p = ASC.Mail.Utility.ParseAddresses(addresses);
+                        result.addresses = p.addresses;
+                        result.hasBad = p.errors.length > 0;
+                        return result;
+                    }
+
+                    for (var i = 0, len = addresses.length; i < len; i++) {
+                        var a = !(addresses[i] instanceof ASC.Mail.Address)
+                            ? ASC.Mail.Utility.ParseAddress(addresses[i])
+                            : addresses[i];
+
+                        result.addresses.push(a);
+
+                        if (!a.isValid)
+                            result.hasBad = true;
+                    }
+
+                    return result;
+                }
+
                 var d = jq.Deferred();
 
                 params = params || { skipAccountsCheck: true };
@@ -897,33 +1028,6 @@ if (typeof ASC.Mail.Utility === "undefined") {
 
                     if (!params.hasOwnProperty("skipAccountsCheck") || !message.from)
                         params.skipAccountsCheck = false;
-
-                    function improveAddresses(addresses) {
-                        var result = { addresses: [], hasBad: false };
-
-                        if (!addresses || !addresses.length)
-                            return result;
-
-                        if (!jq.isArray(addresses) && ("string" === typeof addresses)) {
-                            var p = ASC.Mail.Utility.ParseAddresses(addresses);
-                            result.addresses = p.addresses;
-                            result.hasBad = p.errors.length > 0;
-                            return result;
-                        }
-
-                        for (var i = 0, len = addresses.length; i < len; i++) {
-                            var a = !(addresses[i] instanceof ASC.Mail.Address)
-                                ? ASC.Mail.Utility.ParseAddress(addresses[i])
-                                : addresses[i];
-
-                            result.addresses.push(a);
-
-                            if (!a.isValid)
-                                result.hasBad = true;
-                        }
-
-                        return result;
-                    }
 
                     var t = improveAddresses(message.to);
                     message.to = t.addresses;
@@ -1125,14 +1229,14 @@ if (typeof ASC.Mail.Utility === "undefined") {
 
                 switch (state) {
                     case -1:
-                        toastr.error(ASC.Resources.Master.Resource.MailSendMessageError);
+                        toastr.error(resources.MailSendMessageError);
 
                         if (module === "mail" && window.mailAlerts) { // mail hook
                             window.mailAlerts.check(lastSentMessageId > 0 ? { showFailureOnlyMessageId: lastSentMessageId } : {});
                         }
                         break;
                     case 0:
-                        toastr.success(ASC.Resources.Master.Resource.MailSentMessageText);
+                        toastr.success(resources.MailSentMessageText);
                         if (module === "mail" && window.mailAlerts) { // mail hook
                             if (!ASC.Resources.Master.Hub.Url ||
                             (jq.connection && jq.connection.hub.state !== jq.connection.connectionState.connected)) {
@@ -1143,13 +1247,13 @@ if (typeof ASC.Mail.Utility === "undefined") {
                         }
                         break;
                     case 1:
-                        toastr.success(ASC.Resources.Master.Resource.MailSentIcalRequestText);
+                        toastr.success(resources.MailSentIcalRequestText);
                         break;
                     case 2:
-                        toastr.success(ASC.Resources.Master.Resource.MailSentIcalResponseText);
+                        toastr.success(resources.MailSentIcalResponseText);
                         break;
                     case 3:
-                        toastr.success(ASC.Resources.Master.Resource.MailSentIcalCancelText);
+                        toastr.success(resources.MailSentIcalCancelText);
                         break;
                     default:
                         break;
@@ -1173,20 +1277,20 @@ if (typeof ASC.Mail.Utility === "undefined") {
                     strEnd = dtEnd.format("ddd, DD MMM YYYY"),
                     strStartTime = allDayStart ? "" : dtStart.format("LT"),
                     strEndTime = allDayEnd ? "" : dtEnd.format("LT"),
-                    strTz = "(GMT{0})".format(dtStart.format("Z"));
+                    strTz = "(UTC{0})".format(dtStart.format("Z"));
 
                 if (dtStart.isSame(dtEnd, 'day')) {
                     if (allDayStart)
-                        dateEvent = "{0}, {1}".format(strStart, ASC.Resources.Master.Resource.MailIcsCalendarAllDayEventLabel);
+                        dateEvent = "{0}, {1}".format(strStart, resources.MailIcsCalendarAllDayEventLabel);
                     else
                         dateEvent = "{0}, {1} - {2} {3}".format(strStart, strStartTime, strEndTime, strTz);
                 } else {
                     if (allDayStart && allDayEnd) {
-                        dateEvent = "{0}, {1} - {2}, {1}".format(strStart, ASC.Resources.Master.Resource.MailIcsCalendarAllDayEventLabel, strEnd);
+                        dateEvent = "{0}, {1} - {2}, {1}".format(strStart, resources.MailIcsCalendarAllDayEventLabel, strEnd);
                     } else if (allDayStart && !allDayEnd) {
-                        dateEvent = "{0}, {1} - {2}, {3} {4}".format(strStart, ASC.Resources.Master.Resource.MailIcsCalendarAllDayEventLabel, strEnd, strEndTime, strTz);
+                        dateEvent = "{0}, {1} - {2}, {3} {4}".format(strStart, resources.MailIcsCalendarAllDayEventLabel, strEnd, strEndTime, strTz);
                     } else if (!allDayStart && allDayEnd) {
-                        dateEvent = "{0}, {1} {2} - {3}, {4}".format(strStart, strStartTime, strTz, strEnd, ASC.Resources.Master.Resource.MailIcsCalendarAllDayEventLabel);
+                        dateEvent = "{0}, {1} {2} - {3}, {4}".format(strStart, strStartTime, strTz, strEnd, resources.MailIcsCalendarAllDayEventLabel);
                     } else {
                         dateEvent = "{0}, {1} - {2}, {3} {4}".format(strStart, strStartTime, strEnd, strEndTime, strTz);
                     }
@@ -1200,7 +1304,76 @@ if (typeof ASC.Mail.Utility === "undefined") {
              * @param {Moment DateTime} dtStart
              * @return {String} user-friedndly string;
              */
-            ToCalendarRRuleString: function(rruleRfc2445, dtStart, notLocalize) {
+            ToCalendarRRuleString: function (rruleRfc2445, dtStart, notLocalize) {
+                function getText(id) {
+                    switch (id.toLowerCase()) {
+                        case "every":
+                            return resources.MailIcsRRuleEveryLabel;
+                        case "until":
+                            return resources.MailIcsRRuleUntilLabel;
+                        case "for":
+                            return resources.MailIcsRRuleForLabel;
+                        case "times":
+                            return resources.MailIcsRRuleTimesLabel;
+                        case "time":
+                            return resources.MailIcsRRuleTimeLabel;
+                        case "(~ approximate)":
+                            return "(~ {0})".format(resources.MailIcsRRuleApproximateLabel);
+                        case "hours":
+                            return resources.MailIcsRRuleHoursLabel;
+                        case "hour":
+                            return resources.MailIcsRRuleHourLabel;
+                        case "weekdays":
+                            return resources.MailIcsRRuleWeekdaysLabel;
+                        case "weekday":
+                            return resources.MailIcsRRuleWeekdayLabel;
+                        case "days":
+                            return resources.MailIcsRRuleDaysLabel;
+                        case "day":
+                            return resources.MailIcsRRuleDayLabel;
+                        case "weeks":
+                            return resources.MailIcsRRuleWeeksLabel;
+                        case "week":
+                            return resources.MailIcsRRuleWeekLabel;
+                        case "months":
+                            return resources.MailIcsRRuleMonthsLabel;
+                        case "month":
+                            return resources.MailIcsRRuleMonthLabel;
+                        case "years":
+                            return resources.MailIcsRRuleYearsLabel;
+                        case "year":
+                            return resources.MailIcsRRuleYearLabel;
+                        case "on":
+                            return resources.MailIcsRRuleOnLabel;
+                        case "on the":
+                            return resources.MailIcsRRuleOnTheLabel;
+                        case "in":
+                            return resources.MailIcsRRuleInLabel;
+                        case "at":
+                            return resources.MailIcsRRuleAtLabel;
+                        case "the":
+                            return resources.MailIcsRRuleTheLabel;
+                        case "and":
+                            return resources.MailIcsRRuleAndLabel;
+                        case "or":
+                            return resources.MailIcsRRuleOrLabel;
+                        case "last":
+                            return resources.MailIcsRRuleLastLabel;
+                        case "st":
+                            return resources.MailIcsRRuleStLabel;
+                        case "nd":
+                            return resources.MailIcsRRuleNdLabel;
+                        case "rd":
+                            return resources.MailIcsRRuleRdLabel;
+                        case "th":
+                            return resources.MailIcsRRuleThLabel;
+                        case "rrule error: unable to fully convert this rrule to text":
+                            return resources.MailIcsRRuleParseErrorLabel;
+                        default:
+                            return id;
+                    }
+                }
+
                 checkCalendarRequirements();
 
                 if (!dtStart)
@@ -1259,75 +1432,6 @@ if (typeof ASC.Mail.Utility === "undefined") {
                         }
                     };
 
-                    function getText(id) {
-                        switch (id.toLowerCase()) {
-                            case "every":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleEveryLabel;
-                            case "until":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleUntilLabel;
-                            case "for":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleForLabel;
-                            case "times":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleTimesLabel;
-                            case "time":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleTimeLabel;
-                            case "(~ approximate)":
-                                return "(~ {0})".format(ASC.Resources.Master.Resource.MailIcsRRuleApproximateLabel);
-                            case "hours":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleHoursLabel;
-                            case "hour":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleHourLabel;
-                            case "weekdays":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleWeekdaysLabel;
-                            case "weekday":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleWeekdayLabel;
-                            case "days":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleDaysLabel;
-                            case "day":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleDayLabel;
-                            case "weeks":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleWeeksLabel;
-                            case "week":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleWeekLabel;
-                            case "months":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleMonthsLabel;
-                            case "month":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleMonthLabel;
-                            case "years":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleYearsLabel;
-                            case "year":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleYearLabel;
-                            case "on":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleOnLabel;
-                            case "on the":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleOnTheLabel;
-                            case "in":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleInLabel;
-                            case "at":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleAtLabel;
-                            case "the":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleTheLabel;
-                            case "and":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleAndLabel;
-                            case "or":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleOrLabel;
-                            case "last":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleLastLabel;
-                            case "st":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleStLabel;
-                            case "nd":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleNdLabel;
-                            case "rd":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleRdLabel;
-                            case "th":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleThLabel;
-                            case "rrule error: unable to fully convert this rrule to text":
-                                return ASC.Resources.Master.Resource.MailIcsRRuleParseErrorLabel;
-                            default:
-                                return id;
-                        }
-                    }
-
                     return notLocalize ? rule.toText() : rule.toText(getText, language);
                 } catch (e) {
                     console.warn(e);
@@ -1365,10 +1469,23 @@ if (typeof ASC.Mail.Utility === "undefined") {
                     str += ';WKST=' + ICAL.Recur.numericDayToIcalDay(rrule.wkst);
                 }
                 return str;
-            }
+            },
 
+            GetDraftUrl: function(fileIds) {
+                var url = "/addons/mail/#compose";
+
+                if (!fileIds) return url;
+
+                if (!(fileIds instanceof Array)) {
+                    fileIds = [fileIds];
+                }
+
+                url += "?files={0}".format(encodeURIComponent(JSON.stringify(fileIds)));
+
+                return url;
+            }
         };
-    })(jQuery);
+    })();
 }
 
 if (typeof ASC.Mail.Message === "undefined") {
@@ -1388,6 +1505,8 @@ if (typeof ASC.Mail.Message === "undefined") {
         this.tags = [];
         this.fileLinksShareMode = 2; // ASC.Files.Constants.AceStatusEnum.Read;
         this.calendarIcs = "";
+        this.requestReceipt = false;
+        this.requestRead = false;
 
         this.HasDocumentsForSave = function () {
             return docIds.length > 0;
@@ -1413,7 +1532,12 @@ if (typeof ASC.Mail.Message === "undefined") {
         this.ToData = function () {
 
             function convertAddress(addr) {
-                if (typeof (addr) === "object" && !(addr instanceof ASC.Mail.Address) && addr.hasOwnProperty("name") && addr.hasOwnProperty("email") && addr.hasOwnProperty("isValid")) {
+                if (typeof (addr) === "object" &&
+                    !(addr instanceof ASC.Mail.Address) &&
+                    addr.hasOwnProperty("name") &&
+                    addr.hasOwnProperty("email") &&
+                    addr.hasOwnProperty("isValid"))
+                {
                     addr = new ASC.Mail.Address(addr.name, addr.email, addr.isValid);
                 }
 
@@ -1497,123 +1621,6 @@ if (typeof ASC.Mail.Message === "undefined") {
 
 if (typeof ASC.Mail.Sanitizer === "undefined") {
     ASC.Mail.Sanitizer = (function() {
-        var tagWhitelist = {
-            'A': true,
-            'ABBR': true,
-            'ACRONYM': true,
-            'ADDRESS': true,
-            'APPLET': true,
-            'AREA': true,
-            'ARTICLE': true,
-            'ASIDE': true,
-            'AUDIO': true,
-            'B': true,
-            'BDI': true,
-            'BDO': true,
-            'BGSOUND': true,
-            'BLOCKQUOTE': true,
-            'BIG': true,
-            'BODY': true,
-            'BLINK': true,
-            'BR': true,
-            'CANVAS': true,
-            'CAPTION': true,
-            'CENTER': true,
-            'CITE': true,
-            'CODE': true,
-            'COL': true,
-            'COLGROUP': true,
-            'COMMENT': true,
-            'DATALIST': true,
-            'DD': true,
-            'DEL': true,
-            'DETAILS': true,
-            'DFN': true,
-            'DIR': true,
-            'DIV': true,
-            'DL': true,
-            'DT': true,
-            'EM': true,
-            'FIGCAPTION': true,
-            'FIGURE': true,
-            'FONT': true,
-            'FOOTER': true,
-            'H1': true,
-            'H2': true,
-            'H3': true,
-            'H4': true,
-            'H5': true,
-            'H6': true,
-            'HEAD': true,
-            'HEADER': true,
-            'HGROUP': true,
-            'HR': true,
-            'HTML': true,
-            'I': true,
-            'IMG': true,
-            'INS': true,
-            'ISINDEX': true,
-            'KBD': true,
-            'LABEL': true,
-            'LEGEND': true,
-            'LI': true,
-            'MAP': true,
-            'MARQUEE': true,
-            'MARK': true,
-            'META': false,
-            'METER': true,
-            'NAV': true,
-            'NOBR': true,
-            'NOEMBED': true,
-            'NOFRAMES': true,
-            'NOSCRIPT': true,
-            'OL': true,
-            'OPTGROUP': true,
-            'OPTION': true,
-            'P': true,
-            'PLAINTEXT': true,
-            'PRE': true,
-            'Q': true,
-            'RP': true,
-            'RT': true,
-            'RUBY': true,
-            'S': true,
-            'SAMP': true,
-            'SECTION': true,
-            'SMALL': true,
-            'SPAN': true,
-            'SOURCE': true,
-            'STRIKE': true,
-            'STRONG': true,
-            'STYLE': false,
-            'SUB': true,
-            'SUMMARY': true,
-            'SUP': true,
-            'TABLE': true,
-            'TBODY': true,
-            'TD': true,
-            'TFOOT': true,
-            'TH': true,
-            'THEAD': true,
-            'TIME': true,
-            'TITLE': false,
-            'TR': true,
-            'TT': true,
-            'U': true,
-            'UL': true,
-            'VAR': true,
-            'VIDEO': true,
-            'WBR': true,
-            'XMP': true
-        },
-        regexps = {
-            styleEmbeddedImage: /^data:([\w/]+);(\w+),([^\"^)\s]+)/,
-            styleItems: /^([^\s^:]+)\s*:\s*([^;]+);?/g,
-            styleUrl: /^.*\b\s*url\s*\(([^)]*)\)/i,
-            styleForbiddenValue: /^(?:(expression|eval|javascript|vbscript))\s*(\(|:)/,  // expression(....)
-            quotes: /['"]+/g
-        };
-
         function checkOptions(options) {
             options = options || {
                 urlProxyHandler: "",
@@ -1642,115 +1649,88 @@ if (typeof ASC.Mail.Sanitizer === "undefined") {
             return options;
         }
 
-        function changeUrlToProxy(url, options) {
-            checkOptions(options);
+        // specify the regex to detect external content
+        var regex = /(url\("?)(?!data:)/gim;
 
-            var newUrl = options.needProxyHttp && url.indexOf("http://") === 0
-                                ? "{0}?url={1}".format(options.urlProxyHandler, jq.base64.encode(url))
-                                : url;
-
-            return newUrl;
-        }
-
-        function isWellFormedUrl(url) {
-            try {
-                var uri = new window.URL(url);
-                return uri.protocol !== "http:" && uri.protocol !== "https:";
-            } catch (e) {
-                return false;
+        /**
+         *  Take CSS property-value pairs and proxy URLs in values,
+         *  then add the styles to an array of property-value pairs
+         */
+        function addStyles(output, styles, options) {
+            for (var prop = styles.length - 1; prop >= 0; prop--) {
+                if (styles[styles[prop]] && options.needProxyHttp) {
+                    var url = styles[styles[prop]].replace(regex, '$1' + options.urlProxyHandler);
+                    styles[styles[prop]] = url;
+                }
+                if (styles[styles[prop]]) {
+                    output.push(styles[prop] + ':' + styles[styles[prop]] + ';');
+                }
             }
         }
 
-        function fixBaseLink(foundedUrl, options) {
-            if (foundedUrl.indexOf("/") !== 0)
-                return foundedUrl;
-
-            return options.baseHref ? options.baseHref + foundedUrl : foundedUrl;
-        }
-
-        function fixStyles(styleString, result, options) {
-            checkOptions(options);
-
-            var cleanStyle = "",
-                needChangeStyle = false,
-                embeddedMarker = "http://marker-for-quick-parse.com/without-embedded-image-data";
-            // hack for right url parse if embedded image exists
-
-            var embeddedImage = regexps.styleEmbeddedImage.exec(styleString);
-            if (embeddedImage != null) {
-                styleString = styleString.replace(embeddedImage, embeddedMarker);
-            }
-
-            var styles = styleString.match(regexps.styleItems);
-
-            while ((styles = regexps.styleItems.exec(styleString)) !== null) {
-                var style = styles;
-                var styleName = style[1].toLowerCase();
-                var styleValue = style[2];
-
-                // suppress invalid styles values 
-                if (regexps.styleForbiddenValue.test(styleValue)) {
-                    needChangeStyle = true;
-                    continue;
-                }
-
-                // check if valid url 
-                var urlStyleMatcher = regexps.styleUrl.exec(styleValue);
-                if (!urlStyleMatcher) {
-                    cleanStyle = "{0}{1}:{2};".format(cleanStyle, styleName, styleValue);
-                    continue;
-                }
-
-                try {
-                    var urlString = urlStyleMatcher[1].replace(regexps.quotes, "");
-                    if (!regexps.styleEmbeddedImage.test(urlString)) {
-                        var val = urlString.indexOf("//") === 0
-                            ? "http:" + urlString
-                            : urlString;
-
-                        if (!isWellFormedUrl(val)) {
-                            needChangeStyle = true;
-                            continue;
+        /**
+         * Take CSS rules and analyze them, proxy URLs via addStyles(),
+         * then create matching CSS text for later application to the DOM
+         */
+        function addCssRules(output, cssRules, options) {
+            for (var index = cssRules.length - 1; index >= 0; index--) {
+                var rule = cssRules[index];
+                // check for rules with selector
+                if (rule.type === 1 && rule.selectorText) {
+                    output.push(rule.selectorText + '{');
+                    if (rule.style) {
+                        addStyles(output, rule.style, options);
+                    }
+                    output.push('}');
+                    // check for @media rules
+                } else if (rule.type === rule.MEDIA_RULE) {
+                    output.push('@media ' + rule.media.mediaText + '{');
+                    addCssRules(output, rule.cssRules, options);
+                    output.push('}');
+                    // check for @font-face rules
+                } else if (rule.type === rule.FONT_FACE_RULE) {
+                    output.push('@font-face {');
+                    if (rule.style) {
+                        addStyles(output, rule.style, options);
+                    }
+                    output.push('}');
+                    // check for @keyframes rules
+                } else if (rule.type === rule.KEYFRAMES_RULE) {
+                    output.push('@keyframes ' + rule.name + '{');
+                    for (var i = rule.cssRules.length - 1; i >= 0; i--) {
+                        var frame = rule.cssRules[i];
+                        if (frame.type === 8 && frame.keyText) {
+                            output.push(frame.keyText + '{');
+                            if (frame.style) {
+                                addStyles(output, frame.style, options);
+                            }
+                            output.push('}');
                         }
                     }
-
-                    var newUrl = fixBaseLink(urlString, options);
-
-                    if (options.needProxyHttp) {
-                        if (newUrl.length > 0) {
-                            newUrl = changeUrlToProxy(newUrl, options);
-                        } else {
-                            var t = changeUrlToProxy(urlString, options);
-                            if (!t.Equals(urlString))
-                                newUrl = t;
-                        }
-                    }
-
-                    if (newUrl.length > 0) {
-                        styleValue = styleValue.replace(urlString, newUrl);
-                        needChangeStyle = true;
-                    }
-
-                    if ((styleName === "background-image" ||
-                        (styleName === "background" &&
-                            styleValue.indexOf("url(") !== -1)) &&
-                        !options.loadImages) {
-                        styleName = "tl_disabled_" + styleName;
-                        result.imagesBlocked = true;
-                        needChangeStyle = true;
-                    }
-                } catch (e) {
-                    needChangeStyle = true;
-                    continue;
+                    output.push('}');
                 }
-
-                cleanStyle = "{0}{1}:{2};".format(cleanStyle, styleName, styleValue);
             }
+        }
 
-            if (cleanStyle.indexOf(embeddedMarker) !== -1)
-                cleanStyle = cleanStyle.replace(embeddedMarker, embeddedImage);
+        function isForbiddenStyle(styleName, styleValue) {
+            styleName = (styleName || "").trim().toLowerCase();
+            styleValue = (styleValue || "").trim().toLowerCase();
 
-            return needChangeStyle ? cleanStyle : styleString;
+            switch (styleName) {
+                case "position":
+                case "left":
+                case "top":
+                case "right":
+                case "bottom":
+                    return true;
+                case "margin-left":
+                case "margin-top":
+                case "margin-rigth":
+                case "margin-bottom":
+                    return styleValue.indexOf("-") !== -1;
+                default:
+                    return false;
+            }
         }
 
         function sanitize(html, options) {
@@ -1766,132 +1746,115 @@ if (typeof ASC.Mail.Sanitizer === "undefined") {
             if (!html)
                 return result;
 
-            var iframe = document.createElement("iframe");
-            if (iframe["sandbox"] === undefined) {
-                var error = "Sorry, but your browser does not support sandboxed iframes. Please upgrade to a modern browser.";
-                alert(error);
-                throw error;
-            }
-            iframe["sandbox"] = "allow-same-origin";
-            iframe.style.display = "none";
-            document.body.appendChild(iframe); // necessary so the iframe contains a document
+            // Proxy a URL in case it's not a Data URI
+            function proxyAttribute(url) {
+                if (!options.needProxyHttp)
+                    return url;
 
-            function insertHtmlToSandbox(htmlStr) {
-                iframe.contentDocument.open();
-                iframe.contentDocument.write(htmlStr);
-                iframe.contentDocument.close();
-            }
-
-            try {
-                var temp = html
-                    .replace(/<\/?script\b.*?>/g, "")
-                    .replace(/<\/?link\b.*?>/g, "")
-                    .replace(/ on\w+=".*?"/g, "");
-                insertHtmlToSandbox(temp);
-
-            } catch (e) {
-                insertHtmlToSandbox(html);
-            } 
-
-            var styleSheets = iframe.contentDocument.styleSheets;
-            if (styleSheets.length > 0) {
-                for (var i = 0, n = styleSheets.length; i < n; i++) {
-                    var rules = styleSheets[i].cssRules || [];
-                    for (var j = 0, m = rules.length; j < m; j++) {
-                        if (rules[j].hasOwnProperty("media"))
-                            continue; // Skips media queries
-                        var ruleSelector = "";
-                        try {
-                            ruleSelector = rules[j].selectorText;
-                            if (!ruleSelector)
-                                continue;
-
-                            var collection = iframe.contentDocument.querySelectorAll(ruleSelector);
-                            for (var k = 0, l = collection.length; k < l; k++) {
-                                collection[k].style.cssText += rules[j].style.cssText;
-                            }
-                        } catch (ex) {
-                            console.error("Failed rewrite style's rule (%s): ", ruleSelector, ex);
-                        }
-                    }
+                if (/^data:image\//.test(url)) {
+                    return url;
+                } else {
+                    result.httpProxied = true;
+                    return options.urlProxyHandler + encodeURIComponent(url);
                 }
             }
 
-            function makeSanitizedCopy(node) {
-                var newNode;
-                switch (node.nodeType) {
-                case Node.TEXT_NODE:
-                    newNode = node.cloneNode(true);
-                    break;
-                case Node.ELEMENT_NODE:
-                    var tagName = node.tagName.toUpperCase();
-                    if (tagName.indexOf("O:") === 0) // fix MS tags
-                        tagName = tagName.replace("O:", "");
-
-                    if (!tagWhitelist[tagName]) {
-                        newNode = document.createDocumentFragment();
-                        break;
+            // Add a hook to enforce proxy for leaky CSS rules
+            window.DOMPurify.addHook("uponSanitizeElement", function (node, data) {
+                if (data.tagName === "style") {
+                    var output = [];
+                    if (node && node.sheet && node.sheet.cssRules) {
+                        addCssRules(output, node.sheet.cssRules, options);
                     }
-
-                    newNode = iframe.contentDocument.createElement(tagName);
-                    var i, n;
-                    for (i = 0, n = node.attributes.length; i < n; i++) {
-                        var attr = node.attributes[i];
-                        try {
-                            var newValue;
-                            switch (attr.name) {
-                            case "background":
-                            case "src":
-                                newValue = attr.value;
-                                if (!regexps.styleEmbeddedImage.test(newValue)) {
-                                    newValue = fixBaseLink(attr.value, options);
-                                }
-
-                                if (!options.loadImages) {
-                                    newNode.setAttribute("tl_disabled_" + attr.name, changeUrlToProxy(newValue, options));
-                                    result.imagesBlocked = true;
-                                } else {
-                                    newNode.setAttribute(attr.name, changeUrlToProxy(newValue, options));
-                                }
-                                break;
-                            case "style":
-                                newValue = fixStyles(attr.value, result, options);
-                                newNode.setAttribute(attr.name, newValue);
-                                break;
-                            case "class":
-                                // Skips any classes
-                                break;
-                            default:
-                                if (attr.name.indexOf("on") !== 0) // skip all javascript events
-                                    newNode.setAttribute(attr.name, attr.value);
-                                break;
-                            }
-                        } catch (ex) {
-                            console.log("sanitize: ", ex);
-                        }
-                    }
-                    for (i = 0, n = node.childNodes.length; i < n; i++) {
-                        try {
-                            var subCopy = makeSanitizedCopy(node.childNodes[i]);
-                            newNode.appendChild(subCopy, false);
-                        } catch (er) {
-                            console.log("sanitize: ", er);
-                        }
-                    }
-
-                    break;
-                default:
-                    newNode = document.createDocumentFragment();
-                    break;
+                    node.textContent = output.join("\n");
                 }
-                return newNode;
-            };
+                else if (node.className === "MsoNormal") {
+                    node.setAttribute("style", "margin: 0cm; margin-bottom: .0001pt");
+                }
+            });
 
-            var resultElement = makeSanitizedCopy(iframe.contentDocument.body);
-            document.body.removeChild(iframe);
+            window.DOMPurify.addHook("afterSanitizeAttributes", function (node) {
+                // set all elements owning target to target=_blank
+                if (node.hasOwnProperty("target")) {
+                    node.setAttribute("target", "_blank");
+                }
 
-            result.html = resultElement.innerHTML;
+                // Check all style attribute values and proxy them
+                if (node.hasAttribute("style")) {
+                    var styles = node.style;
+                    var output = [];
+                    for (var prop = styles.length - 1; prop >= 0; prop--) {
+                        var styleName = styles[prop],
+                            styleValue = node.style[styleName];
+
+                        // we re-write each property-value pair to remove invalid CSS
+                        if (styleValue && regex.test(styleValue)) {
+                            if (options.needProxyHttp) {
+                                var url = styleValue.replace(regex, '$1' + options.urlProxyHandler);
+                                result.httpProxied = true;
+                                node.style[styleName] = url;
+                            }
+                        }
+
+                        if (isForbiddenStyle(styleName, styleValue)) {
+                            continue;
+                        }
+
+                        if (!options.loadImages &&
+                        (styleName === "background-image" || styleName === "background")) {
+                            styleName = "tl_disabled_" + styleName;
+                            result.imagesBlocked = true;
+                        }
+
+                        output.push(styleName + ':' + styleValue + ';');
+                    }
+                    // re-add styles in case any are left
+                    if (output.length) {
+                        node.setAttribute('style', output.join(""));
+                    } else {
+                        node.removeAttribute('style');
+                    }
+                }
+                var newSrcVal;
+                if (node.hasAttribute("src")) {
+                    if (!options.loadImages) {
+                        newSrcVal = proxyAttribute(node.getAttribute("src"));
+
+                        if (newSrcVal) {
+                            node.removeAttribute("src");
+                            node.setAttribute("tl_disabled_src", newSrcVal);
+                            result.imagesBlocked = true;
+
+                        }
+                    }
+                }
+
+                if (node.hasAttribute("background")) {
+                    if (!options.loadImages) {
+                        newSrcVal = proxyAttribute(node.getAttribute("background"));
+
+                        if (newSrcVal) {
+                            node.removeAttribute("background");
+                            node.setAttribute("tl_disabled_background", newSrcVal);
+                            result.imagesBlocked = true;
+                        }
+                    }
+                }
+            });
+
+            var clean = window.DOMPurify.sanitize(html,
+            {
+                ALLOWED_URI_REGEXP:
+                    /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|blob|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,// eslint-disable-line no-useless-escape
+                FORBID_TAGS: ['style', 'input', 'form', 'title', 'iframe', 'meta'],
+                FORBID_ATTR: ['srcset', 'action']
+            });
+
+            result.html = clean;
             result.sanitized = true;
+
+            window.DOMPurify.removeHook("afterSanitizeAttributes");
+            window.DOMPurify.removeHook("uponSanitizeElement");
 
             return result;
         }
@@ -1913,5 +1876,5 @@ if (typeof ASC.Mail.Sanitizer === "undefined") {
                 };
             }
         };
-    })(jQuery);
+    })();
 }

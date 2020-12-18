@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -43,8 +34,8 @@ namespace ASC.CRM.Core.Dao
     {
         private readonly HttpRequestDictionary<InvoiceLine> _invoiceLineCache = new HttpRequestDictionary<InvoiceLine>("crm_invoice_line");
 
-        public CachedInvoiceLineDao(int tenantID, string storageKey)
-            : base(tenantID, storageKey)
+        public CachedInvoiceLineDao(int tenantID)
+            : base(tenantID)
         {
         }
 
@@ -81,8 +72,8 @@ namespace ASC.CRM.Core.Dao
     
     public class InvoiceLineDao : AbstractDao
     {
-        public InvoiceLineDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public InvoiceLineDao(int tenantID)
+            : base(tenantID)
         {
         }
 
@@ -113,41 +104,29 @@ namespace ASC.CRM.Core.Dao
 
         public virtual List<InvoiceLine> GetAll()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceLineSqlQuery(null)).ConvertAll(ToInvoiceLine);
-            }
+            return Db.ExecuteList(GetInvoiceLineSqlQuery(null)).ConvertAll(ToInvoiceLine);
         }
 
         public virtual List<InvoiceLine> GetByID(int[] ids)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceLineSqlQuery(Exp.In("id", ids))).ConvertAll(ToInvoiceLine);
-            }
+            return Db.ExecuteList(GetInvoiceLineSqlQuery(Exp.In("id", ids))).ConvertAll(ToInvoiceLine);
         }
 
         public virtual InvoiceLine GetByID(int id)
         {
-            using (var db = GetDb())
-            {
-                var invoiceLines = db.ExecuteList(GetInvoiceLineSqlQuery(Exp.Eq("id", id))).ConvertAll(ToInvoiceLine);
+            var invoiceLines = Db.ExecuteList(GetInvoiceLineSqlQuery(Exp.Eq("id", id))).ConvertAll(ToInvoiceLine);
 
-                return invoiceLines.Count > 0 ? invoiceLines[0] : null;
-            }
+            return invoiceLines.Count > 0 ? invoiceLines[0] : null;
         }
         
         public List<InvoiceLine> GetInvoiceLines(int invoiceID)
         {
-            using (var db = GetDb())
-            {
-                return GetInvoiceLines(invoiceID, db);
-            }
+            return Db.ExecuteList(GetInvoiceLineSqlQuery(Exp.Eq("invoice_id", invoiceID)).OrderBy("sort_order", true)).ConvertAll(ToInvoiceLine);
         }
 
-        public List<InvoiceLine> GetInvoiceLines(int invoiceID, DbManager db)
+        public List<InvoiceLine> GetInvoicesLines(int[] invoiceIDs)
         {
-            return db.ExecuteList(GetInvoiceLineSqlQuery(Exp.Eq("invoice_id", invoiceID)).OrderBy("sort_order", true)).ConvertAll(ToInvoiceLine);
+            return Db.ExecuteList(GetInvoiceLineSqlQuery(Exp.In("invoice_id", invoiceIDs)).OrderBy("sort_order", true)).ConvertAll(ToInvoiceLine);
         }
 
         #endregion
@@ -159,13 +138,10 @@ namespace ASC.CRM.Core.Dao
         {
             _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "invoice.*"));
 
-            using (var db = GetDb())
-            {
-                return SaveOrUpdateInvoiceLine(invoiceLine, db);
-            }
+            return SaveOrUpdateInvoiceLineInDb(invoiceLine);
         }
 
-        private int SaveOrUpdateInvoiceLine(InvoiceLine invoiceLine, DbManager db)
+        private int SaveOrUpdateInvoiceLineInDb(InvoiceLine invoiceLine)
         {
             if (invoiceLine.InvoiceID <= 0 || invoiceLine.InvoiceItemID <= 0)
                 throw new ArgumentException();
@@ -175,9 +151,9 @@ namespace ASC.CRM.Core.Dao
                 invoiceLine.Description = String.Empty;
             }
 
-            if (db.ExecuteScalar<int>(Query("crm_invoice_line").SelectCount().Where(Exp.Eq("id", invoiceLine.ID))) == 0)
+            if (Db.ExecuteScalar<int>(Query("crm_invoice_line").SelectCount().Where(Exp.Eq("id", invoiceLine.ID))) == 0)
             {
-                invoiceLine.ID = db.ExecuteScalar<int>(
+                invoiceLine.ID = Db.ExecuteScalar<int>(
                                Insert("crm_invoice_line")
                               .InColumnValue("id", 0)
                               .InColumnValue("invoice_id", invoiceLine.InvoiceID)
@@ -194,7 +170,7 @@ namespace ASC.CRM.Core.Dao
             else
             {
 
-                db.ExecuteNonQuery(
+                Db.ExecuteNonQuery(
                     Update("crm_invoice_line")
                         .Set("invoice_id", invoiceLine.InvoiceID)
                         .Set("invoice_item_id", invoiceLine.InvoiceItemID)
@@ -221,10 +197,7 @@ namespace ASC.CRM.Core.Dao
 
             if (invoiceLine == null) return;
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_invoice_line").Where("id", invoiceLineID));
-            }
+            Db.ExecuteNonQuery(Delete("crm_invoice_line").Where("id", invoiceLineID));
 
             /*_cache.Remove(_invoiceItemCacheKey);
             _cache.Insert(_invoiceLineCacheKey, String.Empty);*/
@@ -232,10 +205,7 @@ namespace ASC.CRM.Core.Dao
 
         public void DeleteInvoiceLines(int invoiceID)
         {
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_invoice_line").Where(Exp.Eq("invoice_id", invoiceID)));
-            }
+            Db.ExecuteNonQuery(Delete("crm_invoice_line").Where(Exp.Eq("invoice_id", invoiceID)));
 
             /*_cache.Remove(_invoiceItemCacheKey);
             _cache.Insert(_invoiceLineCacheKey, String.Empty);*/
@@ -243,21 +213,18 @@ namespace ASC.CRM.Core.Dao
 
         public Boolean CanDelete(int invoiceLineID)
         {
-            using (var db = GetDb())
-            {
-                return CanDelete(invoiceLineID, db);
-            }
+            return CanDeleteInDb(invoiceLineID);
         }
 
-        public Boolean CanDelete(int invoiceLineID, DbManager db)
+        public Boolean CanDeleteInDb(int invoiceLineID)
         {
 
-                var invoiceID = db.ExecuteScalar<int>(Query("crm_invoice_line").Select("invoice_id")
+                var invoiceID = Db.ExecuteScalar<int>(Query("crm_invoice_line").Select("invoice_id")
                                      .Where(Exp.Eq("id", invoiceLineID)));
 
                 if (invoiceID == 0) return false;
 
-                var count = db.ExecuteScalar<int>(Query("crm_invoice_line").SelectCount()
+                var count = Db.ExecuteScalar<int>(Query("crm_invoice_line").SelectCount()
                                         .Where(Exp.Eq("invoice_id", invoiceID)));
 
                 return count > 1;
@@ -279,9 +246,9 @@ namespace ASC.CRM.Core.Dao
                     InvoiceTax2ID = Convert.ToInt32(row[4]),
                     SortOrder = Convert.ToInt32(row[5]),
                     Description = Convert.ToString(row[6]),
-                    Quantity = Convert.ToInt32(row[7]),
+                    Quantity = Convert.ToDecimal(row[7]),
                     Price = Convert.ToDecimal(row[8]),
-                    Discount = Convert.ToInt32(row[9])
+                    Discount = Convert.ToDecimal(row[9])
                 };
         }
 

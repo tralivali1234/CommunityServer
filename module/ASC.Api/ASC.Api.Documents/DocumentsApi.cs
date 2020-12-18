@@ -1,46 +1,20 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Api.Attributes;
-using ASC.Api.Collections;
-using ASC.Api.Exceptions;
-using ASC.Api.Impl;
-using ASC.Api.Utils;
-using ASC.Core;
-using ASC.Files.Core;
-using ASC.MessagingSystem;
-using ASC.Web.Core.Files;
-using ASC.Web.Files.Classes;
-using ASC.Web.Files.HttpHandlers;
-using ASC.Web.Files.Services.DocumentService;
-using ASC.Web.Files.Services.WCFService;
-using ASC.Web.Files.Services.WCFService.FileOperations;
-using ASC.Web.Files.Utils;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -52,6 +26,27 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
+using ASC.Api.Attributes;
+using ASC.Api.Collections;
+using ASC.Api.Exceptions;
+using ASC.Api.Impl;
+using ASC.Api.Utils;
+using ASC.Core;
+using ASC.Core.Users;
+using ASC.FederatedLogin.Helpers;
+using ASC.FederatedLogin.LoginProviders;
+using ASC.Files.Core;
+using ASC.MessagingSystem;
+using ASC.Web.Core.Files;
+using ASC.Web.Files.Classes;
+using ASC.Web.Files.Helpers;
+using ASC.Web.Files.HttpHandlers;
+using ASC.Web.Files.Services.DocumentService;
+using ASC.Web.Files.Services.WCFService;
+using ASC.Web.Files.Services.WCFService.FileOperations;
+using ASC.Web.Files.Utils;
+using ASC.Web.Studio.Utility;
+using Newtonsoft.Json.Linq;
 using FileShare = ASC.Files.Core.Security.FileShare;
 using FilesNS = ASC.Web.Files.Services.WCFService;
 using MimeMapping = ASC.Common.Web.MimeMapping;
@@ -60,7 +55,7 @@ using SortedByType = ASC.Files.Core.SortedByType;
 namespace ASC.Api.Documents
 {
     /// <summary>
-    /// Provides acces to documents
+    /// Provides access to documents
     /// </summary>
     public class DocumentsApi : Interfaces.IApiEntryPoint
     {
@@ -87,11 +82,9 @@ namespace ASC.Api.Documents
 
 
         /// <summary>
-        /// Returns the detailed list of files and folders located in the current user 'My Documents' section
+        /// Returns the detailed list of files and folders located in the current user My section
         /// </summary>
-        /// <short>
-        /// My folder
-        /// </short>
+        /// <short>Section My</short>
         /// <category>Folders</category>
         /// <returns>My folder contents</returns>
         [Read("@my")]
@@ -101,11 +94,9 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// Returns the detailed list of files and folders located in the current user 'Projects Documents' section
+        /// Returns the detailed list of files and folders located in the current user Projects section
         /// </summary>
-        /// <short>
-        /// Projects folder
-        /// </short>
+        /// <short>Section Projects</short>
         /// <category>Folders</category>
         /// <returns>Projects folder contents</returns>
         [Read("@projects")]
@@ -116,11 +107,9 @@ namespace ASC.Api.Documents
 
 
         /// <summary>
-        /// Returns the detailed list of files and folders located in the 'Common Documents' section
+        /// Returns the detailed list of files and folders located in the Common section
         /// </summary>
-        /// <short>
-        /// Common folder
-        /// </short>
+        /// <short>Section Common</short>
         /// <category>Folders</category>
         /// <returns>Common folder contents</returns>
         [Read("@common")]
@@ -130,11 +119,9 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// Returns the detailed list of files and folders located in the 'Shared with Me' section
+        /// Returns the detailed list of files and folders located in the Shared with Me section
         /// </summary>
-        /// <short>
-        /// Shared folder
-        /// </short>
+        /// <short>Section Shared</short>
         /// <category>Folders</category>
         /// <returns>Shared folder contents</returns>
         [Read("@share")]
@@ -144,11 +131,45 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// Returns the detailed list of files and folders located in the 'Recycle Bin' section
+        /// Returns the detailed list of recent files
         /// </summary>
-        /// <short>
-        /// Trash folder
-        /// </short>
+        /// <short>Section Recent</short>
+        /// <category>Folders</category>
+        /// <returns>Recent contents</returns>
+        [Read("@recent")]
+        public FolderContentWrapper GetRecentFolder(Guid userIdOrGroupId, FilterType filterType)
+        {
+            return ToFolderContentWrapper(Global.FolderRecent, userIdOrGroupId, filterType);
+        }
+
+        /// <summary>
+        /// Returns the detailed list of favorites files
+        /// </summary>
+        /// <short>Section Favorite</short>
+        /// <category>Folders</category>
+        /// <returns>Favorites contents</returns>
+        [Read("@favorites")]
+        public FolderContentWrapper GetFavoritesFolder(Guid userIdOrGroupId, FilterType filterType)
+        {
+            return ToFolderContentWrapper(Global.FolderFavorites, userIdOrGroupId, filterType);
+        }
+
+        /// <summary>
+        /// Returns the detailed list of templates files
+        /// </summary>
+        /// <short>Section Template</short>
+        /// <category>Folders</category>
+        /// <returns>Templates contents</returns>
+        [Read("@templates")]
+        public FolderContentWrapper GetTemplatesFolder(Guid userIdOrGroupId, FilterType filterType)
+        {
+            return ToFolderContentWrapper(Global.FolderTemplates, userIdOrGroupId, filterType);
+        }
+
+        /// <summary>
+        /// Returns the detailed list of files and folders located in the Recycle Bin
+        /// </summary>
+        /// <short>Section Trash</short>
         /// <category>Folders</category>
         /// <returns>Trash folder contents</returns>
         [Read("@trash")]
@@ -176,7 +197,7 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// Uploads the file specified with single file upload or standart multipart/form-data method to 'My Documents' section
+        /// Uploads the file specified with single file upload or standart multipart/form-data method to My section
         /// </summary>
         /// <short>Upload to My</short>
         /// <category>Uploads</category>
@@ -194,13 +215,13 @@ namespace ASC.Api.Documents
         /// <param name="files" visible="false">List of files when posted as multipart/form-data</param>
         /// <returns>Uploaded file</returns>
         [Create("@my/upload")]
-        public object UploadFileToMy(Stream file, ContentType contentType, ContentDisposition contentDisposition, IEnumerable<System.Web.HttpPostedFileBase> files)
+        public object UploadFileToMy(Stream file, ContentType contentType, ContentDisposition contentDisposition, IEnumerable<HttpPostedFileBase> files)
         {
-            return UploadFile(Global.FolderMy.ToString(), file, contentType, contentDisposition, files, false, true);
+            return UploadFile(Global.FolderMy.ToString(), file, contentType, contentDisposition, files, false, null);
         }
 
         /// <summary>
-        /// Uploads the file specified with single file upload or standart multipart/form-data method to 'Common Documents' section
+        /// Uploads the file specified with single file upload or standart multipart/form-data method to Common section
         /// </summary>
         /// <short>Upload to Common</short>
         /// <category>Uploads</category>
@@ -218,16 +239,16 @@ namespace ASC.Api.Documents
         /// <param name="files" visible="false">List of files when posted as multipart/form-data</param>
         /// <returns>Uploaded file</returns>
         [Create("@common/upload")]
-        public object UploadFileToCommon(Stream file, ContentType contentType, ContentDisposition contentDisposition, IEnumerable<System.Web.HttpPostedFileBase> files)
+        public object UploadFileToCommon(Stream file, ContentType contentType, ContentDisposition contentDisposition, IEnumerable<HttpPostedFileBase> files)
         {
-            return UploadFile(Global.FolderCommon.ToString(), file, contentType, contentDisposition, files, false, true);
+            return UploadFile(Global.FolderCommon.ToString(), file, contentType, contentDisposition, files, false, null);
         }
 
 
         /// <summary>
         /// Uploads the file specified with single file upload or standart multipart/form-data method to the selected folder
         /// </summary>
-        /// <short>Upload to folder</short>
+        /// <short>Upload file</short>
         /// <category>Uploads</category>
         /// <remarks>
         /// <![CDATA[
@@ -244,11 +265,15 @@ namespace ASC.Api.Documents
         /// <param name="files" visible="false">List of files when posted as multipart/form-data</param>
         /// <param name="createNewIfExist" visible="false">Create New If Exist</param>
         /// <param name="storeOriginalFileFlag" visible="false">If True, upload documents in original formats as well</param>
+        /// <param name="keepConvertStatus" visible="false">Keep status conversation after finishing</param>
         /// <returns>Uploaded file</returns>
         [Create("{folderId}/upload")]
-        public object UploadFile(string folderId, Stream file, ContentType contentType, ContentDisposition contentDisposition, IEnumerable<System.Web.HttpPostedFileBase> files, bool createNewIfExist, bool storeOriginalFileFlag)
+        public object UploadFile(string folderId, Stream file, ContentType contentType, ContentDisposition contentDisposition, IEnumerable<HttpPostedFileBase> files, bool? createNewIfExist, bool? storeOriginalFileFlag, bool keepConvertStatus = false)
         {
-            FilesSettings.StoreOriginalFiles = storeOriginalFileFlag;
+            if (storeOriginalFileFlag.HasValue)
+            {
+                FilesSettings.StoreOriginalFiles = storeOriginalFileFlag.Value;
+            }
 
             if (files != null && files.Any())
             {
@@ -256,10 +281,10 @@ namespace ASC.Api.Documents
                 {
                     //Only one file. return it
                     var postedFile = files.First();
-                    return InsertFile(folderId, postedFile.InputStream, postedFile.FileName, createNewIfExist);
+                    return InsertFile(folderId, postedFile.InputStream, postedFile.FileName, createNewIfExist, keepConvertStatus);
                 }
                 //For case with multiple files
-                return files.Select(postedFile => InsertFile(folderId, postedFile.InputStream, postedFile.FileName, createNewIfExist)).ToList();
+                return files.Select(postedFile => InsertFile(folderId, postedFile.InputStream, postedFile.FileName, createNewIfExist, keepConvertStatus)).ToList();
             }
             if (file != null)
             {
@@ -269,37 +294,41 @@ namespace ASC.Api.Documents
                     fileName = contentDisposition.FileName;
                 }
 
-                return InsertFile(folderId, file, fileName, createNewIfExist);
+                return InsertFile(folderId, file, fileName, createNewIfExist, keepConvertStatus);
             }
             throw new InvalidOperationException("No input files");
         }
 
         /// <summary>
-        /// Uploads the file specified with single file upload to 'Common Documents' section
+        /// Uploads the file specified with single file upload to Common section
         /// </summary>
+        /// <short>Insert to My</short>
         /// <param name="file" visible="false">Request Input stream</param>
         /// <param name="title">Name of file which has to be uploaded</param>
         /// <param name="createNewIfExist" visible="false">Create New If Exist</param>
+        /// <param name="keepConvertStatus" visible="false">Keep status conversation after finishing</param>
         /// <category>Uploads</category>
         /// <returns></returns>
         [Create("@my/insert")]
-        public FileWrapper InsertFileToMy(Stream file, string title, bool createNewIfExist)
+        public FileWrapper InsertFileToMy(Stream file, string title, bool? createNewIfExist, bool keepConvertStatus = false)
         {
-            return InsertFile(Global.FolderMy.ToString(), file, title, createNewIfExist);
+            return InsertFile(Global.FolderMy.ToString(), file, title, createNewIfExist, keepConvertStatus);
         }
 
         /// <summary>
-        /// Uploads the file specified with single file upload to 'Common Documents' section
+        /// Uploads the file specified with single file upload to Common section
         /// </summary>
+        /// <short>Insert to Common</short>
         /// <param name="file" visible="false">Request Input stream</param>
         /// <param name="title">Name of file which has to be uploaded</param>
         /// <param name="createNewIfExist" visible="false">Create New If Exist</param>
+        /// <param name="keepConvertStatus" visible="false">Keep status conversation after finishing</param>
         /// <category>Uploads</category>
         /// <returns></returns>
         [Create("@common/insert")]
-        public FileWrapper InsertFileToCommon(Stream file, string title, bool createNewIfExist)
+        public FileWrapper InsertFileToCommon(Stream file, string title, bool? createNewIfExist, bool keepConvertStatus = false)
         {
-            return InsertFile(Global.FolderCommon.ToString(), file, title, createNewIfExist);
+            return InsertFile(Global.FolderCommon.ToString(), file, title, createNewIfExist, keepConvertStatus);
         }
 
         /// <summary>
@@ -309,14 +338,15 @@ namespace ASC.Api.Documents
         /// <param name="file" visible="false">Request Input stream</param>
         /// <param name="title">Name of file which has to be uploaded</param>
         /// <param name="createNewIfExist" visible="false">Create New If Exist</param>
+        /// <param name="keepConvertStatus" visible="false">Keep status conversation after finishing</param>
         /// <category>Uploads</category>
         /// <returns></returns>
         [Create("{folderId}/insert")]
-        public FileWrapper InsertFile(string folderId, Stream file, string title, bool createNewIfExist)
+        public FileWrapper InsertFile(string folderId, Stream file, string title, bool? createNewIfExist, bool keepConvertStatus = false)
         {
             try
             {
-                var resultFile = FileUploader.Exec(folderId, title, file.Length, file, createNewIfExist);
+                var resultFile = FileUploader.Exec(folderId, title, file.Length, file, createNewIfExist.HasValue ? createNewIfExist.Value : !FilesSettings.UpdateIfExist, !keepConvertStatus);
                 return new FileWrapper(resultFile);
             }
             catch (FileNotFoundException e)
@@ -329,57 +359,97 @@ namespace ASC.Api.Documents
             }
         }
 
+        /// <summary>
+        /// Update file content
+        /// </summary>
+        /// <category>Files</category>
+        /// <param name="file">Stream of file</param>
+        /// <param name="fileId">File ID</param>
+        /// <param name="encrypted" visible="false"></param>
+        /// <param name="forcesave" visible="false"></param>
+        [Update("{fileId}/update")]
+        public FileWrapper UpdateFileStream(Stream file, string fileId, bool encrypted = false, bool forcesave = false)
+        {
+            try
+            {
+                var resultFile = _fileStorageService.UpdateFileStream(fileId, file, encrypted, forcesave);
+                return new FileWrapper(resultFile);
+            }
+            catch (FileNotFoundException e)
+            {
+                throw new ItemNotFoundException("File not found", e);
+            }
+        }
+
 
         /// <summary>
-        /// 
+        /// Save file 
         /// </summary>
+        /// <short>Editing save</short>
         /// <param name="fileId">File ID</param>
-        /// <param name="version"></param>
-        /// <param name="tabId"></param>
         /// <param name="fileExtension"></param>
         /// <param name="downloadUri"></param>
         /// <param name="stream"></param>
-        /// <param name="asNew"></param>
         /// <param name="doc"></param>
+        /// <param name="forcesave"></param>
         /// <category>Files</category>
         /// <returns></returns>
         [Update("file/{fileId}/saveediting")]
-        public FileWrapper SaveEditing(String fileId, int version, Guid tabId, string fileExtension, string downloadUri, Stream stream, bool asNew, String doc)
+        public FileWrapper SaveEditing(String fileId, string fileExtension, string downloadUri, Stream stream, String doc, bool forcesave)
         {
-            return new FileWrapper(_fileStorageService.SaveEditing(fileId, version, tabId, fileExtension, downloadUri, stream, asNew, doc));
+            return new FileWrapper(_fileStorageService.SaveEditing(fileId, fileExtension, downloadUri, stream, doc, forcesave));
         }
 
         /// <summary>
-        /// 
+        /// Lock file when editing
         /// </summary>
+        /// <short>Editing start</short>
         /// <param name="fileId">File ID</param>
-        /// <param name="docKeyForTrack"></param>
-        /// <param name="asNew"></param>
-        /// <param name="editingAlone"></param>
-        /// <param name="doc"></param>
+        /// <param name="editingAlone" visible="false"></param>
+        /// <param name="doc" visible="false"></param>
         /// <category>Files</category>
-        /// <returns></returns>
+        /// <returns>File key for Document Service</returns>
         [Create("file/{fileId}/startedit")]
-        public string StartEdit(String fileId, String docKeyForTrack, bool asNew, bool editingAlone, String doc)
+        public string StartEdit(String fileId, bool editingAlone, String doc)
         {
-            return _fileStorageService.StartEdit(fileId, docKeyForTrack, asNew, editingAlone, doc);
+            return _fileStorageService.StartEdit(fileId, editingAlone, doc);
         }
 
         /// <summary>
-        /// 
+        /// Continue to lock file when editing
         /// </summary>
+        /// <short>Editing track</short>
         /// <param name="fileId">File ID</param>
-        /// <param name="tabId"></param>
-        /// <param name="docKeyForTrack"></param>
-        /// <param name="shareLinkKey"></param>
-        /// <param name="isFinish"></param>
-        /// <param name="fixedVersion"></param>
+        /// <param name="tabId" visible="false"></param>
+        /// <param name="docKeyForTrack" visible="false"></param>
+        /// <param name="doc" visible="false"></param>
+        /// <param name="isFinish">for unlock</param>
         /// <category>Files</category>
         /// <returns></returns>
         [Read("file/{fileId}/trackeditfile")]
-        public KeyValuePair<bool, String> TrackEditFile(String fileId, Guid tabId, String docKeyForTrack, String shareLinkKey, bool isFinish, bool fixedVersion)
+        public KeyValuePair<bool, String> TrackEditFile(String fileId, Guid tabId, String docKeyForTrack, String doc, bool isFinish)
         {
-            return _fileStorageService.TrackEditFile(fileId, tabId, docKeyForTrack, shareLinkKey, isFinish, fixedVersion);
+            return _fileStorageService.TrackEditFile(fileId, tabId, docKeyForTrack, doc, isFinish);
+        }
+
+        /// <summary>
+        /// Get initialization configuration for open editor
+        /// </summary>
+        /// <short>Editing open</short>
+        /// <param name="fileId">File ID</param>
+        /// <param name="version">File version</param>
+        /// <param name="doc" visible="false"></param>
+        /// <category>Files</category>
+        /// <returns>Configuration</returns>
+        [Read("file/{fileId}/openedit")]
+        public Configuration OpenEdit(String fileId, int version, String doc)
+        {
+            Configuration configuration;
+            DocumentServiceHelper.GetParams(fileId, version, doc, true, true, true, out configuration);
+            configuration.Type = Configuration.EditorType.External;
+
+            configuration.Token = DocumentServiceHelper.GetSignature(configuration);
+            return configuration;
         }
 
 
@@ -392,6 +462,7 @@ namespace ASC.Api.Documents
         /// <param name="fileName">Name of file which has to be uploaded</param>
         /// <param name="fileSize">Length in bytes of file which has to be uploaded</param>
         /// <param name="relativePath">Relative folder from folderId</param>
+        /// <param name="encrypted" visible="false"></param>
         /// <remarks>
         /// <![CDATA[
         /// Each chunk can have different length but its important what length is multiple of <b>512</b> and greater or equal than <b>5 mb</b>. Last chunk can have any size.
@@ -415,33 +486,32 @@ namespace ASC.Api.Documents
         /// ]]>
         /// </returns>
         [Create("{folderId}/upload/create_session")]
-        public string CreateUploadSession(string folderId, string fileName, long fileSize, string relativePath)
+        public object CreateUploadSession(string folderId, string fileName, long fileSize, string relativePath, bool encrypted)
         {
             var file = FileUploader.VerifyChunkedUpload(folderId, fileName, fileSize, FilesSettings.UpdateIfExist, relativePath);
 
-            //if "files.uploader.url" value="products/files/"
-            if (CoreContext.Configuration.Standalone)
+            if (FilesLinkUtility.IsLocalFileUploader)
             {
-                var session = FileUploader.InitiateUpload(file.FolderID.ToString(), (file.ID ?? "").ToString(), file.Title, file.ContentLength);
+                var session = FileUploader.InitiateUpload(file.FolderID.ToString(), (file.ID ?? "").ToString(), file.Title, file.ContentLength, encrypted);
 
                 var response = ChunkedUploaderHandler.ToResponseObject(session, true);
-                return JsonConvert.SerializeObject(new
+                return new
                     {
                         success = true,
-                        data = JsonConvert.SerializeObject(response)
-                    });
+                        data = response
+                    };
             }
 
-            var createSessionUrl = FilesLinkUtility.GetInitiateUploadSessionUrl(file.FolderID, file.ID, file.Title, file.ContentLength);
+            var createSessionUrl = FilesLinkUtility.GetInitiateUploadSessionUrl(file.FolderID, file.ID, file.Title, file.ContentLength, encrypted);
             var request = (HttpWebRequest)WebRequest.Create(createSessionUrl);
             request.Method = "POST";
             request.ContentLength = 0;
 
             // hack for uploader.onlyoffice.com in api requests
-            var rewriterHeader = _context.RequestContext.HttpContext.Request.Headers[System.Web.HttpRequestExtensions.UrlRewriterHeader];
+            var rewriterHeader = _context.RequestContext.HttpContext.Request.Headers[HttpRequestExtensions.UrlRewriterHeader];
             if (!string.IsNullOrEmpty(rewriterHeader))
             {
-                request.Headers[System.Web.HttpRequestExtensions.UrlRewriterHeader] = rewriterHeader;
+                request.Headers[HttpRequestExtensions.UrlRewriterHeader] = rewriterHeader;
             }
 
             // hack. http://ubuntuforums.org/showthread.php?t=1841740
@@ -453,18 +523,19 @@ namespace ASC.Api.Documents
             using (var response = request.GetResponse())
             using (var responseStream = response.GetResponseStream())
             {
-                return new StreamReader(responseStream).ReadToEnd(); //result is json string
+                return JObject.Parse(new StreamReader(responseStream).ReadToEnd()); //result is json string
             }
         }
 
         /// <summary>
-        /// Creates a text (.txt) file in 'My Documents' section with the title and contents sent in the request
+        /// Creates a text (.txt) file in My section with the title and contents sent in the request
         /// </summary>
-        /// <short>Create txt in 'My'</short>
-        /// <category>File Creation</category>
+        /// <short>Create txt in My</short>
+        /// <category>Files</category>
         /// <param name="title">File title</param>
         /// <param name="content">File contents</param>
         /// <returns>Folder contents</returns>
+        /// <visible>false</visible>
         [Create("@my/text")]
         public FileWrapper CreateTextFileInMy(string title, string content)
         {
@@ -472,13 +543,14 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// Creates a text (.txt) file in 'Common Documents' section with the title and contents sent in the request
+        /// Creates a text (.txt) file in Common Documents section with the title and contents sent in the request
         /// </summary>
-        /// <short>Create txt in 'Common'</short>
-        /// <category>File Creation</category>
+        /// <short>Create txt in Common</short>
+        /// <category>Files</category>
         /// <param name="title">File title</param>
         /// <param name="content">File contents</param>
         /// <returns>Folder contents</returns>
+        /// <visible>false</visible>
         [Create("@common/text")]
         public FileWrapper CreateTextFileInCommon(string title, string content)
         {
@@ -489,11 +561,12 @@ namespace ASC.Api.Documents
         /// Creates a text (.txt) file in the selected folder with the title and contents sent in the request
         /// </summary>
         /// <short>Create txt</short>
-        /// <category>File Creation</category>
+        /// <category>Files</category>
         /// <param name="folderId">Folder ID</param>
         /// <param name="title">File title</param>
         /// <param name="content">File contents</param>
         /// <returns>Folder contents</returns>
+        /// <visible>false</visible>
         [Create("{folderId}/text")]
         public FileWrapper CreateTextFile(string folderId, string title, string content)
         {
@@ -525,11 +598,12 @@ namespace ASC.Api.Documents
         /// Creates an html (.html) file in the selected folder with the title and contents sent in the request
         /// </summary>
         /// <short>Create html</short>
-        /// <category>File Creation</category>
+        /// <category>Files</category>
         /// <param name="folderId">Folder ID</param>
         /// <param name="title">File title</param>
         /// <param name="content">File contents</param>
         /// <returns>Folder contents</returns>
+        /// <visible>false</visible>
         [Create("{folderId}/html")]
         public FileWrapper CreateHtmlFile(string folderId, string title, string content)
         {
@@ -538,13 +612,14 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// Creates an html (.html) file in 'My Documents' section with the title and contents sent in the request
+        /// Creates an html (.html) file in My section with the title and contents sent in the request
         /// </summary>
-        /// <short>Create html in 'My'</short>
-        /// <category>File Creation</category>
+        /// <short>Create html in My</short>
+        /// <category>Files</category>
         /// <param name="title">File title</param>
         /// <param name="content">File contents</param>
         /// <returns>Folder contents</returns>
+        /// <visible>false</visible>
         [Create("@my/html")]
         public FileWrapper CreateHtmlFileInMy(string title, string content)
         {
@@ -553,13 +628,14 @@ namespace ASC.Api.Documents
 
 
         /// <summary>
-        /// Creates an html (.html) file in 'Common Documents' section with the title and contents sent in the request
+        /// Creates an html (.html) file in Common section with the title and contents sent in the request
         /// </summary>
-        /// <short>Create html in 'Common'</short>
-        /// <category>File Creation</category>
+        /// <short>Create html in Common</short>
+        /// <category>Files</category>
         /// <param name="title">File title</param>
         /// <param name="content">File contents</param>
-        /// <returns>Folder contents</returns>        
+        /// <returns>Folder contents</returns>
+        /// <visible>false</visible>
         [Create("@common/html")]
         public FileWrapper CreateHtmlFileInCommon(string title, string content)
         {
@@ -571,7 +647,7 @@ namespace ASC.Api.Documents
         /// Creates a new folder with the title sent in the request. The ID of a parent folder can be also specified.
         /// </summary>
         /// <short>
-        /// New folder
+        /// Create folder
         /// </short>
         /// <category>Folders</category>
         /// <param name="folderId">Parent folder ID</param>
@@ -585,32 +661,33 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// Creates a new file in the 'My Documents' section with the title sent in the request
+        /// Creates a new file in the My section with the title sent in the request
         /// </summary>
-        /// <short>Create file</short>
-        /// <category>File Creation</category>
+        /// <short>Create file in My</short>
+        /// <category>Files</category>
         /// <param name="title" remark="Allowed values: the file must have one of the following extensions: DOCX, XLSX, PPTX">File title</param>
         /// <remarks>In case the extension for the file title differs from DOCX/XLSX/PPTX and belongs to one of the known text, spreadsheet or presentation formats, it will be changed to DOCX/XLSX/PPTX accordingly. If the file extension is not set or is unknown, the DOCX extension will be added to the file title.</remarks>
         /// <returns>New file info</returns>
         [Create("@my/file")]
         public FileWrapper CreateFile(string title)
         {
-            return CreateFile(Global.FolderMy.ToString(), title);
+            return CreateFile(Global.FolderMy.ToString(), title, null);
         }
 
         /// <summary>
         /// Creates a new file in the specified folder with the title sent in the request
         /// </summary>
         /// <short>Create file</short>
-        /// <category>File Creation</category>
+        /// <category>Files</category>
         /// <param name="folderId">Folder ID</param>
         /// <param name="title" remark="Allowed values: the file must have one of the following extensions: DOCX, XLSX, PPTX">File title</param>
+        /// <param name="templateId">File ID for using as template</param>
         /// <remarks>In case the extension for the file title differs from DOCX/XLSX/PPTX and belongs to one of the known text, spreadsheet or presentation formats, it will be changed to DOCX/XLSX/PPTX accordingly. If the file extension is not set or is unknown, the DOCX extension will be added to the file title.</remarks>
         /// <returns>New file info</returns>
         [Create("{folderId}/file")]
-        public FileWrapper CreateFile(string folderId, string title)
+        public FileWrapper CreateFile(string folderId, string title, string templateId)
         {
-            var file = _fileStorageService.CreateNewFile(folderId, title);
+            var file = _fileStorageService.CreateNewFile(folderId, title, templateId);
             return new FileWrapper(file);
         }
 
@@ -648,6 +725,7 @@ namespace ASC.Api.Documents
         /// <summary>
         /// Returns parent folders
         /// </summary>
+        /// <short>Folder path</short>
         /// <param name="folderId"></param>
         /// <category>Folders</category>
         /// <returns>Parent folders</returns>
@@ -695,20 +773,22 @@ namespace ASC.Api.Documents
         /// Deletes the file with the ID specified in the request
         /// </summary>
         /// <short>Delete file</short>
-        /// <category>Files</category>
+        /// <category>Operations</category>
         /// <param name="fileId">File ID</param>
+        /// <param name="deleteAfter">Delete after finished</param>
+        /// <param name="immediately">Don't move to the Recycle Bin</param>
         /// <returns>Operation result</returns>
         [Delete("file/{fileId}")]
-        public IEnumerable<FileOperationWraper> DeleteFile(String fileId)
+        public IEnumerable<FileOperationWraper> DeleteFile(String fileId, bool deleteAfter, bool immediately)
         {
-            return DeleteBatchItems(null, new[] { fileId });
+            return DeleteBatchItems(null, new[] { fileId }, deleteAfter, immediately);
         }
 
         /// <summary>
-        ///  Start conversion
+        ///  Start conversion operation
         /// </summary>
-        /// <short>Convert</short>
-        /// <category>File operations</category>
+        /// <short>Convert start</short>
+        /// <category>Operations</category>
         /// <param name="fileId"></param>
         /// <returns>Operation result</returns>
         [Update("file/{fileId}/checkconversion")]
@@ -720,8 +800,8 @@ namespace ASC.Api.Documents
         /// <summary>
         ///  Check conversion status
         /// </summary>
-        /// <short>Convert</short>
-        /// <category>File operations</category>
+        /// <short>Convert status</short>
+        /// <category>Operations</category>
         /// <param name="fileId"></param>
         /// <param name="start"></param>
         /// <returns>Operation result</returns>
@@ -753,35 +833,24 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// Get presigned Uri
-        /// </summary>
-        /// <param name="fileId">File ID</param>
-        /// <returns>Url</returns>
-        /// <visible>false</visible>
-        [Read("file/{fileId}/presigned")]
-        public string GetPresignedUri(String fileId)
-        {
-            var file = _fileStorageService.GetFile(fileId, -1).NotFoundIfNull("File not found");
-            return DocumentServiceConnector.ReplaceCommunityAdress(PathProvider.GetFileStreamUrl(file));
-        }
-
-        /// <summary>
         /// Deletes the folder with the ID specified in the request
         /// </summary>
         /// <short>Delete folder</short>
-        /// <category>Folders</category>
+        /// <category>Operations</category>
         /// <param name="folderId">Folder ID</param>
+        /// <param name="deleteAfter">Delete after finished</param>
+        /// <param name="immediately">Don't move to the Recycle Bin</param>
         /// <returns>Operation result</returns>
         [Delete("folder/{folderId}")]
-        public IEnumerable<FileOperationWraper> DeleteFolder(String folderId)
+        public IEnumerable<FileOperationWraper> DeleteFolder(String folderId, bool deleteAfter, bool immediately)
         {
-            return DeleteBatchItems(new[] { folderId }, null);
+            return DeleteBatchItems(new[] { folderId }, null, deleteAfter, immediately);
         }
 
         /// <summary>
         /// Checking for conflicts
         /// </summary>
-        /// <category>File operations</category>
+        /// <category>Operations</category>
         /// <param name="destFolderId">Destination folder ID</param>
         /// <param name="folderIds">Folder ID list</param>
         /// <param name="fileIds">File ID list</param>
@@ -796,7 +865,7 @@ namespace ASC.Api.Documents
 
             var ids = _fileStorageService.MoveOrCopyFilesCheck(itemList, destFolderId).Keys.Select(id => "file_" + id);
 
-            var entries = _fileStorageService.GetItems(new Web.Files.Services.WCFService.ItemList<string>(ids), FilterType.FilesOnly, "", "");
+            var entries = _fileStorageService.GetItems(new Web.Files.Services.WCFService.ItemList<string>(ids), FilterType.FilesOnly, false, "", "");
             return entries.Select(x => new FileWrapper((Files.Core.File)x)).ToSmartList();
         }
 
@@ -804,49 +873,51 @@ namespace ASC.Api.Documents
         ///   Moves all the selected files and folders to the folder with the ID specified in the request
         /// </summary>
         /// <short>Move to folder</short>
-        /// <category>File operations</category>
+        /// <category>Operations</category>
         /// <param name="destFolderId">Destination folder ID</param>
         /// <param name="folderIds">Folder ID list</param>
         /// <param name="fileIds">File ID list</param>
         /// <param name="conflictResolveType">Overwriting behavior: skip(0), overwrite(1) or duplicate(2)</param>
+        /// <param name="deleteAfter">Delete after finished</param>
         /// <returns>Operation result</returns>
         [Update("fileops/move")]
-        public IEnumerable<FileOperationWraper> MoveBatchItems(String destFolderId, IEnumerable<String> folderIds, IEnumerable<String> fileIds, FileConflictResolveType conflictResolveType)
+        public IEnumerable<FileOperationWraper> MoveBatchItems(String destFolderId, IEnumerable<String> folderIds, IEnumerable<String> fileIds, FileConflictResolveType conflictResolveType, bool deleteAfter)
         {
             var itemList = new Web.Files.Services.WCFService.ItemList<String>();
 
             itemList.AddRange((folderIds ?? new List<String>()).Select(x => "folder_" + x));
             itemList.AddRange((fileIds ?? new List<String>()).Select(x => "file_" + x));
 
-            return _fileStorageService.MoveOrCopyItems(itemList, destFolderId, conflictResolveType, false).Select(o => new FileOperationWraper(o));
+            return _fileStorageService.MoveOrCopyItems(itemList, destFolderId, conflictResolveType, false, deleteAfter).Select(o => new FileOperationWraper(o));
         }
 
         /// <summary>
         ///   Copies all the selected files and folders to the folder with the ID specified in the request
         /// </summary>
         /// <short>Copy to folder</short>
-        /// <category>File operations</category>
+        /// <category>Operations</category>
         /// <param name="destFolderId">Destination folder ID</param>
         /// <param name="folderIds">Folder ID list</param>
         /// <param name="fileIds">File ID list</param>
         /// <param name="conflictResolveType">Overwriting behavior: skip(0), overwrite(1) or duplicate(2)</param>
+        /// <param name="deleteAfter">Delete after finished</param>
         /// <returns>Operation result</returns>
         [Update("fileops/copy")]
-        public IEnumerable<FileOperationWraper> CopyBatchItems(String destFolderId, IEnumerable<String> folderIds, IEnumerable<String> fileIds, FileConflictResolveType conflictResolveType)
+        public IEnumerable<FileOperationWraper> CopyBatchItems(String destFolderId, IEnumerable<String> folderIds, IEnumerable<String> fileIds, FileConflictResolveType conflictResolveType, bool deleteAfter)
         {
             var itemList = new Web.Files.Services.WCFService.ItemList<String>();
 
             itemList.AddRange((folderIds ?? new List<String>()).Select(x => "folder_" + x));
             itemList.AddRange((fileIds ?? new List<String>()).Select(x => "file_" + x));
 
-            return _fileStorageService.MoveOrCopyItems(itemList, destFolderId, conflictResolveType, true).Select(o => new FileOperationWraper(o));
+            return _fileStorageService.MoveOrCopyItems(itemList, destFolderId, conflictResolveType, true, deleteAfter).Select(o => new FileOperationWraper(o));
         }
 
         /// <summary>
         ///   Marks all files and folders as read
         /// </summary>
         /// <short>Mark as read</short>
-        /// <category>File operations</category>
+        /// <category>Operations</category>
         /// <returns>Operation result</returns>
         [Update("fileops/markasread")]
         public IEnumerable<FileOperationWraper> MarkAsRead(IEnumerable<String> folderIds, IEnumerable<String> fileIds)
@@ -860,10 +931,10 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        ///  Finishes all the active file operations
+        ///  Finishes all the active Operations
         /// </summary>
         /// <short>Finish all</short>
-        /// <category>File operations</category>
+        /// <category>Operations</category>
         /// <returns>Operation result</returns>
         [Update("fileops/terminate")]
         public IEnumerable<FileOperationWraper> TerminateTasks()
@@ -873,10 +944,10 @@ namespace ASC.Api.Documents
 
 
         /// <summary>
-        ///  Returns the list of all active file operations
+        ///  Returns the list of all active Operations
         /// </summary>
-        /// <short>Get file operations list</short>
-        /// <category>File operations</category>
+        /// <short>Operations list</short>
+        /// <category>Operations</category>
         /// <returns>Operation result</returns>
         [Read("fileops")]
         public IEnumerable<FileOperationWraper> GetOperationStatuses()
@@ -887,11 +958,11 @@ namespace ASC.Api.Documents
         /// <summary>
         /// Start downlaod process of files and folders with ID
         /// </summary>
-        /// <short>Finish file operations</short>
+        /// <short>Finish Operations</short>
         /// <param name="fileConvertIds" visible="false">File ID list for download with convert to format</param>
         /// <param name="fileIds">File ID list</param>
         /// <param name="folderIds">Folder ID list</param>
-        /// <category>File operations</category>
+        /// <category>Operations</category>
         /// <returns>Operation result</returns>
         [Update("fileops/bulkdownload")]
         public IEnumerable<FileOperationWraper> BulkDownload(
@@ -924,25 +995,27 @@ namespace ASC.Api.Documents
         /// </summary>
         /// <param name="folderIds">Folder ID list</param>
         /// <param name="fileIds">File ID list</param>
+        /// <param name="deleteAfter">Delete after finished</param>
+        /// <param name="immediately">Don't move to the Recycle Bin</param>
         /// <short>Delete files and folders</short>
-        /// <category>File operations</category>
+        /// <category>Operations</category>
         /// <returns>Operation result</returns>
         [Update("fileops/delete")]
-        public IEnumerable<FileOperationWraper> DeleteBatchItems(IEnumerable<String> folderIds, IEnumerable<String> fileIds)
+        public IEnumerable<FileOperationWraper> DeleteBatchItems(IEnumerable<String> folderIds, IEnumerable<String> fileIds, bool deleteAfter, bool immediately)
         {
             var itemList = new Web.Files.Services.WCFService.ItemList<String>();
 
             itemList.AddRange((folderIds ?? new List<String>()).Select(x => "folder_" + x));
             itemList.AddRange((fileIds ?? new List<String>()).Select(x => "file_" + x));
 
-            return _fileStorageService.DeleteItems("delete", itemList).Select(o => new FileOperationWraper(o));
+            return _fileStorageService.DeleteItems("delete", itemList, false, deleteAfter, immediately).Select(o => new FileOperationWraper(o));
         }
 
         /// <summary>
         ///   Deletes all files and folders from the recycle bin
         /// </summary>
         /// <short>Clear recycle bin</short>
-        /// <category>File operations</category>
+        /// <category>Operations</category>
         /// <returns>Operation result</returns>
         [Update("fileops/emptytrash")]
         public IEnumerable<FileOperationWraper> EmptyTrash()
@@ -970,6 +1043,7 @@ namespace ASC.Api.Documents
         /// <param name="fileId">File ID</param>
         /// <param name="version">Version of history</param>
         /// <param name="continueVersion">Mark as version or revision</param>
+        /// <category>Files</category>
         /// <returns></returns>
         [Update("file/{fileId}/history")]
         public IEnumerable<FileWrapper> ChangeHistory(string fileId, int version, bool continueVersion)
@@ -1091,11 +1165,10 @@ namespace ASC.Api.Documents
         /// <summary>
         ///   Returns the external link to the shared file with the ID specified in the request
         /// </summary>
-        /// <summary>
-        ///   File external link
-        /// </summary>
+        /// <short>Shared link</short>
         /// <param name="fileId">File ID</param>
         /// <param name="share">Access right</param>
+        /// <category>Sharing</category>
         /// <returns>Shared file link</returns>
         [Update("{fileId}/sharedlink")]
         public string GenerateSharedLink(string fileId, FileShare share)
@@ -1124,7 +1197,64 @@ namespace ASC.Api.Documents
                 sharedInfo = _fileStorageService.GetSharedInfo(new Web.Files.Services.WCFService.ItemList<string> { objectId }).Find(r => r.SubjectId == FileConstant.ShareLinkId);
             }
 
-            return sharedInfo.SubjectName;
+            return sharedInfo.Link;
+        }
+
+        /// <summary>
+        ///   Get a list of available providers
+        /// </summary>
+        /// <category>Third-Party Integration</category>
+        /// <returns>List of provider key</returns>
+        /// <remarks>List of provider key: DropboxV2, Box, WebDav, Yandex, OneDrive, SharePoint, GoogleDrive</remarks>
+        /// <returns></returns>
+        [Read("thirdparty/capabilities")]
+        public List<List<string>> Capabilities()
+        {
+            var result = new List<List<string>>();
+
+            if (CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsVisitor()
+                || (!FilesSettings.EnableThirdParty
+                    && !CoreContext.Configuration.Personal))
+            {
+                return result;
+            }
+
+            if (ThirdpartyConfiguration.SupportBoxInclusion)
+            {
+                result.Add(new List<string> { "Box", BoxLoginProvider.Instance.ClientID, BoxLoginProvider.Instance.RedirectUri });
+            }
+            if (ThirdpartyConfiguration.SupportDropboxInclusion)
+            {
+                result.Add(new List<string> { "DropboxV2", DropboxLoginProvider.Instance.ClientID, DropboxLoginProvider.Instance.RedirectUri });
+            }
+            if (ThirdpartyConfiguration.SupportGoogleDriveInclusion)
+            {
+                result.Add(new List<string> { "GoogleDrive", GoogleLoginProvider.Instance.ClientID, GoogleLoginProvider.Instance.RedirectUri });
+            }
+            if (ThirdpartyConfiguration.SupportOneDriveInclusion)
+            {
+                result.Add(new List<string> { "OneDrive", OneDriveLoginProvider.Instance.ClientID, OneDriveLoginProvider.Instance.RedirectUri });
+            }
+            if (ThirdpartyConfiguration.SupportSharePointInclusion)
+            {
+                result.Add(new List<string> { "SharePoint" });
+            }
+            if (ThirdpartyConfiguration.SupportkDriveInclusion)
+            {
+                result.Add(new List<string> { "kDrive" });
+            }
+            if (ThirdpartyConfiguration.SupportYandexInclusion)
+            {
+                result.Add(new List<string> { "Yandex" });
+            }
+            if (ThirdpartyConfiguration.SupportWebDavInclusion)
+            {
+                result.Add(new List<string> { "WebDav" });
+            }
+
+            //Obsolete BoxNet, DropBox, Google, SkyDrive,
+
+            return result;
         }
 
         /// <summary>
@@ -1141,7 +1271,7 @@ namespace ASC.Api.Documents
         /// <param name="providerId">Provider ID</param>
         /// <category>Third-Party Integration</category>
         /// <returns>Folder contents</returns>
-        /// <remarks> List of provider key: DropBox, Box, WebDav, Yandex, SkyDrive, SharePoint, GoogleDrive</remarks>
+        /// <remarks>List of provider key: DropboxV2, Box, WebDav, Yandex, OneDrive, SharePoint, GoogleDrive</remarks>
         /// <exception cref="ArgumentException"></exception>
         [Create("thirdparty")]
         public FolderWrapper SaveThirdParty(
@@ -1172,7 +1302,7 @@ namespace ASC.Api.Documents
         ///    Returns the list of all connected third party services
         /// </summary>
         /// <category>Third-Party Integration</category>
-        /// <short>Get third party list</short>
+        /// <short>Third party list</short>
         /// <returns>Connected providers</returns>
         [Read("thirdparty")]
         public IEnumerable<ThirdPartyParams> GetThirdPartyAccounts()
@@ -1181,10 +1311,10 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        ///    Returns the list of third party services connected in the 'Common Documents' section
+        ///    Returns the list of third party services connected in the Common section
         /// </summary>
         /// <category>Third-Party Integration</category>
-        /// <short>Get third party folder</short>
+        /// <short>Third party folder</short>
         /// <returns>Connected providers folder</returns>
         [Read("thirdparty/common")]
         public IEnumerable<Folder> GetCommonThirdPartyFolders()
@@ -1211,10 +1341,10 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// 
+        /// Search files
         /// </summary>
-        /// <param name="query"></param>
-        /// <returns></returns>
+        /// <param name="query">Queary string</param>
+        /// <returns>Files and folders</returns>
         [Read(@"@search/{query}")]
         public IEnumerable<FileEntryWrapper> Search(string query)
         {
@@ -1225,11 +1355,70 @@ namespace ASC.Api.Documents
             return files.Concat(folders);
         }
 
+        /// <summary>
+        /// Adding files to favorite list
+        /// </summary>
+        /// <short>Favorite add</short>
+        /// <category>Files</category>
+        /// <param name="folderIds" visible="false"></param>
+        /// <param name="fileIds">File IDs</param>
+        /// <returns></returns>
+        [Create("favorites")]
+        public bool AddFavorites(IEnumerable<String> folderIds, IEnumerable<String> fileIds)
+        {
+            var list = _fileStorageService.AddToFavorites(new FilesNS.ItemList<string>(folderIds), new FilesNS.ItemList<string>(fileIds));
+            return true;
+        }
 
         /// <summary>
-        /// 
+        /// Removing files from favorite list
+        /// </summary>
+        /// <short>Favorite delete</short>
+        /// <category>Files</category>
+        /// <param name="folderIds" visible="false"></param>
+        /// <param name="fileIds">File IDs</param>
+        /// <returns></returns>
+        [Delete("favorites")]
+        public bool DeleteFavorites(IEnumerable<String> folderIds, IEnumerable<String> fileIds)
+        {
+            var list = _fileStorageService.DeleteFavorites(new FilesNS.ItemList<string>(folderIds), new FilesNS.ItemList<string>(fileIds));
+            return true;
+        }
+
+        /// <summary>
+        /// Adding files to template list
+        /// </summary>
+        /// <short>Template add</short>
+        /// <category>Files</category>
+        /// <param name="fileIds">File IDs</param>
+        /// <returns></returns>
+        [Create("templates")]
+        public bool AddTemplates(IEnumerable<String> fileIds)
+        {
+            var list = _fileStorageService.AddToTemplates(new FilesNS.ItemList<string>(fileIds));
+            return true;
+        }
+
+        /// <summary>
+        /// Removing files from template list
+        /// </summary>
+        /// <short>Template delete</short>
+        /// <category>Files</category>
+        /// <param name="fileIds">File IDs</param>
+        /// <returns></returns>
+        [Delete("templates")]
+        public bool DeleteTemplates(IEnumerable<String> fileIds)
+        {
+            var list = _fileStorageService.DeleteTemplates(new FilesNS.ItemList<string>(fileIds));
+            return true;
+        }
+
+
+        /// <summary>
+        /// Store file in original formats when upload and convert
         /// </summary>
         /// <param name="set"></param>
+        /// <category>Settings</category>
         /// <returns></returns>
         [Update(@"storeoriginal")]
         public bool StoreOriginal(bool set)
@@ -1238,9 +1427,23 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
-        /// 
+        /// Do not show the confirmation dialog
+        /// </summary>
+        /// <param name="save"></param>
+        /// <category>Settings</category>
+        /// <visible>false</visible>
+        /// <returns></returns>
+        [Update(@"hideconfirmconvert")]
+        public bool HideConfirmConvert(bool save)
+        {
+            return _fileStorageService.HideConfirmConvert(save);
+        }
+
+        /// <summary>
+        /// Update the file version if the same name is exist
         /// </summary>
         /// <param name="set"></param>
+        /// <category>Settings</category>
         /// <returns></returns>
         [Update(@"updateifexist")]
         public bool UpdateIfExist(bool set)
@@ -1249,33 +1452,98 @@ namespace ASC.Api.Documents
         }
 
         /// <summary>
+        /// Display recent folder
+        /// </summary>
+        /// <param name="set"></param>
+        /// <category>Settings</category>
+        /// <returns></returns>
+        [Update(@"displayRecent")]
+        public bool DisplayRecent(bool set)
+        {
+            return _fileStorageService.DisplayRecent(set);
+        }
+
+        /// <summary>
+        /// Display favorite folder
+        /// </summary>
+        /// <param name="set"></param>
+        /// <category>Settings</category>
+        /// <returns></returns>
+        [Update(@"settings/favorites")]
+        public bool DisplayFavorite(bool set)
+        {
+            return _fileStorageService.DisplayFavorite(set);
+        }
+
+        /// <summary>
+        /// Display template folder
+        /// </summary>
+        /// <param name="set"></param>
+        /// <category>Settings</category>
+        /// <returns></returns>
+        [Update(@"settings/templates")]
+        public bool DisplayTemplates(bool set)
+        {
+            return _fileStorageService.DisplayTemplates(set);
+        }
+
+        /// <summary>
         ///  Checking document service location
         /// </summary>
-        /// <param name="docServiceUrlApi">Document editing service Address</param>
-        /// <param name="docServiceUrlCommand">Document command service Address</param>
-        /// <param name="docServiceUrlStorage">Document storage service Address</param>
-        /// <param name="docServiceUrlConverter">Document conversion service Address</param>
+        /// <param name="docServiceUrl">Document editing service Domain</param>
+        /// <param name="docServiceUrlInternal">Document command service Domain</param>
         /// <param name="docServiceUrlPortal">Community Server Address</param>
+        /// <category>Settings</category>
         /// <returns></returns>
-        [Read("savedocservice")]
-        public bool CheckDocServiceUrl(string docServiceUrlApi, string docServiceUrlCommand, string docServiceUrlStorage, string docServiceUrlConverter, string docServiceUrlPortal)
+        [Update("docservice")]
+        public IEnumerable<string> CheckDocServiceUrl(string docServiceUrl, string docServiceUrlInternal, string docServiceUrlPortal)
         {
-            FilesLinkUtility.DocServiceApiUrl = docServiceUrlApi;
-            FilesLinkUtility.DocServiceCommandUrl = docServiceUrlCommand;
-            FilesLinkUtility.DocServiceStorageUrl = docServiceUrlStorage;
-            FilesLinkUtility.DocServiceConverterUrl = docServiceUrlConverter;
+            FilesLinkUtility.DocServiceUrl = docServiceUrl;
+            FilesLinkUtility.DocServiceUrlInternal = docServiceUrlInternal;
             FilesLinkUtility.DocServicePortalUrl = docServiceUrlPortal;
 
             MessageService.Send(HttpContext.Current.Request, MessageAction.DocumentServiceLocationSetting);
 
-            return DocumentServiceConnector.CheckDocServiceUrl(docServiceUrlCommand, docServiceUrlStorage, docServiceUrlConverter, docServiceUrlPortal);
+            var https = new Regex(@"^https://", RegexOptions.IgnoreCase);
+            var http = new Regex(@"^http://", RegexOptions.IgnoreCase);
+            if (https.IsMatch(CommonLinkUtility.GetFullAbsolutePath("")) && http.IsMatch(FilesLinkUtility.DocServiceUrl))
+            {
+                throw new Exception("Mixed Active Content is not allowed. HTTPS address for Document Server is required.");
+            }
+
+            DocumentServiceConnector.CheckDocServiceUrl();
+
+            return new[]
+                {
+                    FilesLinkUtility.DocServiceUrl,
+                    FilesLinkUtility.DocServiceUrlInternal,
+                    FilesLinkUtility.DocServicePortalUrl
+                };
         }
 
-        /// <visible>false</visible>
+
+        /// <summary>
+        /// Get the address of connected editors
+        /// </summary>
+        /// <category>Settings</category>
+        /// <param name="version" visible="false"></param>
+        /// <returns>Address</returns>
         [Read("docservice")]
-        public string GetDocServiceUrl()
+        public object GetDocServiceUrl(bool version)
         {
-            return FilesLinkUtility.DocServiceApiUrl;
+            var url = CommonLinkUtility.GetFullAbsolutePath(FilesLinkUtility.DocServiceApiUrl);
+            if (!version)
+            {
+                return url;
+            }
+
+            var dsVersion = DocumentServiceConnector.GetVersion();
+
+            return new
+                {
+                    version = dsVersion,
+                    docServiceUrlApi = url,
+                };
         }
 
 
@@ -1289,12 +1557,212 @@ namespace ASC.Api.Documents
                                                                                startIndex,
                                                                                Convert.ToInt32(_context.Count) - 1, //NOTE: in ApiContext +1
                                                                                filterType,
-                                                                               new OrderBy(sortBy, !_context.SortDescending),
+                                                                               filterType == FilterType.ByUser,
                                                                                userIdOrGroupId.ToString(),
-                                                                               _context.FilterValue),
+                                                                               _context.FilterValue,
+                                                                               false,
+                                                                               false,
+                                                                               new OrderBy(sortBy, !_context.SortDescending)),
                                             startIndex);
         }
 
+        #region wordpress
+
+        /// <visible>false</visible>
+        [Read("wordpress-info")]
+        public object GetWordpressInfo()
+        {
+            var token = WordpressToken.GetToken();
+            if (token != null)
+            {
+                var meInfo = WordpressHelper.GetWordpressMeInfo(token.AccessToken);
+                var blogId = JObject.Parse(meInfo).Value<string>("token_site_id");
+                var wordpressUserName = JObject.Parse(meInfo).Value<string>("username");
+
+                var blogInfo = RequestHelper.PerformRequest(WordpressLoginProvider.WordpressSites + blogId, "", "GET", "");
+                var jsonBlogInfo = JObject.Parse(blogInfo);
+                jsonBlogInfo.Add("username", wordpressUserName);
+
+                blogInfo = jsonBlogInfo.ToString();
+                return new
+                    {
+                        success = true,
+                        data = blogInfo
+                    };
+            }
+            return new
+                {
+                    success = false
+                };
+        }
+
+        /// <visible>false</visible>
+        [Read("wordpress-delete")]
+        public object DeleteWordpressInfo()
+        {
+            var token = WordpressToken.GetToken();
+            if (token != null)
+            {
+                WordpressToken.DeleteToken(token);
+                return new
+                    {
+                        success = true
+                    };
+            }
+            return new
+                {
+                    success = false
+                };
+        }
+
+        /// <visible>false</visible>
+        [Create("wordpress-save")]
+        public object WordpressSave(string code)
+        {
+            if (code == "")
+            {
+                return new
+                    {
+                        success = false
+                    };
+            }
+            try
+            {
+                var token = OAuth20TokenHelper.GetAccessToken<WordpressLoginProvider>(code);
+                WordpressToken.SaveToken(token);
+                var meInfo = WordpressHelper.GetWordpressMeInfo(token.AccessToken);
+                var blogId = JObject.Parse(meInfo).Value<string>("token_site_id");
+
+                var wordpressUserName = JObject.Parse(meInfo).Value<string>("username");
+
+                var blogInfo = RequestHelper.PerformRequest(WordpressLoginProvider.WordpressSites + blogId, "", "GET", "");
+                var jsonBlogInfo = JObject.Parse(blogInfo);
+                jsonBlogInfo.Add("username", wordpressUserName);
+
+                blogInfo = jsonBlogInfo.ToString();
+                return new
+                    {
+                        success = true,
+                        data = blogInfo
+                    };
+            }
+            catch (Exception)
+            {
+                return new
+                    {
+                        success = false
+                    };
+            }
+        }
+
+        /// <visible>false</visible>
+        [Create("wordpress")]
+        public bool CreateWordpressPost(string code, string title, string content, int status)
+        {
+            try
+            {
+                var token = WordpressToken.GetToken();
+                var meInfo = WordpressHelper.GetWordpressMeInfo(token.AccessToken);
+                var parser = JObject.Parse(meInfo);
+                if (parser == null) return false;
+                var blogId = parser.Value<string>("token_site_id");
+
+                if (blogId != null)
+                {
+                    var createPost = WordpressHelper.CreateWordpressPost(title, content, status, blogId, token);
+                    return createPost;
+                }
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        #endregion
+
+        #region easybib
+
+        /// <visible>false</visible>
+        [Read("easybib-citation-list")]
+        public object GetEasybibCitationList(int source, string data)
+        {
+            try
+            {
+                var citationList = EasyBibHelper.GetEasyBibCitationsList(source, data);
+                return new
+                    {
+                        success = true,
+                        citations = citationList
+                    };
+            }
+            catch (Exception)
+            {
+                return new
+                    {
+                        success = false
+                    };
+            }
+
+        }
+
+        /// <visible>false</visible>
+        [Read("easybib-styles")]
+        public object GetEasybibStyles()
+        {
+            try
+            {
+                var data = EasyBibHelper.GetEasyBibStyles();
+                return new
+                    {
+                        success = true,
+                        styles = data
+                    };
+            }
+            catch (Exception)
+            {
+                return new
+                    {
+                        success = false
+                    };
+            }
+        }
+
+        /// <visible>false</visible>
+        [Create("easybib-citation")]
+        public object EasyBibCitationBook(string citationData)
+        {
+            try
+            {
+                var citat = EasyBibHelper.GetEasyBibCitation(citationData);
+                if (citat != null)
+                {
+                    return new
+                        {
+                            success = true,
+                            citation = citat
+                        };
+                }
+                else
+                {
+                    return new
+                        {
+                            success = false
+                        };
+                }
+
+            }
+            catch (Exception)
+            {
+                return new
+                    {
+                        success = false
+                    };
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// Result of file conversation operation.

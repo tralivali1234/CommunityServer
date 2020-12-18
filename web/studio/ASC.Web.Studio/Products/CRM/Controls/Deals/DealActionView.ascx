@@ -13,7 +13,7 @@
             <span class="requiredErrorText"><%=CRMDealResource.EmptyDealName%></span>
             <div class="headerPanelSmall header-base-small" style="margin-bottom: 5px;"><%=CRMDealResource.NameDeal%>:</div>
             <div>
-                <input type="text" id="nameDeal" style="width: 100%" name="nameDeal" class="textEdit" maxlength="100" />
+                <input type="text" id="nameDeal" style="width: 100%" name="nameDeal" class="textEdit" maxlength="255" />
             </div>
         </div>
 
@@ -26,7 +26,7 @@
 
             <dt style="margin:20px 0;" class="assignedDealContacts hiddenFields">
                 <div id="dealsContactListBox">
-                    <table id="contactTable" class="table-list" cellpadding="4" cellspacing="0">
+                    <table id="contactTable" class="table-list padding4" cellpadding="0" cellspacing="0">
                         <tbody>
                         </tbody>
                     </table>
@@ -87,14 +87,14 @@
 
             <dt class="header-base-small"><%=CRMJSResource.ExpectedCloseDate%>:</dt>
             <dd>
-                <input type="text" id="expectedCloseDate" name="expectedCloseDate" class="textEdit textEditCalendar" />
+                <input type="text" id="expectedCloseDate" name="expectedCloseDate" class="textEdit textEditCalendar" autocomplete="off"/>
             </dd>
         </dl>
 
         <div id="AdvUserSelectorContainer" class="requiredField headerPanelSmall-splitter">
             <span class="requiredErrorText"><%=CRMDealResource.EmptyDealResponsible%></span>
             <div class="headerPanelSmall header-base-small" style="margin-bottom:5px;"><%=CRMDealResource.ResponsibleDeal%>:</div>
-            <div id="advUserSelectorResponsible" data-responsible-id="">
+            <div id="advUserSelectorResponsible" data-responsible-id="" style="position: relative;">
                 <span>
                     <a class="link dotline dealResponsibleLabel"></a>
                     <span class="sort-down-black"></span>

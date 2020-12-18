@@ -6,7 +6,6 @@
 <%@ Assembly Name="ASC.Core.Common" %>
 <%@ Import Namespace="ASC.Web.CRM.Resources" %>
 
-<div id="CaseTabs"></div>
 
 <div id="profileTab" class="display-none">
     <asp:PlaceHolder runat="server" ID="_phProfileView"></asp:PlaceHolder>
@@ -20,7 +19,7 @@
         <div class="bold" style="margin-bottom:5px;"><%= CRMContactResource.AssignContactFromExisting%>:</div>
     </div>
     <div id="contactListBox">
-        <table id="contactTable" class="table-list" cellpadding="4" cellspacing="0">
+        <table id="contactTable" class="table-list padding4" cellpadding="0" cellspacing="0">
             <tbody>
             </tbody>
         </table>
@@ -34,7 +33,7 @@
 <div id="caseDetailsMenuPanel" class="studio-action-panel">
     <ul class="dropdown-content">
         <li>
-            <a class="dropdown-item" href="<%= String.Format("cases.aspx?id={0}&action=manage", TargetCase.ID) %>"
+            <a class="dropdown-item" href="<%= String.Format("Cases.aspx?id={0}&action=manage", TargetCase.ID) %>"
                     title="<%= CRMCasesResource.EditCase %>">
                 <%= CRMCasesResource.EditCase %>
             </a>

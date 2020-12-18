@@ -1,53 +1,48 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.CRM.Core.Entities;
-using ASC.Web.Files.Services.DocumentService;
-using Ionic.Zip;
 using System;
-using System.Linq;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Web;
 using System.Xml;
+using ASC.Common.Logging;
+using ASC.CRM.Core.Dao;
+using ASC.CRM.Core.Entities;
+using ASC.Web.CRM.Core;
 using ASC.Web.CRM.Resources;
+using ASC.Web.Files.Services.DocumentService;
+using Autofac;
+using Ionic.Zip;
 using File = ASC.Files.Core.File;
 
 namespace ASC.Web.CRM.Classes
 {
     public class PdfCreator
     {
-        private static string TemplatePath
+        private static Stream Template
         {
             get
             {
-                var path = HttpContext.Current.Server.MapPath("~/products/crm/invoicetemplates");
-                return Path.Combine(path, "template.docx");
+                var bytes = FileHelper.ReadBytesFromEmbeddedResource("ASC.Web.CRM.InvoiceTemplates.template.docx");
+                return new MemoryStream(bytes);
             }
         }
         private const string FormatPdf = ".pdf";
@@ -58,54 +53,61 @@ namespace ASC.Web.CRM.Classes
 
         public static void CreateAndSaveFile(int invoiceId)
         {
-            var log = log4net.LogManager.GetLogger("ASC.CRM");
+            var log = LogManager.GetLogger("ASC.CRM");
             log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}", invoiceId);
             try
             {
-                var invoice = Global.DaoFactory.GetInvoiceDao().GetByID(invoiceId);
-                if (invoice == null)
+                using (var scope = DIHelper.Resolve())
                 {
-                    throw new Exception(CRMErrorsResource.InvoiceNotFound + ". Invoice ID = " + invoiceId);
-                }
+                    var daoFactory = scope.Resolve<DaoFactory>();
 
-                log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. Convertation", invoiceId);
+                    var invoice = daoFactory.InvoiceDao.GetByID(invoiceId);
+                    if (invoice == null)
+                    {
+                        log.Warn(CRMErrorsResource.InvoiceNotFound + ". Invoice ID = " + invoiceId);
+                        return;
+                    }
 
-                string urlToFile;
-                using (var docxStream = GetStreamDocx(invoice))
-                {
-                    urlToFile = GetUrlToFile(docxStream);
-                }
+                    log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. Convertation", invoiceId);
 
-                log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. UrlToFile = {1}", invoiceId, urlToFile);
+                    string urlToFile;
+                    using (var docxStream = GetStreamDocx(invoice))
+                    {
+                        urlToFile = GetUrlToFile(docxStream);
+                    }
 
-                var file = new File
+                    log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. UrlToFile = {1}", invoiceId,
+                        urlToFile);
+
+                    var file = new File
                     {
                         Title = string.Format("{0}{1}", invoice.Number, FormatPdf),
-                        FolderID = Global.DaoFactory.GetFileDao().GetRoot()
+                        FolderID = daoFactory.FileDao.GetRoot()
                     };
 
-                var request = WebRequest.Create(urlToFile);
-                using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                {
-                    file.ContentLength = response.ContentLength;
+                    var request = WebRequest.Create(urlToFile);
+                    using (var response = request.GetResponse())
+                    using (var stream = response.GetResponseStream())
+                    {
+                        file.ContentLength = response.ContentLength;
 
-                    log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. SaveFile", invoiceId);
-                    file = Global.DaoFactory.GetFileDao().SaveFile(file, stream);
+                        log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. SaveFile", invoiceId);
+                        file = daoFactory.FileDao.SaveFile(file, stream);
+                    }
+
+                    if (file == null)
+                    {
+                        throw new Exception(CRMErrorsResource.FileCreateError);
+                    }
+
+                    invoice.FileID = Int32.Parse(file.ID.ToString());
+
+                    log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. UpdateInvoiceFileID. FileID = {1}", invoiceId, file.ID);
+                    daoFactory.InvoiceDao.UpdateInvoiceFileID(invoice.ID, invoice.FileID);
+
+                    log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. AttachFiles. FileID = {1}", invoiceId, file.ID);
+                    daoFactory.RelationshipEventDao.AttachFiles(invoice.ContactID, invoice.EntityType, invoice.EntityID, new[] {invoice.FileID});
                 }
-
-                if (file == null)
-                {
-                    throw new Exception(CRMErrorsResource.FileCreateError);
-                }
-
-                invoice.FileID = Int32.Parse(file.ID.ToString());
-
-                log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. UpdateInvoiceFileID. FileID = {1}", invoiceId, file.ID);
-                Global.DaoFactory.GetInvoiceDao().UpdateInvoiceFileID(invoice.ID, invoice.FileID);
-
-                log.DebugFormat("PdfCreator. CreateAndSaveFile. Invoice ID = {0}. AttachFiles. FileID = {1}", invoiceId, file.ID);
-                Global.DaoFactory.GetRelationshipEventDao().AttachFiles(invoice.ContactID, invoice.EntityType, invoice.EntityID, new[] {invoice.FileID});
             }
             catch (Exception e)
             {
@@ -113,15 +115,15 @@ namespace ASC.Web.CRM.Classes
             }
         }
 
-        public static File CreateFile(Invoice data)
+        public static File CreateFile(Invoice data, DaoFactory daoFactory)
         {
-            var log = log4net.LogManager.GetLogger("ASC.CRM");
+            var log = LogManager.GetLogger("ASC.CRM");
             try
             {
                 using (var docxStream = GetStreamDocx(data))
                 {
                     var urlToFile = GetUrlToFile(docxStream);
-                    return SaveFile(data, urlToFile);
+                    return SaveFile(data, urlToFile, daoFactory);
                 }
             }
             catch (Exception e)
@@ -133,15 +135,15 @@ namespace ASC.Web.CRM.Classes
 
         private static string GetUrlToFile(Stream docxStream)
         {
+            var externalUri = Files.Classes.PathProvider.GetTempUrl(docxStream, FormatDocx);
+            externalUri = DocumentServiceConnector.ReplaceCommunityAdress(externalUri);
+            LogManager.GetLogger("ASC.CRM").DebugFormat("PdfCreator. GetUrlToFile. externalUri = {0}", externalUri);
+
             var revisionId = DocumentServiceConnector.GenerateRevisionId(Guid.NewGuid().ToString());
-
-            var externalUri = DocumentServiceConnector.GetExternalUri(docxStream, "text/plain", revisionId);
-            log4net.LogManager.GetLogger("ASC.CRM").DebugFormat("PdfCreator. GetUrlToFile. externalUri = {0}", externalUri);
-
             string urlToFile;
-            DocumentServiceConnector.GetConvertedUri(externalUri, FormatDocx, FormatPdf, revisionId, false, out urlToFile);
+            DocumentServiceConnector.GetConvertedUri(externalUri, FormatDocx, FormatPdf, revisionId, null, false, out urlToFile);
 
-            log4net.LogManager.GetLogger("ASC.CRM").DebugFormat("PdfCreator. GetUrlToFile. urlToFile = {0}", urlToFile);
+            LogManager.GetLogger("ASC.CRM").DebugFormat("PdfCreator. GetUrlToFile. urlToFile = {0}", urlToFile);
             return urlToFile;
         }
 
@@ -149,12 +151,12 @@ namespace ASC.Web.CRM.Classes
         {
             using (var docxStream = GetStreamDocx(data))
             {
+                var externalUri = Files.Classes.PathProvider.GetTempUrl(docxStream, FormatDocx);
+                externalUri = DocumentServiceConnector.ReplaceCommunityAdress(externalUri);
+
                 var revisionId = DocumentServiceConnector.GenerateRevisionId(Guid.NewGuid().ToString());
-
-                var externalUri = DocumentServiceConnector.GetExternalUri(docxStream, MimeMapping.GetMimeMapping(FormatDocx), revisionId);
-
                 string urlToFile;
-                DocumentServiceConnector.GetConvertedUri(externalUri, FormatDocx, FormatPdf, revisionId, true, out urlToFile);
+                DocumentServiceConnector.GetConvertedUri(externalUri, FormatDocx, FormatPdf, revisionId, null, true, out urlToFile);
 
                 return new ConverterData
                     {
@@ -165,7 +167,7 @@ namespace ASC.Web.CRM.Classes
             }
         }
 
-        public static File GetConvertedFile(ConverterData data)
+        public static File GetConvertedFile(ConverterData data, DaoFactory daoFactory)
         {
             if (string.IsNullOrEmpty(data.StorageUrl) || string.IsNullOrEmpty(data.RevisionId))
             {
@@ -173,19 +175,19 @@ namespace ASC.Web.CRM.Classes
             }
             
             string urlToFile;
-            DocumentServiceConnector.GetConvertedUri(data.StorageUrl, FormatDocx, FormatPdf, data.RevisionId, true, out urlToFile);
+            DocumentServiceConnector.GetConvertedUri(data.StorageUrl, FormatDocx, FormatPdf, data.RevisionId, null, true, out urlToFile);
 
             if (string.IsNullOrEmpty(urlToFile))
             {
                 return null;
             }
 
-            var invoice = Global.DaoFactory.GetInvoiceDao().GetByID(data.InvoiceId);
+            var invoice = daoFactory.InvoiceDao.GetByID(data.InvoiceId);
 
-            return SaveFile(invoice, urlToFile);
+            return SaveFile(invoice, urlToFile, daoFactory);
         }
 
-        private static File SaveFile(Invoice data, string url)
+        private static File SaveFile(Invoice data, string url, DaoFactory daoFactory)
         {
             File file = null;
 
@@ -200,16 +202,16 @@ namespace ASC.Web.CRM.Classes
                         var document = new File
                         {
                             Title = string.Format("{0}{1}", data.Number, FormatPdf),
-                            FolderID = Global.DaoFactory.GetFileDao().GetRoot(),
+                            FolderID = daoFactory.FileDao.GetRoot(),
                             ContentLength = response.ContentLength
                         };
 
-                        if (data.GetInvoiceFile() != null)
+                        if (data.GetInvoiceFile(daoFactory) != null)
                         {
                             document.ID = data.FileID;
                         }
 
-                        file = Global.DaoFactory.GetFileDao().SaveFile(document, stream);
+                        file = daoFactory.FileDao.SaveFile(document, stream);
                     }
                 }
             }
@@ -231,7 +233,7 @@ namespace ASC.Web.CRM.Classes
                 logo = Convert.FromBase64String(OrganisationLogoManager.GetOrganisationLogoBase64(invoiceData.LogoBase64Id));
             }
 
-            using (var zip = ZipFile.Read(TemplatePath))
+            using (var zip = ZipFile.Read(Template))
             {
                 var documentXmlStream = new MemoryStream();
                 foreach (var entry in zip.Entries.Where(entry => entry.FileName == DocumentXml))
@@ -310,24 +312,27 @@ namespace ASC.Web.CRM.Classes
                 }
                 else
                 {
-                    var stream = new MemoryStream(logo);
-                    var img = System.Drawing.Image.FromStream(stream);
-                    var cx = img.Width * 9525;//1px =  9525emu
-                    var cy = img.Height * 9525;//1px =  9525emu
-                    
-                    var newText = parent.CloneNode(true).OuterXml;
-                    newText = newText
-                        .Replace("${width}", cx.ToString(CultureInfo.InvariantCulture))
-                        .Replace("${height}", cy.ToString(CultureInfo.InvariantCulture));
-                    var newEl = new XmlDocument();
-                    newEl.LoadXml(newText);
-                    if (parent.ParentNode != null)
+                    using (var stream = new MemoryStream(logo))
+                    using (var img = System.Drawing.Image.FromStream(stream))
                     {
-                        if (newEl.DocumentElement != null)
+                        var cx = img.Width*9525; //1px =  9525emu
+                        var cy = img.Height*9525; //1px =  9525emu
+
+                        var newText = parent.CloneNode(true).OuterXml;
+                        newText = newText
+                            .Replace("${width}", cx.ToString(CultureInfo.InvariantCulture))
+                            .Replace("${height}", cy.ToString(CultureInfo.InvariantCulture));
+                        var newEl = new XmlDocument();
+                        newEl.LoadXml(newText);
+                        if (parent.ParentNode != null)
                         {
-                            parent.ParentNode.InsertBefore(xDocument.ImportNode(newEl.DocumentElement, true), parent);
+                            if (newEl.DocumentElement != null)
+                            {
+                                parent.ParentNode.InsertBefore(xDocument.ImportNode(newEl.DocumentElement, true),
+                                                               parent);
+                            }
+                            parent.ParentNode.RemoveChild(parent);
                         }
-                        parent.ParentNode.RemoveChild(parent);
                     }
                 }
             }

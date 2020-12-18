@@ -8,14 +8,7 @@
 <%@ Assembly Name="ASC.Web.Core" %>
 
 <div id="invoiceTaxesList"class="clearFix">
-    <p style="margin-bottom: 10px;"><%= CRMInvoiceResource.InvoiceTaxesDescriptionText %></p>
-    <p style="margin-bottom: 20px;"><%= CRMInvoiceResource.InvoiceTaxesDescriptionTextEditDelete%></p>
-    <div class="clearFix" style="margin-bottom: 8px;">
-        <a class="gray button" id="createNewTax">
-            <span class="plus"><%= CRMInvoiceResource.CreateInvoiceTax %></span>
-        </a>
-    </div>
-    <table id="invoiceTaxesTable" class="table-list" cellpadding="4" cellspacing="0">
+    <table id="invoiceTaxesTable" class="table-list padding4" cellpadding="0" cellspacing="0">
         <colgroup>
             <col style="width: 1%;"/>
             <col style="width: 1%;"/>
@@ -29,7 +22,7 @@
 
 <div id="invoiceTaxesActionMenu" class="studio-action-panel">
     <ul class="dropdown-content">
-        <li><a class="dropdown-item editInvoiceTaxLink"><%= CRMInvoiceResource.EditInvoiceTax %></a></li>
-        <li><a class="dropdown-item deleteInvoiceTaxLink"><%= CRMCommonResource.Delete %></a></li>
+        <li><a class="dropdown-item with-icon edit editInvoiceTaxLink"><%= CRMInvoiceResource.EditInvoiceTax %></a></li>
+        <li><a class="dropdown-item with-icon delete deleteInvoiceTaxLink"><%= CRMCommonResource.Delete %></a></li>
     </ul>
 </div>

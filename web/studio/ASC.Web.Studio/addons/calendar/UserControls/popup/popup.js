@@ -1,36 +1,19 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
-
-/*
- * Popup Widgets
- *
- * Dmitry Sokolov
- * Ascensio System SIA.
- * 2011
- */
 
 (function($, window) {
 
@@ -74,15 +57,30 @@
 		_arrowWidth: 0,
 		_arrowHeight: 0,
 
+		_arrowSize: {},
+
 		_create: function() {
+			var arrow = $('<div class="arrow" style="margin:0;"/>');
+
 			this.element
 					.hide()
-					.appendTo("body")
 					.addClass(this.options.cssClassName)
-					.append('<div class="arrow" style="margin:0;"/>');
-			this._arrow = this.element.find(".arrow");
-			this._arrowWidth = this._arrow.outerWidth(true);
-			this._arrowHeight = this._arrow.outerHeight(true);
+					.append(arrow)
+					.appendTo("body");
+
+			this._arrow = arrow;
+
+			var size = this._arrowSize[this.options.cssClassName];
+
+			if (!size) {
+				size = this._arrowSize[this.options.cssClassName] = {
+					width: this._arrow.outerWidth(true),
+					height: this._arrow.outerHeight(true)
+				};
+			}
+
+			this._arrowWidth = size.width;
+			this._arrowHeight = size.height;
 		},
 
 		_makeVArrow: function(arrow, anchorX, label) {
@@ -173,7 +171,8 @@
 		},
 
 		_parsePageX: function(_pageX) {
-			var win = $(window);
+		    var win = $(window);
+		    var studioPageContent = $('#studioPageContent');
 			var pageX = (/^\s*(\d+|left|right|center)/i).exec(_pageX);
 			if (!pageX) {pageX = "center";}
 			var pX = parseInt(pageX[1], 10);
@@ -184,9 +183,10 @@
 					return 0;
 				} else if ("right" === pageX[1]) {
 					return win.width();
-				} else {
-					return Math.round((win.width() - this.element.outerWidth(true)) * 0.5);
-				}
+			    } else {
+			        var center = win.width() < studioPageContent.width() ? Math.round((studioPageContent.width() - this.element.outerWidth(true)) * 0.5) : Math.round((win.width() - this.element.outerWidth(true)) * 0.5);
+			        return center;
+			    }
 			}
 			return 0;
 		},
@@ -215,9 +215,9 @@
 			var isElement = isHtmlElement(label[0]);
 			var anchor = this.options.anchor.match(/^\s*(left|right)\s*,\s*(top|bottom)/i);
 			var dir = this.options.direction.match(/^\s*(left|right)\s*,\s*(up|down)/i);
-			var offs = this.options.offset.match(/^\s*([+-]?\d+)\s*(px)?\s*,\s*([+-]?\d+)\s*(px)?/i);
+			var offs = this.options.offset.match(/^\s*([+-]?\d+(\.\d+)?)\s*(px)?\s*,\s*([+-]?\d+(\.\d+)?)\s*(px)?/i);
 			var arr = this.options.arrow.match(/^\s*(left|right|up|down)/i);
-			var arrPos = this.options.arrowPosition.match(/^\s*([+-]?\d+)\s*(%)?/i);
+			var arrPos = this.options.arrowPosition.match(/^\s*([+-]?\d+(\.\d+)?)\s*(%)?/i);
 			if (!anchor || !dir || !offs || !arr) {return;}
 
 			if (!label || label.length < 1 || !isElement) {
@@ -231,7 +231,7 @@
 			var dirY = dir[2].toLowerCase();
 			var offset = {
 				x: (offs[1] != undefined ? parseInt(offs[1]) : 0),
-				y: (offs[3] != undefined ? parseInt(offs[3]) : 0)
+				y: (offs[4] != undefined ? parseInt(offs[4]) : 0)
 			};
 			var arrow = arr[1];
 			var arrowPosition = (arrPos[1] != undefined ? parseInt(arrPos[1]) : -1);
@@ -288,8 +288,16 @@
 			this._visible = true;
 		},
 
+        hide: function() {
+            this.element.hide();
+        },
+
+        show: function() {
+            this.element.show();
+        },
+
 		close: function() {
-			if(this.element.is(":visible")) {
+			if (this.element[0].style.display != "none") {
 				this.element.hide();
 			}
 			this._visible = false;
@@ -424,7 +432,7 @@
 				$(window.document).bind("mousedown", t, t._outerClick);
 			}
 
-			$.each(t.options.items, function(i,_item) {
+            $.each(t.options.items, function(i,_item) {
 				if (_item === t.options.divider || 
 						_item.label === t.options.divider) {
 					$("<div class='divider'/>").appendTo(t.element);
@@ -436,7 +444,7 @@
 							.click({itemIndex: i, item: _item}, function(e) {t._itemClick(e);})
 							.appendTo(t.element);
 				}
-			});
+            });
 		},
 
 		_outerClick: function(event) {

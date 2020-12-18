@@ -1,53 +1,32 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-#region Import
-
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
-using System.Net;
-using System.Web;
-using System.Linq;
-using ASC.Collections;
-using ASC.Common.Threading.Workers;
-using ASC.Data.Storage;
-using ASC.Web.CRM.Configuration;
-using ASC.Web.Core.Files;
-using ASC.Web.Core.Utility;
-using ASC.Web.Core.Utility.Skins;
-using ASC.Web.Studio.Controls.FileUploader;
-using ASC.Web.Studio.Core;
 using System.Drawing.Imaging;
-using System.Drawing.Drawing2D;
-using ASC.Web.CRM.Resources;
+using System.IO;
+using ASC.Common.Logging;
+using ASC.CRM.Core.Dao;
+using ASC.Data.Storage;
 using ASC.Web.Core;
-
-#endregion
+using ASC.Web.Core.Utility.Skins;
+using ASC.Web.CRM.Configuration;
+using ASC.Web.CRM.Core;
+using Autofac;
 
 namespace ASC.Web.CRM.Classes
 {
@@ -63,22 +42,6 @@ namespace ASC.Web.CRM.Classes
         public static readonly Size OrganisationLogoSize = new Size(200, 150);
 
         private static readonly Object _synchronizedObj = new Object();
-
-        #endregion
-
-        #region DataStore Methods
-
-        private static String FromDataStore()
-        {
-            var directoryPath = BuildFileDirectory();
-            var filesURI = Global.GetStore().ListFiles(directoryPath, OrganisationLogoImgName + "*", false);
-
-            if (filesURI.Length == 0)
-            {
-                return String.Empty;
-            }
-            return filesURI[0].ToString();
-        }
 
         #endregion
 
@@ -135,7 +98,10 @@ namespace ASC.Web.CRM.Classes
         public static String GetOrganisationLogoBase64(int logoID)
         {
             if (logoID <= 0) { return ""; }
-            return Global.DaoFactory.GetInvoiceDao().GetOrganisationLogoBase64(logoID);
+            using (var scope = DIHelper.Resolve())
+            {
+                return scope.Resolve<DaoFactory>().InvoiceDao.GetOrganisationLogoBase64(logoID);
+            }
         }
 
         public static String GetOrganisationLogoSrc(int logoID)
@@ -162,9 +128,8 @@ namespace ASC.Web.CRM.Classes
             }
         }
 
-        public static int TryUploadOrganisationLogoFromTmp()
+        public static int TryUploadOrganisationLogoFromTmp(DaoFactory factory)
         {
-            var logo_id = 0;
             var directoryPath = BuildFileDirectory();
             var dataStore = Global.GetStore();
 
@@ -173,37 +138,32 @@ namespace ASC.Web.CRM.Classes
 
             try
             {
-                var photoPath = FromDataStore();
-                photoPath = photoPath.Substring(photoPath.IndexOf(directoryPath));
+                var photoPaths = Global.GetStore().ListFilesRelative("", directoryPath, OrganisationLogoImgName + "*", false);
+                if (photoPaths.Length == 0)
+                    return 0;
 
                 byte[] bytes;
-                using (var photoTmpStream = dataStore.GetReadStream(photoPath))
+                using (var photoTmpStream = dataStore.GetReadStream(Path.Combine(directoryPath, photoPaths[0])))
                 {
                     bytes = Global.ToByteArray(photoTmpStream);
                 }
 
-                logo_id = Global.DaoFactory.GetInvoiceDao().SaveOrganisationLogo(bytes);
+                var logoID = factory.InvoiceDao.SaveOrganisationLogo(bytes);
                 dataStore.DeleteFiles(directoryPath, "*", false);
-                return logo_id;
+                return logoID;
             }
 
             catch (Exception ex)
             {
-                log4net.LogManager.GetLogger("ASC.CRM").ErrorFormat("TryUploadOrganisationLogoFromTmp failed with error: {0}", ex);
+                LogManager.GetLogger("ASC.CRM").ErrorFormat("TryUploadOrganisationLogoFromTmp failed with error: {0}", ex);
                 return 0;
             }
         }
 
-        public static String UploadLogo(Stream inputStream, bool isTmpDir)
+        public static String UploadLogo(byte[] imageData, ImageFormat imageFormat)
         {
-            var imageData = Global.ToByteArray(inputStream);
-
-            var fileExtension = String.Concat("." + Global.GetImgFormatName(ImageFormat.Jpeg));
-            var photoPath = BuildFilePath(fileExtension);
-
-            var result = ExecResizeImage(imageData, OrganisationLogoSize, Global.GetStore(), photoPath);
-
-            return result;
+            var photoPath = BuildFilePath("." + Global.GetImgFormatName(imageFormat));
+            return ExecResizeImage(imageData, OrganisationLogoSize, Global.GetStore(), photoPath);
         }
     }
 }

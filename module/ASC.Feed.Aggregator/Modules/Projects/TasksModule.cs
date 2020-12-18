@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,6 +18,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Web;
 using ASC.Common.Data;
 using ASC.Common.Data.Sql;
@@ -34,9 +26,10 @@ using ASC.Common.Data.Sql.Expressions;
 using ASC.Projects.Core.Domain;
 using ASC.Projects.Core.Domain.Entities.Feed;
 using ASC.Projects.Engine;
-using ASC.Web.Core.Security;
+using ASC.Web.Projects.Core;
 using ASC.Web.Studio.Utility;
-using System.Linq;
+using ASC.Web.Studio.Utility.HtmlUtility;
+using Autofac;
 
 namespace ASC.Feed.Aggregator.Modules.Projects
 {
@@ -106,7 +99,10 @@ namespace ASC.Feed.Aggregator.Modules.Projects
 
         public override bool VisibleFor(Feed feed, object data, Guid userId)
         {
-            return base.VisibleFor(feed, data, userId) && ProjectSecurity.CanGoToFeed((Task)data, userId);
+            using (var scope = DIHelper.Resolve())
+            {
+                return base.VisibleFor(feed, data, userId) && scope.Resolve<ProjectSecurity>().CanGoToFeed((Task)data, userId);
+            }
         }
 
         public override IEnumerable<Tuple<Feed, object>> GetFeeds(FeedFilter filter)
@@ -115,10 +111,13 @@ namespace ASC.Feed.Aggregator.Modules.Projects
                 new SqlQuery("projects_tasks t")
                     .Select(TaskColumns().Select(t => "t." + t).ToArray())
                     .LeftOuterJoin("projects_tasks_responsible r", Exp.EqColumns("r.task_id", "t.id") & Exp.Eq("r.tenant_id", filter.Tenant))
+
                     .Select("group_concat(distinct r.responsible_id)")
                     .InnerJoin("projects_projects p", Exp.EqColumns("p.id", "t.project_id") & Exp.Eq("p.tenant_id", filter.Tenant))
+
                     .Select(ProjectColumns().Select(p => "p." + p).ToArray())
                     .LeftOuterJoin("projects_comments c", Exp.EqColumns("c.target_uniq_id", "concat('Task_', convert(t.id, char))") & Exp.Eq("c.tenant_id", filter.Tenant) & Exp.Eq("c.inactive", 0))
+
                     .Select(CommentColumns().Select(c => "c." + c).ToArray())
                     .Where("t.tenant_id", filter.Tenant)
                     .Where(Exp.Between("t.create_on", filter.Time.From, filter.Time.To) | Exp.Between("c.create_on", filter.Time.From, filter.Time.To))
@@ -207,7 +206,7 @@ namespace ASC.Feed.Aggregator.Modules.Projects
                             StartDate = Convert.ToDateTime(r[9]),
                             CreateBy = new Guid(Convert.ToString(r[10])),
                             CreateOn = Convert.ToDateTime(r[11]),
-                            LastModifiedBy = new Guid(Convert.ToString(r[12])),
+                            LastModifiedBy = ToGuid(r[12]),
                             LastModifiedOn = Convert.ToDateTime(r[13]),
                             Responsibles =
                                 r[14] != null
@@ -224,7 +223,7 @@ namespace ASC.Feed.Aggregator.Modules.Projects
                                     Private = Convert.ToBoolean(r[21]),
                                     CreateBy = new Guid(Convert.ToString(r[22])),
                                     CreateOn = Convert.ToDateTime(r[23]),
-                                    LastModifiedBy = new Guid(Convert.ToString(r[24])),
+                                    LastModifiedBy = ToGuid(r[24]),
                                     LastModifiedOn = Convert.ToDateTime(r[25]),
                                 }
                         }
@@ -249,8 +248,8 @@ namespace ASC.Feed.Aggregator.Modules.Projects
         {
             var task = t.Item1;
 
-            var itemUrl = "/products/projects/tasks.aspx?prjID=" + task.Project.ID + "&id=" + task.ID;
-            var projectUrl = "/products/projects/tasks.aspx?prjID=" + task.Project.ID;
+            var itemUrl = "/Products/Projects/Tasks.aspx?prjID=" + task.Project.ID + "&id=" + task.ID;
+            var projectUrl = "/Products/Projects/Tasks.aspx?prjID=" + task.Project.ID;
             var commentApiUrl = "/api/2.0/project/task/" + task.ID + "/comment.json";
 
             var comments = t.Item2.Where(c => c.Comment != null).OrderBy(c => c.Comment.CreateOn).ToList();
@@ -290,8 +289,8 @@ namespace ASC.Feed.Aggregator.Modules.Projects
         {
             return new FeedComment(comment.Comment.CreateBy)
                 {
-                    Id = comment.Comment.ID.ToString(),
-                    Description = HtmlSanitizer.Sanitize(comment.Comment.Content),
+                    Id = comment.Comment.OldGuidId.ToString(),
+                    Description = HtmlUtility.GetFull(comment.Comment.Content),
                     Date = comment.Comment.CreateOn
                 };
         }

@@ -1,39 +1,20 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using Amazon;
-using Amazon.CloudFront;
-using Amazon.CloudFront.Model;
-using Amazon.S3;
-using Amazon.S3.Model;
-using Amazon.S3.Transfer;
-using Amazon.Util;
-using ASC.Core.Tenants;
-using ASC.Data.Storage.Configuration;
-using ASC.Security.Cryptography;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -42,30 +23,56 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web;
+
+using Amazon;
+using Amazon.CloudFront;
+using Amazon.CloudFront.Model;
+using Amazon.S3;
+using Amazon.S3.Model;
+using Amazon.S3.Transfer;
+using Amazon.Util;
+
+using ASC.Core;
+using ASC.Data.Storage.Configuration;
+
 using MimeMapping = ASC.Common.Web.MimeMapping;
 
 namespace ASC.Data.Storage.S3
 {
     public class S3Storage : BaseStorage
     {
-        private readonly DataList _dataList;
         private readonly List<string> _domains = new List<string>();
         private readonly Dictionary<string, S3CannedACL> _domainsAcl;
-        private readonly Dictionary<string, TimeSpan> _domainsExpires;
-        private readonly string _modulename;
-        private readonly string _tenant;
         private readonly S3CannedACL _moduleAcl;
         private string _accessKeyId = "";
         private string _bucket = "";
         private string _recycleDir = "";
         private Uri _bucketRoot;
         private Uri _bucketSSlRoot;
-        private string _region;
+        private string _region = String.Empty;
+        private string _serviceurl;
+        private bool _forcepathstyle;
         private string _secretAccessKeyId = "";
+        private ServerSideEncryptionMethod _sse = ServerSideEncryptionMethod.AES256;
+        private bool _useHttp = true;
+
         private bool _lowerCasing = true;
         private bool _revalidateCloudFront;
         private string _distributionId = string.Empty;
         private String _subDir = String.Empty;
+
+        public S3Storage(string tenant)
+        {
+            _tenant = tenant;
+            _modulename = string.Empty;
+            _dataList = null;
+
+            //Make expires
+            _domainsExpires = new Dictionary<string, TimeSpan> { { string.Empty, TimeSpan.Zero } };
+
+            _domainsAcl = new Dictionary<string, S3CannedACL>();
+            _moduleAcl = S3CannedACL.PublicRead;
+        }
 
         public S3Storage(string tenant, HandlerConfigurationElement handlerConfig, ModuleConfigurationElement moduleConfig)
         {
@@ -74,7 +81,8 @@ namespace ASC.Data.Storage.S3
             _dataList = new DataList(moduleConfig);
             _domains.AddRange(
                 moduleConfig.Domains.Cast<DomainConfigurationElement>().Select(x => string.Format("{0}/", x.Name)));
-            //Make acl
+
+            //Make expires
             _domainsExpires =
                 moduleConfig.Domains.Cast<DomainConfigurationElement>().Where(x => x.Expires != TimeSpan.Zero).
                     ToDictionary(x => x.Name,
@@ -100,20 +108,22 @@ namespace ASC.Data.Storage.S3
             return _moduleAcl;
         }
 
-        private TimeSpan GetExpire(string domain)
-        {
-            return _domainsExpires.ContainsKey(domain) ? _domainsExpires[domain] : _domainsExpires[string.Empty];
-        }
-
         private S3CannedACL GetS3Acl(ACL acl)
         {
             switch (acl)
             {
                 case ACL.Read:
                     return S3CannedACL.PublicRead;
+                case ACL.Private:
+                    return S3CannedACL.Private;
                 default:
                     return S3CannedACL.PublicRead;
             }
+        }
+
+        public Uri GetUriInternal(string path)
+        {
+            return new Uri(SecureHelper.IsSecure() ? _bucketSSlRoot : _bucketRoot, path);
         }
 
         public Uri GetUriShared(string domain, string path)
@@ -121,7 +131,7 @@ namespace ASC.Data.Storage.S3
             return new Uri(SecureHelper.IsSecure() ? _bucketSSlRoot : _bucketRoot, MakePath(domain, path));
         }
 
-        public override Uri GetPreSignedUri(string domain, string path, TimeSpan expire, IEnumerable<string> headers)
+        public override Uri GetInternalUri(string domain, string path, TimeSpan expire, IEnumerable<string> headers)
         {
             if (expire == TimeSpan.Zero || expire == TimeSpan.MinValue || expire == TimeSpan.MaxValue)
             {
@@ -157,8 +167,10 @@ namespace ASC.Data.Storage.S3
                 }
                 pUrlRequest.ResponseHeaderOverrides = headersOverrides;
             }
-
-            return MakeUri(GetClient().GetPreSignedURL(pUrlRequest));
+            using (var client = GetClient())
+            {
+                return MakeUri(client.GetPreSignedURL(pUrlRequest));
+            }
         }
 
 
@@ -184,13 +196,10 @@ namespace ASC.Data.Storage.S3
 
             if (0 < offset) request.ByteRange = new ByteRange(offset, int.MaxValue);
 
-            return new ResponseStreamWrapper(GetClient().GetObject(request));
-        }
-
-        public override string[] ListFilesRelative(string domain, string path, string pattern, bool recursive)
-        {
-            return GetS3Objects(domain, path, true).Where(x => Wildcard.IsMatch(pattern, Path.GetFileName(x.Key)))
-                .Select(x => x.Key.Substring(MakePath(domain, path + "/").Length).TrimStart('/')).ToArray();
+            using (var client = GetClient())
+            {
+                return new ResponseStreamWrapper(client.GetObject(request));
+            }
         }
 
         protected override Uri SaveWithAutoAttachment(string domain, string path, Stream stream, string attachmentFileName)
@@ -214,26 +223,12 @@ namespace ASC.Data.Storage.S3
         public Uri Save(string domain, string path, Stream stream, string contentType,
                                  string contentDisposition, ACL acl, string contentEncoding = null, int cacheDays = 5)
         {
-            bool postWriteCheck = false;
+            var buffered = stream.GetBuffered();
+
             if (QuotaController != null)
             {
-                try
-                {
-                    QuotaController.QuotaUsedAdd(_modulename, domain, _dataList.GetData(domain), stream.Length);
-                }
-                catch (TenantQuotaException)
-                {
-                    //this exception occurs only if tenant has no free space
-                    //or if file size larger than allowed by quota
-                    //so we can exit this function without stream buffering etc
-                    throw;
-                }
-                catch (Exception)
-                {
-                    postWriteCheck = true;
-                }
+                QuotaController.QuotaUsedCheck(buffered.Length);
             }
-
 
             using (var client = GetClient())
             using (var uploader = new TransferUtility(client))
@@ -241,24 +236,35 @@ namespace ASC.Data.Storage.S3
                 var mime = string.IsNullOrEmpty(contentType)
                                   ? MimeMapping.GetMimeMapping(Path.GetFileName(path))
                                   : contentType;
-                var buffered = stream.GetBuffered();
 
                 var request = new TransferUtilityUploadRequest
                 {
                     BucketName = _bucket,
                     Key = MakePath(domain, path),
-                    CannedACL = acl == ACL.Auto ? GetDomainACL(domain) : GetS3Acl(acl),
                     ContentType = mime,
-                    ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256,
+                    ServerSideEncryptionMethod = _sse,
                     InputStream = buffered,
                     AutoCloseStream = false,
                     Headers =
                     {
                         CacheControl = string.Format("public, maxage={0}", (int)TimeSpan.FromDays(cacheDays).TotalSeconds),
-                        Expires = DateTime.UtcNow.Add(TimeSpan.FromDays(cacheDays))
+                        ExpiresUtc = DateTime.UtcNow.Add(TimeSpan.FromDays(cacheDays))
                     }
                 };
 
+                if (!WorkContext.IsMono) //  System.Net.Sockets.SocketException: Connection reset by peer
+                {
+                    switch (acl)
+                    {
+                        case ACL.Auto:
+                            request.CannedACL = GetDomainACL(domain);
+                            break;
+                        case ACL.Read:
+                        case ACL.Private:
+                            request.CannedACL = GetS3Acl(acl);
+                            break;
+                    }
+                }
 
                 if (!string.IsNullOrEmpty(contentDisposition))
                 {
@@ -274,58 +280,11 @@ namespace ASC.Data.Storage.S3
                     request.Headers.ContentEncoding = contentEncoding;
                 }
 
-                //Send body
-                if (postWriteCheck)
-                {
-                    QuotaController.QuotaUsedAdd(_modulename, domain, _dataList.GetData(domain), buffered.Length);
-                }
-
                 uploader.Upload(request);
 
                 InvalidateCloudFront(MakePath(domain, path));
 
-                return GetUri(domain, path);
-            }
-        }
-
-        public override Uri UploadWithoutQuota(string domain, string path, Stream stream, string contentType, string contentDisposition)
-        {
-            var acl = ACL.Auto;
-            using (var client = GetClient())
-            {
-                var util = new TransferUtility(client);
-                var mime = string.IsNullOrEmpty(contentType)
-                                  ? MimeMapping.GetMimeMapping(Path.GetFileName(path))
-                                  : contentType;
-
-                var buffered = stream.GetBuffered();
-                var request = new TransferUtilityUploadRequest
-                {
-                    BucketName = _bucket,
-                    Key = MakePath(domain, path),
-                    CannedACL = acl == ACL.Auto ? GetDomainACL(domain) : GetS3Acl(acl),
-                    ContentType = mime,
-                    InputStream = buffered,
-                    AutoCloseStream = false,
-                    Headers =
-                    {
-                        CacheControl = string.Format("public, maxage={0}", (int)TimeSpan.FromDays(5).TotalSeconds),
-                        Expires = DateTime.UtcNow.Add(TimeSpan.FromDays(5)),
-                    }
-                };
-
-                if (!string.IsNullOrEmpty(contentDisposition))
-                {
-                    request.Headers.ContentDisposition = Uri.EscapeDataString(contentDisposition);
-                }
-                else if (mime == "application/octet-stream")
-                {
-                    request.Headers.ContentDisposition = "attachment";
-                }
-
-                util.Upload(request);
-
-                InvalidateCloudFront(MakePath(domain, path));
+                QuotaUsedAdd(domain, buffered.Length);
 
                 return GetUri(domain, path);
             }
@@ -380,7 +339,7 @@ namespace ASC.Data.Storage.S3
             {
                 BucketName = _bucket,
                 Key = MakePath(domain, path),
-                ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
+                ServerSideEncryptionMethod = _sse
             };
 
             using (var s3 = GetClient())
@@ -390,7 +349,7 @@ namespace ASC.Data.Storage.S3
             }
         }
 
-        public override string UploadChunk(string domain, string path, string uploadId, Stream stream, int chunkNumber, long chunkLength)
+        public override string UploadChunk(string domain, string path, string uploadId, Stream stream, long defaultChunkSize, int chunkNumber, long chunkLength)
         {
             var request = new UploadPartRequest
             {
@@ -441,7 +400,7 @@ namespace ASC.Data.Storage.S3
                 if (QuotaController != null)
                 {
                     var size = GetFileSize(domain, path);
-                    QuotaController.QuotaUsedAdd(_modulename, domain, _dataList.GetData(domain), size);
+                    QuotaUsedAdd(domain, size);
                 }
 
                 return GetUri(domain, path);
@@ -480,18 +439,10 @@ namespace ASC.Data.Storage.S3
 
         public override void Delete(string domain, string path)
         {
-            Delete(domain, path, true);
-        }
-
-        public void Delete(string domain, string path, bool quotaDelete)
-        {
             using (var client = GetClient())
             {
                 var key = MakePath(domain, path);
-                if (quotaDelete)
-                {
-                    QuotaDelete(domain, client, key);
-                }
+                var size = GetFileSize(domain, path);
 
                 Recycle(client, domain, key);
 
@@ -502,27 +453,9 @@ namespace ASC.Data.Storage.S3
                 };
 
                 client.DeleteObject(request);
-            }
-        }
 
-        private long QuotaDelete(string domain, IAmazonS3 client, string key)
-        {
-            if (QuotaController != null)
-            {
-                var responce = client.ListObjects(new ListObjectsRequest
-                {
-                    BucketName = _bucket,
-                    Prefix = key
-                });
-
-                if (responce.S3Objects != null && responce.S3Objects.Count > 0)
-                {
-                    var size = Convert.ToInt64(responce.S3Objects[0].Size);
-                    QuotaController.QuotaUsedDelete(_modulename, domain, _dataList.GetData(domain), size);
-                    return size;
-                }
+                QuotaUsedDelete(domain, size);
             }
-            return 0;
         }
 
         public override void DeleteFiles(string domain, List<string> paths)
@@ -559,11 +492,6 @@ namespace ASC.Data.Storage.S3
             if (!keysToDel.Any())
                 return;
 
-            if (QuotaController != null && quotaUsed > 0)
-            {
-                QuotaController.QuotaUsedDelete(_modulename, domain, _dataList.GetData(domain), quotaUsed);
-            }
-
             using (var client = GetClient())
             {
                 var deleteRequest = new DeleteObjectsRequest
@@ -574,22 +502,26 @@ namespace ASC.Data.Storage.S3
 
                 client.DeleteObjects(deleteRequest);
             }
+
+            if (quotaUsed > 0)
+            {
+                QuotaUsedDelete(domain, quotaUsed);
+            }
         }
 
         public override void DeleteFiles(string domain, string path, string pattern, bool recursive)
         {
+            var makedPath = MakePath(domain, path) + '/';
             var objToDel = GetS3Objects(domain, path)
-                .Where(x => Wildcard.IsMatch(pattern, Path.GetFileName(x.Key)));
+                .Where(x =>
+                    Wildcard.IsMatch(pattern, Path.GetFileName(x.Key))
+                    && (recursive || !x.Key.Remove(0, makedPath.Length).Contains('/'))
+                    );
 
             using (var client = GetClient())
             {
                 foreach (var s3Object in objToDel)
                 {
-                    if (QuotaController != null)
-                    {
-                        QuotaController.QuotaUsedDelete(_modulename, domain, _dataList.GetData(domain), Convert.ToInt64(s3Object.Size));
-                    }
-
                     Recycle(client, domain, s3Object.Key);
 
                     var deleteRequest = new DeleteObjectRequest
@@ -599,6 +531,32 @@ namespace ASC.Data.Storage.S3
                     };
 
                     client.DeleteObject(deleteRequest);
+
+                    QuotaUsedDelete(domain, Convert.ToInt64(s3Object.Size));
+                }
+            }
+        }
+
+        public override void DeleteFiles(string domain, string path, DateTime fromDate, DateTime toDate)
+        {
+            var objToDel = GetS3Objects(domain, path)
+                .Where(x => x.LastModified >= fromDate && x.LastModified <= toDate);
+
+            using (var client = GetClient())
+            {
+                foreach (var s3Object in objToDel)
+                {
+                    Recycle(client, domain, s3Object.Key);
+
+                    var deleteRequest = new DeleteObjectRequest
+                    {
+                        BucketName = _bucket,
+                        Key = s3Object.Key
+                    };
+
+                    client.DeleteObject(deleteRequest);
+
+                    QuotaUsedDelete(domain, Convert.ToInt64(s3Object.Size));
                 }
             }
         }
@@ -626,7 +584,7 @@ namespace ASC.Data.Storage.S3
                         DestinationBucket = _bucket,
                         DestinationKey = s3Object.Key.Replace(srckey, dstkey),
                         CannedACL = GetDomainACL(newdomain),
-                        ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
+                        ServerSideEncryptionMethod = _sse
                     });
 
                     client.DeleteObject(new DeleteObjectRequest
@@ -644,11 +602,8 @@ namespace ASC.Data.Storage.S3
             {
                 var srcKey = MakePath(srcdomain, srcpath);
                 var dstKey = MakePath(newdomain, newpath);
-                var size = QuotaDelete(srcdomain, client, srcKey);
-                if (QuotaController != null)
-                {
-                    QuotaController.QuotaUsedAdd(_modulename, newdomain, _dataList.GetData(newdomain), size);
-                }
+                var size = GetFileSize(srcdomain, srcpath);
+
                 var request = new CopyObjectRequest
                 {
                     SourceBucket = _bucket,
@@ -657,11 +612,15 @@ namespace ASC.Data.Storage.S3
                     DestinationKey = dstKey,
                     CannedACL = GetDomainACL(newdomain),
                     MetadataDirective = S3MetadataDirective.REPLACE,
-                    ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
+                    ServerSideEncryptionMethod = _sse
                 };
 
                 client.CopyObject(request);
-                Delete(srcdomain, srcpath, false);
+                Delete(srcdomain, srcpath);
+
+                QuotaUsedDelete(srcdomain, size);
+                QuotaUsedAdd(newdomain, size);
+
                 return GetUri(newdomain, newpath);
             }
         }
@@ -672,9 +631,11 @@ namespace ASC.Data.Storage.S3
             return Save(domain, assignedPath, stream);
         }
 
-        public override Uri[] List(string domain, string path, bool recursive)
+        public override string[] ListDirectoriesRelative(string domain, string path, bool recursive)
         {
-            throw new NotSupportedException();
+            return GetS3Objects(domain, path)
+                .Select(x => x.Key.Substring((MakePath(domain, path) + "/").Length))
+                .ToArray();
         }
 
 
@@ -694,7 +655,7 @@ namespace ASC.Data.Storage.S3
                     Headers =
                     {
                         CacheControl = string.Format("public, maxage={0}", (int)TimeSpan.FromDays(5).TotalSeconds),
-                        Expires = DateTime.UtcNow.Add(TimeSpan.FromDays(5)),
+                        ExpiresUtc = DateTime.UtcNow.Add(TimeSpan.FromDays(5)),
                         ContentDisposition = "attachment",
                     }
                 };
@@ -888,7 +849,8 @@ namespace ASC.Data.Storage.S3
                         try
                         {
                             var size = GetFileSize(domain, domainpath);
-                            QuotaController.QuotaUsedAdd(_modulename, domain, _dataList.GetData(domain), size);
+                            QuotaUsedAdd(domain, size);
+
                             if (HttpContext.Current.Session != null)
                             {
                                 HttpContext.Current.Session.Add(etag, size);
@@ -906,11 +868,11 @@ namespace ASC.Data.Storage.S3
         }
 
 
-        public override Uri[] ListFiles(string domain, string path, string pattern, bool recursive)
+        public override string[] ListFilesRelative(string domain, string path, string pattern, bool recursive)
         {
             return GetS3Objects(domain, path)
                 .Where(x => Wildcard.IsMatch(pattern, Path.GetFileName(x.Key)))
-                .Select(x => GetUriInternal(x.Key))
+                .Select(x => x.Key.Substring((MakePath(domain, path) + "/").Length).TrimStart('/'))
                 .ToArray();
         }
 
@@ -954,6 +916,15 @@ namespace ASC.Data.Storage.S3
             }
         }
 
+        public override long GetDirectorySize(string domain, string path)
+        {
+            if (!IsDirectory(domain, path))
+                throw new FileNotFoundException("directory not found", path);
+
+            return GetS3Objects(domain, path)
+                .Where(x => Wildcard.IsMatch("*.*", Path.GetFileName(x.Key)))
+                .Sum(x => x.Size);
+        }
 
         public override long ResetQuota(string domain)
         {
@@ -979,11 +950,8 @@ namespace ASC.Data.Storage.S3
             {
                 var srcKey = MakePath(srcdomain, srcpath);
                 var dstKey = MakePath(newdomain, newpath);
-                var size = QuotaDelete(srcdomain, client, srcKey);
-                if (QuotaController != null)
-                {
-                    QuotaController.QuotaUsedAdd(_modulename, newdomain, _dataList.GetData(newdomain), size);
-                }
+                var size = GetFileSize(srcdomain, srcpath);
+
                 var request = new CopyObjectRequest
                 {
                     SourceBucket = _bucket,
@@ -992,10 +960,13 @@ namespace ASC.Data.Storage.S3
                     DestinationKey = dstKey,
                     CannedACL = GetDomainACL(newdomain),
                     MetadataDirective = S3MetadataDirective.REPLACE,
-                    ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
+                    ServerSideEncryptionMethod = _sse
                 };
 
                 client.CopyObject(request);
+
+                QuotaUsedAdd(newdomain, size);
+
                 return GetUri(newdomain, newpath);
             }
         }
@@ -1012,11 +983,6 @@ namespace ASC.Data.Storage.S3
                 var response = client.ListObjects(request);
                 foreach (var s3Object in response.S3Objects)
                 {
-                    if (QuotaController != null)
-                    {
-                        QuotaController.QuotaUsedAdd(_modulename, newdomain, _dataList.GetData(newdomain), s3Object.Size);
-                    }
-
                     client.CopyObject(new CopyObjectRequest
                     {
                         SourceBucket = _bucket,
@@ -1024,8 +990,10 @@ namespace ASC.Data.Storage.S3
                         DestinationBucket = _bucket,
                         DestinationKey = s3Object.Key.Replace(srckey, dstkey),
                         CannedACL = GetDomainACL(newdomain),
-                        ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
+                        ServerSideEncryptionMethod = _sse
                     });
+
+                    QuotaUsedAdd(newdomain, s3Object.Size);
                 }
             }
         }
@@ -1052,11 +1020,13 @@ namespace ASC.Data.Storage.S3
                 return objects;
             }
         }
+
         private IEnumerable<S3Object> GetS3Objects(string domain, string path = "", bool recycle = false)
         {
-            var obj = GetS3ObjectsByPath(domain, MakePath(domain, path.TrimEnd('/') + '/')).ToList();
+            path = MakePath(domain, path) + '/';
+            var obj = GetS3ObjectsByPath(domain, path).ToList();
             if (string.IsNullOrEmpty(_recycleDir) || !recycle) return obj;
-            obj.AddRange(GetS3ObjectsByPath(domain, GetRecyclePath(MakePath(domain, path.TrimEnd('/') + '/'))));
+            obj.AddRange(GetS3ObjectsByPath(domain, GetRecyclePath(path)));
             return obj;
         }
 
@@ -1072,15 +1042,60 @@ namespace ASC.Data.Storage.S3
                 _recycleDir = props["recycleDir"];
             }
 
+            if (props.ContainsKey("region") && !string.IsNullOrEmpty(props["region"]))
+            {
+                _region = props["region"];
+            }
+
+            if (props.ContainsKey("serviceurl") && !string.IsNullOrEmpty(props["serviceurl"]))
+            {
+                _serviceurl = props["serviceurl"];
+            }
+
+            if (props.ContainsKey("forcepathstyle"))
+            {
+                bool fps;
+                if (bool.TryParse(props["forcepathstyle"], out fps))
+                {
+                    _forcepathstyle = fps;
+                }
+            }
+
+            if (props.ContainsKey("usehttp"))
+            {
+                bool uh;
+                if (bool.TryParse(props["usehttp"], out uh))
+                {
+                    _useHttp = uh;
+                }
+            }
+
+            if (props.ContainsKey("sse") && !string.IsNullOrEmpty(props["sse"]))
+            {
+                switch (props["sse"].ToLower())
+                {
+                    case "none":
+                        _sse = ServerSideEncryptionMethod.None;
+                        break;
+                    case "aes256":
+                        _sse = ServerSideEncryptionMethod.AES256;
+                        break;
+                    case "awskms":
+                        _sse = ServerSideEncryptionMethod.AWSKMS;
+                        break;
+                    default:
+                        _sse = ServerSideEncryptionMethod.None;
+                        break;
+                }
+            }
+
             _bucketRoot = props.ContainsKey("cname") && Uri.IsWellFormedUriString(props["cname"], UriKind.Absolute)
                               ? new Uri(props["cname"], UriKind.Absolute)
-                              : new Uri(string.Format("http://{0}.s3.amazonaws.com", _bucket), UriKind.Absolute);
+                              : new Uri(String.Format("http://s3.{1}.amazonaws.com/{0}/", _bucket, _region), UriKind.Absolute);
             _bucketSSlRoot = props.ContainsKey("cnamessl") &&
                              Uri.IsWellFormedUriString(props["cnamessl"], UriKind.Absolute)
                                  ? new Uri(props["cnamessl"], UriKind.Absolute)
-                                 : new Uri(string.Format("https://s3.amazonaws.com/{0}/", _bucket), UriKind.Absolute);
-
-            _region = props["region"];
+                                 : new Uri(String.Format("https://s3.{1}.amazonaws.com/{0}/", _bucket, _region), UriKind.Absolute);
 
             if (props.ContainsKey("lower"))
             {
@@ -1123,7 +1138,7 @@ namespace ASC.Data.Storage.S3
                                                          domain,
                                                          path);
 
-            result = result.Replace("//", "/").TrimStart('/');
+            result = result.Replace("//", "/").TrimStart('/').TrimEnd('/');
             if (_lowerCasing)
             {
                 result = result.ToLowerInvariant();
@@ -1149,35 +1164,44 @@ namespace ASC.Data.Storage.S3
                 DestinationKey = GetRecyclePath(key),
                 CannedACL = GetDomainACL(domain),
                 MetadataDirective = S3MetadataDirective.REPLACE,
-                ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
+                ServerSideEncryptionMethod = _sse,
+                StorageClass = S3StorageClass.Glacier,
+
             };
 
             client.CopyObject(copyObjectRequest);
         }
 
-        public override Uri GetUriInternal(string path)
-        {
-            return new Uri(SecureHelper.IsSecure() ? _bucketSSlRoot : _bucketRoot, path);
-        }
-
         private IAmazonCloudFront GetCloudFrontClient()
         {
             var cfg = new AmazonCloudFrontConfig { MaxErrorRetry = 3 };
-            return AWSClientFactory.CreateAmazonCloudFrontClient(_accessKeyId, _secretAccessKeyId, cfg);
+            return new AmazonCloudFrontClient(_accessKeyId, _secretAccessKeyId, cfg);
         }
 
         private IAmazonS3 GetClient()
         {
-            var cfg = new AmazonS3Config { UseHttp = true, MaxErrorRetry = 3, RegionEndpoint = RegionEndpoint.GetBySystemName(_region) };
-            return AWSClientFactory.CreateAmazonS3Client(_accessKeyId, _secretAccessKeyId, cfg);
+            var cfg = new AmazonS3Config { MaxErrorRetry = 3 };
+
+            if (!String.IsNullOrEmpty(_serviceurl))
+            {
+                cfg.ServiceURL = _serviceurl;
+
+                cfg.ForcePathStyle = _forcepathstyle;
+            }
+            else
+            {
+                cfg.RegionEndpoint = RegionEndpoint.GetBySystemName(_region);
+            }
+
+            cfg.UseHttp = _useHttp;
+
+            return new AmazonS3Client(_accessKeyId, _secretAccessKeyId, cfg);
         }
 
         public Stream GetWriteStream(string domain, string path)
         {
             throw new NotSupportedException();
         }
-
-
 
         private class ResponseStreamWrapper : Stream
         {

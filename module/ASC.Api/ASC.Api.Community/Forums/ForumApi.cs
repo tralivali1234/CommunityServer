@@ -1,31 +1,24 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Security;
 using ASC.Api.Attributes;
 using ASC.Api.Collections;
 using ASC.Api.Forums;
@@ -34,6 +27,8 @@ using ASC.Core;
 using ASC.Forum;
 using System;
 using ASC.Web.Community.Forum;
+using ASC.Web.Community.Forum.Resources;
+using ASC.Web.Studio.Utility;
 
 namespace ASC.Api.Community
 {
@@ -281,24 +276,6 @@ namespace ASC.Api.Community
         }
 
         ///<summary>
-        /// Deletes a selected post in an existing topic
-        ///</summary>
-        ///<short>
-        /// Delete post in topic
-        ///</short>
-        ///<param name="topicid">Topic ID</param>
-        ///<param name="postid">Post ID</param>
-        ///<returns></returns>
-        ///<category>Forums</category>
-        [Delete("forum/topic/{topicid}/{postid}")]
-        public ForumTopicPostWrapper DeleteTopicPosts(int topicid, int postid)
-        {
-            ForumDataProvider.RemovePost(TenantId, postid);
-            return null;
-        }
-
-
-        ///<summary>
         ///Returns a list of topics matching the search query with the topic title, date of creation and update, post text and author
         ///</summary>
         ///<short>
@@ -313,6 +290,109 @@ namespace ASC.Api.Community
             int count;
             var topics = ForumDataProvider.SearchTopicsByText(TenantId, query, 0, -1, out count);
             return topics.Select(x => new ForumTopicWrapper(x)).ToSmartList();
+        }
+
+
+
+        ///<summary>
+        /// Deletes a selected post
+        ///</summary>
+        ///<short>
+        /// Delete post
+        ///</short>
+        ///<param name="postid">Post ID</param>
+        ///<returns></returns>
+        ///<category>Forums</category>
+        [Delete("forum/post/{postid}")]
+        public ForumTopicPostWrapper DeletePost(int postid)
+        {
+            var post = ForumDataProvider.GetPostByID(TenantId, postid);
+
+            if (post == null || !ForumManager.Settings.ForumManager.ValidateAccessSecurityAction(ForumAction.PostDelete, post))
+            {
+                throw new SecurityException(ForumResource.ErrorAccessDenied);
+            }
+
+            var result = RemoveDataHelper.RemovePost(post);
+
+            if(result != DeletePostResult.Successfully)
+                throw new Exception("DeletePostResult: " + result);
+            
+            return new ForumTopicPostWrapper(post);
+        }
+
+        ///<summary>
+        /// Deletes a selected topic
+        ///</summary>
+        ///<short>
+        /// Delete topic
+        ///</short>
+        ///<param name="topicid">Topic ID</param>
+        ///<returns></returns>
+        ///<category>Forums</category>
+        [Delete("forum/topic/{topicid}")]
+        public ForumTopicWrapper DeleteTopic(int topicid)
+        {
+            var topic = ForumDataProvider.GetTopicByID(TenantProvider.CurrentTenantID, topicid);
+
+            if (topic == null || !ForumManager.Settings.ForumManager.ValidateAccessSecurityAction(ForumAction.TopicDelete, topic))
+            {
+                throw new SecurityException(ForumResource.ErrorAccessDenied);
+            }
+
+            RemoveDataHelper.RemoveTopic(topic);
+
+            return new ForumTopicWrapper(topic);
+        }
+
+        ///<summary>
+        /// Deletes a selected thread
+        ///</summary>
+        ///<short>
+        /// Delete thread
+        ///</short>
+        ///<param name="threadid">Thread ID</param>
+        ///<returns></returns>
+        ///<category>Forums</category>
+        [Delete("forum/thread/{threadid}")]
+        public ForumThreadWrapper DeleteThread(int threadid)
+        {
+            var thread = ForumDataProvider.GetThreadByID(TenantProvider.CurrentTenantID, threadid);
+
+            if (thread == null || !ForumManager.Instance.ValidateAccessSecurityAction(ForumAction.GetAccessForumEditor, null))
+            {
+                throw new SecurityException(ForumResource.ErrorAccessDenied);
+            }
+
+            RemoveDataHelper.RemoveThread(thread);
+
+            return new ForumThreadWrapper(thread);
+        }
+
+        ///<summary>
+        /// Deletes a selected thread category
+        ///</summary>
+        ///<short>
+        /// Delete category
+        ///</short>
+        ///<param name="categoryid">Category ID</param>
+        ///<returns></returns>
+        ///<category>Forums</category>
+        [Delete("forum/category/{categoryid}")]
+        public ForumCategoryWrapper DeleteThreadCategory(int categoryid)
+        {
+            List<Thread> threads;
+
+            var category = ForumDataProvider.GetCategoryByID(TenantProvider.CurrentTenantID, categoryid, out threads);
+
+            if (category == null || !ForumManager.Instance.ValidateAccessSecurityAction(ForumAction.GetAccessForumEditor, null))
+            {
+                throw new SecurityException(ForumResource.ErrorAccessDenied);
+            }
+
+            RemoveDataHelper.RemoveThreadCategory(category);
+
+            return new ForumCategoryWrapper(category, threads);
         }
     }
 }

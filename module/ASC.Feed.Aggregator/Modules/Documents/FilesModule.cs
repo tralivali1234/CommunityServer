@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -31,6 +22,7 @@ using ASC.Common.Data;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
 using ASC.Core;
+using ASC.Feed.Data;
 using ASC.Files.Core;
 using ASC.Files.Core.Data;
 using ASC.Files.Core.Security;
@@ -84,7 +76,7 @@ namespace ASC.Feed.Aggregator.Modules.Documents
 
         public override bool VisibleFor(Feed feed, object data, Guid userId)
         {
-            if (!WebItemSecurity.IsAvailableForUser(ProductID.ToString(), userId)) return false;
+            if (!WebItemSecurity.IsAvailableForUser(ProductID, userId)) return false;
 
             var tuple = (Tuple<File, SmallShareRecord>)data;
             var file = tuple.Item1;
@@ -109,6 +101,41 @@ namespace ASC.Feed.Aggregator.Modules.Documents
             }
 
             return targetCond && new FileSecurity(new DaoFactory()).CanRead(file, userId);
+        }
+
+        public override void VisibleFor(List<Tuple<FeedRow, object>> feed, Guid userId)
+        {
+            if (!WebItemSecurity.IsAvailableForUser(ProductID, userId)) return;
+
+            var fileSecurity = new FileSecurity(new DaoFactory());
+
+            var feed1 = feed.Select(r =>
+            {
+                var tuple = (Tuple<File, SmallShareRecord>)r.Item2;
+                return new Tuple<FeedRow, File, SmallShareRecord>(r.Item1, tuple.Item1, tuple.Item2);
+            })
+            .ToList();
+
+            var files = feed1.Where(r => r.Item1.Feed.Target == null).Select(r => r.Item2).ToList();
+
+            foreach (var f in feed1.Where(r => r.Item1.Feed.Target != null && !(r.Item3 != null && r.Item3.ShareBy == userId)))
+            {
+                var file = f.Item2;
+                if (IsTarget(f.Item1.Feed.Target, userId) && !files.Any(r => r.UniqID.Equals(file.UniqID)))
+                {
+                    files.Add(file);
+                }
+            }
+
+            var canRead = fileSecurity.CanRead(files, userId).Where(r => r.Item2).ToList();
+
+            foreach (var f in feed1)
+            {
+                if (IsTarget(f.Item1.Feed.Target, userId) && canRead.Any(r => r.Item1.ID.Equals(f.Item2.ID)))
+                {
+                    f.Item1.Users.Add(userId);
+                }
+            }
         }
 
         public override IEnumerable<int> GetTenantsWithFeeds(DateTime fromTime)
@@ -158,13 +185,19 @@ namespace ASC.Feed.Aggregator.Modules.Documents
                        Exp.Lt("s.security", 3) &
                        Exp.Between("s.timestamp", filter.Time.From, filter.Time.To));
 
+            List<Tuple<File, SmallShareRecord>> files;
             using (var db = new DbManager(DbId))
             {
-                var files = db.ExecuteList(q1.UnionAll(q2)).ConvertAll(ToFile);
-                return files
+                files = db.ExecuteList(q1.UnionAll(q2))
+                    .ConvertAll(ToFile)
                     .Where(f => f.Item1.RootFolderType != FolderType.TRASH && f.Item1.RootFolderType != FolderType.BUNCH)
-                    .Select(f => new Tuple<Feed, object>(ToFeed(f), f));
+                    .ToList();
             }
+
+            var folderIDs = files.Select(r => r.Item1.FolderID).ToArray();
+            var folders = new FolderDao(Tenant, DbId).GetFolders(folderIDs, checkShare: false);
+
+            return files.Select(f => new Tuple<Feed, object>(ToFeed(f, folders.FirstOrDefault(r=> r.ID.Equals(f.Item1.FolderID))), f));
         }
 
 
@@ -224,12 +257,10 @@ namespace ASC.Feed.Aggregator.Modules.Documents
             return new Tuple<File, SmallShareRecord>(file, shareRecord);
         }
 
-        private Feed ToFeed(Tuple<File, SmallShareRecord> tuple)
+        private Feed ToFeed(Tuple<File, SmallShareRecord> tuple, Folder rootFolder)
         {
             var file = tuple.Item1;
             var shareRecord = tuple.Item2;
-
-            var rootFolder = new FolderDao(Tenant, DbId).GetFolder(file.FolderID);
 
             if (shareRecord != null)
             {
@@ -273,6 +304,19 @@ namespace ASC.Feed.Aggregator.Modules.Documents
                     Target = null,
                     GroupId = GetGroupId(fileItem, file.ModifiedBy, file.FolderID.ToString(), updated ? 1 : 0)
                 };
+        }
+
+        private bool IsTarget(object target, Guid userId)
+        {
+            if (target == null) return true;
+            var owner = (Guid)target;
+            var groupUsers = CoreContext.UserManager.GetUsersByGroup(owner).Select(x => x.ID).ToList();
+            if (!groupUsers.Any())
+            {
+                groupUsers.Add(owner);
+            }
+
+            return groupUsers.Contains(userId);
         }
     }
 }

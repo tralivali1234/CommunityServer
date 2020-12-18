@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -184,6 +175,12 @@ jQuery.extend({
 }
 );
 
+jQuery.extend(StudioManager, {
+    GetCRMImage: function (imageName) {
+        return ASC.CRM.Data.ImageWebPath + "/" + imageName;
+    }
+});
+
 jq.fn.datepickerWithButton = function(options) {
     return this.datepicker(jQuery.extend({
         showOn: "both",
@@ -238,8 +235,8 @@ ASC.CRM.Common = (function() {
                 jq(this).removeAttr("title")
                     .unbind("mouseenter").mouseenter(function () {
                         var $obj = jq(this),
-                            top = $obj.position().top + $obj.height() + 5,
-                            left = $obj.position().left + 5;
+                            top = $obj.offset().top + $obj.height() + 5,
+                            left = $obj.offset().left + 5;
 
                         jq(my_tooltip).data("overTaskDescrPanel", true);
                         jq(my_tooltip).css("top", top);
@@ -401,7 +398,7 @@ ASC.CRM.Common = (function() {
             contact.showUnlinkBtn = (typeof (params) != "undefined" && params != null && params.hasOwnProperty("showUnlinkBtn") && params.showUnlinkBtn);
             contact.showActionMenu = (typeof (params) != "undefined" && params != null && params.hasOwnProperty("showActionMenu") && params.showActionMenu);
 
-            var basePathForLink = StudioManager.getLocationPathToModule("crm") + "default.aspx?id=";
+            var basePathForLink = StudioManager.getLocationPathToModule("CRM") + "Default.aspx?id=";
 
             contact.contactLink = basePathForLink + contact.id;
             if (contact.showCompanyLink && typeof (contact.company) && contact.company != null) {
@@ -443,48 +440,51 @@ ASC.CRM.Common = (function() {
         getAddressTextForDisplay: function (addressObj) {
             if (typeof (addressObj) != "object") return "";
 
-            var text = addressObj.street != "" && addressObj.street != null ? jq.htmlEncodeLight(addressObj.street) : "",
-                tmp = addressObj.city != "" && addressObj.city != null ? jq.htmlEncodeLight(addressObj.city) + ", " : "";
+            var items = [],
+                subitems = [];
 
-            if (addressObj.state != "" && addressObj.state != null) {
-                tmp += jq.htmlEncodeLight(addressObj.state) + ", ";
-            }
-            if (addressObj.zip != "" && addressObj.zip != null) {
-                tmp += jq.htmlEncodeLight(addressObj.zip);
-            }
-            tmp = jq.trim(tmp);
-            tmp = tmp.charAt(tmp.length - 1) === ',' ? tmp.substring(0, tmp.length - 1) : tmp;
-            if (tmp != "") {
-                text = text != "" ? text + ",<br/>" + tmp : tmp;
-            }
-            text = text != "" && addressObj.country != "" && addressObj.country != null
-                    ? text + ",<br/>" + jq.htmlEncodeLight(addressObj.country)
-                    : (addressObj.country != "" && addressObj.country != null ? jq.htmlEncodeLight(addressObj.country) : text);
-            return text;
+            if (addressObj.street)
+                items.push(jq.htmlEncodeLight(addressObj.street));
+
+            if (addressObj.city)
+                subitems.push(addressObj.city);
+
+            if (addressObj.state)
+                subitems.push(addressObj.state);
+
+            if (addressObj.zip)
+                subitems.push(addressObj.zip);
+
+            if (subitems.length)
+                items.push(jq.htmlEncodeLight(subitems.join(", ")));
+
+            if (addressObj.country)
+                items.push(jq.htmlEncodeLight(addressObj.country));
+
+            return items.join(",<br/>");
         },
 
         getAddressQueryForMap: function (addressObj) {
             if (typeof (addressObj) != "object") return "";
 
-            var query = "";
-            if (addressObj.street != "" && addressObj.street != null) {
-                query += addressObj.street + ", ";
-            }
-            if (addressObj.city != "" && addressObj.city != null) {
-                query += addressObj.city + ", ";
-            }
-            if (addressObj.state != "" && addressObj.state != null) {
-                query += addressObj.state + ", ";
-            }
-            if (addressObj.zip != "" && addressObj.zip != null) {
-                query += addressObj.zip + ", ";
-            }
-            if (addressObj.country != "" && addressObj.country != null) {
-                query += addressObj.country + ", ";
-            }
-            query = jq.trim(query).replace(/</ig, '&lt;').replace(/>/ig, '&gt;').replace(/\n/ig, ' ');
-            query = query.charAt(query.length - 1) === ',' ? query.substring(0, query.length - 1) : query;
-            return query;
+            var items = [];
+
+            if (addressObj.street)
+                items.push(addressObj.street);
+
+            if (addressObj.city)
+                items.push(addressObj.city);
+
+            if (addressObj.state)
+                items.push(addressObj.state);
+
+            if (addressObj.zip)
+                items.push(addressObj.zip);
+
+            if (addressObj.country)
+                items.push(addressObj.country);
+
+            return jq.trim(items.join(", ")).replace(/</ig, '&lt;').replace(/>/ig, '&gt;').replace(/\n/ig, ' ');
         },
 
 
@@ -668,19 +668,12 @@ ASC.CRM.Common = (function() {
             if (jq("#exportListToCSV").length == 1) {
                 jq("#exportListToCSV").parent().remove();
             }
-            if (jq("#openListInEditor").length == 1) {
-                jq("#openListInEditor").parent().remove();
-            }
         },
 
         hideExportButtons: function () {
             if (jq("#exportListToCSV").length == 1) {
                 jq("#exportListToCSV").parent().addClass("display-none");
             }
-            if (jq("#openListInEditor").length == 1) {
-                jq("#openListInEditor").parent().addClass("display-none");
-            }
-
             if (!jq("#otherActions li:not(.display-none)").length) {
                 jq("#menuOtherActionsButton").hide();
             }
@@ -690,37 +683,14 @@ ASC.CRM.Common = (function() {
             if (jq("#exportListToCSV").length == 1) {
                 jq("#exportListToCSV").parent().removeClass("display-none");
             }
-            if (jq("#openListInEditor").length == 1) {
-                jq("#openListInEditor").parent().removeClass("display-none");
-            }
-
             if (!!jq("#otherActions li:not(.display-none)").length) {
                 jq("#menuOtherActionsButton").show();
             }
         },
 
         exportCurrentListToCsv : function() {
-            var index = window.location.href.indexOf('#'),
-                basePath = index >= 0 ? window.location.href.substr(0, index) : window.location.href,
-                anchor = index >= 0 ? window.location.href.substr(index, window.location.href.length) : "";
             jq("#otherActions").hide();
-            window.location.href = [
-                basePath,
-                window.location.search != null && window.location.search != "" ? "&" : "?",
-                "action=export",
-                anchor].join('');
-        },
-
-        openExportFile : function() {
-            var index = window.location.href.indexOf('#'),
-                basePath = index >= 0 ? window.location.href.substr(0, index) : window.location.href;
-            jq("#otherActions").hide();
-
-            window.open([
-                basePath,
-                window.location.search != null && window.location.search != "" ? "&" : "?",
-                "action=export&view=editor"]
-                .join(''));
+            ASC.CRM.PartialExport.startExport();
         },
 
         getMailModuleBasePath: function () {
@@ -733,46 +703,17 @@ ASC.CRM.Common = (function() {
             return o ? o.constructor.toString().indexOf("Array") != -1 : false;
         },
 
-        findUserByGuid: function (id) {
-            for (var i = 0, n = ASC.Resources.Master.ApiResponses_Profiles.response.length; i < n; i++) {
-                if (ASC.Resources.Master.ApiResponses_Profiles.response[i].id == id) {
-                    return ASC.Resources.Master.ApiResponses_Profiles.response[i];
-                }
-            }
-            return null;
-        },
-
-        getAdminUsers: function () {
-            var admins = [];
-            for (var i = 0, n = ASC.Resources.Master.ApiResponses_Profiles.response.length; i < n; i++) {
-                if (ASC.Resources.Master.ApiResponses_Profiles.response[i].isAdmin === true) {
-                    admins.push(ASC.Resources.Master.ApiResponses_Profiles.response[i]);
-                }
-            }
-            return admins;
-        },
-
         getAccessListHtml: function (userGuids) {
             if (typeof (userGuids) == "undefined" || userGuids.length == 0) { return ""; }
             var html = "";
             for (var i = 0, n = userGuids.length; i < n; i++) {
-                var usr = ASC.CRM.Common.findUserByGuid(userGuids[i]);
+                var usr = window.UserManager.getUser(userGuids[i]);
                 html += [
                     i == 0 ? "" : ",<span class='splitter'></span>",
                     usr != null ? usr.displayName : ASC.CRM.Data.ProfileRemoved
                 ].join('');
             }
             return html;
-        },
-
-        isUserActive: function (id) {
-            //ASC.Resources.Master.ApiResponses_Profiles.response - only active users
-            for (var i = 0, n = ASC.Resources.Master.ApiResponses_Profiles.response.length; i < n; i++) {
-                if (ASC.Resources.Master.ApiResponses_Profiles.response[i].id === id) {
-                    return true;
-                }
-            }
-            return false;
         },
 
         convertText: function (str, toText) {
@@ -955,10 +896,6 @@ ASC.CRM.Common = (function() {
             document.title = jq.format("{0} - {1}", module, ASC.CRM.Resources.CRMCommonResource.ProductName);
         },
 
-        getCurrencySymbol: function (symbol, abbr) {
-            return abbr != "RUB" ? symbol : "<span class='rub'>Р</span>";
-        },
-
         bindOnbeforeUnloadEvent: function () {
             if (window.onbeforeunload == null) {
                 window.onbeforeunload = function (e) {
@@ -1047,52 +984,72 @@ ASC.CRM.Common = (function() {
         },
 
         createInvoiceMail: function (invoice, newTab) {
-            var message = new ASC.Mail.Message();
-            message.to = [typeof (invoice.contact.email) != "undefined" && invoice.contact.email != null ? invoice.contact.email.data : ""];
-            message.subject = '';
-            message.body = invoice.description.replace(/\r\n|\n|\r/g, '<br>');
-            message.AddDocumentsForSave([invoice.fileId]);
 
-            ASC.Mail.Utility
-                .SaveMessageInDrafts(message)
-                    .done(function (params, data) {
-                        LoadingBanner.hideLoading();
-                        if (newTab && newTab.location) {
-                            newTab.location.href = data.messageUrl;
-                        } else {
-                            window.location.href = data.messageUrl;
-                        }
-                    })
-                    .fail(function (params, error) {
-                        console.log(params, error);
-                        if(error === "No accounts.")
-                        {
-                            if (newTab) {
-                                newTab.close();
+            Teamlab.getCrmContactInfo({}, invoice.contact.id, {
+                success: function (params, info) {
+                    var email = "";
+
+                    for (var i = 0, n = info.length; i < n; i++) {
+                        if (info[i].infoType == 1) {
+                            email = info[i].data;
+                            if (info[i].isPrimary) {
+                                break;
                             }
-                            if (jq("#noMailAccountsError").length == 0) {
-                                jq.tmpl("template-blockUIPanel", {
-                                    id: "noMailAccountsError",
-                                    headerTest: ASC.CRM.Resources.CRMCommonResource.Alert,
-                                    questionText: "",
-                                    innerHtmlText: ['<div>', ASC.CRM.Resources.CRMCommonResource.NoMailAccountsAvailableError, '</div>'].join(''),
-                                    CancelBtn: ASC.CRM.Resources.CRMCommonResource.Close,
-                                    OKBtn: ASC.CRM.Resources.CRMCommonResource.AddMailAccount,
-                                    OKBtnClass: "OKAddMailAccount"
-                                }).appendTo(".mainContainerClass .containerBodyBlock");
+                        }
+                    }
 
-                                jq("#noMailAccountsError").on("click", ".OKAddMailAccount", function () {
-                                    window.open(ASC.CRM.Common.getMailModuleBasePath(), "_blank");
-                                    jq.unblockUI();
-                                });
+                    invoice.contact.email = email;
+
+                    var message = new ASC.Mail.Message();
+                    message.to = [invoice.contact.email || ""];
+                    message.subject = '';
+                    message.body = invoice.description.replace(/\r\n|\n|\r/g, '<br>');
+                    message.AddDocumentsForSave([invoice.fileId]);
+
+                    ASC.Mail.Utility
+                        .SaveMessageInDrafts(message)
+                        .done(function (params, data) {
+                            LoadingBanner.hideLoading();
+                            if (newTab && newTab.location) {
+                                newTab.location.href = data.messageUrl;
+                            } else {
+                                window.location.href = data.messageUrl;
+                            }
+                        })
+                        .fail(function (params, error) {
+                            console.log(params, error);
+                            if (error === "No accounts.") {
+                                if (newTab) {
+                                    newTab.close();
+                                }
+                                if (jq("#noMailAccountsError").length == 0) {
+                                    jq.tmpl("template-blockUIPanel", {
+                                        id: "noMailAccountsError",
+                                        headerTest: ASC.CRM.Resources.CRMCommonResource.Alert,
+                                        questionText: "",
+                                        innerHtmlText: ['<div>', ASC.CRM.Resources.CRMCommonResource.NoMailAccountsAvailableError, '</div>'].join(''),
+                                        CancelBtn: ASC.CRM.Resources.CRMCommonResource.Close,
+                                        OKBtn: ASC.CRM.Resources.CRMCommonResource.AddMailAccount,
+                                        OKBtnClass: "OKAddMailAccount"
+                                    }).appendTo(".mainContainerClass .containerBodyBlock");
+
+                                    jq("#noMailAccountsError").on("click", ".OKAddMailAccount", function () {
+                                        window.open(ASC.CRM.Common.getMailModuleBasePath(), "_blank");
+                                        jq.unblockUI();
+                                    });
+                                }
+
+                                PopupKeyUpActionProvider.EnableEsc = false;
+                                StudioBlockUIManager.blockUI("#noMailAccountsError", 500);
                             }
 
-                            PopupKeyUpActionProvider.EnableEsc = false;
-                            StudioBlockUIManager.blockUI("#noMailAccountsError", 500, 200, 0);
-                        }
-                        
-                        LoadingBanner.hideLoading();
-                    });
+                            LoadingBanner.hideLoading();
+                        });
+                },
+                error: function (params, error) {
+                    console.log(error);
+                }
+            });
         },
 
         setPostionPageLoader: function () {
@@ -1412,7 +1369,7 @@ ASC.CRM.HistoryView = (function () {
 
     var _initEventCategorySelector = function () {
         var helpInfoText = ASC.CRM.Data.IsCRMAdmin ? jq.format(ASC.CRM.Resources.CRMCommonResource.HistoryCategoriesHelpInfo,
-            "<a class='linkAction' href='settings.aspx?type=history_category' target='blank'>",
+            "<a class='linkAction' href='Settings.aspx?type=history_category' target='blank'>",
             "</a>") : "",
             selectedCategory = {};
 
@@ -1457,13 +1414,8 @@ ASC.CRM.HistoryView = (function () {
         ASC.CRM.HistoryView.advansedFilter = jq("#eventsAdvansedFilter")
                 .advansedFilter({
                     anykey: false,
-                    hint: ASC.CRM.Resources.CRMCommonResource.AdvansedFilterInfoText.format(
-                                '<b>',
-                                '</b>',
-                                '<br/><br/><a href="' + ASC.Resources.Master.FilterHelpCenterLink + '" target="_blank">',
-                                '</a>'),
-                    hintDefaultDisable: !ASC.Resources.Master.FilterHelpCenterLink,
-                    maxfilters: 3,
+                    hintDefaultDisable: true,
+                    maxfilters: -1,
                     maxlength: "100",
                     store: false,
                     filters: [
@@ -1761,7 +1713,7 @@ ASC.CRM.HistoryView = (function () {
             jq("#DepsAndUsersContainer").css("z-index", 999);
 
             jq("#historyBlock input.textEditCalendar").mask(ASC.Resources.Master.DatePatternJQ);
-            jq("#historyBlock input.textEditCalendar").datepickerWithButton().val(window.historyView_dateTimeNowShortDateString);
+            jq("#historyBlock input.textEditCalendar").datepickerWithButton().datepicker('setDate', window.historyView_dateTimeNowShortDateString);
 
             jq("#historyBlock table #selectedUsers").remove();
 
@@ -1776,24 +1728,37 @@ ASC.CRM.HistoryView = (function () {
             }, 100);
 
             setInterval(function () {
-                var text = jq.trim(jq("#historyCKEditor").val());
-
-                if (ASC.CRM.HistoryView.historyCKEditor) {
-                    text = jq.trim(ASC.CRM.HistoryView.historyCKEditor.getData());
-                }
+                var $button = jq("#historyBlock .middle-button-container a.button.blue.middle");
+                var $input = jq("#historyBlock input.textEditCalendar");
+                var $message = jq("#historyBlock .lond-data-text");
+                var isValid = true;
+                var text = jq.trim(ASC.CRM.HistoryView.historyCKEditor ? ASC.CRM.HistoryView.historyCKEditor.getData() : jq("#historyCKEditor").val());
 
                 if (!text.length) {
-                    jq("#historyBlock .lond-data-text").text("").addClass("display-none");
-                    jq("#historyBlock .middle-button-container a.button.blue.middle").addClass("disable");
+                    $message.text("").addClass("display-none");
+                    isValid = false;
                 } else if (text.length > ASC.CRM.Data.MaxHistoryEventCharacters) {
-                    jq("#historyBlock .lond-data-text")
+                    $message
                         .text(ASC.CRM.Resources.CRMCommonResource.HistoryLongDataMsg.format(text.length - ASC.CRM.Data.MaxHistoryEventCharacters))
                         .removeClass("display-none");
-                    jq("#historyBlock .middle-button-container a.button.blue.middle").addClass("disable");
+                    isValid = false;
                 } else {
-                    jq("#historyBlock .lond-data-text").text("").addClass("display-none");
-                    jq("#historyBlock .middle-button-container a.button.blue.middle.disable").removeClass("disable");
+                    $message.text("").addClass("display-none");
                 }
+
+                if (jq.isDateFormat($input.val().trim())) {
+                    $input.css("borderColor", "");
+                } else {
+                    $input.css("borderColor", "#CC0000");
+                    isValid = false;
+                }
+
+                if (isValid) {
+                    $button.removeClass("disable");
+                } else {
+                    $button.addClass("disable");
+                }
+
             }, 500);
 
             _initFilter();
@@ -1888,11 +1853,11 @@ ASC.CRM.HistoryView = (function () {
             if (eventItem.entity != null) {
                 switch (eventItem.entity.entityType) {
                     case "opportunity":
-                        eventItem.entityURL = "deals.aspx?id=" + eventItem.entity.entityId;
+                        eventItem.entityURL = "Deals.aspx?id=" + eventItem.entity.entityId;
                         eventItem.entityType = ASC.CRM.Resources.CRMJSResource.Deal;
                         break;
                     case "case":
-                        eventItem.entityURL = "cases.aspx?id=" + eventItem.entity.entityId;
+                        eventItem.entityURL = "Cases.aspx?id=" + eventItem.entity.entityId;
                         eventItem.entityType = ASC.CRM.Resources.CRMJSResource.Case;
                         break;
                     default:
@@ -2930,6 +2895,50 @@ ASC.CRM.ContactSelector = new function() {
     };
 };
 
+ASC.CRM.UpdateCRMCaldavCalendar = function (task, action, oldResponsibleId) {
+    var postData = {
+        calendarId: "crm_calendar",
+        uid: "crm_" + task.type + "_" + task.id,
+        responsibles: [task.responsible.id]
+    };
+
+    var url = ASC.Resources.Master.ApiPath + "calendar/caldavevent.json";
+    switch (action) {
+        case 0: //new
+        case 1: //update
+            postData.alert = task.alertValue || 0;
+            jq.ajax({
+                type: 'put',
+                url: url,
+                data: postData,
+                complete: function (d) {
+
+                }
+            });
+            if (task.responsible.id !== oldResponsibleId && oldResponsibleId !== undefined) {
+                jq.ajax({
+                    type: 'delete',
+                    url: url,
+                    data: {
+                        calendarId: "crm_calendar",
+                        uid: "crm_" + task.type + "_" + task.id,
+                        responsibles: [oldResponsibleId]
+                    },
+                    complete: function (d) {}
+                });
+            }
+            break;
+        case 2:
+            jq.ajax({
+                type: 'delete',
+                url: url,
+                data: postData,
+                complete: function (d) {}
+            });
+            break;
+    }
+};
+
 ASC.CRM.CategorySelector = function (objName, currentCategory) {
     this.ObjName = objName;
     this.Me = function() { return jq("#" + this.ObjName); };
@@ -3088,7 +3097,7 @@ ASC.CRM.TagView = (function() {
                 switcherSelector: "#addNewTag",
                 addTop: 1,
                 addLeft: 0,
-                simpleToggle: true
+                simpleToggle: (typeof (params) != "undefined" && params.hasOwnProperty("simpleToggle")) ? params.simpleToggle : true
             });
 
             jq("#addThisTag").click(function() {
@@ -3184,17 +3193,18 @@ ASC.CRM.ImportFromCSVView = (function() {
 
     return {
         init: function(intEntityType, entityType) {
-            jq("#delimiterCharacterSelect,#encodingSelect, #quoteCharacterSelect").tlcombobox();
+            jq("#delimiterCharacterSelect,#encodingSelect, #quoteCharacterSelect").tlcombobox({ align: "left" });
             initOtherActionMenu();
 
             if (intEntityType != 3) {//not tasks
                 jq.tmpl("tagViewTmpl",
                        {
                            tags: [],
-                           availableTags: ASC.CRM.Data.tagList
+                           availableTags: ASC.CRM.Data.tagList,
+                           containerClass: "initial"
                        })
                        .appendTo("#importFromCSVTags");
-                ASC.CRM.TagView.init(entityType, true);
+                ASC.CRM.TagView.init(entityType, true, { simpleToggle: false });
             }
 
             if (intEntityType == 0) {//contact
@@ -3223,7 +3233,7 @@ ASC.CRM.ImportFromCSVView = (function() {
                     .append(jq("<option value='2'></option>").text(ASC.CRM.Resources.CRMCommonResource.AccessRightsForReading))
                     .append(jq("<option value='1'></option>").text(ASC.CRM.Resources.CRMCommonResource.AccessRightsForReadWriting))
                     .val("2")
-                    .tlCombobox();
+                    .tlCombobox({ align: "left" });
 
                 $html.appendTo("#makePublicPanel");
             }
@@ -3418,8 +3428,18 @@ ASC.CRM.ImportEntities = (function ($) {
         LoadingBanner.hideLoaderBtn("#importFromCSVSteps");
         jq("#importErrorPanel .errorNote").text(msg);
         //PopupKeyUpActionProvider.EnableEsc = false;
-        StudioBlockUIManager.blockUI("#importErrorPanel", 500, 200, 0);
-    }
+        StudioBlockUIManager.blockUI("#importErrorPanel", 500);
+    };
+
+    var _resetUploader = function () {
+        jq("#importFromCSVSteps dd:first .middle-button-container a.button.blue.middle:first").addClass("disable");
+        jq("#uploadCSVFile")
+            .removeClass("edit_button")
+            .addClass("import_button")
+            .text(ASC.CRM.Resources.CRMJSResource.SelectCSVFileButton)
+            .prev().hide();
+        ASC.CRM.ImportEntities.prevStep(0);
+    };
 
     return {
         init: function (entityType, entityTypeName) {
@@ -3445,16 +3465,15 @@ ASC.CRM.ImportEntities = (function ($) {
                 autoSubmit: false,
                 onChange: function (file, extension) {
                     _CSVFileURI = "";
-                    if (extension == "") {
-                        jq("#uploadCSVFile").removeClass("edit_button").addClass("import_button");
-                        jq("#uploadCSVFile").text(ASC.CRM.Resources.CRMJSResource.SelectCSVFileButton);
-                        jq("#uploadCSVFile").prev().hide();
-                        ASC.CRM.ImportEntities.prevStep(0);
+
+                    if (!file) {
+                        _resetUploader();
                         return false;
                     }
 
-                    if (extension[0].toLowerCase() != "csv") {
+                    if (!extension || extension[0].toLowerCase() != "csv") {
                         _showErrorPanel(ASC.CRM.Resources.CRMJSResource.ErrorMessage_NotSupportedFileFormat);
+                        _resetUploader();
                         return false;
                     }
 
@@ -3629,7 +3648,10 @@ ASC.CRM.ImportEntities = (function ($) {
                 });
         },
 
-        startUploadCSVFile: function () {
+        startUploadCSVFile: function (obj) {
+            if (jq(obj).hasClass("disable"))
+                return;
+
             if (_CSVFileURI == "") {
                 _ajaxUploader.submit();
             } else {
@@ -3944,13 +3966,13 @@ ASC.CRM.UserSelectorListView = new function() {
     };
 };
 
-// Google Analytics const
 var ga_Categories = {
     contacts: "crm_contacts",
     cases: "crm_cases",
     deals: "crm_deals",
     tasks: "crm_tasks",
-    sender: "crm_sender"
+    sender: "crm_sender",
+    reports: "crm_reports"
 };
 
 var ga_Actions = {
@@ -3963,6 +3985,50 @@ var ga_Actions = {
     next: "next",
     userClick: "user-click",
     actionClick: "action-click",
-    quickAction: "quick-action"
+    quickAction: "quick-action",
+    generateNew: "generate-new"
 };
-// end Google Analytics
+
+
+ASC.CRM.PartialExport = (function () {
+
+    var initialized = false,
+        filterObj = null,
+        entityType = null;
+
+    function startExport(data) {
+
+        ProgressDialog.generate(data ||
+        {
+            entityType: entityType,
+            base64FilterString: jq(filterObj).advansedFilter("hash")
+        });
+    }
+
+    function init(filter, type) {
+        filterObj = filter;
+        entityType = type;
+
+        ProgressDialog.init(
+            {
+                header: ASC.CRM.Resources.CRMCommonResource.ExportData,
+                footer: ASC.CRM.Resources.CRMCommonResource.ExportDataInfo.format("<a class='link underline' href='/Products/Files/'>", "</a>"),
+                progress: ASC.CRM.Resources.CRMCommonResource.ExportDataProgress
+            },
+            jq("#studioPageContent .mainPageContent .containerBodyBlock:first"),
+            {
+                terminate: Teamlab.cancelCrmCancelPartialExport,
+                status: Teamlab.getCrmPartialExportStatus,
+                generate: Teamlab.startCrmPartialExport
+            });
+        
+        if (initialized) return;
+        
+        initialized = true;
+    };
+
+    return {
+        init: init,
+        startExport: startExport
+    };
+})();

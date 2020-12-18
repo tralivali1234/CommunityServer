@@ -1,35 +1,29 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Files.Core;
-using ASC.Web.Files.Services.WCFService.FileOperations;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using ASC.Files.Core;
+using ASC.Web.Files.Core.Entries;
+using ASC.Web.Files.Helpers;
+using ASC.Web.Files.Services.WCFService.FileOperations;
 using File = ASC.Files.Core.File;
+using FileShare = ASC.Files.Core.Security.FileShare;
 
 namespace ASC.Web.Files.Services.WCFService
 {
@@ -47,19 +41,21 @@ namespace ASC.Web.Files.Services.WCFService
 
         Folder FolderRename(String folderId, String title);
 
-        DataWrapper GetFolderItems(String parentId, int from, int count, FilterType filter, OrderBy orderBy, String subjectID, String searchText);
+        DataWrapper GetFolderItems(String parentId, int from, int count, FilterType filter, bool subjectGroup, String subjectID, String searchText, bool searchInContent, bool withSubfolders, OrderBy orderBy);
 
-        object GetFolderItemsXml(String parentId, int from, int count, FilterType filter, OrderBy orderBy, String subjectID, String searchText);
+        object GetFolderItemsXml(String parentId, int from, int count, FilterType filter, bool subjectGroup, String subjectID, String searchText, bool searchInContent, bool withSubfolders, OrderBy orderBy);
 
-        ItemList<FileEntry> GetItems(ItemList<String> items, FilterType filter, String subjectID, String searchText);
+        ItemList<FileEntry> GetItems(ItemList<String> items, FilterType filter, bool subjectGroup, String subjectID, String searchText);
 
         ItemDictionary<String, String> MoveOrCopyFilesCheck(ItemList<String> items, String destFolderId);
 
-        ItemList<FileOperationResult> MoveOrCopyItems(ItemList<String> items, String destFolderId, FileConflictResolveType resolveType, bool isCopyOperation);
+        ItemList<FileOperationResult> MoveOrCopyItems(ItemList<String> items, String destFolderId, FileConflictResolveType resolveType, bool isCopyOperation, bool deleteAfter = false);
 
-        ItemList<FileOperationResult> DeleteItems(string action, ItemList<String> items);
+        ItemList<FileOperationResult> DeleteItems(string action, ItemList<String> items, bool ignoreException = false, bool deleteAfter = false, bool immediately = false);
 
-        ItemList<FileOperationResult> DeleteItems(string action, ItemList<String> items, bool ignoreException);
+        void ReassignStorage(Guid userFromId, Guid userToId);
+
+        void DeleteStorage(Guid userId);
 
         #endregion
 
@@ -67,7 +63,7 @@ namespace ASC.Web.Files.Services.WCFService
 
         File GetFile(String fileId, int version);
 
-        File CreateNewFile(String parentId, String fileTitle);
+        File CreateNewFile(String parentId, String fileTitle, string templateId);
 
         File FileRename(String fileId, String title);
 
@@ -79,27 +75,53 @@ namespace ASC.Web.Files.Services.WCFService
 
         ItemList<File> GetFileHistory(String fileId);
 
-        KeyValuePair<String, ItemDictionary<String, String>> GetSiblingsFile(String fileId, FilterType filter, OrderBy orderBy, String subjectID, String searchText);
+        ItemList<File> GetSiblingsFile(String fileId, String folderId, FilterType filter, bool subjectGroup, String subjectID, String searchText, bool searchInContent, bool withSubfolders, OrderBy orderBy);
 
-        KeyValuePair<bool, String> TrackEditFile(String fileId, Guid tabId, String docKeyForTrack, String shareLinkKey, bool isFinish, bool fixedVersion);
+        KeyValuePair<bool, String> TrackEditFile(String fileId, Guid tabId, String docKeyForTrack, String doc, bool isFinish);
 
         ItemDictionary<String, String> CheckEditing(ItemList<String> filesId);
 
-        File SaveEditing(String fileId, int version, Guid tabId, string fileExtension, string fileuri, Stream stream, bool asNew, String shareLinkKey);
+        File SaveEditing(String fileId, string fileExtension, string fileuri, Stream stream, String doc, bool forcesave);
 
-        string StartEdit(String fileId, String docKeyForTrack, bool asNew, bool editingAlone, String shareLinkKey);
+        File UpdateFileStream(String fileId, Stream stream, bool encrypted, bool forcesave);
+
+        string StartEdit(String fileId, bool editingAlone, String doc);
 
         ItemList<FileOperationResult> CheckConversion(ItemList<ItemList<String>> filesIdVersion);
 
         File LockFile(String fileId, bool lockFile);
 
-        ItemList<EditHistory> GetEditHistory(String fileId, String shareLinkKey);
+        ItemList<EditHistory> GetEditHistory(String fileId, String doc);
 
-        KeyValuePair<string, string> GetEditDiffUrl(String fileId, int version, String doc = null);
+        EditHistoryData GetEditDiffUrl(String fileId, int version, String doc = null);
+
+        ItemList<EditHistory> RestoreVersion(String fileId, int version, String url, String doc = null);
+
+        Web.Core.Files.DocumentService.FileLink GetPresignedUri(String fileId);
+
+        #endregion
+
+        #region Favorites Manager
+
+        ItemList<FileEntry> AddToFavorites(ItemList<String> foldersId, ItemList<String> filesId);
+
+        ItemList<FileEntry> DeleteFavorites(ItemList<String> foldersId, ItemList<String> filesId);
+
+        #endregion
+
+        #region Templates Manager
+
+        ItemList<FileEntry> AddToTemplates(ItemList<String> filesId);
+
+        ItemList<FileEntry> DeleteTemplates(ItemList<String> filesId);
+
+        object GetTemplates(FilterType filter, int from, int count, bool subjectGroup, String ssubject, String searchText, bool searchInContent);
 
         #endregion
 
         #region Utils
+
+        ItemList<FileEntry> ChangeOwner(ItemList<String> items, Guid userId);
 
         ItemList<FileOperationResult> BulkDownload(Dictionary<String, String> items);
 
@@ -111,11 +133,23 @@ namespace ASC.Web.Files.Services.WCFService
 
         String GetShortenLink(String fileId);
 
-        void SendLinkToEmail(String fileId, MessageParams messageAddresses);
-
         bool StoreOriginal(bool store);
 
+        bool HideConfirmConvert(bool isForSave);
+
         bool UpdateIfExist(bool update);
+
+        bool Forcesave(bool value);
+
+        bool StoreForcesave(bool value);
+
+        bool DisplayRecent(bool value);
+
+        bool DisplayFavorite(bool value);
+
+        bool DisplayTemplates(bool value);
+
+        bool ChangeDeleteConfrim(bool update);
 
         String GetHelpCenter();
 
@@ -135,6 +169,14 @@ namespace ASC.Web.Files.Services.WCFService
 
         object GetNewItems(String folderId);
 
+        bool SetAceLink(String fileId, FileShare share);
+
+        ItemList<MentionWrapper> SharedUsers(String fileId);
+
+        ItemList<AceShortWrapper> SendEditorNotify(String fileId, MentionMessageWrapper mentionMessage);
+
+        ItemList<EncryptionKeyPair> GetEncryptionAccess(String fileId);
+
         #endregion
 
         #region ThirdParty
@@ -148,6 +190,12 @@ namespace ASC.Web.Files.Services.WCFService
         object DeleteThirdParty(String providerId);
 
         bool ChangeAccessToThirdparty(bool enableThirdpartySettings);
+
+        bool SaveDocuSign(String code);
+
+        object DeleteDocuSign();
+
+        String SendDocuSign(string fileId, DocuSignData docuSignData);
 
         #endregion
 

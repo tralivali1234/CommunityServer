@@ -1,4 +1,21 @@
-﻿window.ASC = window.ASC || {};
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+window.ASC = window.ASC || {};
 
 window.ASC.TMTalk = window.ASC.TMTalk || {};
 
@@ -19,7 +36,9 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     defaultContact = null,
     groupsContainer = null,
     contactsContainer = null,
+    filterContainer = null,
     contactlistContainer = null,
+    tablistContainer =null,
     constants = {
       propertyStatusId : 'sid'
     },
@@ -59,11 +78,13 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     if (contactlistContainer === null) {
       var nodes = null;
       contactlistContainer = document.getElementById('talkContactsContainer');
+      tablistContainer = document.getElementById('talkTabContainer');
       nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'grouplist', 'ul');
       groupsContainer = nodes.length > 0 ? nodes[0] : null;
       nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'contactlist', 'ul');
       contactsContainer = nodes.length > 0 ? nodes[0] : null;
       filterField = document.getElementById('filterValue');
+      filterContainer = document.getElementById('talkFilterContainer');
       toolbarContainer = document.getElementById('talkContactToolbarContainer');
     }
   };
@@ -192,6 +213,42 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     return hashes;
   };
 
+  var countUnreadMessagesGroup = function (group) {
+      if (ASC.TMTalk.dom.hasClass(group, 'group')
+            && !ASC.TMTalk.dom.hasClass(group, 'none')
+                && !ASC.TMTalk.dom.hasClass(group, 'open')) {
+
+          var countMessage = 0;
+          var gropeState = jq(jq(group).children(".head")[0]).children(".state");
+          var contactList = jq(group).children(".contactlist")[0].childNodes;
+          
+          for (var i = 0; i < contactList.length; i++) {
+
+              if (ASC.TMTalk.dom.hasClass(contactList[i], 'contact')
+                    && !ASC.TMTalk.dom.hasClass(contactList[i], 'default')
+                        && ASC.TMTalk.dom.hasClass(contactList[i], 'new-message')) {
+
+                  if (jq(contactList[i]).children(".state")[0].innerHTML) {
+                      countMessage += +jq(contactList[i]).children(".state")[0].innerHTML;
+                  }
+              }
+          }
+          if (countMessage == 0) {
+              gropeState.hide();
+          } else {
+              if (countMessage < 10) {
+                  gropeState.removeClass('many-message');
+                  gropeState.addClass('few-message');
+              } else {
+                  gropeState.removeClass('few-message');
+                  gropeState.addClass('many-message');
+              }
+              gropeState.show();
+              gropeState.html(countMessage);
+          }
+      }
+     
+  };
   var readMessages = function (jid) {
     var
       nodes = null,
@@ -200,9 +257,19 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'contact', 'li');
     nodesInd = nodes.length;
     while (nodesInd--) {
-      if (nodes[nodesInd].getAttribute('data-cid') === jid) {
-        ASC.TMTalk.dom.removeClass(nodes[nodesInd], 'new-message');
-      }
+        if (nodes[nodesInd].getAttribute('data-cid') === jid) {
+            
+            
+           ASC.TMTalk.dom.removeClass(nodes[nodesInd], 'new-message');
+           var state = ASC.TMTalk.dom.getElementsByClassName(nodes[nodesInd], 'state', 'div');
+           state[0].innerText = "";
+            
+           var contactList = jq(nodes[nodesInd])[0].parentElement;
+           var group = jq(contactList)[0].parentElement;
+
+           countUnreadMessagesGroup(group);
+           
+        }
     }
     var unreadmessagesInd = unreadMessages.length;
     while (unreadmessagesInd--) {
@@ -221,6 +288,15 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       ASC.TMTalk.dom.removeClass(toolbarContainer, 'unread-messages');
       setTimeout(function () {ASC.TMTalk.indicator.stop()}, 300);
     }
+      
+    var openedRooms = localStorageManager.getItem("openedRooms") != undefined ? localStorageManager.getItem("openedRooms") : {};
+    if (openedRooms[jid] != undefined) {
+        openedRooms[jid].unreadMessages = 0;
+        openedRooms[jid].unreadOfflineMessages = 0;
+        localStorageManager.setItem("openedRooms", openedRooms);
+    }
+
+    ASC.TMTalk.connectionManager.clearUnreadMessage(ASC.TMTalk.connectionManager.getJid(), ASC.TMTalk.roomsManager.getRoomData().id);
   };
 
   var getOpeningConferenceCallback = function (cid) {
@@ -282,7 +358,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     ASC.TMTalk.messagesManager.bind(ASC.TMTalk.messagesManager.events.sentMessageToChat, onSentMessage);
     ASC.TMTalk.messagesManager.bind(ASC.TMTalk.messagesManager.events.recvMessageFromChat, onRecvMessage);
     ASC.TMTalk.messagesManager.bind(ASC.TMTalk.messagesManager.events.recvMessageFromChat, onRecvMessageFromChat);
-    ASC.TMTalk.messagesManager.bind(ASC.TMTalk.messagesManager.events.recvOfflineMessagesFromChat, onRecvMessageFromChat);
+    ASC.TMTalk.messagesManager.bind(ASC.TMTalk.messagesManager.events.recvOfflineMessagesFromChat, onRecvOfflineMessageFromChat);
 
     ASC.TMTalk.indicator.bind(ASC.TMTalk.indicator.events.start, onStartIndicator);
     ASC.TMTalk.indicator.bind(ASC.TMTalk.indicator.events.show, onShowIndicator);
@@ -353,10 +429,30 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     lastFilterValue = '';
   };
 
+  $('#talkFilterContainer').keypress(function (evt) {
+      if ($('#talkFilterContainer div.helper input#filterValue').is(':focus')) {
+          if (ASC.TMTalk.properties.item('enblfltr') === '0') {
+              ASC.TMTalk.properties.item('enblfltr', '1');
+          }
+          //return false;
+      }
+  });
   var filteringContactlist = function (evt) {
     var resetSelected = false;
-
     if (typeof evt !== 'undefined') {
+      if (filterField !== null && filterContainer !== null) {
+          nodes = ASC.TMTalk.dom.getElementsByClassName(filterContainer, 'clear-filter', 'div');
+          if (filterField.value) {
+              if (nodes.length > 0) {
+                  ASC.TMTalk.dom.removeClass(nodes[0], 'hidden');
+              }
+          } else {
+              if (nodes.length > 0) {
+                  ASC.TMTalk.dom.addClass(nodes[0], 'hidden');
+                  ASC.TMTalk.properties.item('enblfltr', '0');
+              }
+          }
+      }  
       switch (evt.keyCode) {
         case 13 :
           var container = null;
@@ -394,8 +490,12 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
           }
           return undefined;
         case 27 :
-          if (filterField !== null) {
-            filterField.value = '';
+          if (filterField !== null && filterContainer !== null) {
+              filterField.value = '';
+              nodes = ASC.TMTalk.dom.getElementsByClassName(filterContainer, 'clear-filter', 'div');
+              if (nodes.length > 0) {
+                  ASC.TMTalk.dom.addClass(nodes[0], 'hidden');
+              }
           }
           ASC.TMTalk.properties.item('enblfltr', '0');
           return undefined;
@@ -517,7 +617,6 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       contactname = '',
       validcontacts = 0,
       filterValue = filterField.value;
-
     if (typeof filterValue !== 'string') {
       return undefined;
     }
@@ -525,7 +624,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     if ((filterValue = (filterValue.replace(/^\s+|\s+$/g, '')).toLowerCase()) === lastFilterValue && typeof evt !== 'undefined') {
       return undefined;
     }
-
+    
     //container = contactlistContainer;
     container = contactsContainer;
 
@@ -601,7 +700,11 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     }
     
   };
-
+    var getUnreadMessageCount = function() {
+        if (unreadMessages) {
+            return unreadMessages.length;
+        }
+    };
   var onPageFocus = function () {
     var currentRoomData = ASC.TMTalk.roomsManager.getRoomData();
     if (currentRoomData !== null) {
@@ -719,7 +822,37 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     }
   };
 
-  var onRecvMessageFromChat = function (jid) {
+  var findUnreadMessages = function (node, jid, forHiddenTabs) {
+        var userUnreadMessages = 0;
+        for (var i = 0; i < unreadMessages.length; i++) {
+            if (unreadMessages[i].cid === jid) {
+                userUnreadMessages++;
+            }
+        }
+        var state = ASC.TMTalk.dom.getElementsByClassName(node, 'state', 'div');
+        if (userUnreadMessages <= 9) {
+            ASC.TMTalk.dom.removeClass(state[0], 'many-message');
+            ASC.TMTalk.dom.addClass(state[0], 'few-message');
+        } else {
+            ASC.TMTalk.dom.addClass(state[0], 'many-message');
+            ASC.TMTalk.dom.removeClass(state[0], 'few-message');
+        }
+        state[0].innerHTML = userUnreadMessages.toString();
+        
+        //hack for safari
+        if (jQuery.browser.safari && node.getAttribute('data-roomid')) {
+            jQuery(node).html(jQuery(node).html());
+        }
+     
+        if (forHiddenTabs) {
+            return userUnreadMessages;
+        }
+    };
+
+  var onRecvOfflineMessageFromChat = function (jid, unreadMessagesArr) {
+        onRecvMessageFromChat(jid, unreadMessagesArr, true);
+    };
+  var onRecvMessageFromChat = function (jid, unreadMessagesArr, isOffline) {
     if (!roomIds.hasOwnProperty(jid)) {
       var inBackground = false;
       for (var fld in roomIds) {
@@ -731,20 +864,79 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
 
     var currentRoomData = ASC.TMTalk.roomsManager.getRoomData();
     if (TMTalk.properties.focused === false || currentRoomData !== null && currentRoomData.id !== jid) {
-      var
-        nodes = null,
+    var nodes = null,
+        tabs = null,
+        tabsInd = 0,
         nodesInd = 0;
+      tabs = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab', 'li');
       nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'contact', 'li');
       nodesInd = nodes.length;
-      while (nodesInd--) {
-        if (nodes[nodesInd].getAttribute('data-cid') === jid) {
-          ASC.TMTalk.dom.addClass(nodes[nodesInd], 'new-message');
-        }
+      var openedRooms = localStorageManager.getItem("openedRooms") != undefined ? localStorageManager.getItem("openedRooms") : {};
+      
+      if (typeof unreadMessagesArr == 'object' && unreadMessagesArr.length > 0) {
+          //add only new offline messages
+          if (isOffline == true) {
+              if (openedRooms[jid].unreadOfflineMessages < unreadMessagesArr.length) {
+                  var diffOfflineMessages = unreadMessagesArr.length - openedRooms[jid].unreadOfflineMessages;
+                  for (var i = 0; i < diffOfflineMessages; i++) {
+                      unreadMessages.push({ cid: jid, type: 'chat' });
+                      openedRooms[jid].unreadOfflineMessages = openedRooms[jid].unreadOfflineMessages + 1;
+                      openedRooms[jid].unreadMessages = openedRooms[jid].unreadMessages + 1;
+                  }
+              }
+              
+          } else {
+              for (var i = 0; i < unreadMessagesArr.length; i++) {
+                  unreadMessages.push({ cid: jid, type: 'chat' });
+                  openedRooms[jid].unreadMessages = openedRooms[jid].unreadMessages + 1;
+              }
+          }
+      } else {
+          if (isOffline == true) {
+              if (openedRooms[jid].unreadOfflineMessages < unreadMessagesArr.length) {
+                  unreadMessages.push({ cid: jid, type: 'chat' });
+                  openedRooms[jid].unreadMessages = openedRooms[jid].unreadMessages + 1;
+                  openedRooms[jid].unreadOfflineMessages = openedRooms[jid].unreadOfflineMessages + 1;
+              }
+          } else {
+              unreadMessages.push({ cid: jid, type: 'chat' });
+              openedRooms[jid].unreadMessages = openedRooms[jid].unreadMessages + 1;
+          }
+          
       }
-      unreadMessages.push({cid : jid, type : 'chat'});
+     
+      localStorageManager.setItem("openedRooms", openedRooms);
+
+      while (nodesInd--) {
+          
+          
+          if (nodes[nodesInd].getAttribute('data-cid') === jid) {
+
+              var contactList = jq(nodes[nodesInd])[0].parentElement;
+              var group = jq(contactList)[0].parentElement;
+              
+              findUnreadMessages(nodes[nodesInd], jid);
+             
+              ASC.TMTalk.dom.addClass(nodes[nodesInd], 'new-message');
+
+              countUnreadMessagesGroup(group);
+
+          }
+      }
+      tabsInd = tabs.length;
+      while (tabsInd--) {
+          if (tabs[tabsInd].getAttribute('data-cid') === jid) {
+
+              //Unread Messages
+              findUnreadMessages(tabs[tabsInd], jid);
+              break;
+              
+          }
+      }
       nodes = ASC.TMTalk.dom.getElementsByClassName(toolbarContainer, 'unread-messages', 'div');
       if (nodes.length > 0) {
-        nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'read-new-message', 'div');
+          nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'read-new-message', 'div');
+         
         if (nodes.length > 0) {
           nodes[0].innerHTML = unreadMessages.length;
         }
@@ -753,29 +945,51 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
         setTimeout(function () {ASC.TMTalk.indicator.start()}, 300);
       }
     }
+    updateHiddenTabs();
   };
 
   var onRecvMessageFromConference = function (roomjid, name, displaydate, date, body, isMine) {
     var currentRoomData = ASC.TMTalk.roomsManager.getRoomData();
     if (TMTalk.properties.focused === false || currentRoomData !== null && currentRoomData.id !== roomjid) {
-      var
-        nodes = null,
-        nodesInd = 0;
+        var
+            nodes = null,
+            tabs = null,
+            tabsInd = 0,
+            nodesInd = 0;
+      tabs = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab', 'li');
       nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'contact', 'li');
       nodesInd = nodes.length;
-
       ASC.TMTalk.notifications.show(
         roomjid,
         ASC.TMTalk.mucManager.getConferenceName(roomjid) + " (" + name + ")",
         body.length < 50 ? body : body.substring(0, 50) + '...'
       );
-
+      unreadMessages.push({ cid: roomjid, type: 'conference' });
       while (nodesInd--) {
-        if (nodes[nodesInd].getAttribute('data-cid') === roomjid) {
-          ASC.TMTalk.dom.addClass(nodes[nodesInd], 'new-message');
+          if (nodes[nodesInd].getAttribute('data-cid') === roomjid) {
+              
+              var contactList = jq(nodes[nodesInd])[0].parentElement;
+              var group = jq(contactList)[0].parentElement;
+
+              findUnreadMessages(nodes[nodesInd], roomjid);
+
+              ASC.TMTalk.dom.addClass(nodes[nodesInd], 'new-message');
+
+              countUnreadMessagesGroup(group);
+              
         }
       }
-      unreadMessages.push({cid : roomjid, type : 'conference'});
+      tabsInd = tabs.length;
+      while (tabsInd--) {
+          if (tabs[tabsInd].getAttribute('data-cid') === roomjid) {
+
+              //Unread Messages
+              findUnreadMessages(tabs[tabsInd], roomjid);
+              break;
+
+          }
+      }
+      
       nodes = ASC.TMTalk.dom.getElementsByClassName(toolbarContainer, 'unread-messages', 'div');
       if (nodes.length > 0) {
         nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'read-new-message', 'div');
@@ -787,6 +1001,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
         setTimeout(function () {ASC.TMTalk.indicator.start()}, 300);
       }
     }
+    updateHiddenTabs();
   };
 
   var onAcceptInvite = function (roomjid, roomname, inviterjid) {
@@ -860,7 +1075,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       conferencenode = null,
       contactlistnode = null;
 
-    groupname = ASC.TMTalk.Resources.conferenceGroupName;
+    groupname = ASC.TMTalk.Resources.ConferenceGroupName;
 
     nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'group rooms', 'li');
     groupnode = nodes.length > 0 ? nodes[0] : null;
@@ -1180,6 +1395,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
   };
 
   var openRoom = function (jid, inBackground) {
+    var isNewRoom = ASC.TMTalk.roomsManager.getRoomDataById(jid) == null ? true : false;
     if (!roomIds.hasOwnProperty(jid)) {
       ASC.TMTalk.roomsManager.createRoom({
         type : 'chat',
@@ -1190,6 +1406,45 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     if (roomIds.hasOwnProperty(jid)) {
       ASC.TMTalk.roomsManager.openRoom(roomIds[jid].id, inBackground === true);
     }
+    var openedRooms = localStorageManager.getItem("openedRooms") != undefined ? localStorageManager.getItem("openedRooms") : {};
+    var _unreadMessages = openedRooms[jid] != undefined ? openedRooms[jid].unreadMessages : 0;
+    var _unreadOfflineMessages = openedRooms[jid] != undefined ? openedRooms[jid].unreadOfflineMessages : 0;
+
+      openedRooms[jid] = {
+          type: 'chat',
+          inBackground: inBackground === true,
+          unreadOfflineMessages: _unreadOfflineMessages,
+          unreadMessages: _unreadMessages
+      };
+      if (((openedRooms[jid].inBackground && openedRooms[jid].unreadMessages > 0) || (!TMTalk.properties.focused && openedRooms[jid].unreadMessages > 0)) && isNewRoom) {
+        var tabs = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab', 'li');
+        var nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'contact', 'li');
+        
+        var tabsInd = tabs.length;
+        var nodesInd = nodes.length;
+        for (var i = 0; i < openedRooms[jid].unreadMessages; i++) {
+            unreadMessages.push({ cid: jid, type: "chat" });
+        }
+        
+        while (nodesInd--) {
+            if (nodes[nodesInd].getAttribute('data-cid') === jid) {
+                var contactList = jq(nodes[nodesInd])[0].parentElement;
+                var group = jq(contactList)[0].parentElement;
+                findUnreadMessages(nodes[nodesInd], jid);
+                ASC.TMTalk.dom.addClass(nodes[nodesInd], 'new-message');
+                countUnreadMessagesGroup(group);
+            }
+        }
+        
+        while (tabsInd--) {
+            if (tabs[tabsInd].getAttribute('data-cid') === jid) {
+                ASC.TMTalk.dom.addClass(tabs[tabsInd], 'new-message');
+                findUnreadMessages(tabs[tabsInd], jid);
+                break;
+            }
+        }
+    }
+    localStorageManager.setItem("openedRooms", openedRooms);
   };
 
   var openItem = function (cid, inBackground) {
@@ -1236,17 +1491,25 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     switch (data.type) {
       case 'chat' :
         if (inBackground !== true) {
-          if (TMTalk.properties.focused) {
-            readMessages(data.id);
-          }
+            var openedRooms = localStorageManager.getItem("openedRooms") != undefined ? localStorageManager.getItem("openedRooms") : {};
 
-          var contact = ASC.TMTalk.contactsManager.getContact(jid);
-          if (contact !== null) {
-            ASC.TMTalk.tabsContainer.resetStatus('chat', {department : contact.group, message : contact.status, show : contact.show}, 1);
-          }
+            if (TMTalk.properties.focused) {
+                if (openedRooms[jid] != undefined) {
+                    openedRooms[jid].inBackground = false;
+                    openedRooms[jid].unreadMessages = 0;
+                    openedRooms[jid].unreadOfflineMessages = 0;
+                    localStorageManager.setItem("openedRooms", openedRooms);
+                }
+                readMessages(data.id);
+            }
 
-          ASC.TMTalk.dom.removeClass(contactlistContainer, 'mailing');
-          ASC.TMTalk.dom.removeClass(contactlistContainer, 'conference');
+            var contact = ASC.TMTalk.contactsManager.getContact(jid);
+            if (contact !== null) {
+                ASC.TMTalk.tabsContainer.resetStatus('chat', {department : contact.group, message : contact.status, show : contact.show}, 1);
+            }
+
+            ASC.TMTalk.dom.removeClass(contactlistContainer, 'mailing');
+            ASC.TMTalk.dom.removeClass(contactlistContainer, 'conference');
         }
         break;
       case 'conference' :
@@ -1256,7 +1519,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
           }
 
           if (data.minimized === false) {
-            ASC.TMTalk.tabsContainer.setStatus('hint', {hint : ASC.TMTalk.Resources.hintSendInvite}, 2);
+            ASC.TMTalk.tabsContainer.setStatus('hint', {hint : ASC.TMTalk.Resources.HintSendInvite}, 2);
           } else {
             ASC.TMTalk.tabsContainer.resetStatus('conference', {confsubject : ASC.TMTalk.mucManager.getConferenceSubject(jid)}, 1);
           }
@@ -1267,7 +1530,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
         break;
       case 'mailing' :
         if (inBackground !== true) {
-          ASC.TMTalk.tabsContainer.setStatus('hint', {hint : ASC.TMTalk.Resources.hintSendInvite}, 2);
+          ASC.TMTalk.tabsContainer.setStatus('hint', {hint : ASC.TMTalk.Resources.HintSendInvite}, 2);
 
           ASC.TMTalk.dom.removeClass(contactlistContainer, 'conference');
           ASC.TMTalk.dom.addClass(contactlistContainer, 'mailing');
@@ -1302,53 +1565,216 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
         }
         break;
     }
+    var openedRooms = localStorageManager.getItem("openedRooms") != undefined ? localStorageManager.getItem("openedRooms") : {};
+    delete openedRooms[data.id];
+    localStorageManager.setItem("openedRooms", openedRooms);
+ 
   };
 
   var onClientConnecting = function () {
-    $('#talkStatusMenu').addClass('processing');
-    $('#talkContactsContainer').removeClass('processing');
-    ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.hintClientConnecting});
+      if(!$('#talkStatusMenu').hasClass('processing'))
+      {
+          $('#talkStatusMenu').addClass('processing');
+          $('#talkContactsContainer').addClass('processing');
+          $('#talkStartSplash').hide();
+      }
+    
+  //  ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.HintClientConnecting});
   };
 
   var onClientConnected = function () {
+    $('#button-create-conference').bind('click', ASC.TMTalk.meseditorContainer.openCreatingConferenceDialog).css('cursor', 'pointer');
+    $('#button-create-conference').css('opacity', '1');
+    $('#button-clear-files').bind('click', ASC.TMTalk.meseditorContainer.openClearFilesDialog).css('cursor', 'pointer');
+    $('#talkMeseditorToolbarContainer div.button-talk.searchmessage:first').bind('click', ASC.TMTalk.meseditorContainer.searchMessages);
     $('#talkStatusMenu').removeClass('processing');
-    if ($('#talkContactsContainer').find('li.contact:not(.default)').length === 0) {
+    $('#talkContactsContainer').removeClass('processing');
+      
+    $('#talkContentContainer.disabled #talkStartSplash').show();
+    
+    /*if ($('#talkContactsContainer').find('li.contact:not(.default)').length === 0) {
       $('#talkContactsContainer').addClass('processing');
-    }
+    }*/
 
-    ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.hintSelectContact});
-
+   // ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.HintSelectContact});
     ASC.TMTalk.sounds.play('startup');
   };
 
   var onClientDisconnecting = function () {
     $('#talkStatusMenu').addClass('processing');
-    $('#talkContactsContainer').removeClass('processing');
+    $('#talkContactsContainer').addClass('processing');
+    $('#talkRoomsContainer').removeClass('searchmessage');
+    $('#talkStartSplash').hide();
   };
 
   var onClientDisconnected = function () {
-    $('#talkStatusMenu').removeClass('processing');
-    $('#talkContactsContainer').removeClass('processing');
-
-    ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.hintClientDisconnected});
+    $('#button-create-conference').unbind('click', ASC.TMTalk.meseditorContainer.openCreatingConferenceDialog).css('cursor', 'default');
+    $('#button-create-conference').css('opacity','.4');
+    $('#button-clear-files').unbind('click', ASC.TMTalk.meseditorContainer.openClearFilesDialog).css('cursor', 'pointer');;
+    $('#talkMeseditorToolbarContainer div.button-talk.searchmessage:first').unbind('click', ASC.TMTalk.meseditorContainer.searchMessages);
+    $('#talkRoomsContainer').removeClass('searchmessage');
+    //$('#talkStatusMenu').removeClass('processing');
+    //$('#talkContactsContainer').removeClass('processing');
+   // ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.HintClientDisconnected});
     
+    if (ASC.TMTalk.connectionManager.conflict == false) {
+        ASC.TMTalk.connectionManager.status(1);
+    }
+
     ASC.TMTalk.sounds.play('letup');
   };
 
   var onClientConnectingFailed = function () {
-    $('#talkStatusMenu').removeClass('processing');
-    $('#talkContactsContainer').removeClass('processing');
-    ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.hintClientDisconnected});
+    $('#button-create-conference').unbind('click', ASC.TMTalk.meseditorContainer.openCreatingConferenceDialog).css('cursor', 'default');
+    $('#button-create-conference').css('opacity', '.4');
+    $('#button-clear-files').unbind('click', ASC.TMTalk.meseditorContainer.openClearFilesDialog).css('cursor', 'pointer');;
+    $('#talkMeseditorToolbarContainer div.button-talk.searchmessage:first').unbind('click', ASC.TMTalk.meseditorContainer.searchMessages);
+    $('#talkRoomsContainer').removeClass('searchmessage');
+    //$('#talkStatusMenu').removeClass('processing');
+    //$('#talkContactsContainer').removeClass('processing');
+    //ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.HintClientDisconnected});
 
-    ASC.TMTalk.connectionManager.bind(ASC.TMTalk.connectionManager.events.disconnected, (function (status, timeout) {
+    setTimeout(function () { ASC.TMTalk.connectionManager.status(Strophe.Status.CONNECTING); }, timeout * 1000);
+    /*ASC.TMTalk.connectionManager.bind(ASC.TMTalk.connectionManager.events.disconnected, (function (status, timeout) {
       return function () {
         if (status !== null) {
           setTimeout(function(){ASC.TMTalk.connectionManager.status(status.id)}, timeout * 1000);
         }
       };
-    })(ASC.TMTalk.connectionManager.status(), reconnectTimeout), {once : true});
+    })(ASC.TMTalk.connectionManager.status(), reconnectTimeout), {once : true});*/
   };
+    
+  document.addEventListener('copy', function (e) {
+      
+        var fragment = '';
+        if (window.getSelection) {
+            fragment = window.getSelection().getRangeAt(0).cloneContents();
+        }
+        var newCopyFragment = formattingCopiedMessages(fragment);
+        if (newCopyFragment != null) {
+            e.preventDefault();
+            e.clipboardData.setData('text/plain', newCopyFragment);
+        }
+  });
+  var formattingCopiedMessages = function (fragment) {
 
+      var copyFragment = $(fragment)[0];
+      var firstCopyElement = null;
+      var copyElements, firstChildFragment, newCopyFragment;
+      var time, day, title, body, daysplit;
+      
+      if (copyFragment.hasChildNodes()) {
+          firstCopyElement = copyFragment.firstChild;
+          if ($(copyFragment).find('ul.rooms li.room.current').length !== 0) {
+              copyFragment = $(copyFragment).find("ul.rooms li.room.current ul.messages")[0];
+              if (copyFragment) firstCopyElement = $(copyFragment).find("li.message")[0];
+          }
+          if (firstCopyElement.nodeName == 'LI' && $(firstCopyElement).hasClass('message')) {
+              copyFragment.firstChild.remove();
+              copyElements = copyFragment.childNodes;
+              firstChildFragment = $(window.getSelection().getRangeAt(0).startContainer).parents('.message.paragraph')[0];
+              newCopyFragment = "";
+              
+              if (firstChildFragment) {
+                  daysplit = $(firstChildFragment).find('span.daysplit span.value').not('.hidden');
+                  if (daysplit.length != 0 && daysplit[0].innerText != "") {
+                      newCopyFragment += "---" + daysplit[0].innerText + "---" + '\n';
+                  }
+
+                  time = $(firstChildFragment).find('div.message-container div.date');
+                  day = $(firstChildFragment).find('span.daysplit span.value').attr('date');
+                  if (time.length != 0 && time[0].innerText != "") {
+                      newCopyFragment += "[" + day + " " + time[0].innerText.replace(/\s/g, '') + "] ";
+                  }
+
+                  title = $(firstChildFragment).find('div.message-container div.message div.head span.title');
+                  if (title.length != 0 && title[0].innerText != "") {
+                      newCopyFragment += title[0].innerText + '\n';
+                  }
+
+                  body = $(firstChildFragment).find('div.message-container div.message div.body');
+                  if (body.length != 0 && body[0].innerText != "") {
+                      newCopyFragment += body[0].innerText + '\n';
+                  }
+              }
+              
+              for (var i = 0; i < copyElements.length; i++) {
+                  daysplit = $(copyElements[i]).find('span.daysplit span.value').not('.hidden');
+                  if (daysplit.length != 0 && daysplit[0].innerText != "") {
+                      newCopyFragment += "---" + daysplit[0].innerText + "---" + '\n';
+                  }
+
+                  time = $(copyElements[i]).find('div.message-container div.date');
+                  day = $(copyElements[i]).find('span.daysplit span.value').attr('date') ? $(copyElements[i]).find('span.daysplit span.value').attr('date') : "123";
+                  if (time.length != 0 && time[0].innerText != "") {
+                      newCopyFragment += "[" + day + " " + time[0].innerText.replace(/\s/g, '') + "] ";
+                  }
+                  
+                  title = $(copyElements[i]).find('div.message-container div.message div.head span.title');
+                  if (title.length != 0 && title[0].innerText != "") {
+                      newCopyFragment += title[0].innerText + '\n';
+                  }
+                  
+                  body = $(copyElements[i]).find('div.message-container div.message div.body');
+                  if (body.length != 0 && body[0].innerText != "") {
+                      newCopyFragment += body[0].innerText + '\n';
+                  }
+              }
+              return newCopyFragment;
+          } else if (firstCopyElement.nodeName == 'SPAN' && $(firstCopyElement).hasClass('daysplit')) {
+              copyElements = copyFragment.childNodes;
+              newCopyFragment = "";
+              
+              for (var i = 0; i < copyElements.length; i++) {
+                  var $copyElement = $(copyElements[i]);
+                  if ($copyElement.hasClass('daysplit')) {
+                      day = $copyElement.find('span.value').attr('date') ? $copyElement.find('span.value').attr('date') : "";
+                  } else if ($copyElement.hasClass('message-container')) {
+                      time = $copyElement.find('div.date');
+                      if (time.length != 0 && time[0].innerText != "") {
+                          newCopyFragment += "[" + day + " " + time[0].innerText.replace(/\s/g, '') + "] ";
+                      }
+                      title = $copyElement.find('div.message div.head span.title');
+                      if (title.length != 0 && title[0].innerText != "") {
+                          newCopyFragment += title[0].innerText + '\n';
+                      }
+
+                      body = $copyElement.find('div.message div.body');
+                      if (body.length != 0 && body[0].innerText != "") {
+                          newCopyFragment += body[0].innerText + '\n';
+                      }
+                  }
+              }
+              return newCopyFragment;
+          } else if (firstCopyElement.nodeName == 'DIV' && ($(firstCopyElement).hasClass('message') || $(firstCopyElement).hasClass('date'))) {
+
+              firstChildFragment = $(window.getSelection().getRangeAt(0).startContainer).parents('.message.paragraph')[0];
+              newCopyFragment = "";
+              daysplit = $(firstChildFragment).find('span.daysplit span.value').not('.hidden');
+              if (daysplit.length != 0 && daysplit[0].innerText != "") {
+                  newCopyFragment += "---" + daysplit[0].innerText + "---" + '\n';
+              }
+
+              time = $(firstChildFragment).find('div.message-container div.date');
+              day = $(firstChildFragment).find('span.daysplit span.value').attr('date');
+              if (time.length != 0 && time[0].innerText != "") {
+                  newCopyFragment += "[" + day + " " + time[0].innerText.replace(/\s/g, '') + "] ";
+              }
+
+              title = $(firstChildFragment).find('div.message-container div.message div.head span.title');
+              if (title.length != 0 && title[0].innerText != "") {
+                  newCopyFragment += title[0].innerText + '\n';
+              }
+
+              body = $(firstChildFragment).find('div.message-container div.message div.body');
+              if (body.length != 0 && body[0].innerText != "") {
+                  newCopyFragment += body[0].innerText + '\n';
+              }
+              return  newCopyFragment;
+              
+          } else return null;
+      } else return null;
+  };
   var onUpdateStatus = function (status, wasOffline) {
     var
       $statuses = $('#talkStatusMenu li.status').removeClass('current'),
@@ -1390,7 +1816,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
 
     if (ASC.TMTalk.properties.item('enabledMassend') === 'true' && ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'group mailings', 'li').length === 0) {
       tempgroups.push({
-        name      : ASC.TMTalk.Resources.mailingsGroupName,
+        name      : ASC.TMTalk.Resources.MailingsGroupName,
         type      : 'mailings',
         isEmpty   : true,
         isFixed   : true,
@@ -1400,7 +1826,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
 
     if (ASC.TMTalk.properties.item('enabledConferences') === 'true' && ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'group rooms', 'li').length === 0) {
       tempgroups.push({
-        name      : ASC.TMTalk.Resources.conferenceGroupName,
+        name: ASC.TMTalk.Resources.ConferenceGroupName,
         type      : 'rooms',
         isEmpty   : true,
         isFixed   : true,
@@ -1534,6 +1960,23 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     if ($.support.iscroll) {
       clScroller = new iScroll('talkContactsContainer');
     }
+    setTimeout(function() {
+        var openedRooms = localStorageManager.getItem("openedRooms") != undefined ? localStorageManager.getItem("openedRooms") : {};
+        for (key in openedRooms) {
+            var nodes = ASC.TMTalk.dom.getElementsByClassName(document.getElementById('talkContactsContainer'), 'contact', 'li');
+            var nodesInd = nodes.length;
+            while (nodesInd--) {
+                if (nodes[nodesInd].getAttribute('data-cid') === key && openedRooms[key].unreadMessages > 0) {
+                    var contactList = jq(nodes[nodesInd])[0].parentElement;
+                    var group = jq(contactList)[0].parentElement;
+                    ASC.TMTalk.contactsContainer.findUnreadMessages(nodes[nodesInd], key);
+                    ASC.TMTalk.dom.addClass(nodes[nodesInd], 'new-message');
+                    ASC.TMTalk.contactsContainer.countUnreadMessagesGroup(group);
+                }
+            }
+        }
+    }, 500);
+
   };
 
   var onGetLists = function (mailinglists) {
@@ -1548,7 +1991,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       contactlistnode = null,
       contactlistfragment = document.createDocumentFragment();
 
-    groupname = ASC.TMTalk.Resources.conferenceGroupName;
+    groupname = ASC.TMTalk.Resources.ConferenceGroupName;
 
     nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'group mailings', 'li');
     var groupnode = nodes.length > 0 ? nodes[0] : null;
@@ -1628,7 +2071,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       contactlistnode = null,
       contactlistfragment = document.createDocumentFragment();
 
-    groupname = ASC.TMTalk.Resources.conferenceGroupName;
+    groupname = ASC.TMTalk.Resources.ConferenceGroupName;
 
     nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'group rooms', 'li');
     var groupnode = nodes.length > 0 ? nodes[0] : null;
@@ -1949,7 +2392,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       mailingnode = null,
       contactlistnode = null;
 
-    groupname = ASC.TMTalk.Resources.mailingsGroupName;
+    groupname = ASC.TMTalk.Resources.MailingsGroupName;
 
     nodes = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'group mailings', 'li');
     groupnode = nodes.length > 0 ? nodes[0] : null;
@@ -2075,6 +2518,161 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       ASC.TMTalk.roomsManager.openRoom(roomIds[listId].id);
     }
   };
+    
+    var updateHiddenTabs = function() {
+        var tablistContainer = document.getElementById('talkTabContainer'),
+            nodes = null,
+            lastTab = null,
+            currentTab = null;
+
+        nodes = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab current', 'li');
+        if (nodes.length > 0) {
+            currentTab = nodes[0];
+        }
+
+        nodes = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab', 'li');
+        if (nodes.length > 0) {
+            lastTab = nodes[nodes.length - 1];
+            if (ASC.TMTalk.dom.hasClass(lastTab, 'default')) {
+                lastTab = null;
+            }
+        }
+
+        // has hidden tabs
+        if (lastTab && lastTab.offsetTop < lastTab.offsetHeight) {
+            nodes = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab hidden', 'li');
+            var nodesInd = nodes.length;
+            while (nodesInd--) {
+                ASC.TMTalk.dom.removeClass(nodes[nodesInd], 'hidden');
+                if (lastTab.offsetTop >= lastTab.offsetHeight) {
+                    ASC.TMTalk.dom.addClass(nodes[nodesInd], 'hidden');
+                    break;
+                }
+            }
+        }
+
+        // if need to hide
+        if (currentTab && currentTab.offsetTop >= currentTab.offsetHeight) {
+            if (!ASC.TMTalk.dom.hasClass(currentTab, 'hidden')) {
+                nodes = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab', 'li');
+                for (var i = 0, n = nodes.length; i < n; i++) {
+                    ASC.TMTalk.dom.addClass(nodes[i], 'hidden');
+                    if (currentTab.offsetTop < currentTab.offsetHeight) {
+                        for (var j = i + i; j < n; j++) {
+                            if (nodes[j].offsetTop >= nodes[j].offsetHeight && !ASC.TMTalk.dom.hasClass(nodes[j], 'hidden')) {
+                                ASC.TMTalk.dom.addClass(nodes[j], 'hidden');
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        } else if (currentTab) {
+            var allNodes = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab', 'li');
+            for (var i = 0, n = allNodes.length; i < n; i++) {
+                if (allNodes[i].offsetTop >= allNodes[i].offsetHeight && !ASC.TMTalk.dom.hasClass(allNodes[i], 'hidden')) {
+                    ASC.TMTalk.dom.addClass(allNodes[i], 'hidden');
+                }
+            }
+        }
+        nodes = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab hidden', 'li');
+        var hiddenLen = (nodes.length === 1 && ASC.TMTalk.dom.hasClass(nodes[0], 'default')) ? 0 : nodes.length;
+
+
+        findHiddenTabs(tablistContainer);
+
+
+        var hiddenTabs = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'size', 'div');
+        var sizeHiddenTabs = hiddenTabs.length > 0 ? hiddenTabs[0] : null;
+        if (sizeHiddenTabs !== null) {
+            hiddenTabs = ASC.TMTalk.dom.getElementsByClassName(sizeHiddenTabs, 'all', 'span');
+            var num = hiddenLen !== 0 ? hiddenLen - 1 : 0;
+            hiddenTabs[0].innerHTML = num;
+            if (num <= 0)
+                ASC.TMTalk.dom.addClass(sizeHiddenTabs, 'hidden');
+            else
+                ASC.TMTalk.dom.removeClass(sizeHiddenTabs, 'hidden');
+        }
+
+        if (hiddenLen > 0 || (lastTab && lastTab.offsetTop >= lastTab.offsetHeight)) {
+            if (hiddenLen > 0) {
+                ASC.TMTalk.dom.addClass(tablistContainer, 'has-hidden');
+            } else {
+                ASC.TMTalk.dom.removeClass(tablistContainer, 'has-hidden');
+            }
+
+            if (lastTab && lastTab.offsetTop >= lastTab.offsetHeight) {
+                ASC.TMTalk.dom.addClass(tablistContainer, 'has-repressed');
+            } else {
+                ASC.TMTalk.dom.removeClass(tablistContainer, 'has-repressed');
+            }
+        }
+    };
+    var findHiddenTabs = function (tablistContainer) {
+        var countHiddenMessages = 0;
+        var nodes = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'tab hidden', 'li');
+
+        var hiddenLen = (nodes.length === 1 && ASC.TMTalk.dom.hasClass(nodes[0], 'default')) ? 0 : nodes.length;
+
+        var containerHiddenTabs = ASC.TMTalk.dom.getElementsByClassName(tablistContainer, 'popupContainerClass hiddenTabs', 'div');
+        var nodesContact = ASC.TMTalk.dom.getElementsByClassName(containerHiddenTabs[0], 'contact default', 'li');
+        var
+            newcontact,
+            newcontacttitle,
+            classname,
+            contactjid,
+            titleHiddenTab = null;
+
+        var defaultContact = nodesContact.length > 0 ? nodesContact[0] : null;
+        var listHiddenTabs = ASC.TMTalk.dom.getElementsByClassName(containerHiddenTabs[0], 'contactlist', 'ul');
+
+        if (hiddenLen >= 2) {
+            jq("div.popupContainerClass.hiddenTabs li").not(".default").remove();
+            jq('div#talkTabContainer div.navigation div.size div.hiddennewmessage:first').hide();
+            for (var i = 1; i < nodes.length; i++) {
+                newcontact = defaultContact.cloneNode(true);
+                newcontact.className = newcontact.className.replace(/\s*default\s*/, ' ').replace(/^\s+|\s+$/g, '');
+                contactjid = nodes[i].getAttribute('data-cid');
+                newcontact.setAttribute('data-cid', contactjid);
+                titleHiddenTab = ASC.TMTalk.dom.getElementsByClassName(nodes[i], 'tab-title', 'div');
+
+                classname = newcontact.className;
+                classname += ' ' + ASC.TMTalk.contactsManager.getContactStatus(contactjid).className;
+                if (ASC.TMTalk.dom.hasClass(nodes[i], 'conference')) {
+                    classname += ' room';
+                }
+                if (ASC.TMTalk.dom.hasClass(nodes[i], 'mailing')) {
+                    classname += ' mailing';
+                }
+                if (ASC.TMTalk.dom.hasClass(nodes[i], 'new-message')) {
+                    classname += ' new-message';
+                    countHiddenMessages += findUnreadMessages(newcontact, nodes[i].getAttribute('data-cid'), true);
+                    jq('div#talkTabContainer div.navigation div.size div.hiddennewmessage:first').show();
+                    if (countHiddenMessages < 10) {
+                        jq('div#talkTabContainer div.navigation div.size div.hiddennewmessage:first').removeClass('many-message');
+                        jq('div#talkTabContainer div.navigation div.size div.hiddennewmessage:first').addClass('few-message');
+                    } else {
+                        jq('div#talkTabContainer div.navigation div.size div.hiddennewmessage:first').addClass('many-message');
+                        jq('div#talkTabContainer div.navigation div.size div.hiddennewmessage:first').removeClass('few-message');
+                    }
+                    jq('div#talkTabContainer div.navigation div.size div.hiddennewmessage:first').html(countHiddenMessages);
+                }
+                
+                if (contactjid === ASC.TMTalk.connectionManager.getDomain()) {
+                    classname += ' master';
+                }
+                newcontact.className = classname;
+                
+                newcontacttitle = ASC.TMTalk.dom.getElementsByClassName(newcontact, 'title', 'div');
+                ASC.TMTalk.dom.addClass(newcontacttitle[0], 'hiddenContactTitle');
+                newcontacttitle[0].title = titleHiddenTab[0].getAttribute('title');
+                newcontacttitle[0].innerHTML = titleHiddenTab[0].innerHTML;
+                
+
+                listHiddenTabs[0].appendChild(newcontact);
+            }
+        }
+    };
 
   return {
     init  : init,
@@ -2085,9 +2683,13 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     getContactlistHash  : getContactlistHash,
 
     resetContactlist      : resetContactlist,
-    filteringContactlist  : filteringContactlist,
-
+    filteringContactlist: filteringContactlist,
+    
+    findUnreadMessages:findUnreadMessages,
+    countUnreadMessagesGroup: countUnreadMessagesGroup,
+    
     showFirstUnreadMessage  : showFirstUnreadMessage,
+    getUnreadMessageCount   : getUnreadMessageCount,
 
     openItem        : openItem,
     openRoom        : openRoom,
@@ -2144,7 +2746,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
         ASC.TMTalk.properties.item('grps', ASC.TMTalk.contactsContainer.getContactlistHash(), true);
       }
     }
-    if (ASC.TMTalk.dom.hasClass(selectedTargets[0], 'sub-panel')) {
+    if (ASC.TMTalk.dom.hasClass(selectedTargets[0], 'room')) {
       var
         fn = null,
         currentJid,
@@ -2174,7 +2776,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
 
   $(function () {
     ASC.TMTalk.contactsContainer.nodes();
-
+    var isOnlineTimerId, fromOffline = false;
     if ($.browser.safari) {
       $('#talkContactToolbarContainer div.unread-messages:first div.button-container').mousedown(function () {
         if (window.getSelection) {
@@ -2199,22 +2801,41 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     }
 
     if (ASC.TMTalk.properties.item('requestTransportType') === 'flash' && ASC.TMTalk.flashPlayer.isCorrect === false) {
-      ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.flashPlayer.isInstalled ? ASC.TMTalk.Resources.hintFlastPlayerIncorrect : ASC.TMTalk.Resources.hintNoFlashPlayer});
+      ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.flashPlayer.isInstalled ? ASC.TMTalk.Resources.HintFlastPlayerIncorrect : ASC.TMTalk.Resources.HintNoFlashPlayer});
     } else {
-      ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.hintClientDisconnected});
+     // ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.Resources.HintClientDisconnected});
 
       var lastStatusId = ASC.TMTalk.properties.item(ASC.TMTalk.contactsContainer.constants.propertyStatusId);
       lastStatusId = isFinite(+lastStatusId) ? +lastStatusId : ASC.TMTalk.connectionManager.onlineStatusId;
-      setTimeout((function (statusId) {return function () {ASC.TMTalk.connectionManager.status(statusId)}})(lastStatusId), 100);
+      setTimeout((function (statusId) { return function () { ASC.TMTalk.connectionManager.status(Strophe.Status.CONNECTING); } })(ASC.TMTalk.connectionManager.onlineStatusId), 100);
+      
+      isOnlineTimerId = setTimeout(function tick() {
+          if (navigator.onLine) {
+              if (fromOffline) {
+                  ASC.TMTalk.connectionManager.status(ASC.TMTalk.connectionManager.onlineStatusId);
+              }
+              fromOffline = false;
+          } else {
+              if (!fromOffline) {
+                  ASC.TMTalk.connectionManager.status(ASC.TMTalk.connectionManager.offlineStatusId);
+                  fromOffline = true;
+              }
+          }
+          isOnlineTimerId = setTimeout(tick, 5000);
+      }, 5000);
     }
-
+    
     if (ASC.TMTalk.sounds.supported()) {
       if (ASC.TMTalk.properties.item('enblsnds') === '0') {
         ASC.TMTalk.sounds.disable();
-        $('#talkContactToolbarContainer div.button-container.toggle-sounds:first').addClass('disabled');
+          //$('#talkContactToolbarContainer div.button-container.toggle-sounds:first').addClass('disabled');
+        $('#talkSidebarContainer').addClass('eventsignal');
+        $('#button-event-signal').removeClass('on').addClass('off');
       } else {
         ASC.TMTalk.sounds.enable();
-        $('#talkContactToolbarContainer div.button-container.toggle-sounds:first').removeClass('disabled');
+          //$('#talkContactToolbarContainer div.button-container.toggle-sounds:first').removeClass('disabled');
+        $('#talkSidebarContainer').removeClass('eventsignal');
+        $('#button-event-signal').removeClass('off').addClass('on');
       }
     } else {
       ASC.TMTalk.sounds.disable();
@@ -2222,49 +2843,121 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
     }
 
     if (ASC.TMTalk.notifications.supported.current === true) {
-      if (ASC.TMTalk.notifications.enabled()) {
-        $('#talkContactToolbarContainer div.button-container.toggle-notifications:first').removeClass('disabled');
-      } else {
-        $('#talkContactToolbarContainer div.button-container.toggle-notifications:first').addClass('disabled');
+        if (ASC.TMTalk.notifications.enabled()) {
+            $('#button-browser-notification').addClass('on').removeClass('off');
+        //$('#talkContactToolbarContainer div.button-container.toggle-notifications:first').removeClass('disabled');
+        } else {
+            $('#button-browser-notification').addClass('off').removeClass('on');
+       // $('#talkContactToolbarContainer div.button-container.toggle-notifications:first').addClass('disabled');
       }
     } else {
-      $('#talkContactToolbarContainer div.button-container.toggle-notifications:first').addClass('disabled').addClass('not-available');
+        $('#button-browser-notification').addClass('off').removeClass('on');
+     // $('#talkContactToolbarContainer div.button-container.toggle-notifications:first').addClass('disabled').addClass('not-available');
     }
 
     if ($.support.iscroll) {
       $('#talkContactToolbarContainer div.button-container.toggle-group:first').addClass('disabled').addClass('not-available');
     }
-
+    
     if (ASC.TMTalk.properties.item('shwoffusrs') === '0') {
-      $('#talkSidebarContainer').addClass('hide-offlineusers');
+        $('#talkSidebarContainer').addClass('hide-offlineusers');
+        $('#button-offlineusers').removeClass('off').addClass('on');
     } else {
-      $('#talkSidebarContainer').removeClass('hide-offlineusers');
+        $('#talkSidebarContainer').removeClass('hide-offlineusers');
+        $('#button-offlineusers').removeClass('on').addClass('off');
     }
     if (ASC.TMTalk.properties.item('shwgrps') === '0') {
-      $('#talkSidebarContainer').removeClass('grouplist').addClass('contactlist');
+        $('#talkSidebarContainer').removeClass('grouplist').addClass('contactlist');
+        $('#button-list-contacts-groups').removeClass('on').addClass('off');
     } else {
-      $('#talkSidebarContainer').removeClass('contactlist').addClass('grouplist');
-    }
-
-    if ($.support.iscroll) {
-      $('#talkSidebarContainer').removeClass('grouplist').addClass('contactlist');
+        $('#talkSidebarContainer').removeClass('contactlist').addClass('grouplist');
+        $('#button-list-contacts-groups').removeClass('off').addClass('on');
     }
 
     ASC.TMTalk.properties.item('enblfltr', '0');
+   
 
+    $("#button_settings").click(function () {
+
+        jq.dropdownToggle({
+            switcherSelector: "#button_settings",
+            dropdownID: "pop",
+            inPopup: true,
+            addTop: -1
+        });
+    });
+
+
+
+
+
+    //    var obj = document.getElementById('pop');
+     //   if (obj.style.display == 'none')
+      //      obj.style.display = 'block';
+       // else
+        //    obj.style.display = 'none';
+    //});
+    
+
+  /*  $('#button_settings').click(function () {
+        var $container = null;
+
+        if (($container = $('#talkMeseditorToolbarContainer div.button-container.emotions:first div.container:first')).is(':hidden')) {
+            $container.show('fast', function () {
+                if ($.browser.msie) {
+                    window.focus();
+                }
+                $(document).one('click', function () {
+                    $('#talkMeseditorToolbarContainer div.button-container.emotions:first div.container:first').hide();
+                });
+            });
+        }
+    });
+    */
+    $('#button-offlineusers').click(function () {
+        ASC.TMTalk.properties.item('shwoffusrs', $('#talkSidebarContainer').toggleClass('hide-offlineusers').hasClass('hide-offlineusers') ? '0' : '1', true);
+        $('#button-offlineusers').toggleClass('on off');
+        
+    });
+    $('#button-event-signal').click(function () {
+        //ASC.TMTalk.properties.item('enblsnds', $('#talkContactToolbarContainer div.button-container.toggle-sounds:first').toggleClass('disabled').hasClass('disabled') ? '0' : '1', true);
+        ASC.TMTalk.properties.item('enblsnds', $('#talkSidebarContainer').toggleClass('eventsignal').hasClass('eventsignal') ? '0' : '1', true);
+        $('#button-event-signal').toggleClass('on off');
+    });
+    $('#button-list-contacts-groups').click(function () {
+        ASC.TMTalk.properties.item('shwgrps', $('#talkSidebarContainer').toggleClass('grouplist').hasClass('grouplist') ? '1' : '0', true);
+        $('#button-list-contacts-groups').toggleClass('on off');
+    });
+    
+    $('#button-send-ctrl-enter').click(function () {
+        ASC.TMTalk.properties.item('sndbyctrlentr', $('#talkMeseditorToolbarContainer div.button-container.toggle-sendbutton:first').toggleClass('send-by-ctrlenter').hasClass('send-by-ctrlenter') ? '1' : '0', true);
+        $('#button-send-ctrl-enter').toggleClass('on off');
+    });
+    $('#button-browser-notification').click(function () {
+        $('#button-browser-notification').toggleClass('on off');
+        if ($('#button-browser-notification').hasClass('on')) {
+            if (!jQuery.browser.msie) ASC.TMTalk.notifications.enable();
+        } else {
+            if (!jQuery.browser.msie) ASC.TMTalk.notifications.disable();
+        }
+    });
+   // $('#button-create-conference').click(function () {
+   //     ASC.TMTalk.showDialog('create-room', null, { roomname: '', temproomchecked: true });       
+   // });
     $('#talkContactToolbarContainer div.button-talk.toggle-offlineusers:first').click(function() {
       ASC.TMTalk.properties.item('shwoffusrs', $('#talkSidebarContainer').toggleClass('hide-offlineusers').hasClass('hide-offlineusers') ? '0' : '1', true);
     });
 
-    $('#talkContactToolbarContainer div.button-talk.toggle-group:first').click(function() {
+    $('#talkContactToolbarContainer div.button-talk.toggle-group:first').click(function () {
       ASC.TMTalk.properties.item('shwgrps', $('#talkSidebarContainer').toggleClass('grouplist').hasClass('grouplist') ? '1' : '0', true);
     });
 
-    $('#talkContactToolbarContainer div.button-talk.toggle-sounds:first').click(function() {
-      ASC.TMTalk.properties.item('enblsnds', $('#talkContactToolbarContainer div.button-container.toggle-sounds:first').toggleClass('disabled').hasClass('disabled') ? '0' : '1', true);
+    $('#talkContactToolbarContainer div.button-talk.toggle-sounds:first').click(function () {
+        //ASC.TMTalk.properties.item('enblsnds', $('#talkContactToolbarContainer div.button-container.toggle-sounds:first').toggleClass('disabled').hasClass('disabled') ? '0' : '1', true);
+        ASC.TMTalk.properties.item('enblsnds', $('#talkSidebarContainer').toggleClass('eventsignal').hasClass('eventsignal') ? '0' : '1', true);
     });
 
-    $('#talkContactToolbarContainer div.button-talk.toggle-notifications:first').click(function() {
+    $('#talkContactToolbarContainer div.button-talk.toggle-notifications:first').click(function () {
       if ($('#talkContactToolbarContainer div.button-container.toggle-notifications:first').hasClass('disabled')) {
         ASC.TMTalk.notifications.enable();
       } else {
@@ -2272,8 +2965,13 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       }
     });
 
-    $('#talkContactToolbarContainer div.button-talk.toggle-filter:first').click(function() {
+    /*$('#talkContactToolbarContainer div.button-talk.toggle-filter:first').click(function() {
       ASC.TMTalk.properties.item('enblfltr', $('#talkSidebarContainer').toggleClass('enable-filter').hasClass('enable-filter') ? '1' : '0');
+    });*/
+    $('#talkContactToolbarContainer div.button-talk.clear-filter:first').click(function () {
+        $('#filterValue').val('');
+        ASC.TMTalk.properties.item('enblfltr', '0');
+        $('#talkContactToolbarContainer div.button-talk.clear-filter:first').addClass('hidden');
     });
 
     $('#talkContactToolbarContainer div.unread-messages:first').click(function () {
@@ -2286,7 +2984,110 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
           evt.originalEvent.stopPropagation ? evt.originalEvent.stopPropagation() : evt.originalEvent.cancelBubble = true;
         }
       });
+    var ismousemove = false;
+    function simulateTouchEvents(oo, bIgnoreChilds) {
+        if (!$(oo)[0])
+        { return false; }
 
+        if (!window.__touchTypes) {
+            window.__touchTypes = { touchstart: 'mousedown', touchmove: 'mousemove', touchend: 'mouseup' };
+            window.__touchInputs = { INPUT: 1, TEXTAREA: 1, SELECT: 1, OPTION: 1, 'input': 1, 'textarea': 1, 'select': 1, 'option': 1 };
+        }
+
+        $(oo).bind('touchstart touchmove touchend', function (ev) {
+            
+            if (ismousemove) {
+                var bSame = (ev.target == this);
+                if (bIgnoreChilds && !bSame)
+                { return; }
+
+                var b = (!bSame && ev.target.__ajqmeclk),
+                    e = ev.originalEvent;
+                if (b === true || !e.touches || e.touches.length > 1 || !window.__touchTypes[e.type])
+                { return; }
+
+                var oEv = (!bSame && typeof b != 'boolean') ? $(ev.target).data('events') : false,
+                    b = (!bSame) ? (ev.target.__ajqmeclk = oEv ? (oEv['click'] || oEv['mousedown'] || oEv['mouseup'] || oEv['mousemove']) : false) : false;
+
+                if (b || window.__touchInputs[ev.target.tagName])
+                { return; }
+
+                var touch = e.changedTouches[0], newEvent = document.createEvent("MouseEvent");
+                newEvent.initMouseEvent(window.__touchTypes[e.type], true, true, window, 1,
+                        touch.screenX, touch.screenY,
+                        touch.clientX, touch.clientY, false,
+                        false, false, false, 0, null);
+
+                touch.target.dispatchEvent(newEvent);
+                
+                if (ev.type == "touchend") {
+                    $('#talkContactsContainer').off('touchstart touchmove touchend');
+                    $('#talkContactsContainer').on('touchstart', touchstart);
+                    $('#talkContactsContainer').on('touchend', touchend);
+                    ismousemove = false;
+                }
+
+                e.preventDefault();
+                ev.stopImmediatePropagation();
+                ev.stopPropagation();
+                ev.preventDefault();
+            }
+
+        });
+        return true;
+    };
+
+    var timer, lockTimer;
+    var touchduration = 1000;
+    function sendTouchEvent(x, y, element, eventType) {
+          var touchObj = new Touch({
+              identifier: Date.now(),
+              target: element,
+              clientX: x,
+              clientY: y,
+              radiusX: 2.5,
+              radiusY: 2.5,
+              rotationAngle: 10,
+              force: 0.5,
+          });
+
+          var touchEvent = new TouchEvent(eventType, {
+              cancelable: true,
+              bubbles: true,
+              touches: [touchObj],
+              targetTouches: [],
+              changedTouches: [touchObj],
+              shiftKey: true,
+          });
+
+        element.dispatchEvent(touchEvent);
+    }
+
+    var touchstart = function(e) {
+        var pageX = e.originalEvent.touches[0].pageX,
+            pageY = e.originalEvent.touches[0].pageY;
+
+        if (lockTimer) {
+            return;
+        }
+        timer = setTimeout(function(parameters) {
+            ismousemove = true;
+            simulateTouchEvents($('#talkContactsContainer')[0]);
+            setTimeout(function() {
+                sendTouchEvent(pageX, pageY, $(e.target)[0], 'touchstart');
+                navigator.vibrate(50);
+            }, 100);
+        }, touchduration);
+        lockTimer = true;
+    };
+    var touchend = function(e) {
+          if (timer) {
+              clearTimeout(timer);
+              lockTimer = false;
+          }
+    };
+    $('#talkContactsContainer').on('touchstart', touchstart);
+    $('#talkContactsContainer').on('touchend', touchend);
     $('#talkContactsContainer')
       .mousedown(function (evt) {
         var element = evt.target;
@@ -2305,12 +3106,13 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
               targets = [];
             nodes = currentRoomData === null ? [] : ASC.TMTalk.dom.getElementsByClassName('talkRoomsContainer', 'room' + (currentRoomData.type === 'conference' ? ' conference' : ' mailing') + ' current', 'li');
             if (nodes.length > 0) {
-              nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'sub-panel', 'div');
-              if (nodes.length > 0) {
+                //nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'room', 'li');
+              //if (nodes.length > 0) {
                 targets.push(nodes[0]);
-              }
+              //}
             }
             groups = ASC.TMTalk.dom.getElementsByClassName(contactlistContainer, 'group', 'li');
+       
             groupsInd = groups.length;
             while (groupsInd--) {
               if (ASC.TMTalk.dom.hasClass(groups[groupsInd], 'default')) {
@@ -2346,12 +3148,12 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
           }
         } else if (ASC.TMTalk.dom.hasClass(element, 'contact-title')) {
           var currentRoomData = ASC.TMTalk.roomsManager.getRoomData();
-          if (currentRoomData && (currentRoomData.type === 'conference' || currentRoomData.type === 'mailing') && currentRoomData.minimized === false) {
+          if (currentRoomData && (currentRoomData.type === 'conference' || currentRoomData.type === 'mailing')) {
             var contact = element.parentNode;
             if (ASC.TMTalk.dom.hasClass(contact, 'contact') && !ASC.TMTalk.dom.hasClass(contact, 'master') && (currentRoomData.type === 'mailing' || (currentRoomData.type === 'conference' && !ASC.TMTalk.dom.hasClass(contact, 'offline')))) {
               var targets = ASC.TMTalk.dom.getElementsByClassName('talkRoomsContainer', 'room' + (currentRoomData.type === 'conference' ? ' conference' : ' mailing') + ' current', 'li');
               if (targets.length > 0) {
-                targets = ASC.TMTalk.dom.getElementsByClassName(targets[0], 'sub-panel', 'div');
+                targets = ASC.TMTalk.dom.getElementsByClassName(targets[0], 'room', 'li');
               }
               ASC.TMTalk.dragMaster.start(
                 evt,
@@ -2395,7 +3197,13 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
         if (ASC.TMTalk.dom.hasClass(element, 'group-title')) {
           var group = element.parentNode.parentNode;
           if (ASC.TMTalk.dom.hasClass(group, 'group') && !ASC.TMTalk.dom.hasClass(group, 'checked-by-filter')) {
-            ASC.TMTalk.dom.toggleClass(group, 'open');
+              ASC.TMTalk.dom.toggleClass(group, 'open');
+              var gropeState = jq(jq(group).children(".head")[0]).children(".state");
+              if (ASC.TMTalk.dom.hasClass(group, 'open')) {
+                  gropeState.hide();
+              } else {
+                  ASC.TMTalk.contactsContainer.countUnreadMessagesGroup(group);
+              }
             ASC.TMTalk.properties.item('grps', ASC.TMTalk.contactsContainer.getContactlistHash(), true);
           }
         } else if (ASC.TMTalk.dom.hasClass(element, 'room-title')) {
@@ -2466,7 +3274,7 @@ window.ASC.TMTalk.contactsContainer = (function ($) {
       }
 
       if (ASC.TMTalk.properties.item('requestTransportType') === 'flash' && ASC.TMTalk.flashPlayer.isCorrect === false) {
-        ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.flashPlayer.isInstalled ? ASC.TMTalk.Resources.hintFlastPlayerIncorrect : ASC.TMTalk.Resources.hintNoFlashPlayer});
+        ASC.TMTalk.tabsContainer.setStatus('information', {title : ASC.TMTalk.flashPlayer.isInstalled ? ASC.TMTalk.Resources.HintFlastPlayerIncorrect : ASC.TMTalk.Resources.HintNoFlashPlayer});
         return undefined;
       }
 

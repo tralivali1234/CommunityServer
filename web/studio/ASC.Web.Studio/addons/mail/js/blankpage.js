@@ -1,34 +1,27 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 window.blankPages = (function($) {
-    var page;
+    var page,
+        mailBoxContainer;
 
     var init = function() {
-        page = $('#blankPage');
+        page = $('#blankPage'),
+        mailBoxContainer = $("#mailBoxContainer");
     };
 
     function showEmptyAccounts() {
@@ -55,7 +48,9 @@ window.blankPages = (function($) {
                 href: null
             });
 
-        showPage(MailScriptResource.EmptyScrAccountsHeader,
+        showPage(
+            "accountsEmptyScreen",
+            MailScriptResource.EmptyScrAccountsHeader,
             MailScriptResource.EmptyScrAccountsDescription,
             'accounts',
             buttons
@@ -73,9 +68,51 @@ window.blankPages = (function($) {
             href: null
         }];
 
-        showPage(MailScriptResource.EmptyScrTagsHeader,
+        showPage(
+            "tagsEmptyScreen",
+            MailScriptResource.EmptyScrTagsHeader,
             MailScriptResource.EmptyScrTagsDescription,
             'tags',
+            buttons
+        );
+    }
+
+    function showEmptyUserFolders() {
+        var buttons = [{
+            text: MailScriptResource.EmptyScrUserFoldersButton,
+            cssClass: "addFirstElement",
+            handler: function () {
+                userFoldersPage.createFolder();
+                return false;
+            },
+            href: null
+        }];
+
+        showPage(
+            "userFoldersEmptyScreen",
+            MailScriptResource.EmptyScrUserFoldersHeader,
+            MailScriptResource.EmptyScrUserFoldersDescription,
+            'userfolder',
+            buttons
+        );
+    }
+
+    function showEmptyFilters() {
+        var buttons = [{
+            text: MailScriptResource.EmptyScrFiltersButton,
+            cssClass: "addFirstElement",
+            handler: function () {
+                filtersPage.createFilter();
+                return false;
+            },
+            href: null
+        }];
+
+        showPage(
+            "filtersEmptyScreen",
+            MailScriptResource.EmptyScrFiltersHeader,
+            MailScriptResource.EmptyScrFiltersDescription,
+            'userFilter',
             buttons
         );
     }
@@ -91,7 +128,9 @@ window.blankPages = (function($) {
             href: null
         }];
 
-        showPage(MailScriptResource.NoLettersFilterHeader,
+        showPage(
+            "filterNoLettersEmptyScreen",
+            MailScriptResource.NoLettersFilterHeader,
             MailScriptResource.NoLettersFilterDescription,
             'filter',
             buttons
@@ -128,6 +167,11 @@ window.blankPages = (function($) {
             description = MailScriptResource.EmptyDraftsDescription;
             imgClass = 'drafts';
             buttons[0].text = MailScriptResource.EmptyDraftsButton;
+        } else if (TMMail.pageIs('templates')) {
+            header = MailScriptResource.EmptyTemplatesHeader;
+            description = MailScriptResource.EmptyTemplatesDescription;
+            imgClass = 'drafts';
+            buttons[0].text = MailScriptResource.EmptyTemplatesButton;
         } else if (TMMail.pageIs('trash')) {
             header = MailScriptResource.EmptyTrashHeader;
             description = MailScriptResource.EmptyTrashDescription;
@@ -138,9 +182,14 @@ window.blankPages = (function($) {
             description = MailScriptResource.EmptySpamDescription;
             imgClass = 'spam';
             buttons = [];
+        } else if (TMMail.pageIs('userfolder')) { 
+            header = MailScriptResource.EmptyUserFolderHeader; 
+            description = MailScriptResource.EmptyUserFolderDescription;
+            imgClass = 'inbox'; // TODO: Change to userfolder
+            buttons = [];
         }
 
-        showPage(header, description, imgClass, buttons);
+        showPage("folderEmptyScreen", header, description, imgClass, buttons);
     }
 
     function showEmptyCrmContacts() {
@@ -148,10 +197,12 @@ window.blankPages = (function($) {
             text: MailScriptResource.EmptyScrCrmButton,
             cssClass: "addFirstElement",
             handler: null,
-            href: "/products/crm/"
+            href: "/Products/CRM/"
         }];
 
-        showPage(MailScriptResource.EmptyScrCrmHeader,
+        showPage(
+            "crmContactsEmptyScreen",
+            MailScriptResource.EmptyScrCrmHeader,
             MailScriptResource.EmptyScrCrmDescription,
             'contacts',
             buttons
@@ -169,7 +220,9 @@ window.blankPages = (function($) {
             href: null
         }];
 
-        showPage(MailScriptResource.EmptyScrCrmHeader,
+        showPage(
+            "mailContactsEmptyScreen",
+            MailScriptResource.EmptyScrCrmHeader,
             MailScriptResource.EmptyScrMailContactsDescription,
             'contacts',
             buttons
@@ -187,7 +240,9 @@ window.blankPages = (function($) {
             href: null
         }];
 
-        showPage(MailScriptResource.ResetCrmContactsFilterHeader,
+        showPage(
+            "filterNoCrmContactsEmptyScreen",
+            MailScriptResource.ResetCrmContactsFilterHeader,
             MailScriptResource.ResetCrmContactsFilterDescription,
             'filter',
             buttons
@@ -205,7 +260,9 @@ window.blankPages = (function($) {
             href: null
         }];
 
-        showPage(MailScriptResource.ResetTlContactsFilterHeader,
+        showPage(
+            "filterNoTlContactsEmptyScreen",
+            MailScriptResource.ResetTlContactsFilterHeader,
             MailScriptResource.ResetTlContactsFilterDescription,
             'filter',
             buttons
@@ -223,7 +280,9 @@ window.blankPages = (function($) {
             href: null
         }];
 
-        showPage(MailScriptResource.ResetMailContactsFilterHeader,
+        showPage(
+            "filterNoMailContactsEmptyScreen",
+            MailScriptResource.ResetMailContactsFilterHeader,
             MailScriptResource.ResetMailContactsFilterDescription,
             'filter',
             buttons
@@ -241,7 +300,21 @@ window.blankPages = (function($) {
             href: null
         }];
 
-        showPage(window.MailAdministrationResource.NoDomainSetUpHeader,
+        if (ASC.Mail.Constants.MS_MIGRATION_LINK_AVAILABLE) {
+            buttons.push(
+            {
+                text: window.MailAdministrationResource.MigrateFromMSExchangeButton,
+                cssClass: "linkMseFaq",
+                handler: null,
+                href: ASC.Resources.Master.HelpLink + "/server/docker/enterprise/migrate-from-exchange.aspx",
+                skipNewLine: true,
+                openNewTab: true
+            });
+        }
+
+        showPage(
+            "domainsEmptyScreen",
+            window.MailAdministrationResource.NoDomainSetUpHeader,
             window.MailAdministrationResource.NoDomainSetUpDescription,
             'domains',
             buttons
@@ -249,7 +322,7 @@ window.blankPages = (function($) {
     }
 
     //buttons = [{ text: "", cssClass: "", handler: function(){}, href: "" }]
-    function showPage(header, description, imgClass, buttons) {
+    function showPage(id, header, description, imgClass, buttons) {
 
         var buttonHtml = undefined;
 
@@ -260,6 +333,7 @@ window.blankPages = (function($) {
 
         var screen = $.tmpl("emptyScrTmpl",
             {
+                ID: id,
                 ImgCss: imgClass,
                 Header: header,
                 Describe: TMMail.htmlEncode(description),
@@ -268,18 +342,21 @@ window.blankPages = (function($) {
 
         page.empty().html(screen);
 
-        var btnArray = page.find('.emptyScrBttnPnl a');
+        var btnArray = page.find("#{0} .emptyScrBttnPnl a".format(id));
         $.each(btnArray, function (index, value) {
             if (buttons[index] && buttons[index].handler) {
                 $(value).click(buttons[index].handler);
             }
         });
 
+        mailBoxContainer.hide();
         page.show();
+        TMMail.scrollTop();
     }
 
     function hide() {
         page.hide();
+        mailBoxContainer.show();
     }
 
     return {
@@ -294,6 +371,8 @@ window.blankPages = (function($) {
         showNoMailContacts: showNoMailContacts,
         showEmptyTags: showEmptyTags,
         showNoMailDomains: showNoMailDomains,
+        showEmptyUserFolders: showEmptyUserFolders,
+        showEmptyFilters: showEmptyFilters,
         hide: hide
     };
 })(jQuery);

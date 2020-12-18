@@ -1,33 +1,20 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Web.Core.Mobile;
-using ASC.Web.Core.Utility;
-using ASC.Web.Studio.UserControls.Statistics;
-using ASC.Web.Studio.Utility;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -36,16 +23,23 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Web;
+using ASC.Web.Studio.UserControls.Statistics;
+using ASC.Web.Studio.Utility;
 
 namespace ASC.Web.Studio.Core
 {
     public static class SetupInfo
     {
-        private static readonly string web_import_contacts_url;
-        private static readonly string web_autotest_secret_email;
-        private static readonly string[] web_display_mobapps_banner;
-        private static readonly string[] hideSettings;
+        private static string web_autotest_secret_email;
+        private static string[] web_display_mobapps_banner;
+        private static string[] hideSettings;
 
+
+        public static string MetaImageURL
+        {
+            get;
+            private set;
+        }
 
         public static string StatisticTrackURL
         {
@@ -105,7 +99,8 @@ namespace ASC.Web.Studio.Core
 
         public static long AvailableFileSize
         {
-            get { return 100L * 1024L * 1024L; }
+            get;
+            private set;
         }
 
         /// <summary>
@@ -139,6 +134,12 @@ namespace ASC.Web.Studio.Core
         }
 
         public static bool ThirdPartyAuthEnabled
+        {
+            get;
+            private set;
+        }
+
+        public static bool ThirdPartyBannerEnabled
         {
             get;
             private set;
@@ -180,28 +181,18 @@ namespace ASC.Web.Studio.Core
             private set;
         }
 
-        public static string GetImportServiceUrl()
-        {
-            var url = web_import_contacts_url;
-            if (string.IsNullOrEmpty(url))
-            {
-                return string.Empty;
-            }
-            var urlSeparatorChar = "?";
-            if (url.Contains(urlSeparatorChar))
-            {
-                urlSeparatorChar = "&";
-            }
-            var cultureName = HttpUtility.HtmlEncode(System.Threading.Thread.CurrentThread.CurrentUICulture.Name);
-            return UrlSwitcher.SelectCurrentUriScheme(string.Format("{0}{2}culture={1}&mobile={3}", url, cultureName, urlSeparatorChar, MobileDetector.IsMobile));
-        }
-
         public static string WebApiBaseUrl
         {
             get { return VirtualPathUtility.ToAbsolute(GetAppSettings("api.url", "~/api/2.0/")); }
         }
 
-        public static TimeSpan ValidEamilKeyInterval
+        public static TimeSpan ValidEmailKeyInterval
+        {
+            get;
+            private set;
+        }
+
+        public static TimeSpan ValidAuthKeyInterval
         {
             get;
             private set;
@@ -215,22 +206,18 @@ namespace ASC.Web.Studio.Core
 
         public static bool IsSecretEmail(string email)
         {
-            var s = web_autotest_secret_email;
             //the point is not needed in gmail.com
-            email = Regex.Replace(email ?? "", "\\.*(?=\\S*(@gmail.com$))", "");
-            return !string.IsNullOrEmpty(s) && s.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries).Contains(email, StringComparer.CurrentCultureIgnoreCase);
+            email = Regex.Replace(email ?? "", "\\.*(?=\\S*(@gmail.com$))", "").ToLower();
+            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(web_autotest_secret_email))
+                return false;
+
+            var regex = new Regex(web_autotest_secret_email, RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+            return regex.IsMatch(email);
         }
 
         public static bool DisplayMobappBanner(string product)
         {
             return web_display_mobapps_banner.Contains(product, StringComparer.InvariantCultureIgnoreCase);
-        }
-
-
-        public static string ShareGooglePlusUrl
-        {
-            get;
-            private set;
         }
 
         public static string ShareTwitterUrl
@@ -240,19 +227,6 @@ namespace ASC.Web.Studio.Core
         }
 
         public static string ShareFacebookUrl
-        {
-            get;
-            private set;
-        }
-
-
-        public static string ApiSystemUrl
-        {
-            get;
-            private set;
-        }
-
-        public static string ApiCacheUrl
         {
             get;
             private set;
@@ -270,31 +244,155 @@ namespace ASC.Web.Studio.Core
             private set;
         }
 
+        public static bool VoipEnabled
+        {
+            get;
+            private set;
+        }
+
+
+        public static string StartProductList
+        {
+            get;
+            private set;
+        }
+
+        public static string SsoSamlLoginUrl
+        {
+            get;
+            private set;
+        }
+
+        public static string DownloadForDesktopUrl
+        {
+            get;
+            private set;
+        }
+        public static string DownloadForIosDocuments
+        {
+            get;
+            private set;
+        }
+        public static string DownloadForIosProjects
+        {
+            get;
+            private set;
+        }
+        public static string DownloadForAndroidDocuments
+        {
+            get;
+            private set;
+        }
+
+        public static string SsoSamlLogoutUrl
+        {
+            get;
+            private set;
+        }
+
+
+        public static bool SmsTrial
+        {
+            get;
+            private set;
+        }
+
+        public static string TfaRegistration
+        {
+            get;
+            private set;
+        }
+
+        public static int TfaAppBackupCodeLength
+        {
+            get;
+            private set;
+        }
+
+        public static int TfaAppBackupCodeCount
+        {
+            get;
+            private set;
+        }
+
+        public static string TfaAppSender
+        {
+            get;
+            private set;
+        }
+
+        public static string NotifyAnalyticsUrl
+        {
+            get;
+            private set;
+        }
+
+        public static string RecaptchaPublicKey
+        {
+            get;
+            private set;
+        }
+
+        public static string RecaptchaPrivateKey
+        {
+            get;
+            private set;
+        }
+
+        public static string RecaptchaVerifyUrl
+        {
+            get;
+            private set;
+        }
+
+        public static int LoginThreshold
+        {
+            get;
+            private set;
+        }
+        
+        public static string AmiMetaUrl
+        {
+            get;
+            private set;
+        }
 
         static SetupInfo()
         {
+            Refresh();
+        }
+
+        public static void Refresh()
+        {
+            MetaImageURL = GetAppSettings("web.meta-image-url", "https://download.onlyoffice.com/assets/fb/fb_icon_325x325.jpg");
             StatisticTrackURL = GetAppSettings("web.track-url", string.Empty);
             UserVoiceURL = GetAppSettings("web.uservoice", string.Empty);
             MainLogoURL = GetAppSettings("web.logo.main", string.Empty);
             MainLogoMailTmplURL = GetAppSettings("web.logo.mail.tmpl", string.Empty);
+            DownloadForDesktopUrl = GetAppSettings("web.download.for.desktop.url", "https://www.onlyoffice.com/desktop.aspx");
+            DownloadForIosDocuments = GetAppSettings("web.download.for.ios.doc", "https://itunes.apple.com/app/onlyoffice-documents/id944896972");
+            DownloadForIosProjects = GetAppSettings("web.download.for.ios.proj", "https://itunes.apple.com/app/onlyoffice-projects/id1353395928?mt=8");
+            DownloadForAndroidDocuments = GetAppSettings("web.download.for.android.doc", "https://play.google.com/store/apps/details?id=com.onlyoffice.documents");
 
             EnabledCultures = GetAppSettings("web.cultures", "en-US")
                 .Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(l => CultureInfo.GetCultureInfo(l.Trim()))
-                .OrderBy(l => l.Name)
+                .OrderBy(l => l.DisplayName)
                 .ToList();
             EnabledCulturesPersonal = GetAppSettings("web.cultures.personal", GetAppSettings("web.cultures", "en-US"))
                 .Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(l => CultureInfo.GetCultureInfo(l.Trim()))
-                .OrderBy(l => l.Name)
+                .OrderBy(l => l.DisplayName)
                 .ToList();
 
-            ExchangeRateRuble = GetAppSettings("exchange-rate.ruble", 60);
+            ExchangeRateRuble = GetAppSettings("exchange-rate.ruble", 65);
             MaxImageUploadSize = GetAppSettings<long>("web.max-upload-size", 1024 * 1024);
+            AvailableFileSize = GetAppSettings("web.available-file-size", 100L * 1024L * 1024L);
 
             TeamlabSiteRedirect = GetAppSettings("web.teamlab-site", string.Empty);
             ChunkUploadSize = GetAppSettings("files.uploader.chunk-size", 5 * 1024 * 1024);
-            ThirdPartyAuthEnabled = String.Equals(GetAppSettings("web.thirdparty-auth", "true"), "true");
+            ThirdPartyAuthEnabled = string.Equals(GetAppSettings("web.thirdparty-auth", "true"), "true");
+            ThirdPartyBannerEnabled = string.Equals(GetAppSettings("web.thirdparty-banner", "false"), "true");
             NoTenantRedirectURL = GetAppSettings("web.notenant-url", "");
             CustomScripts = GetAppSettings("web.custom-scripts", string.Empty).Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -303,24 +401,41 @@ namespace ASC.Web.Studio.Core
             UserForum = GetAppSettings("web.user-forum", string.Empty);
             SupportFeedback = GetAppSettings("web.support-feedback", string.Empty);
 
-            web_import_contacts_url = GetAppSettings("web.import-contacts-url", string.Empty);
-            ValidEamilKeyInterval = GetAppSettings("email.validinterval", TimeSpan.FromDays(7));
+            ValidEmailKeyInterval = GetAppSettings("email.validinterval", TimeSpan.FromDays(7));
+            ValidAuthKeyInterval = GetAppSettings("auth.validinterval", TimeSpan.FromHours(1));
+
             SalesEmail = GetAppSettings("web.payment.email", "sales@onlyoffice.com");
-            web_autotest_secret_email = (ConfigurationManager.AppSettings["web.autotest.secret-email"] ?? "").Trim();
-            web_display_mobapps_banner = (ConfigurationManager.AppSettings["web.display.mobapps.banner"] ?? "").Trim().Split(new char[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            ShareGooglePlusUrl = GetAppSettings("web.share.google-plus", "https://plus.google.com/share?url={0}");
+            web_autotest_secret_email = (ConfigurationManagerExtension.AppSettings["web.autotest.secret-email"] ?? "").Trim();
+
+            RecaptchaPublicKey = GetAppSettings("web.recaptcha.public-key", "");
+            RecaptchaPrivateKey = GetAppSettings("web.recaptcha.private-key", "");
+            RecaptchaVerifyUrl = GetAppSettings("web.recaptcha.verify-url", "https://www.google.com/recaptcha/api/siteverify");
+            LoginThreshold = Convert.ToInt32(GetAppSettings("web.login.threshold", "0"));
+            if (LoginThreshold < 1) LoginThreshold = 5;
+
+            web_display_mobapps_banner = (ConfigurationManagerExtension.AppSettings["web.display.mobapps.banner"] ?? "").Trim().Split(new char[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
             ShareTwitterUrl = GetAppSettings("web.share.twitter", "https://twitter.com/intent/tweet?text={0}");
-            ShareFacebookUrl = GetAppSettings("web.share.facebook", "http://www.facebook.com/sharer.php?s=100&p[url]={0}&p[title]={1}&p[images][0]={2}&p[summary]={3}");
-            ApiSystemUrl = GetAppSettings("web.api-system", "");
-            ApiCacheUrl = GetAppSettings("web.api-cache", "");
+            ShareFacebookUrl = GetAppSettings("web.share.facebook", "");
             ControlPanelUrl = GetAppSettings("web.controlpanel.url", "");
             FontOpenSansUrl = GetAppSettings("web.font.opensans.url", "");
+            VoipEnabled = GetAppSettings("voip.enabled", true);
+            StartProductList = GetAppSettings("web.start.product.list", "");
+            SsoSamlLoginUrl = GetAppSettings("web.sso.saml.login.url", "");
+            SsoSamlLogoutUrl = GetAppSettings("web.sso.saml.logout.url", "");
 
-            var s = GetAppSettings("web.hide-settings", null);
-            if (!string.IsNullOrEmpty(s))
-            {
-                hideSettings = s.Split(new[] { ',', ';', ' ' });
-            }
+            hideSettings = GetAppSettings("web.hide-settings", string.Empty).Split(new[] {',', ';', ' '}, StringSplitOptions.RemoveEmptyEntries);
+
+            SmsTrial = GetAppSettings("core.sms.trial", false);
+
+            TfaRegistration = (GetAppSettings("core.tfa.registration", "") ?? "").Trim().ToLower();
+
+            TfaAppBackupCodeLength = GetAppSettings("web.tfaapp.backup.length", 6);
+            TfaAppBackupCodeCount = GetAppSettings("web.tfaapp.backup.count", 5);
+            TfaAppSender = GetAppSettings("web.tfaapp.backup.title", "ONLYOFFICE");
+
+            NotifyAnalyticsUrl = GetAppSettings("core.notify.analytics.url", "");
+
+            AmiMetaUrl = GetAppSettings("web.ami.meta", "");
         }
 
 
@@ -337,14 +452,21 @@ namespace ASC.Web.Studio.Core
 
         private static string GetAppSettings(string key, string defaultValue)
         {
-            return ConfigurationManager.AppSettings[key] ?? defaultValue;
+            var result = ConfigurationManagerExtension.AppSettings[key] ?? defaultValue;
+
+            if (!string.IsNullOrEmpty(result))
+                result = result.Trim();
+
+            return result;
+
         }
 
         private static T GetAppSettings<T>(string key, T defaultValue)
         {
-            var configSetting = ConfigurationManager.AppSettings[key];
+            var configSetting = ConfigurationManagerExtension.AppSettings[key];
             if (!string.IsNullOrEmpty(configSetting))
             {
+                configSetting = configSetting.Trim();
                 var converter = TypeDescriptor.GetConverter(typeof(T));
                 if (converter != null && converter.CanConvertFrom(typeof(string)))
                 {

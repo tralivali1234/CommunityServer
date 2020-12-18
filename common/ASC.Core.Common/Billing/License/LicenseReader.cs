@@ -1,45 +1,36 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Core.Tenants;
-using ASC.Core.Users;
-using log4net;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Configuration;
 using System.IO;
 using System.Linq;
 
+using ASC.Common.Logging;
+using ASC.Core.Tenants;
+using ASC.Core.Users;
+
 namespace ASC.Core.Billing
 {
     public static class LicenseReader
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(LicenseReader));
-        private static readonly string licensePath;
-        private static readonly string licensePathTemp;
+        private static readonly ILog Log = LogManager.GetLogger("ASC");
+        public static readonly string LicensePath;
+        private static readonly string LicensePathTemp;
 
         public const string CustomerIdKey = "CustomerId";
         public const int MaxUserCount = 10000;
@@ -47,8 +38,8 @@ namespace ASC.Core.Billing
 
         static LicenseReader()
         {
-            licensePath = ConfigurationManager.AppSettings["license.file.path"];
-            licensePathTemp = licensePath + ".tmp";
+            LicensePath = (ConfigurationManagerExtension.AppSettings["license.file.path"] ?? "").Trim();
+            LicensePathTemp = LicensePath + ".tmp";
         }
 
 
@@ -58,9 +49,9 @@ namespace ASC.Core.Billing
             private set { CoreContext.Configuration.SaveSetting(CustomerIdKey, value); }
         }
 
-        public static Stream GetLicenseStream(bool temp = false)
+        private static Stream GetLicenseStream(bool temp = false)
         {
-            var path = temp ? licensePathTemp : licensePath;
+            var path = temp ? LicensePathTemp : LicensePath;
             if (!File.Exists(path)) throw new BillingNotFoundException("License not found");
 
             return File.OpenRead(path);
@@ -68,10 +59,10 @@ namespace ASC.Core.Billing
 
         public static void RejectLicense()
         {
-            if (File.Exists(licensePathTemp))
-                File.Delete(licensePathTemp);
-            if (File.Exists(licensePath))
-                File.Delete(licensePath);
+            if (File.Exists(LicensePathTemp))
+                File.Delete(LicensePathTemp);
+            if (File.Exists(LicensePath))
+                File.Delete(LicensePath);
 
             CoreContext.PaymentManager.DeleteDefaultTariff();
         }
@@ -81,11 +72,11 @@ namespace ASC.Core.Billing
             try
             {
                 var temp = true;
-                if (!File.Exists(licensePathTemp))
+                if (!File.Exists(LicensePathTemp))
                 {
                     Log.Debug("Temp license not found");
 
-                    if (!File.Exists(licensePath))
+                    if (!File.Exists(LicensePath))
                     {
                         throw new BillingNotFoundException("License not found");
                     }
@@ -96,17 +87,18 @@ namespace ASC.Core.Billing
                 using (var reader = new StreamReader(licenseStream))
                 {
                     var licenseJsonString = reader.ReadToEnd();
+                    var license = License.Parse(licenseJsonString);
 
-                    LicenseToDB(licenseJsonString);
+                    LicenseToDB(license);
 
                     if (temp)
                     {
-                        SaveLicense(licenseStream, licensePath);
+                        SaveLicense(licenseStream, LicensePath);
                     }
                 }
 
                 if (temp)
-                    File.Delete(licensePathTemp);
+                    File.Delete(LicensePathTemp);
             }
             catch (Exception ex)
             {
@@ -115,21 +107,20 @@ namespace ASC.Core.Billing
             }
         }
 
-        public static void SaveLicenseTemp(Stream licenseStream)
+        public static DateTime SaveLicenseTemp(Stream licenseStream)
         {
             try
             {
                 using (var reader = new StreamReader(licenseStream))
                 {
                     var licenseJsonString = reader.ReadToEnd();
+                    var license = License.Parse(licenseJsonString);
 
-                    string customerId;
-                    DateTime dueDate;
-                    int activeUsers;
-                    int countPortals;
-                    Validate(licenseJsonString, out customerId, out dueDate, out activeUsers, out countPortals);
+                    var dueDate = Validate(license);
 
-                    SaveLicense(licenseStream, licensePathTemp);
+                    SaveLicense(licenseStream, LicensePathTemp);
+
+                    return dueDate;
                 }
             }
             catch (Exception ex)
@@ -160,88 +151,96 @@ namespace ASC.Core.Billing
             }
         }
 
-        private static JObject Validate(string licenseJsonString, out string customerId, out DateTime dueDate, out int activeUsers, out int countPortals)
+        private static DateTime Validate(License license)
         {
-            var licenseJson = JObject.Parse(licenseJsonString);
-
-            if (string.IsNullOrEmpty(customerId = licenseJson.Value<string>("customer_id"))
-                || string.IsNullOrEmpty(licenseJson.Value<string>("signature")))
+            if (string.IsNullOrEmpty(license.CustomerId)
+                || string.IsNullOrEmpty(license.Signature))
             {
-                throw new BillingNotConfiguredException("License not correct", licenseJsonString);
+                throw new BillingNotConfiguredException("License not correct", license.OriginalLicense);
             }
 
-            dueDate = licenseJson.Value<DateTime>("end_date");
-            if (dueDate.Date < DateTime.UtcNow.Date)
+            if (license.DueDate.Date < VersionReleaseDate)
             {
-                throw new BillingException("License expired", licenseJsonString);
+                throw new LicenseExpiredException("License expired", license.OriginalLicense);
             }
 
-            activeUsers = licenseJson.Value<int>("user_quota");
-            if (activeUsers.Equals(default(int)) || activeUsers < 1)
-                activeUsers = MaxUserCount;
+            if (license.ActiveUsers.Equals(default(int)) || license.ActiveUsers < 1)
+                license.ActiveUsers = MaxUserCount;
 
-            if (activeUsers < CoreContext.UserManager.GetUsers(EmployeeStatus.Default, EmployeeType.User).Length)
+            if (license.ActiveUsers < CoreContext.UserManager.GetUsers(EmployeeStatus.Default, EmployeeType.User).Length)
             {
-                throw new BillingException("License quota", licenseJsonString);
+                throw new LicenseQuotaException("License quota", license.OriginalLicense);
             }
 
-            countPortals = licenseJson.Value<int>("portal_count");
-            if (countPortals <= 0)
+            if (license.PortalCount <= 0)
             {
-                countPortals = CoreContext.TenantManager.GetTenantQuota(Tenant.DEFAULT_TENANT).CountPortals;
+                license.PortalCount = CoreContext.TenantManager.GetTenantQuota(Tenant.DEFAULT_TENANT).CountPortals;
             }
-            var activePortals = CoreContext.TenantManager.GetTenants().Count(t => t.Status == TenantStatus.Active);
-            if (activePortals > 1 && countPortals < activePortals)
+            var activePortals = CoreContext.TenantManager.GetTenants().Count();
+            if (activePortals > 1 && license.PortalCount < activePortals)
             {
-                throw new BillingException("License portal count", licenseJsonString);
+                throw new LicensePortalException("License portal count", license.OriginalLicense);
             }
 
-            return licenseJson;
+            return license.DueDate.Date;
         }
 
-        private static void LicenseToDB(string licenseJsonString)
+        private static void LicenseToDB(License license)
         {
-            string customerId;
-            DateTime dueDate;
-            int activeUsers;
-            int countPortals;
-            var licenseJson = Validate(licenseJsonString, out customerId, out dueDate, out activeUsers, out countPortals);
+            Validate(license);
 
-            CustomerId = customerId;
+            CustomerId = license.CustomerId;
 
-            var tenant = CoreContext.TenantManager.GetCurrentTenant();
+            var defaultQuota = CoreContext.TenantManager.GetTenantQuota(Tenant.DEFAULT_TENANT);
 
             var quota = new TenantQuota(-1000)
-                {
-                    ActiveUsers = activeUsers,
-                    MaxFileSize = 1024 * 1024 * 1024,
-                    MaxTotalSize = 1024L * 1024 * 1024 * 1024 - 1,
-                    Name = "license",
-                    HasDomain = true,
-                    Audit = true,
-                    ControlPanel = true,
-                    HealthCheck = true,
-                    Ldap = true,
-                    WhiteLabel = true,
-                    Update = true,
-                    Support = true,
-                    Trial = licenseJson.Value<bool>("trial"),
-                    CountPortals = countPortals,
-                };
+            {
+                ActiveUsers = license.ActiveUsers,
+                MaxFileSize = defaultQuota.MaxFileSize,
+                MaxTotalSize = defaultQuota.MaxTotalSize,
+                Name = "license",
+                DocsEdition = true,
+                HasDomain = true,
+                Audit = true,
+                ControlPanel = true,
+                HealthCheck = true,
+                Ldap = true,
+                Sso = true,
+                Customization = license.Customization,
+                WhiteLabel = license.WhiteLabel || license.Customization,
+                Branding = license.Branding,
+                SSBranding = license.SSBranding,
+                Update = true,
+                Support = true,
+                Trial = license.Trial,
+                CountPortals = license.PortalCount,
+                DiscEncryption = true,
+                PrivacyRoom = true,
+            };
+
+            if (defaultQuota.Name != "overdue" && !defaultQuota.Trial)
+            {
+                quota.WhiteLabel |= defaultQuota.WhiteLabel;
+                quota.Branding |= defaultQuota.Branding;
+                quota.SSBranding |= defaultQuota.SSBranding;
+
+                quota.CountPortals = Math.Max(defaultQuota.CountPortals, quota.CountPortals);
+            }
+
             CoreContext.TenantManager.SaveTenantQuota(quota);
 
             var tariff = new Tariff
-                {
-                    QuotaId = quota.Id,
-                    DueDate = dueDate,
-                };
+            {
+                QuotaId = quota.Id,
+                DueDate = license.DueDate,
+            };
 
             CoreContext.PaymentManager.SetTariff(-1, tariff);
 
-            var affiliateId = licenseJson.Value<string>("affiliate_id");
-            if (!string.IsNullOrEmpty(affiliateId))
+            if (!string.IsNullOrEmpty(license.AffiliateId))
             {
-                tenant.AffiliateId = affiliateId;
+                var tenant = CoreContext.TenantManager.GetCurrentTenant();
+                tenant.AffiliateId = license.AffiliateId;
                 CoreContext.TenantManager.SaveTenant(tenant);
             }
         }
@@ -262,6 +261,64 @@ namespace ASC.Core.Billing
                 {
                     Log.Error(error.Message);
                 }
+            }
+        }
+
+        private static DateTime _date = DateTime.MinValue;
+
+        public static DateTime VersionReleaseDate
+        {
+            get
+            {
+                // release sign is not longer requered
+                return _date;
+
+                /*
+                if (_date != DateTime.MinValue) return _date;
+
+                _date = DateTime.MaxValue;
+                try
+                {
+                    var versionDate = ConfigurationManagerExtension.AppSettings["version.release-date"];
+                    var sign = ConfigurationManagerExtension.AppSettings["version.release-date.sign"];
+
+                    if (!sign.StartsWith("ASC "))
+                    {
+                        throw new Exception("sign without ASC");
+                    }
+
+                    var splitted = sign.Substring(4).Split(':');
+                    var pkey = splitted[0];
+                    if (pkey != versionDate)
+                    {
+                        throw new Exception("sign with different date");
+                    }
+
+                    var date = splitted[1];
+                    var orighash = splitted[2];
+
+                    var skey = MachinePseudoKeys.GetMachineConstant();
+
+                    using (var hasher = new HMACSHA1(skey))
+                    {
+                        var data = string.Join("\n", date, pkey);
+                        var hash = hasher.ComputeHash(Encoding.UTF8.GetBytes(data));
+                        if (HttpServerUtility.UrlTokenEncode(hash) != orighash && Convert.ToBase64String(hash) != orighash)
+                        {
+                            throw new Exception("incorrect hash");
+                        }
+                    }
+
+                    var year = Int32.Parse(versionDate.Substring(0, 4));
+                    var month = Int32.Parse(versionDate.Substring(4, 2));
+                    var day = Int32.Parse(versionDate.Substring(6, 2));
+                    _date = new DateTime(year, month, day);
+                }
+                catch (Exception ex)
+                {
+                    LogManager.GetLogger("ASC").Error("VersionReleaseDate", ex);
+                }
+                return _date;*/
             }
         }
     }

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -33,7 +24,6 @@
 .page-menu .studio-action-panel .dropdown-content {
     max-height: 500px;
     .dropdown-item {
-        display: block;
         line-height: 28px;
     }
 }
@@ -47,7 +37,7 @@
         display: block;
         list-style: none;
         overflow: hidden;
-        padding: 4px 0 4px 0;
+        padding: 5px 0 5px 0;
 
         .feed-new-count {
             float: right;
@@ -57,7 +47,7 @@
 
         .category-wrapper {
             overflow: hidden;
-            padding: 4px 0;
+            padding: 5px 0 5px 0;
         }
 
         .menu-item-label {
@@ -109,10 +99,14 @@
             .category-wrapper {
                 padding: 0;
             }
+
+            .expander, .menu-sub-list {
+                display: none;
+            }
         }
 
         &.sub-list {
-            padding: 1px 0 0 0;
+            padding: 0;
 
             .expander {
                 float: left;
@@ -138,6 +132,10 @@
                     display: block;
                     overflow: hidden;
                     padding: 4px 0 4px 45px;
+
+                    &.display-none {
+                        display: none;
+                    }
                 }
 
                 .menu-item-label {
@@ -245,7 +243,7 @@
 
         &.add-block {
             &:first-child {
-                margin-top: 24px;
+                margin-top: 9px;
             }
 
             .category-wrapper .menu-item-label {
@@ -258,11 +256,11 @@
         }
 
         &:not(.add-block) + li.add-block {
-            margin-top: 24px;
+            margin-top: 9px;
         }
 
         &.add-block-always {
-            margin-top: 24px;
+            margin-top: 9px;
         }
 
         &.active > .menu-item-label,
@@ -283,20 +281,37 @@
 }
 
 
+.menu-item-svg {
+    width: 16px;
+    height: 16px;
+    fill: #83888d;
+
+    &-green {
+        fill: #7ca52f;
+    }
+}
+.statistics-icons-svg {
+    width: 16px;
+    height: 16px;
+    fill: #83888d;
+    display: block;
+    margin: auto;
+    margin-bottom: 6px;
+}
 
 .menu-item-icon 
 {
     width: 16px;
     height: 16px;
     margin:2px 5px 0 1px;
-    background: url("@{imagesBaseUrl}icons_nav_panel.png") no-repeat 0 0;
+   // background: url("@{imagesBaseUrl}icons_nav_panel.png") no-repeat 0 0;
     float:left;
 
     &.home{ background-position: 0 0;} 
     &.people{ background-position: 0 -26px;} 
     &.projects{ background-position: 0 -52px; } 
     &.milestones{ background-position: 0 -78px;} 
-    &.tasks{ background-position: 0 -104px; } 
+    &.tasks{ background-position: 0 -104px;}
     &.messages{ background-position: 0 -129px;} 
     &.documents{ background-position: 0 -156px; } 
     &.reports{ background-position: 0 -182px; } 
@@ -326,21 +341,23 @@
     &.general{ background-position: 0 -806px; } 
     &.productsandinstruments{ background-position: 0 -833px; } 
     &.payment{ background-position: 0 -858px; } 
+    &.payment.rub{ background-position: 0 -1352px; } 
     &.statistic{ background-position: 0 -884px; } 
-    &.ldapsettings{ background-position: 0 -988px; }
     &.help{ background-position: 0 -910px; } 
     &.support {background-position: 0 -936px;}
     &.thirdpartyauthorization {background-position: 0 -961px;}
+    &.ldapsettings{ background-position: 0 -988px; }
     &.monitoring{ background-position: 0 -1014px; }
-    &.security{ background-position: 0 -1042px;} 
-    &.loginhistory { background-position: 0 -1100px; }
-    &.audittrail { background-position: 0 -1072px; }
+    &.security{ background-position: 0 -1040px;} 
+    &.audittrail { background-position: 0 -1066px; }
+    &.loginhistory { background-position: 0 -1092px; }
+    &.chart{ background-position: 0 -1118px;} 
     &.integration { background-position: 0 -1128px; }
-    &.chart{ background-position: 0 -1154px;} 
-    &.video-guides{ background-position: 0 -1209px;} 
-    &.tariff{ background-position: 0 -1244px;}
-    &.userforum{ background-position: 0 -1296px;}
-    &.controlpanel{ background-position: 0 -1322px; } 
+    &.video-guides{ background-position: 0 -1170px;} 
+    &.tariff{ background-position: 0 -1196px;}
+    &.userforum{ background-position: 0 -1222px;}
+    &.controlpanel{ background-position: 0 -1248px; } 
+    &.calls{ background-position: 0 -1274px; } 
 
 
     &.inviteusers{
@@ -403,7 +420,7 @@
             background-color: transparent;
             background-repeat: no-repeat;
             font-size: 15px;
-            padding: 1px 12px;
+            padding: 1px 5px;
         }
     }
 
@@ -472,7 +489,8 @@
         min-width: 24px;
         padding: 4px;
 
-        &.disable {
+        &.disable,
+        &.not-ready {
             .opacityStyle();
         }
     }
@@ -503,7 +521,8 @@
             }
 
             &.mail {
-                background: url("@{img-change-url}refresh.png") center 4px no-repeat;
+                background: url('@{img-change-url}rotate.svg') center 3px no-repeat;
+                background-size:70%;
             }
         }
     }
@@ -540,8 +559,8 @@
 
 
 .menu-upload-icon {
-    background-image: url("@{img-change-url}mainmenu_upload.png");
-    background-position: center 4px;
+   // background-image: url("@{img-change-url}mainmenu_upload.png");
+    //background-position: center 4px;
 }
 
 :root .page-menu .menu-actions .menu-main-button {
@@ -626,4 +645,56 @@
 }
 
 
+/*******************************************************************************
+    Banner
+*******************************************************************************/
+.banner-link {
+    background: no-repeat 0 0 transparent;
+    border: 1px solid #d1d1d1;
+    display: block;
+    height: 54px;
+    margin: 20px 0 0;
+    outline: medium none;
+    overflow: hidden;
+    padding: 5px 5px 5px 60px;
+    text-decoration: none;
+    width: 173px;
+    border-radius: 3px;
+    -moz-border-radius: 3px;
+    -webkit-border-radius: 3px;
 
+    &.banner-large {
+        height: auto;
+        max-height: 51px;
+        padding: 37px 15px 11px;
+        width: 208px;
+
+        .cancelButton {
+            float: right;
+            margin-top: -33px;
+            margin-right: -9px;
+            padding: 2px 5px;
+        }
+    }
+}
+.banner-link:active {
+    text-decoration: none;
+}
+.banner-link span {
+    font-size: 14px;
+    font-weight: 600;
+}
+/*******************************************************************************
+   For Retina
+*******************************************************************************/
+@media only screen and (-webkit-min-device-pixel-ratio: 2),
+only screen and (   min--moz-device-pixel-ratio: 2),
+only screen and (     -o-min-device-pixel-ratio: 2/1),
+only screen and (        min-device-pixel-ratio: 2),
+only screen and (                min-resolution: 192dpi),
+only screen and (                min-resolution: 2dppx) {
+    .menu-item-icon{
+		//background: url("@{imagesBaseUrl}icons_nav_panel_retina.png") no-repeat 0 0;
+		background-size: 32px 1416px;
+    }
+}

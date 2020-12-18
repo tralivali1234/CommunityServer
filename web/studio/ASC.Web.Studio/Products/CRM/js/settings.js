@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -101,7 +92,7 @@ ASC.CRM.SettingsPage = (function() {
             _createField();
         });
         PopupKeyUpActionProvider.EnableEsc = false;
-        StudioBlockUIManager.blockUI("#manageField", 400, 400, 0);
+        StudioBlockUIManager.blockUI("#manageField", 400);
     };
 
     var _initOtherActionMenu = function() {
@@ -360,8 +351,6 @@ ASC.CRM.SettingsPage = (function() {
                 onclick: "ASC.CRM.SettingsPage.initData('case');"
             }]
         });
-
-        jq("<label class='linkTabsLabel'></label>").text(ASC.CRM.Resources.CRMCommonResource.Show + ":").insertAfter("#CustomFieldsTabs");
     };
 
     var _getCurEntityType = function () {
@@ -384,82 +373,6 @@ ASC.CRM.SettingsPage = (function() {
         }).insertAfter("#customFieldList");
 
         jq("#manageField .button.gray").on("click", function(){PopupKeyUpActionProvider.EnableEsc = true;jq.unblockUI();});
-    };
-
-    var _iniChangeDefaultCurrencyConfirmationPanel = function () {
-        jq.tmpl("template-blockUIPanel", {
-            id: "changeDefaultCurrencyConfirmation",
-            headerTest: ASC.CRM.Resources.CRMCommonResource.Confirmation,
-            questionText: '',
-            innerHtmlText: ["<div>", ASC.CRM.Resources.CRMSettingResource.ChangeDefaultCurrencyConfText, "</div>"].join(''),
-            OKBtn: ASC.CRM.Resources.CRMCommonResource.OK,
-            OKBtnClass: "OKChangeCurrency",
-            CancelBtn: ASC.CRM.Resources.CRMCommonResource.Cancel
-        }).insertAfter("#defaultCurrency");
-
-        jq("#changeDefaultCurrencyConfirmation").on("click", ".OKChangeCurrency", function () {
-            _changeDefaultCurrencyComplete();
-        });
-        jq("#changeDefaultCurrencyConfirmation").on("click", ".button.gray, .cancelButton", function () {
-            jq("#defaultCurrency").val(jq.data(jq("#defaultCurrency")[0], "val"));
-        });
-
-        jq.data(jq("#defaultCurrency")[0], "val", jq("#defaultCurrency").val());
-    };
-
-    var _changeDefaultCurrencyComplete = function () {
-        var item = jq("#defaultCurrency"),
-            newCurrency = item.val();
-
-        Teamlab.updateCrmCurrency({ item: item }, newCurrency,
-            {
-                before: function (params) {
-                    params.item.prop("disabled", true);
-                    params.item.next().show();
-                    params.item.next('span').hide();
-                },
-                after: function (params) {
-                    params.item.prop("disabled", false);
-                    params.item.next().hide();
-                },
-                success: function (params, response) {
-                    jq.data(params.item[0], "val", response.abbreviation);
-                    params.item.next().next().show();
-                    jq.unblockUI();
-                },
-                error: function (params, errors) {
-                    var err = errors[0];
-                    jq.unblockUI();
-                    params.item.val(jq.data(params.item[0], "val"));
-                    toastr.error(err);
-                }
-            });
-    };
-
-    var _initSendTestMail = function () {
-        jq.tmpl("template-blockUIPanel", {
-            id: "sendTestMailPanel",
-            headerTest: ASC.CRM.Resources.CRMSettingResource.CreateTestLetter,
-            questionText: "",
-            innerHtmlText: jq("#sendTestMailPanelBody").html(),
-            OKBtn: ASC.CRM.Resources.CRMCommonResource.Send,
-            OKBtnClass: "sendTestMailPanelBtn",
-            CancelBtn: ASC.CRM.Resources.CRMCommonResource.Cancel
-        }).insertAfter("#smtpSettingsContent");
-
-        jq("#sendTestMailPanel .sendTestMailPanelBtn").bind("click", function () {
-            ASC.CRM.SettingsPage.sendTestMailSMTP();
-        });
-
-        jq("#sendTestMailPanel input.testMailToField, #sendTestMailPanel textarea.testMailBodyField ").bind("keyup", function () {
-            var toEmail = jq("#sendTestMailPanel input.testMailToField").val().trim(),
-                mailBody = jq("#sendTestMailPanel textarea.testMailBodyField").val().trim();
-            if (toEmail == "" || mailBody == "") {
-                jq("#sendTestMailPanel .sendTestMailPanelBtn").addClass("disable");
-            } else {
-                jq("#sendTestMailPanel .sendTestMailPanelBtn").removeClass("disable");
-            }
-        });
     };
 
     var _iniDeleteFieldConfirmationPanel = function () {
@@ -501,7 +414,7 @@ ASC.CRM.SettingsPage = (function() {
         });
     };
 
-
+    var timeoutId = null;
 
     return {
         CallbackMethods: {
@@ -596,6 +509,11 @@ ASC.CRM.SettingsPage = (function() {
             ASC.CRM.SettingsPage.initData(type);
         },
 
+        initExportView: function() {
+            _initOtherActionMenu();
+            ASC.CRM.SettingsPage.checkExportStatus(true);
+        },
+
         startExportData: function () {
             jq("#exportDataContent a.button.blue.middle").hide();
             jq("#exportDataContent p.header-base-small").show();
@@ -612,10 +530,6 @@ ASC.CRM.SettingsPage = (function() {
                         }
                     }
                 });
-        },
-
-        changeDefaultCurrency: function() {
-            StudioBlockUIManager.blockUI("#changeDefaultCurrencyConfirmation", 500, 180, 0);
         },
 
         deleteField: function() {
@@ -644,7 +558,7 @@ ASC.CRM.SettingsPage = (function() {
             if (field.relativeItemsCount == 0) {
                 _deleteFieldComplete(fieldid, liObj);
             } else {
-                StudioBlockUIManager.blockUI("#deleteFieldConfirmation", 500, 180, 0);
+                StudioBlockUIManager.blockUI("#deleteFieldConfirmation", 500);
             }
 
         },
@@ -719,7 +633,7 @@ ASC.CRM.SettingsPage = (function() {
                 _editField(liObj, field, index);
             });
             PopupKeyUpActionProvider.EnableEsc = false;
-            StudioBlockUIManager.blockUI("#manageField", 400, 400, 0);
+            StudioBlockUIManager.blockUI("#manageField", 400);
         },
 
         selectTypeEvent: function(selectObj) {
@@ -757,169 +671,6 @@ ASC.CRM.SettingsPage = (function() {
             $Obj.toggleClass('headerCollapse');
         },
 
-        initSMTPSettings: function(testMailBodyText) {
-            jq("#menuCreateNewTask").bind("click", function() { ASC.CRM.TaskActionView.showTaskPanel(0, "", 0, null, {}); });
-
-            jq.tmpl("SMTPSettingsFormTemplate", null).appendTo("#SMTPSettingsPannel");
-            jq("#SMTPSettingsPannel").on("change", "#cbxAuthentication", function() {
-                ASC.CRM.SettingsPage.changeAuthentication();
-            });
-
-
-            ASC.CRM.SettingsPage.checkExportStatus(true);
-
-            ASC.CRM.SettingsPage.testMailBodyText = ASC.CRM.Common.convertText(Encoder.htmlDecode(testMailBodyText));
-
-            jq.forceNumber({
-                parent: "#SMTPSettingsPannel",
-                input: "#tbxPort",
-                integerOnly: true,
-                positiveOnly: true
-            });
-
-            if (typeof (window.SMTPSettings.EnableSSL) != "undefined" && window.SMTPSettings.EnableSSL != null) {
-                jq("#tbxHost").val(window.SMTPSettings.Host);
-                jq("#tbxPort").val(window.SMTPSettings.Port);
-                jq("#tbxHostLogin").val(window.SMTPSettings.HostLogin);
-                jq("#tbxHostPassword").val(window.SMTPSettings.HostPassword);
-                jq("#tbxSenderDisplayName").val(window.SMTPSettings.SenderDisplayName);
-                jq("#tbxSenderEmailAddress").val(window.SMTPSettings.SenderEmailAddress);
-                jq("#cbxEnableSSL").prop("checked", window.SMTPSettings.EnableSSL);
-                if (window.SMTPSettings.RequiredHostAuthentication) {
-                    jq("#cbxAuthentication").prop("checked", true);
-                    jq("#tbxHostLogin").removeAttr("disabled");
-                    jq("#tbxHostPassword").removeAttr("disabled");
-                } else {
-                    jq("#cbxAuthentication").prop("checked", false);
-                    jq("#tbxHostLogin").prop("disabled", true);
-                    jq("#tbxHostPassword").prop("disabled", true);
-                }
-                jq("#showSendTestMailPanelBtn").removeClass("disable");
-            }
-
-            jq("#smtpSettingsContent table input").bind("change keyup", function() {
-                jq("#showSendTestMailPanelBtn").addClass("disable");
-            });
-
-            _initSendTestMail();
-
-            _iniChangeDefaultCurrencyConfirmationPanel();
-        },
-
-        changeAuthentication: function() {
-            if (jq("#cbxAuthentication").is(":checked")) {
-                jq("#tbxHostLogin").removeAttr("disabled");
-                jq("#tbxHostPassword").removeAttr("disabled");
-            } else {
-                jq("#tbxHostLogin").prop("disabled", true);
-                jq("#tbxHostPassword").prop("disabled", true);
-            }
-        },
-
-        saveSMTPSettings: function() {
-            jq("#smtpSettingsContent div.errorBox").remove();
-            jq("#smtpSettingsContent div.okBox").remove();
-
-            var data = {
-                host: jq("#tbxHost").val().trim(),
-                port: jq("#tbxPort").val().trim(),
-                authentication: jq("#cbxAuthentication").is(":checked"),
-                hostLogin: jq("#tbxHostLogin").val().trim(),
-                hostPassword: jq("#tbxHostPassword").val().trim(),
-                senderDisplayName: jq("#tbxSenderDisplayName").val().trim(),
-                senderEmailAddress: jq("#tbxSenderEmailAddress").val().trim(),
-                enableSSL: jq("#cbxEnableSSL").is(":checked")
-            },
-
-            isValid = true;
-
-            if (data.authentication
-                && (data.host == "" || data.port == "" || data.hostLogin == "" || data.hostPassword == "" || data.senderDisplayName == "" || data.senderEmailAddress == "")) {
-                    isValid = false;
-            }
-            if (!data.authentication
-                && (data.host == "" || data.port == "" || data.senderDisplayName == "" || data.senderEmailAddress == "")) {
-                    isValid = false;
-            }
-
-            if (!isValid) {
-                jq("#smtpSettingsContent").prepend(
-                    jq("<div></div>").addClass("errorBox").text(ASC.CRM.Resources.CRMJSResource.EmptyFieldsOfSettings)
-                );
-                return;
-            }
-            
-
-            Teamlab.updateCRMSMTPSettings({}, data, {
-                success: function (params, response) {
-                    jq("#smtpSettingsContent div.errorBox").remove();
-                    jq("#smtpSettingsContent").prepend(
-                        jq("<div></div>").addClass("okBox").text(ASC.CRM.Resources.CRMJSResource.SettingsUpdated)
-                    );
-                    jq("#showSendTestMailPanelBtn").removeClass("disable");
-                    setTimeout(function () {
-                        jq("#smtpSettingsContent div.okBox").remove();
-                    }, 3000);
-                },
-                error: function (params, errors) {
-                    var err = errors[0];
-                    jq("#smtpSettingsContent").prepend(
-                                            jq("<div></div>").addClass("errorBox").text(err)
-                                        );
-                }
-            });
-        },
-
-        showSendTestMailPanel: function() {
-            if (jq("#showSendTestMailPanelBtn").hasClass("disable")) {
-                return;
-            }
-            jq("#sendTestMailPanel textarea.testMailBodyField").val(ASC.CRM.SettingsPage.testMailBodyText);
-            var email = jq("#tbxSenderEmailAddress").val().trim();
-            jq("#sendTestMailPanel .testMailFromLabel").text(email);
-
-            var toEmail = jq("#sendTestMailPanel input.testMailToField").val().trim(),
-                mailBody = jq("#sendTestMailPanel textarea.testMailBodyField").val().trim();
-            if (toEmail == "" || mailBody == "") {
-                jq("#sendTestMailPanel .sendTestMailPanelBtn").addClass("disable");
-            } else {
-                jq("#sendTestMailPanel .sendTestMailPanelBtn").removeClass("disable");
-            }
-            PopupKeyUpActionProvider.EnableEsc = false;
-            StudioBlockUIManager.blockUI("#sendTestMailPanel", 600, 320, 0);
-        },
-
-        sendTestMailSMTP: function() {
-            var fromEmail = jq("#tbxSenderEmailAddress").val().trim(),
-                data = {
-                    toEmail: jq("#sendTestMailPanel input.testMailToField").val().trim(),
-                    mailSubj: jq("#sendTestMailPanel input.testMailSubjectField").val().trim(),
-                    mailBody: jq("#sendTestMailPanel textarea.testMailBodyField").val().trim()
-                };
-
-            if (fromEmail == "" || data.toEmail == "" || data.mailBody == "") {
-                return;
-            }
-            LoadingBanner.showLoaderBtn("#sendTestMailPanel");
-
-            Teamlab.sendSMTPTestMail({}, data, {
-                success: function (params, response) {
-                    PopupKeyUpActionProvider.EnableEsc = true;
-                    jq.unblockUI();
-                    setTimeout(function () {
-                        LoadingBanner.hideLoaderBtn("#sendTestMailPanel");
-                    }, 0);
-                },
-                error: function (params, errors) {
-                    LoadingBanner.hideLoaderBtn("#sendTestMailPanel");
-                    var err = errors[0];
-                    if (err != null) {
-                        toastr.error(err);
-                    }
-                }
-            });
-        },
-
         checkExportStatus: function(isFirstVisit) {
             if (isFirstVisit) {
                 ASC.CRM.SettingsPage.closeExportProgressPanel();
@@ -945,14 +696,14 @@ ASC.CRM.SettingsPage = (function() {
                         } else {
                             if (response.isCompleted) {
                                 $edt.find("#exportLinkBox span").html(
-                                    jq("<a></a>").attr("href", response.status).text("exportdata.zip")
+                                    jq("<a></a>").attr("href", response.fileUrl).text(response.fileName)
                                 );
                                 $edt.find("p.header-base-small").hide();
                                 $edt.find("#exportLinkBox").show();
                                 $edt.find("#abortButton").hide();
                                 $edt.find("#okButton").show();
                             } else {
-                                setTimeout("ASC.CRM.SettingsPage.checkExportStatus(false)", 3000);
+                                timeoutId = setTimeout(ASC.CRM.SettingsPage.checkExportStatus, 3000);
                             }
                         }
                     },
@@ -969,6 +720,7 @@ ASC.CRM.SettingsPage = (function() {
             Teamlab.cancelExportToCSV({},
                 {
                     success: function (params, response) {
+                        clearTimeout(timeoutId);
                         ASC.CRM.SettingsPage.closeExportProgressPanel();
                     },
                     error: function (params, errors) {
@@ -1141,7 +893,7 @@ ASC.CRM.ListItemView = (function() {
         RemoveRequiredErrorClass(jq("#manageItem input:first"));
         PopupKeyUpActionProvider.CloseDialogAction = "javascript:jq('.iconsPanelSettings').hide();jq('#colorsPanel').hide();jq('#popup_colorsPanel').hide();";
         PopupKeyUpActionProvider.EnableEsc = false;
-        StudioBlockUIManager.blockUI("#manageItem", 400, 400, 0);
+        StudioBlockUIManager.blockUI("#manageItem", 400);
 
         if (!ASC.CRM.ListItemView.IsDropdownToggleRegistered) {
             ASC.CRM.ListItemView.IsDropdownToggleRegistered = true;
@@ -1269,7 +1021,7 @@ ASC.CRM.ListItemView = (function() {
 
             hash.push(jq.toJSON(filtervaluehash));
             anchor = jq.base64.encode(hash.join(';'));
-            item.relativeItemsUrl = "default.aspx#" + anchor;
+            item.relativeItemsUrl = "Default.aspx#" + anchor;
         }
         if (ASC.CRM.ListItemView.CurrentType == 2) { //Task category
             //hash.push('{"id":"sorter","type":"sorter","params":"eyJpZCI6ImNhdGVnb3J5IiwiZGVmIjpmYWxzZSwiZHNjIjpmYWxzZSwic29ydE9yZGVyIjoiYXNjZW5kaW5nIn0="}');
@@ -1285,7 +1037,7 @@ ASC.CRM.ListItemView = (function() {
 
             hash.push(jq.toJSON(filtervaluehash));
             anchor = jq.base64.encode(hash.join(';'));
-            item.relativeItemsUrl = "tasks.aspx#" + anchor;
+            item.relativeItemsUrl = "Tasks.aspx#" + anchor;
         }
 
         if (ASC.CRM.ListItemView.CurrentType == 4) { //Contact type
@@ -1302,7 +1054,7 @@ ASC.CRM.ListItemView = (function() {
 
             hash.push(jq.toJSON(filtervaluehash));
             anchor = jq.base64.encode(hash.join(';'));
-            item.relativeItemsUrl = "default.aspx#" + anchor;
+            item.relativeItemsUrl = "Default.aspx#" + anchor;
         }
     };
 
@@ -1606,7 +1358,7 @@ ASC.CRM.ListItemView = (function() {
             RemoveRequiredErrorClass(jq("#manageItem input:first"));
             PopupKeyUpActionProvider.CloseDialogAction = "javascript:jq('.iconsPanelSettings').hide();jq('#colorsPanel').hide();jq('#popup_colorsPanel').hide();";
             PopupKeyUpActionProvider.EnableEsc = false;
-            StudioBlockUIManager.blockUI("#manageItem", 400, 400, 0);
+            StudioBlockUIManager.blockUI("#manageItem", 400);
 
             if (!ASC.CRM.ListItemView.IsDropdownToggleRegistered) {
                 ASC.CRM.ListItemView.IsDropdownToggleRegistered = true;
@@ -1727,7 +1479,7 @@ ASC.CRM.ListItemView = (function() {
                     });
                 });
 
-                StudioBlockUIManager.blockUI("#selectItemForReplacePopUp", 500, 300, 0);
+                StudioBlockUIManager.blockUI("#selectItemForReplacePopUp", 500);
 
             } else {
                 Teamlab.removeCrmListItem({ liObj: liObj }, ASC.CRM.ListItemView.CurrentType, listitemid, 0, {
@@ -1861,7 +1613,7 @@ ASC.CRM.DealMilestoneView = (function() {
         RemoveRequiredErrorClass(jq("#manageDealMilestone .title"));
 
         PopupKeyUpActionProvider.EnableEsc = false;
-        StudioBlockUIManager.blockUI("#manageDealMilestone", 400, 500, 0);
+        StudioBlockUIManager.blockUI("#manageDealMilestone", 400);
 
         if (!ASC.CRM.DealMilestoneView.IsDropdownToggleRegistered) {
             ASC.CRM.DealMilestoneView.IsDropdownToggleRegistered = true;
@@ -1924,7 +1676,7 @@ ASC.CRM.DealMilestoneView = (function() {
 
         hash.push(jq.toJSON(filtervaluehash));
         var anchor = jq.base64.encode(hash.join(';'));
-        dealMilestone.relativeItemsUrl = "deals.aspx#" + anchor;
+        dealMilestone.relativeItemsUrl = "Deals.aspx#" + anchor;
     };
 
     var _readDealMilestoneData = function(sortOrder) {
@@ -2166,7 +1918,7 @@ ASC.CRM.DealMilestoneView = (function() {
 
             RemoveRequiredErrorClass(jq("#manageDealMilestone .title"));
             PopupKeyUpActionProvider.EnableEsc = false;
-            StudioBlockUIManager.blockUI("#manageDealMilestone", 400, 500, 0);
+            StudioBlockUIManager.blockUI("#manageDealMilestone", 400);
 
             if (!ASC.CRM.DealMilestoneView.IsDropdownToggleRegistered) {
                 ASC.CRM.DealMilestoneView.IsDropdownToggleRegistered = true;
@@ -2236,7 +1988,7 @@ ASC.CRM.TagSettingsView = (function() {
         jq("#tagTitle").val("");
         RemoveRequiredErrorClass(jq("#tagTitle"));
         PopupKeyUpActionProvider.EnableEsc = false;
-        StudioBlockUIManager.blockUI("#manageTag", 400, 400, 0);
+        StudioBlockUIManager.blockUI("#manageTag", 400);
     };
 
     var _deleteUnusedTags = function() {
@@ -2256,7 +2008,7 @@ ASC.CRM.TagSettingsView = (function() {
         var hash = [],
             filtervaluehash = {},
             anchor = "",
-            baseUrl = "default.aspx";
+            baseUrl = "Default.aspx";
         //hash.push('{"id":"sorter","type":"sorter","params":"eyJpZCI6InRpdGxlIiwiZGVmIjp0cnVlLCJkc2MiOmZhbHNlLCJzb3J0T3JkZXIiOiJhc2NlbmRpbmcifQ=="}');
 
         filtervaluehash = {
@@ -2272,11 +2024,11 @@ ASC.CRM.TagSettingsView = (function() {
         anchor = jq.base64.encode(hash.join(';'));
 
         if (type == "contacts") {
-            baseUrl = "default.aspx";
+            baseUrl = "Default.aspx";
         } else if (type == "opportunity") {
-            baseUrl = "deals.aspx";
+            baseUrl = "Deals.aspx";
         } else if (type == "case") {
-            baseUrl = "cases.aspx";
+            baseUrl = "Cases.aspx";
         }
         tag.relativeItemsUrl = baseUrl + "#" + anchor;
     };
@@ -2340,8 +2092,6 @@ ASC.CRM.TagSettingsView = (function() {
                 onclick: "ASC.CRM.TagSettingsView.initData('case');"
             }]
         });
-
-        jq("<label class='linkTabsLabel'></label>").text(ASC.CRM.Resources.CRMCommonResource.Show + ":").insertAfter("#TagSettingsTabs");
     };
 
     var _getCurEntityType = function () {
@@ -2855,35 +2605,33 @@ ASC.CRM.TaskTemplateView = (function() {
                 title: ASC.CRM.Resources.CRMSettingResource.BothPersonAndCompany,
                 selected: type === "contact",
                 divID: "contTagsFake",
-                href: "settings.aspx?type=task_template&view=contact"
+                href: "Settings.aspx?type=task_template&view=contact"
             },
             {
                 title: ASC.CRM.Resources.CRMSettingResource.JustForCompany,
                 selected: type === "company",
                 divID: "contTagsFake",
-                href: "settings.aspx?type=task_template&view=company"
+                href: "Settings.aspx?type=task_template&view=company"
             },
             {
                 title: ASC.CRM.Resources.CRMSettingResource.JustForPerson,
                 selected: type === "person",
                 divID: "contTagsFake",
-                href: "settings.aspx?type=task_template&view=person"
+                href: "Settings.aspx?type=task_template&view=person"
             },
             {
                 title: ASC.CRM.Resources.CRMCommonResource.DealModuleName,
                 selected: type === "opportunity",
                 divID: "dealTagsFake",
-                href: "settings.aspx?type=task_template&view=opportunity"
+                href: "Settings.aspx?type=task_template&view=opportunity"
             },
             {
                 title: ASC.CRM.Resources.CRMCommonResource.CasesModuleName,
                 selected: type === "case",
                 divID: "caseTagsFake",
-                href: "settings.aspx?type=task_template&view=case"
+                href: "Settings.aspx?type=task_template&view=case"
             }]
         });
-
-        jq("<label class='linkTabsLabel'></label>").text(ASC.CRM.Resources.CRMCommonResource.Show + ":").insertAfter("#TaskTemplateViewTabs");
     };
 
 
@@ -2935,13 +2683,13 @@ ASC.CRM.TaskTemplateView = (function() {
             if (!id) {
                 ASC.CRM.TaskTemplateView.initTemplateConatainerPanel();
                 PopupKeyUpActionProvider.EnableEsc = false;
-                StudioBlockUIManager.blockUI("#templateConatainerPanel", 500, 500, 0);
+                StudioBlockUIManager.blockUI("#templateConatainerPanel", 500);
             } else {
                 Teamlab.getCrmEntityTaskTemplateContainer({}, id, {
                     success: function(params, templateContainer) {
                         ASC.CRM.TaskTemplateView.initTemplateConatainerPanel(templateContainer);
                         PopupKeyUpActionProvider.EnableEsc = false;
-                        StudioBlockUIManager.blockUI("#templateConatainerPanel", 500, 500, 0);
+                        StudioBlockUIManager.blockUI("#templateConatainerPanel", 500);
                     }
                 });
             }
@@ -3068,13 +2816,13 @@ ASC.CRM.TaskTemplateView = (function() {
             if (!id) {
                 ASC.CRM.TaskTemplateView.initTemplatePanel(containerid);
                 PopupKeyUpActionProvider.EnableEsc = false;
-                StudioBlockUIManager.blockUI("#templatePanel", 500, 500, 0);
+                StudioBlockUIManager.blockUI("#templatePanel", 500);
             } else {
                 Teamlab.getCrmEntityTaskTemplate({}, id, {
                     success: function(params, template) {
                         ASC.CRM.TaskTemplateView.initTemplatePanel(containerid, template);
                         PopupKeyUpActionProvider.EnableEsc = false;
-                        StudioBlockUIManager.blockUI("#templatePanel", 500, 500, 0);
+                        StudioBlockUIManager.blockUI("#templatePanel", 500);
                     }
                 });
             }
@@ -3295,6 +3043,167 @@ ASC.CRM.TaskTemplateView = (function() {
             } else {
                 return jq.format(ASC.CRM.Resources.CRMJSResource.TemplateNotFixedDeadline, displacement, hour, minute);
             }
+        }
+    };
+})();
+
+ASC.CRM.CurrencySettingsView = (function () {
+    
+    function initOtherActionMenu () {
+        jq("#menuCreateNewTask").bind("click", function () { ASC.CRM.TaskActionView.showTaskPanel(0, "", 0, null, {}); });
+    }
+
+    function setBindings() {
+        jq("#defaultCurrency").bind("change", changeDefaultCurrency);
+        jq("#currencySelector").bind("change", changeCurrency);
+        jq("#addCurrencyRate").bind("click", addCurrencyRate);
+        jq("#currencyRateList").on("click", ".crm-deleteLink", deleteCurrencyRate);
+        jq("#currencyRateList").on("change", ".textEdit", changeCurrencyRate);
+        jq("#saveCurrencySettings").bind("click", saveCurrencySettings);
+        jq("#cancelCurrencySettings").bind("click", cancelCurrencySettings);
+    }
+
+    function renderCurrencyRateList(items, clear) {
+        if (clear) {
+            jq("#currencyRateList").empty();
+        }
+
+        if (items) {
+            render(items);
+            return;
+        }
+
+        Teamlab.getCrmCurrencyRates({},
+            {
+                before: function () {
+                    LoadingBanner.displayLoading();
+                },
+                after: function () {
+                    LoadingBanner.hideLoading();
+                },
+                success: function (params, response) {
+                    render(response);
+                },
+                error: function (params, errors) {
+                    console.log(errors);
+                    toastr.error(errors[0]);
+                }
+            });
+
+        function render(data) {
+            jq.tmpl("currencyRateItemTmpl", data).appendTo("#currencyRateList");
+            
+            jq(data).each(function (index, item) {
+                jq.forceNumber({
+                    parent: "#currencyRateList",
+                    input: "#currencyRate_" + item.fromCurrency,
+                    integerOnly: false,
+                    positiveOnly: true
+                });
+            });
+            
+            jq("#currencySelector").change();
+        }
+    }
+
+    function changeDefaultCurrency() {
+        renderCurrencyRateList(jq(this).val() == window.defaultCurrency ? window.currencyRates : [], true);
+        jq("#currencySelector").change();
+    }
+
+    function changeCurrency() {
+        var value = jq(this).val();
+        var exist = value == jq("#defaultCurrency").val();
+
+        if (!exist) {
+            jq("#currencyRateList .currency-rate-item span:first-child").each(function(index, item) {
+                if (jq(item).text().trim() == value)
+                    exist = true;
+            });
+        }
+
+        if (exist) {
+            jq("#addCurrencyRate").addClass("disable");
+        } else {
+            jq("#addCurrencyRate").removeClass("disable");
+        }
+    }
+
+    function addCurrencyRate() {
+        if (jq(this).hasClass("disable"))
+            return;
+
+        var data = [{
+            fromCurrency: jq("#currencySelector").val(),
+            rate: "1.00",
+            toCurrency: jq("#defaultCurrency").val()
+        }];
+
+        renderCurrencyRateList(data, false);
+        jq("#currencySelector").change();
+    }
+
+    function deleteCurrencyRate() {
+        jq(this).parent().remove();
+        jq("#currencySelector").change();
+    }
+
+    function changeCurrencyRate() {
+        var obj = jq(this);
+        var rate = Number(obj.val());
+
+        if (rate <= 0) {
+            obj.val("1.00");
+        } else {
+            obj.val(rate.toFixed(2));
+        }
+    }
+
+    function saveCurrencySettings() {
+        var newDefaultCurrency = jq("#defaultCurrency").val();
+        var newCurrencyRates = [];
+
+        jq("#currencyRateList .currency-rate-item").each(function (index, item) {
+            var obj = jq(item);
+
+            newCurrencyRates.push({
+                fromCurrency: obj.find("span:first-child").text().trim(),
+                rate: obj.find("input").val().trim(),
+                toCurrency: newDefaultCurrency
+            });
+        });
+
+        Teamlab.setCrmCurrencyRates({ newDefaultCurrency: newDefaultCurrency }, newDefaultCurrency, newCurrencyRates,
+            {
+                before: function() {
+                    LoadingBanner.displayLoading();
+                },
+                after: function() {
+                    LoadingBanner.hideLoading();
+                },
+                success: function(params, response) {
+                    window.defaultCurrency = params.newDefaultCurrency;
+                    window.currencyRates = response;
+                    toastr.success(ASC.CRM.Resources.CRMJSResource.SettingsUpdated);
+                },
+                error: function(params, errors) {
+                    console.log(errors);
+                    toastr.error(errors[0]);
+                }
+            });
+    }
+
+    function cancelCurrencySettings() {
+        jq("#defaultCurrency").val(window.defaultCurrency);
+        renderCurrencyRateList(window.currencyRates, true);
+        jq("#currencySelector").change();
+    }
+
+    return {
+        init: function () {
+            initOtherActionMenu();
+            setBindings();
+            renderCurrencyRateList(window.currencyRates, true);
         }
     };
 })();

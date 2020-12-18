@@ -1,45 +1,37 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Configuration;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Web;
+
 using ASC.Core;
 using ASC.Security.Cryptography;
 using ASC.Web.Studio.Utility;
-using System;
-using System.Threading;
-using System.Web;
-using System.Web.Configuration;
 
 namespace ASC.Web.Core.Files
 {
     public static class FilesLinkUtility
     {
-        public const string FilesBaseVirtualPath = "~/products/files/";
-        public const string EditorPage = "doceditor.aspx";
-        private static readonly string files_uploader_url = WebConfigurationManager.AppSettings["files.uploader.url"] ?? "~";
-        private static readonly string files_uploader_url_local = WebConfigurationManager.AppSettings["files.uploader.url.local"] ?? "~/products/files";
+        public const string FilesBaseVirtualPath = "~/Products/Files/";
+        public const string EditorPage = "DocEditor.aspx";
+        private static readonly string FilesUploaderURL = ConfigurationManagerExtension.AppSettings["files.uploader.url"] ?? "~";
 
         public static string FilesBaseAbsolutePath
         {
@@ -57,56 +49,180 @@ namespace ASC.Web.Core.Files
         public const string FolderUrl = "folderurl";
         public const string OutType = "outputtype";
         public const string AuthKey = "stream_auth";
+        public const string Anchor = "anchor";
 
         public static string FileHandlerPath
         {
-            get { return FilesBaseAbsolutePath + "httphandlers/filehandler.ashx"; }
+            get { return FilesBaseAbsolutePath + "HttpHandlers/filehandler.ashx"; }
+        }
+
+        public static string DocServiceUrl
+        {
+            get
+            {
+                var url = GetUrlSetting("public");
+                if (!string.IsNullOrEmpty(url) && url != "/")
+                {
+                    url = url.TrimEnd('/') + "/";
+                }
+                return url;
+            }
+            set
+            {
+                SetUrlSetting("api", null);
+
+                value = (value ?? "").Trim().ToLowerInvariant();
+                if (!string.IsNullOrEmpty(value))
+                {
+                    value = value.TrimEnd('/') + "/";
+                    if (!new Regex(@"(^https?:\/\/)|^\/", RegexOptions.CultureInvariant).IsMatch(value))
+                    {
+                        value = "http://" + value;
+                    }
+                }
+
+                SetUrlSetting("public", value);
+            }
+        }
+
+        public static string DocServiceUrlInternal
+        {
+            get
+            {
+                var url = GetUrlSetting("internal");
+                if (string.IsNullOrEmpty(url))
+                {
+                    url = DocServiceUrl;
+                }
+                else
+                {
+                    url = url.TrimEnd('/') + "/";
+                }
+                return url;
+            }
+            set
+            {
+                SetUrlSetting("converter", null);
+                SetUrlSetting("storage", null);
+                SetUrlSetting("command", null);
+                SetUrlSetting("docbuilder", null);
+
+                value = (value ?? "").Trim().ToLowerInvariant();
+                if (!string.IsNullOrEmpty(value))
+                {
+                    value = value.TrimEnd('/') + "/";
+                    if (!new Regex(@"(^https?:\/\/)", RegexOptions.CultureInvariant).IsMatch(value))
+                    {
+                        value = "http://" + value;
+                    }
+                }
+
+                SetUrlSetting("internal", value);
+            }
         }
 
         public static string DocServiceApiUrl
         {
-            get { return GetUrlSetting("api"); }
-            set { SetUrlSetting("api", value); }
+            get
+            {
+                var url = GetUrlSetting("api");
+                if (string.IsNullOrEmpty(url))
+                {
+                    url = DocServiceUrl;
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        url += "web-apps/apps/api/documents/api.js";
+                    }
+                }
+                return url;
+            }
         }
 
         public static string DocServiceConverterUrl
         {
-            get { return GetUrlSetting("converter"); }
-            set { SetUrlSetting("converter", value); }
-        }
-
-        public static string DocServiceStorageUrl
-        {
-            get { return GetUrlSetting("storage"); }
-            set { SetUrlSetting("storage", value); }
+            get
+            {
+                var url = GetUrlSetting("converter");
+                if (string.IsNullOrEmpty(url))
+                {
+                    url = DocServiceUrlInternal;
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        url += "ConvertService.ashx";
+                    }
+                }
+                return url;
+            }
         }
 
         public static string DocServiceCommandUrl
         {
-            get { return GetUrlSetting("command"); }
-            set { SetUrlSetting("command", value); }
+            get
+            {
+                var url = GetUrlSetting("command");
+                if (string.IsNullOrEmpty(url))
+                {
+                    url = DocServiceUrlInternal;
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        url += "coauthoring/CommandService.ashx";
+                    }
+                }
+                return url;
+            }
+        }
+
+        public static string DocServiceDocbuilderUrl
+        {
+            get
+            {
+                var url = GetUrlSetting("docbuilder");
+                if (string.IsNullOrEmpty(url))
+                {
+                    url = DocServiceUrlInternal;
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        url += "docbuilder";
+                    }
+                }
+                return url;
+            }
+        }
+
+        public static string DocServiceHealthcheckUrl
+        {
+            get
+            {
+                var url = GetUrlSetting("healthcheck");
+                if (string.IsNullOrEmpty(url))
+                {
+                    url = DocServiceUrlInternal;
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        url += "healthcheck";
+                    }
+                }
+                return url;
+            }
         }
 
         public static string DocServicePortalUrl
         {
             get { return GetUrlSetting("portal"); }
-            set { SetUrlSetting("portal", value); }
-        }
+            set
+            {
+                value = (value ?? "").Trim().ToLowerInvariant();
+                if (!string.IsNullOrEmpty(value))
+                {
+                    value = value.TrimEnd('/') + "/";
+                    if (!new Regex(@"(^https?:\/\/)", RegexOptions.CultureInvariant).IsMatch(value))
+                    {
+                        value = "http://" + value;
+                    }
+                }
 
-        public static string FileViewUrlString
-        {
-            get { return FileHandlerPath + "?" + Action + "=view&" + FileId + "={0}"; }
-        }
-
-        public static string GetFileViewUrl(object fileId)
-        {
-            return GetFileViewUrl(fileId, 0);
-        }
-
-        public static string GetFileViewUrl(object fileId, int fileVersion)
-        {
-            return string.Format(FileViewUrlString, HttpUtility.UrlEncode(fileId.ToString()))
-                   + (fileVersion > 0 ? string.Empty : "&" + Version + "=" + fileVersion);
+                SetUrlSetting("portal", value);
+            }
         }
 
         public static string FileDownloadUrlString
@@ -126,7 +242,7 @@ namespace ASC.Web.Core.Files
                    + (string.IsNullOrEmpty(convertToExtension) ? string.Empty : "&" + OutType + "=" + convertToExtension);
         }
 
-        public static string GetFileWebImageViewUrl(object fileId)
+        public static string GetFileWebMediaViewUrl(object fileId)
         {
             return FilesBaseAbsolutePath + "#preview/" + HttpUtility.UrlEncode(fileId.ToString());
         }
@@ -138,7 +254,7 @@ namespace ASC.Web.Core.Files
 
         public static string GetFileWebViewerUrlForMobile(object fileId, int fileVersion)
         {
-            var viewerUrl = CommonLinkUtility.ToAbsolute("~/../products/files/") + EditorPage + "?" + FileId + "={0}";
+            var viewerUrl = CommonLinkUtility.ToAbsolute("~/../Products/Files/") + EditorPage + "?" + FileId + "={0}";
 
             return string.Format(viewerUrl, HttpUtility.UrlEncode(fileId.ToString()))
                    + (fileVersion > 0 ? "&" + Version + "=" + fileVersion : string.Empty);
@@ -149,7 +265,7 @@ namespace ASC.Web.Core.Files
             get { return FilesBaseAbsolutePath + EditorPage + "?" + FileUri + "={0}&" + FileTitle + "={1}&" + FolderUrl + "={2}"; }
         }
 
-        public static string GetFileWebViewerExternalUrl(string fileUri, string fileTitle, string refererUrl)
+        public static string GetFileWebViewerExternalUrl(string fileUri, string fileTitle, string refererUrl = "")
         {
             return string.Format(FileWebViewerExternalUrlString, HttpUtility.UrlEncode(fileUri), HttpUtility.UrlEncode(fileTitle), HttpUtility.UrlEncode(refererUrl));
         }
@@ -189,8 +305,8 @@ namespace ASC.Web.Core.Files
 
         public static string GetFileWebPreviewUrl(string fileTitle, object fileId)
         {
-            if (FileUtility.CanImageView(fileTitle))
-                return GetFileWebImageViewUrl(fileId);
+            if (FileUtility.CanImageView(fileTitle) || FileUtility.CanMediaView(fileTitle))
+                return GetFileWebMediaViewUrl(fileId);
 
             if (FileUtility.CanWebView(fileTitle))
             {
@@ -199,43 +315,55 @@ namespace ASC.Web.Core.Files
                 return GetFileWebEditorUrl(fileId);
             }
 
-            return GetFileViewUrl(fileId);
+            return GetFileDownloadUrl(fileId);
+        }
+
+        public static string FileRedirectPreviewUrlString
+        {
+            get { return FileHandlerPath + "?" + Action + "=redirect"; }
         }
 
         public static string GetFileRedirectPreviewUrl(object enrtyId, bool isFile)
         {
-            return FileHandlerPath + "?" + Action + "=redirect&" + (isFile ? FileId : FolderId) + "=" + enrtyId;
+            return FileRedirectPreviewUrlString + "&" + (isFile ? FileId : FolderId) + "=" + HttpUtility.UrlEncode(enrtyId.ToString());
         }
 
-        public static string GetInitiateUploadSessionUrl(object folderId, object fileId, string fileName, long contentLength)
+        public static string GetInitiateUploadSessionUrl(object folderId, object fileId, string fileName, long contentLength, bool encrypted)
         {
-            var queryString = string.Format("?initiate=true&name={0}&fileSize={1}&tid={2}&userid={3}&culture={4}",
-                                            fileName, contentLength, TenantProvider.CurrentTenantID,
+            var queryString = string.Format("?initiate=true&{0}={1}&fileSize={2}&tid={3}&userid={4}&culture={5}&encrypted={6}",
+                                            FileTitle,
+                                            HttpUtility.UrlEncode(fileName),
+                                            contentLength,
+                                            TenantProvider.CurrentTenantID,
                                             HttpUtility.UrlEncode(InstanceCrypto.Encrypt(SecurityContext.CurrentAccount.ID.ToString())),
-                                            Thread.CurrentThread.CurrentUICulture.Name);
+                                            Thread.CurrentThread.CurrentUICulture.Name,
+                                            encrypted.ToString().ToLower());
 
             if (fileId != null)
-                queryString = queryString + "&fileid=" + fileId;
+                queryString = queryString + "&" + FileId + "=" + HttpUtility.UrlEncode(fileId.ToString());
 
             if (folderId != null)
-                queryString = queryString + "&folderid=" + folderId;
+                queryString = queryString + "&" + FolderId + "=" + HttpUtility.UrlEncode(folderId.ToString());
 
-            return CommonLinkUtility.GetFullAbsolutePath(GetFileUploaderHandlerVirtualPath(contentLength > 0) + queryString);
+            return CommonLinkUtility.GetFullAbsolutePath(GetFileUploaderHandlerVirtualPath() + queryString);
         }
 
-        public static string GetUploadChunkLocationUrl(string uploadId, bool serviceUrl)
+        public static string GetUploadChunkLocationUrl(string uploadId)
         {
             var queryString = "?uid=" + uploadId;
-            return CommonLinkUtility.GetFullAbsolutePath(GetFileUploaderHandlerVirtualPath(serviceUrl) + queryString);
+            return CommonLinkUtility.GetFullAbsolutePath(GetFileUploaderHandlerVirtualPath() + queryString);
         }
 
-
-        private static string GetFileUploaderHandlerVirtualPath(bool getServiceUrl)
+        public static bool IsLocalFileUploader
         {
-            string virtualPath = getServiceUrl ? files_uploader_url : files_uploader_url_local;
+            get { return !Regex.IsMatch(FilesUploaderURL, "^http(s)?://\\.*"); }
+        }
+
+        private static string GetFileUploaderHandlerVirtualPath()
+        {
+            var virtualPath = FilesUploaderURL;
             return virtualPath.EndsWith(".ashx") ? virtualPath : virtualPath.TrimEnd('/') + "/ChunkedUploader.ashx";
         }
-
 
         private static string GetUrlSetting(string key, string appSettingsKey = null)
         {
@@ -246,7 +374,7 @@ namespace ASC.Web.Core.Files
             }
             if (string.IsNullOrEmpty(value))
             {
-                value = WebConfigurationManager.AppSettings["files.docservice.url." + (appSettingsKey ?? key)];
+                value = ConfigurationManagerExtension.AppSettings["files.docservice.url." + (appSettingsKey ?? key)];
             }
             return value;
         }
@@ -258,6 +386,7 @@ namespace ASC.Web.Core.Files
                 throw new NotSupportedException("Method for server edition only.");
             }
             value = (value ?? "").Trim();
+            if (string.IsNullOrEmpty(value)) value = null;
             if (GetUrlSetting(key) != value)
                 CoreContext.Configuration.SaveSetting(GetSettingsKey(key), value);
         }

@@ -1,43 +1,34 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Api.Attributes;
-using ASC.Api.Impl;
-using ASC.Api.Interfaces;
-using ASC.Api.Logging;
-using ASC.Core;
-using ASC.Core.Billing;
-using ASC.Core.Tenants;
-using ASC.Web.Core;
-using Microsoft.Practices.ServiceLocation;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Runtime.Remoting.Messaging;
 using System.Web;
+using ASC.Api;
+using ASC.Api.Attributes;
+using ASC.Api.Impl;
+using ASC.Api.Interfaces;
+using ASC.Common.Logging;
+using ASC.Core;
+using ASC.Core.Billing;
+using ASC.Core.Tenants;
+using ASC.Web.Core;
 
 namespace ASC.Specific.GlobalFilters
 {
@@ -55,70 +46,74 @@ namespace ASC.Specific.GlobalFilters
             var news = new Guid("3cfd481b-46f2-4a4a-b55c-b8c0c9def02c");
             var wiki = new Guid("742cf945-cbbc-4a57-82d6-1600a12cf8ca");
             var photo = new Guid("9d51954f-db9b-4aed-94e3-ed70b914e101");
-            var birthdays = new Guid("37620ae5-c40b-45ce-855a-39dd7d76a1fa");
-            var community = new Guid("ea942538-e68e-4907-9394-035336ee0ba8");
-            var crm = new Guid("6743007c-6f95-4d20-8c88-a8601ce5e76d");
-            var files = new Guid("e67be73d-f9ae-4ce1-8fec-1880cb518cb4");
-            var project = new Guid("1e044602-43b5-4d79-82f3-fd6208a11960");
-            var calendar = new Guid("32d24cb5-7ece-4606-9c94-19216ba42086");
-            var mail = new Guid("2a923037-8b2d-487b-9a22-5ac0918acf3f");
+
             products = new Dictionary<string, Guid>
-            {
-                { "blog", blog },
-                { "bookmark", bookmark },
-                { "event", news },
-                { "forum", forum },
-                { "photo", photo },
-                { "wiki", wiki },
-                { "birthdays", birthdays },
-                { "community", community },
-                { "crm", crm },
-                { "files", files },
-                { "project", project },
-                { "calendar", calendar },
-                { "mail", mail },
-            };
+                {
+                    { "blog", blog },
+                    { "bookmark", bookmark },
+                    { "event", news },
+                    { "forum", forum },
+                    { "photo", photo },
+                    { "wiki", wiki },
+                    { "birthdays", WebItemManager.BirthdaysProductID },
+                    { "community", WebItemManager.CommunityProductID },
+                    { "crm", WebItemManager.CRMProductID },
+                    { "files", WebItemManager.DocumentsProductID },
+                    { "project", WebItemManager.ProjectsProductID },
+                    { "calendar", WebItemManager.CalendarProductID },
+                    { "mail", WebItemManager.MailProductID },
+                };
         }
 
 
-        public ProductSecurityFilter()
+        public ProductSecurityFilter(ILog log)
         {
-            log = ServiceLocator.Current.GetInstance<ILog>();
+            this.log = log;
         }
 
 
         public override void PreMethodCall(IApiMethodCall method, ApiContext context, IEnumerable<object> arguments)
         {
-            var header = context.RequestContext.HttpContext.Request.Headers["Payment-Info"];
-            var flag = true;
-            if (string.IsNullOrEmpty(header) || (bool.TryParse(header, out flag) && flag))
+            if (context.RequestContext.RouteData.DataTokens.ContainsKey(DataTokenConstants.CheckPayment)
+                && !(bool)context.RequestContext.RouteData.DataTokens[DataTokenConstants.CheckPayment])
             {
-                var tenant = CoreContext.TenantManager.GetCurrentTenant(false);
-                if (tenant == null)
+                log.Debug("Payment is not required");
+            }
+            else
+            {
+                var header = context.RequestContext.HttpContext.Request.Headers["Payment-Info"];
+                bool flag;
+                if (string.IsNullOrEmpty(header) || (bool.TryParse(header, out flag) && flag))
                 {
-                    var hostname = string.Empty;
-                    try
+                    var tenant = CoreContext.TenantManager.GetCurrentTenant(false);
+                    if (tenant == null)
                     {
-                        hostname = HttpContext.Current.Request.GetUrlRewriter().Host;
+                        var hostname = string.Empty;
+                        try
+                        {
+                            hostname = HttpContext.Current.Request.GetUrlRewriter().Host;
+                        }
+                        catch
+                        {
+                        }
+                        throw new System.Security.SecurityException(string.Format("Portal {0} not found.", hostname));
                     }
-                    catch { }
-                    throw new System.Security.SecurityException(string.Format("Portal {0} not found.", hostname));
-                }
 
-                var tenantStatus = tenant.Status;
-                if (tenantStatus == TenantStatus.Transfering)
-                {
-                    context.RequestContext.HttpContext.Response.StatusCode = (int) HttpStatusCode.ServiceUnavailable;
-                    context.RequestContext.HttpContext.Response.StatusDescription = HttpStatusCode.ServiceUnavailable.ToString();
-                    log.Warn("Portal {0} is transfering to another region", context.RequestContext.HttpContext.Request.Url);
-                }
+                    var tenantStatus = tenant.Status;
+                    if (tenantStatus == TenantStatus.Transfering)
+                    {
+                        context.RequestContext.HttpContext.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                        context.RequestContext.HttpContext.Response.StatusDescription = HttpStatusCode.ServiceUnavailable.ToString();
+                        log.WarnFormat("Portal {0} is transfering to another region", context.RequestContext.HttpContext.Request.Url);
+                    }
 
-                var tariff = CoreContext.PaymentManager.GetTariff(tenant.TenantId);
-                if (tenantStatus != TenantStatus.Active || tariff.State >= TariffState.NotPaid)
-                {
-                    context.RequestContext.HttpContext.Response.StatusCode = (int) HttpStatusCode.PaymentRequired;
-                    context.RequestContext.HttpContext.Response.StatusDescription = HttpStatusCode.PaymentRequired.ToString();
-                    log.Warn("Payment Required {0}.", context.RequestContext.HttpContext.Request.Url);
+                    var tariff = CoreContext.PaymentManager.GetTariff(tenant.TenantId);
+                    if (tenantStatus != TenantStatus.Active || tariff.State >= TariffState.NotPaid)
+                    {
+                        context.RequestContext.HttpContext.Response.StatusCode = (int)HttpStatusCode.PaymentRequired;
+                        context.RequestContext.HttpContext.Response.StatusDescription = HttpStatusCode.PaymentRequired.ToString();
+                        log.WarnFormat("Payment Required {0}.", context.RequestContext.HttpContext.Request.Url);
+                    }
                 }
             }
 
@@ -131,17 +126,17 @@ namespace ASC.Specific.GlobalFilters
                 {
                     CallContext.SetData("asc.web.product_id", pid);
                 }
-                if (!WebItemSecurity.IsAvailableForUser(pid.ToString(), SecurityContext.CurrentAccount.ID))
+                if (!WebItemSecurity.IsAvailableForMe(pid))
                 {
-                    context.RequestContext.HttpContext.Response.StatusCode = (int) HttpStatusCode.Forbidden;
+                    context.RequestContext.HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
                     context.RequestContext.HttpContext.Response.StatusDescription = HttpStatusCode.Forbidden.ToString();
-                    log.Warn("Product {0} denied for user {1}", method.Name, SecurityContext.CurrentAccount);
+                    log.WarnFormat("Product {0} denied for user {1}", method.Name, SecurityContext.CurrentAccount);
                 }
             }
         }
 
 
-        private Guid FindProduct(IApiMethodCall method)
+        private static Guid FindProduct(IApiMethodCall method)
         {
             if (method == null || string.IsNullOrEmpty(method.Name))
             {

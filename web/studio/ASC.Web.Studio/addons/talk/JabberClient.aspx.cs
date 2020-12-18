@@ -1,46 +1,38 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
+using System.Configuration;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using System.Web;
+using AjaxPro;
+using ASC.Common.Logging;
 using ASC.Core;
 using ASC.Core.Users;
-using ASC.Data.Storage;
+using ASC.Web.Core;
 using ASC.Web.Core.Jabber;
-using ASC.Web.Core.Utility.Skins;
 using ASC.Web.Studio;
 using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Utility;
 using ASC.Web.Talk.Addon;
+using ASC.Web.Talk.ClientScript;
 using ASC.Web.Talk.Resources;
-using AjaxPro;
-using log4net;
-using System.IO;
 
 namespace ASC.Web.Talk
 {
@@ -61,28 +53,59 @@ namespace ASC.Web.Talk
 
         protected void Page_Load(object sender, EventArgs e)
         {
+            var thirdPartyChat = ConfigurationManagerExtension.AppSettings["web.third-party-chat-url"];
+            var isEnabledTalk = ConfigurationManagerExtension.AppSettings["web.talk"] ?? "false";
+
+            if (!String.IsNullOrEmpty(thirdPartyChat))
+            {
+                if (CoreContext.Configuration.CustomMode)
+                {
+                    Response.Redirect(thirdPartyChat + "?ask_key=" + HttpUtility.UrlEncode(CookiesManager.GetCookies(CookiesType.AuthKey)), true);
+                }
+                Response.Redirect(thirdPartyChat, true);
+            }
+
+            if (isEnabledTalk != "true")
+            {
+                Response.Redirect(CommonLinkUtility.GetDefault());
+            }
+
             _cfg = new TalkConfiguration();
 
             Utility.RegisterTypeForAjax(GetType());
 
             Master.DisabledSidePanel = true;
             Master.DisabledTopStudioPanel = true;
-            Page.RegisterBodyScripts("~/addons/talk/js/gears.init.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/gears.init.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/iscroll.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.customevents.js");
-            Page.RegisterBodyScripts("~/js/third-party/jquery/jquery.notification.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.common.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.navigationitem.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.msmanager.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.mucmanager.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.roomsmanager.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.contactsmanager.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.messagesmanager.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.connectiomanager.js");
-            Page.RegisterBodyScripts("~/addons/talk/js/talk.default.js");
 
-            Page.RegisterStyle("~/addons/talk/css/default/talk.style.css");
+            Page
+                .RegisterBodyScripts("~/addons/talk/js/gears.init.js",
+                    "~/addons/talk/js/gears.init.js",
+                    "~/addons/talk/js/iscroll.js",
+                    "~/addons/talk/js/talk.customevents.js",
+                    "~/js/third-party/jquery/jquery.notification.js",
+                    "~/js/third-party/moment.min.js",
+                    "~/js/third-party/moment-timezone.min.js",
+                    "~/addons/talk/js/talk.common.js",
+                    "~/addons/talk/js/talk.navigationitem.js",
+                    "~/addons/talk/js/talk.msmanager.js",
+                    "~/addons/talk/js/talk.mucmanager.js",
+                    "~/addons/talk/js/talk.roomsmanager.js",
+                    "~/addons/talk/js/talk.contactsmanager.js",
+                    "~/addons/talk/js/talk.messagesmanager.js",
+                    "~/addons/talk/js/talk.connectiomanager.js",
+                    "~/addons/talk/js/talk.default.js",
+                    "~/addons/talk/js/talk.init.js")
+                .RegisterStyle("~/addons/talk/css/default/talk.style.css");
+            if (Request.Browser != null && Request.Browser.Browser != "IE" && Request.Browser.Browser != "InternetExplorer")
+            {
+                Page
+                    .RegisterBodyScripts("~/js/third-party/firebase.js",
+                        "~/js/third-party/firebase-app.js",
+                        "~/js/third-party/firebase-auth.js",
+                        "~/js/third-party/firebase-database.js",
+                        "~/js/third-party/firebase-messaging.js");
+            }
+
             var virtPath = "~/addons/talk/css/default/talk.style." + CultureInfo.CurrentCulture.Name.ToLower() + ".css";
             if (File.Exists(Server.MapPath(virtPath)))
             {
@@ -94,101 +117,46 @@ namespace ASC.Web.Talk
             switch (_cfg.RequestTransportType.ToLower())
             {
                 case "flash":
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/plugins/strophe.flxhr.js");
+                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/plugins/strophe.flxhr.js",
 
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/flxhr/checkplayer.js");
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/flxhr/flensed.js");
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/flxhr/flxhr.js");
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/flxhr/swfobject.js");
+                        "~/addons/talk/js/jlib/flxhr/checkplayer.js",
+                        "~/addons/talk/js/jlib/flxhr/flensed.js",
+                        "~/addons/talk/js/jlib/flxhr/flxhr.js",
+                        "~/addons/talk/js/jlib/flxhr/swfobject.js",
 
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/strophe/base64.js");
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/strophe/md5.js");
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/strophe/core.js");
+                        "~/js/third-party/xregexp.js",
+
+                        "~/addons/talk/js/jlib/strophe/base64.js",
+                        "~/addons/talk/js/jlib/strophe/md5.js",
+                        "~/addons/talk/js/jlib/strophe/core.js");
 
                     break;
                 default:
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/strophe/base64.js");
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/strophe/md5.js");
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/strophe/core.js");
-
-                    Page.RegisterBodyScripts("~/addons/talk/js/jlib/flxhr/swfobject.js");
+                    Page.RegisterBodyScripts(
+                        "~/addons/talk/js/jlib/strophe/base64.js",
+                        "~/addons/talk/js/jlib/strophe/md5.js",
+                        "~/addons/talk/js/jlib/strophe/core.js",
+                        "~/js/third-party/xregexp.js",
+                        "~/addons/talk/js/jlib/flxhr/swfobject.js");
                     break;
             }
 
-            var jsResources = new StringBuilder();
-            jsResources.Append("window.ASC=window.ASC||{};");
-            jsResources.Append("window.ASC.TMTalk=window.ASC.TMTalk||{};");
-            jsResources.Append("window.ASC.TMTalk.Resources={};");
-            jsResources.Append("window.ASC.TMTalk.Resources.statusTitles={}" + ';');
-            jsResources.Append("window.ASC.TMTalk.Resources.statusTitles.offline='" + EscapeJsString(TalkResource.StatusOffline) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.statusTitles.online='" + EscapeJsString(TalkResource.StatusOnline) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.statusTitles.away='" + EscapeJsString(TalkResource.StatusAway) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.statusTitles.xa='" + EscapeJsString(TalkResource.StatusNA) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.addonIcon='" + EscapeJsString(WebImageSupplier.GetAbsoluteWebPath("product_logo.png", TalkAddon.AddonID)) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.addonIcon16='" + EscapeJsString(WebImageSupplier.GetAbsoluteWebPath("talk16.png", TalkAddon.AddonID)) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.addonIcon32='" + EscapeJsString(WebImageSupplier.GetAbsoluteWebPath("talk32.png", TalkAddon.AddonID)) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.addonIcon48='" + EscapeJsString(WebImageSupplier.GetAbsoluteWebPath("talk48.png", TalkAddon.AddonID)) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.addonIcon128='" + EscapeJsString(WebImageSupplier.GetAbsoluteWebPath("talk128.png", TalkAddon.AddonID)) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.iconNewMessage='" + EscapeJsString(WebImageSupplier.GetAbsoluteWebPath("icon-new-message.ico", TalkAddon.AddonID)) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.iconTeamlabOffice32='" + EscapeJsString(WebImageSupplier.GetAbsoluteWebPath("icon-teamlab-office32.png", TalkAddon.AddonID)) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.productName='" + EscapeJsString(TalkResource.ProductName) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.updateFlashPlayerUrl='" + EscapeJsString(TalkResource.UpdateFlashPlayerUrl) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.selectUserBookmarkTitle='" + EscapeJsString(TalkResource.SelectUserBookmarkTitle) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.defaultConferenceSubjectTemplate='" + EscapeJsString(TalkResource.DefaultConferenceSubjectTemplate) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.labelNewMessage='" + EscapeJsString(TalkResource.LabelNewMessage) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.labelRecvInvite='" + EscapeJsString(TalkResource.LabelRecvInvite) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.titleRecvInvite='" + EscapeJsString(TalkResource.TitleRecvInvite) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintClientConnecting='" + EscapeJsString(TalkResource.HintClientConnecting) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintClientDisconnected='" + EscapeJsString(TalkResource.HintClientDisconnected) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintEmotions='" + EscapeJsString(TalkResource.HintEmotions) + "',");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintFlastPlayerIncorrect='" + EscapeJsString(TalkResource.HintFlastPlayerIncorrect) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintGroups='" + EscapeJsString(TalkResource.HintGroups) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintNoFlashPlayer='" + EscapeJsString(TalkResource.HintNoFlashPlayer) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintOfflineContacts='" + EscapeJsString(TalkResource.HintOfflineContacts) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintSounds='" + EscapeJsString(TalkResource.HintSounds) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintUpdateHrefText='" + EscapeJsString(TalkResource.HintUpdateHrefText) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintSelectContact='" + EscapeJsString(TalkResource.HintSelectContact) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintSendInvite='" + EscapeJsString(TalkResource.HintSendInvite) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintPossibleClientConflict='" + EscapeJsString(TalkResource.HintPossibleClientConflict) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.hintCreateShortcutDialog='" + EscapeJsString(TalkResource.HintCreateShortcutDialog) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.sendFileMessage='" + EscapeJsString(string.Format(TalkResource.SendFileMessage, "{0}<br/>", "{1}")) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.mailingsGroupName='" + EscapeJsString(TalkResource.MailingsGroupName) + "';");
-            jsResources.Append("window.ASC.TMTalk.Resources.conferenceGroupName='" + EscapeJsString(TalkResource.ConferenceGroupName) + "';");
-
-            Page.RegisterInlineScript(jsResources.ToString(), true, false);
-
-            jsResources = new StringBuilder();
-
-            jsResources.Append("TMTalk.init();");
-            jsResources.Append("ASC.TMTalk.properties.init(\"2.0\");");
-            jsResources.Append("ASC.TMTalk.iconManager.init();");
-            jsResources.AppendFormat("ASC.TMTalk.notifications.init(\"{0}\", \"{1}\");", GetUserPhotoHandlerPath(), GetNotificationHandlerPath());
-            jsResources.AppendFormat("ASC.TMTalk.msManager.init(\"{0}\");", GetValidSymbols());
-            jsResources.AppendFormat("ASC.TMTalk.mucManager.init(\"{0}\");", GetValidSymbols());
-            jsResources.Append("ASC.TMTalk.roomsManager.init();");
-            jsResources.Append("ASC.TMTalk.contactsManager.init();");
-            jsResources.AppendFormat("ASC.TMTalk.messagesManager.init(\"{0}\", \"{1}\", \"{2}\", \"{3}\");", GetShortDateFormat(), GetFullDateFormat(), GetMonthNames(), GetHistoryLength());
-            jsResources.AppendFormat("ASC.TMTalk.connectionManager.init(\"{0}\", \"{1}\", \"{2}\", \"{3}\");", GetBoshUri(), GetJabberAccount(), GetResourcePriority(), GetInactivity());
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"addonID\", \"{0}\");", TalkAddon.AddonID);
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"enabledMassend\", \"{0}\");", GetMassendState());
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"enabledConferences\", \"{0}\");", GetConferenceState());
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"requestTransportType\", \"{0}\");", GetRequestTransportType());
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"fileTransportType\", \"{0}\");", GetFileTransportType());
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"maxUploadSize\",\"{0}\");", SetupInfo.MaxImageUploadSize);
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"maxUploadSizeError\", \"{0}\");", FileSizeComment.FileImageSizeExceptionString);
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"sounds\", \"{0}\");", WebPath.GetPath("/addons/talk/swf/sounds.swf"));
-            jsResources.AppendFormat("ASC.TMTalk.properties.item(\"expressInstall\", \"{0}\");", WebPath.GetPath("/addons/talk/swf/expressinstall.swf"));
-
-            Page.RegisterInlineScript(jsResources.ToString(), onReady: false);
+            Master.AddClientScript(new TalkClientScript(), new TalkClientScriptLocalization());
 
             try
             {
-                Page.Title = TalkResource.ProductName + " - " + CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).DisplayUserName();
+                Page.Title = TalkResource.ProductName + " - " + CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).DisplayUserName(false);
             }
             catch (System.Security.SecurityException)
             {
                 Page.Title = TalkResource.ProductName + " - " + HeaderStringHelper.GetPageTitle(TalkResource.DefaultContactTitle);
             }
+            try
+            {
+                Page.RegisterInlineScript("ASC.TMTalk.notifications && ASC.TMTalk.notifications.initialiseFirebase(" + GetFirebaseConfig() + ");");
+            }
+            catch (Exception){}
+            
         }
 
         [AjaxMethod(HttpSessionStateRequirement.ReadWrite), Core.Security.SecurityPassthrough]
@@ -197,6 +165,36 @@ namespace ASC.Web.Talk
             try
             {
                 return new JabberServiceClient().GetAuthToken(TenantProvider.CurrentTenantID);
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Talk").Error(ex);
+                return String.Empty;
+            }
+        }
+
+        [AjaxMethod]
+        public string GetSpaceUsage()
+        {
+            try
+            {
+                var spaceUsage = TalkSpaceUsageStatManager.GetSpaceUsage();
+                return spaceUsage > 0 ? FileSizeComment.FilesSizeToString(spaceUsage) : String.Empty;
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Talk").Error(ex);
+                return String.Empty;
+            }
+        }
+
+        [AjaxMethod]
+        public string ClearSpaceUsage(TalkSpaceUsageStatManager.ClearType type)
+        {
+            try
+            {
+                TalkSpaceUsageStatManager.ClearSpaceUsage(type);
+                return GetSpaceUsage();
             }
             catch (Exception ex)
             {
@@ -244,7 +242,10 @@ namespace ASC.Web.Talk
         {
             return String.Join(",", CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedMonthNames);
         }
-
+        protected String GetDayNames()
+        {
+            return String.Join(",", CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames);
+        }
         protected String GetHistoryLength()
         {
             return _cfg.HistoryLength ?? String.Empty;
@@ -300,6 +301,29 @@ namespace ASC.Web.Talk
             {
                 return String.Empty;
             }
+        }
+        private String GetFirebaseConfig()
+        {
+            string firebase_projectId = FireBase.Instance.ProjectId;
+            firebase_projectId = firebase_projectId.Trim();
+            var script = new StringBuilder();
+
+            if (firebase_projectId != String.Empty)
+            {
+                script.AppendLine("{apiKey: '" + FireBase.Instance.ApiKey.Trim() + "',");
+                script.AppendLine(" authDomain: '" + firebase_projectId + ".firebaseapp.com',");
+                script.AppendLine(" databaseURL: 'https://" + firebase_projectId + ".firebaseapp.com',");
+                script.AppendLine(" projectId: '" + firebase_projectId + "',");
+                script.AppendLine(" storageBucket: '" + firebase_projectId + ".appspot.com',");
+                script.AppendLine(" messagingSenderId: '" + FireBase.Instance.MessagingSenderId.Trim() + "'}");
+
+                return script.ToString();
+            }
+            else
+            {
+                return null;
+            }
+
         }
     }
 }

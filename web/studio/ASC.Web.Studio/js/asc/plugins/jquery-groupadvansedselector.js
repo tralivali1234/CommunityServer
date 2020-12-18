@@ -1,5 +1,23 @@
-﻿
-(function ($, win, doc, body) {
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+(function ($) {
+    var resources = ASC.Resources.Master.Resource, teamlab = Teamlab;
+
     var groupadvancedSelector = function (element, options) {
         this.$element = $(element);
         this.options = $.extend({}, $.fn.groupadvancedSelector.defaults, options);
@@ -15,10 +33,10 @@
                 itemsSimpleSelect = [];
 
             opts.newoptions = [
-                { title: ASC.Resources.Master.Resource.SelectorTitle, type: "input", tag: "title" },
-                { title: ASC.Resources.Master.Resource.SelectorHead, type: "select", tag: "manager" }
+                { title: resources.SelectorTitle, type: "input", tag: "title" },
+                { title: resources.SelectorHead, type: "select", tag: "manager" }
             ];
-            opts.newbtn = ASC.Resources.Master.Resource.CreateButton;
+            opts.newbtn = resources.CreateButton;
             that.displayAddItemBlock.call(that, opts);
 
             var filter = {
@@ -26,15 +44,15 @@
                 employeeType: 1
             };
 
-            Teamlab.getProfilesByFilter({}, {
+            teamlab.getSimpleProfilesByFilter({}, {
                 before: that.showLoaderSimpleSelector.call(that, "manager"),
                 filter: filter,
                 success: function (params, data) {
                     for (var i = 0, length = data.length; i < length; i++) {
-                        if (data[i].id == Teamlab.profile.id) {
+                        if (data[i].id == teamlab.profile.id) {
                             itemsSimpleSelect.unshift(
                                 {
-                                    title: ASC.Resources.Master.Resource.MeLabel,
+                                    title: resources.MeLabel,
                                     id: data[i].id
                                 }
                             );
@@ -60,12 +78,11 @@
         },
 
         initAdvSelectorData: function () {
-            var that = this,
-                data = ASC.Resources.Master.ApiResponses_Groups.response;
+            var that = this;
 
-            that.rewriteObjectItem.call(that, data);
+            that.rewriteObjectItem.call(that, window.GroupManager.getAllGroups());
 
-            //Teamlab.getGroups({}, {
+            //teamlab.getGroups({}, {
             //    before: function () {
             //        that.showLoaderListAdvSelector.call(that, 'items');
             //    },
@@ -126,24 +143,24 @@
                 members: []
             };
             if (!newGroup.groupName) {
-                that.showErrorField.call(that, { field: $addPanel.find(".title"), error: ASC.Resources.Master.Resource.ErrorEmptyGroupTitle });
+                that.showErrorField.call(that, { field: $addPanel.find(".title"), error: resources.ErrorEmptyGroupTitle });
                 isError = true;
             }
             if (newGroup.groupName && newGroup.groupName.length > 64) {
-                that.showErrorField.call(that, { field: $addPanel.find(".title"), error: ASC.Resources.Master.Resource.ErrorMesLongField64 });
+                that.showErrorField.call(that, { field: $addPanel.find(".title"), error: resources.ErrorMesLongField64 });
                 isError = true;
             }
             if (newGroup.groupManager == "00000000-0000-0000-0000-000000000000" && $addPanel.find(".manager input").val().trim()) {
-                that.showErrorField.call(that, { field: $addPanel.find(".manager"), error: ASC.Resources.Master.Resource.ErrorHeadNotExist });
+                that.showErrorField.call(that, { field: $addPanel.find(".manager"), error: resources.ErrorHeadNotExist });
                 isError = true;
             }
             if (isError) {
                 $addPanel.find(".error input").first().focus();
                 return;
             }
-            Teamlab.addGroup(null, newGroup, {
+            teamlab.addGroup(null, newGroup, {
                 before: function(){
-                    that.displayLoadingBtn.call(that, { btn: $btn, text: ASC.Resources.Master.Resource.LoadingProcessing });
+                    that.displayLoadingBtn.call(that, { btn: $btn, text: resources.LoadingProcessing });
                 },
                 after: function(){
                     that.hideLoadingBtn.call(that, $btn);
@@ -158,7 +175,7 @@
                         title: group.name,
                         head: group.manager
                     }
-                    toastr.success(ASC.Resources.Master.Resource.GroupSelectorAddSuccess.format("<b>" + newgroup.title + "</b>"));
+                    toastr.success(resources.GroupSelectorAddSuccess.format("<b>" + Encoder.htmlEncode(newgroup.title) + "</b>"));
                     that.actionsAfterCreateItem.call(that, { newitem: newgroup, response: group });
                 }
             })  
@@ -190,13 +207,13 @@
         });
     }
     $.fn.groupadvancedSelector.defaults = $.extend({}, $.fn.advancedSelector.defaults, {
-        addtext: ASC.Resources.Master.Resource.GroupSelectorAddText,
-        noresults: ASC.Resources.Master.Resource.GroupSelectorNoResults,
-        emptylist: ASC.Resources.Master.Resource.GroupSelectorEmptyList,
+        addtext: resources.GroupSelectorAddText,
+        noresults: resources.GroupSelectorNoResults,
+        emptylist: resources.GroupSelectorEmptyList,
         witheveryone: false,
         withadmin: false,
         isInitializeItems: true
     });
 
 
-})(jQuery, window, document, document.body);
+})(jQuery);

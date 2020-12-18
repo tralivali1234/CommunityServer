@@ -1,171 +1,173 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Linq;
+using System.Web;
 using ASC.Core;
+using ASC.Core.Tenants;
 using Twilio.TwiML;
+using Twilio.Types;
 
 namespace ASC.VoipService.Twilio
 {
     public class TwilioResponseHelper
     {
         private readonly VoipSettings settings;
-        private readonly string tenant;
-        private readonly string echoUrl;
+        private readonly string baseUrl;
 
-        public TwilioResponseHelper(VoipSettings settings, string tenant)
+        public TwilioResponseHelper(VoipSettings settings, string baseUrl)
         {
             this.settings = settings;
-            this.tenant = tenant;
-            echoUrl = ConfigurationManager.AppSettings["echoUrl"] ?? "http://voip.teamlab.info/";
-            if (!echoUrl.EndsWith("/"))
-                echoUrl += "/";
-            echoUrl += "api/twilio/{0}?Tenant={1}";
+            this.baseUrl = baseUrl.TrimEnd('/') + "/twilio/";
         }
 
-        public TwilioResponse Inbound()
+        public VoiceResponse Inbound(Tuple<Agent,bool> agentTuple)
         {
-            var response = new TwilioResponse();
-
+            var agent = agentTuple != null ? agentTuple.Item1 : null;
+            var anyOnline = agentTuple != null ? agentTuple.Item2 : false;
+            var response = new VoiceResponse();
+            
             if (settings.WorkingHours != null && settings.WorkingHours.Enabled)
             {
-                if (!(settings.WorkingHours.From <= DateTime.UtcNow.TimeOfDay && settings.WorkingHours.To >= DateTime.UtcNow.TimeOfDay))
+                var now = TenantUtil.DateTimeFromUtc(DateTime.UtcNow);
+                if (!(settings.WorkingHours.From <= now.TimeOfDay && settings.WorkingHours.To >= now.TimeOfDay))
                 {
                     return AddVoiceMail(response);
                 }
             }
 
-            if (settings.AvailableOperators.Any())
+            if (anyOnline)
             {
                 if (!string.IsNullOrEmpty(settings.GreetingAudio))
                 {
-                    response.Play(settings.GreetingAudio);
+                    response.Play(Uri.EscapeUriString(settings.GreetingAudio));
                 }
 
-                response.Enqueue(settings.Queue.Name, new { method = "GET", action = GetEcho("enqueue"), waitUrl = GetEcho("wait"), waitUrlMethod = "GET" });
+                response.Enqueue(settings.Queue.Name, GetEcho("Enqueue", agent != null), "POST",
+                    GetEcho("Wait", agent != null), "POST");
             }
 
-            return AddVoiceMail(response); 
+            return AddVoiceMail(response);
         }
 
-        public TwilioResponse Outbound()
+        public VoiceResponse Outbound()
         {
             return !settings.Caller.AllowOutgoingCalls
-                       ? new TwilioResponse()
-                       : AddToResponse(new TwilioResponse(), settings.Caller);
+                       ? new VoiceResponse()
+                       : AddToResponse(new VoiceResponse(), settings.Caller);
         }
 
-        public TwilioResponse Dial()
+        public VoiceResponse Dial()
         {
-            return new TwilioResponse();
+            return new VoiceResponse();
         }
 
-        public TwilioResponse Queue()
+        public VoiceResponse Queue()
         {
-            return new TwilioResponse();
+            return new VoiceResponse();
         }
 
-        public TwilioResponse Enqueue(string queueResult)
+        public VoiceResponse Enqueue(string queueResult)
         {
-            return queueResult == "leave" ? AddVoiceMail(new TwilioResponse()) : new TwilioResponse();
+            return queueResult == "leave" ? AddVoiceMail(new VoiceResponse()) : new VoiceResponse();
         }
 
-        public TwilioResponse Dequeue()
+        public VoiceResponse Dequeue()
         {
-            return AddToResponse(new TwilioResponse(), settings.Caller);
+            return AddToResponse(new VoiceResponse(), settings.Caller);
         }
 
-        public TwilioResponse Leave()
+        public VoiceResponse Leave()
         {
-            return AddVoiceMail(new TwilioResponse());
+            return AddVoiceMail(new VoiceResponse());
         }
 
-        public TwilioResponse Wait(string queueId, string queueTime, string queueSize)
+        public VoiceResponse Wait(string queueId, string queueTime, string queueSize)
         {
-            var response = new TwilioResponse();
-            response.AllowedChildren.Add("Leave");
-
+            var response = new VoiceResponse();
             var queue = settings.Queue;
 
             if (Convert.ToInt32(queueTime) > queue.WaitTime || Convert.ToInt32(queueSize) > queue.Size) return response.Leave();
 
             if (!string.IsNullOrEmpty(queue.WaitUrl))
             {
-                response.BeginGather(new { method = "GET", action = GetEcho("gatherQueue") })
-                        .Play(queue.WaitUrl)
-                        .EndGather();
+                var gather = new Gather(method: "POST", action: GetEcho("gatherQueue"));
+                gather.Play(Uri.EscapeUriString(queue.WaitUrl));
+                response.Gather(gather);
+            }
+            else
+            {
+                response.Pause(queue.WaitTime);
             }
 
             return response;
         }
 
-        public TwilioResponse GatherQueue(string digits, string number)
+        public VoiceResponse GatherQueue(string digits, string number, List<Agent> availableOperators)
         {
-            var response = new TwilioResponse();
+            var response = new VoiceResponse();
 
             if (digits == "#") return AddVoiceMail(response);
 
-            var oper = settings.AvailableOperators.Find(r => r.PostFix == digits) ?? settings.AvailableOperators.FirstOrDefault();
+            var oper = settings.Operators.Find(r => r.PostFix == digits && availableOperators.Contains(r)) ??
+                settings.Operators.FirstOrDefault(r => availableOperators.Contains(r));
 
             return oper != null ? AddToResponse(response, oper) : response;
         }
 
-        public TwilioResponse Redirect(string to)
+        public VoiceResponse Redirect(string to)
         {
-            return to == "hold"
-                       ? new TwilioResponse().Play(settings.HoldAudio, new {loop = 0})
-                       : new TwilioResponse().Enqueue(settings.Queue.Name, new { method = "GET", action = GetEcho("enqueue"), waitUrl = GetEcho("wait") + "&RedirectTo=" + to, waitUrlMethod = "GET" });
+            if (to == "hold")
+            {
+                return new VoiceResponse().Play(Uri.EscapeUriString(settings.HoldAudio), 0);
+            }
+
+            Guid newCallerId;
+
+            if (Guid.TryParse(to, out newCallerId))
+            {
+                SecurityContext.AuthenticateMe(newCallerId);
+            }
+
+            return new VoiceResponse().Enqueue(settings.Queue.Name, GetEcho("enqueue"), "POST",
+                GetEcho("wait") + "&RedirectTo=" + to, "POST");
         }
 
-        public TwilioResponse VoiceMail()
+        public VoiceResponse VoiceMail()
         {
-            return new TwilioResponse();
+            return new VoiceResponse();
         }
 
-        private TwilioResponse AddToResponse(TwilioResponse response, Agent agent)
+        private VoiceResponse AddToResponse(VoiceResponse response, Agent agent)
         {
-            var dialAttributes = new { method = "GET", action = GetEcho("dial"), timeout = agent.TimeOut, record = agent.Record ? "record-from-answer" : "do-not-record" };
+            var dial = new Dial(method: "POST", action: GetEcho("dial"), timeout: agent.TimeOut, record: agent.Record ? "record-from-answer" : "do-not-record");
 
             switch (agent.Answer)
             {
                 case AnswerType.Number:
-                    var number = new Number(agent.RedirectToNumber);
-                    AddUrlAttr(number, GetEcho("client"));
-                    response.Dial(number, dialAttributes);
+                    response.Dial(dial.Number(agent.PhoneNumber, method: "POST", url: GetEcho("client")));
                     break;
                 case AnswerType.Client:
-                    var client = new Client(agent.ClientID);
-                    AddUrlAttr(client, GetEcho("client"));
-                    response.Dial(client, dialAttributes);
+                    response.Dial(dial.Client(agent.ClientID, "POST", GetEcho("client")));
                     break;
                 case AnswerType.Sip:
-                    response.Dial(new Sip(agent.ClientID), dialAttributes);
+                    response.Dial(dial.Sip(agent.ClientID, method: "POST", url: GetEcho("client")));
                     break;
             }
 
@@ -173,32 +175,24 @@ namespace ASC.VoipService.Twilio
         }
 
 
-        private void AddUrlAttr(ElementBase element, string url)
+        private VoiceResponse AddVoiceMail(VoiceResponse response)
         {
-            if (element.AllowedAttributes == null)
-                element.AllowedAttributes = new List<string>();
-
-            element.AllowedAttributes.Add("url");
-            element.SetAttributeValue("url", url);
-
-            element.AllowedAttributes.Add("method");
-            element.SetAttributeValue("method", "GET");
-        }
-
-        private TwilioResponse AddVoiceMail(TwilioResponse response)
-        {
-            return settings.VoiceMail == null || !settings.VoiceMail.Enabled
-                       ? response
-                       : response.Play(settings.VoiceMail.Url).Record(new { method = "GET", action = GetEcho("voiceMail"), maxLength = settings.VoiceMail.TimeOut });
+            return string.IsNullOrEmpty(settings.VoiceMail)
+                       ? response.Say("")
+                       : response.Play(Uri.EscapeUriString(settings.VoiceMail)).Record(method: "POST", action: GetEcho("voiceMail"), maxLength: 30);
         }
 
         public string GetEcho(string action, bool user = true)
         {
-            var result = string.Format(echoUrl, action, tenant);
+            var result = baseUrl.TrimEnd('/');
 
+            if (!string.IsNullOrEmpty(action))
+            {
+                result += "/" + action.TrimStart('/');
+            }
             if (user)
             {
-                result += "&CallerId=" + SecurityContext.CurrentAccount.ID;
+                result += "?CallerId=" + SecurityContext.CurrentAccount.ID;
             }
 
             return result;

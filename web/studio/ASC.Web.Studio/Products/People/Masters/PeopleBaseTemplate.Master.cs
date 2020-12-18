@@ -1,66 +1,82 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
-using System.Linq;
-using System.Text;
-using System.Web;
 using System.Web.UI;
+using ASC.Web.Core.Client.Bundling;
+using ASC.Web.People.Masters.ClientScripts;
 using ASC.Web.People.UserControls;
 using ASC.Web.Studio.UserControls.Users;
-using ASC.Web.Studio.UserControls.Management;
-using ASC.Web.Studio.Utility;
 
 namespace ASC.Web.People.Masters
 {
-    public partial class PeopleBaseTemplate : MasterPage
+    public partial class PeopleBaseTemplate : MasterPage, IStaticBundle
     {
         protected void Page_Load(object sender, EventArgs e)
         {
             InitScripts();
 
-            _sidepanelHolder.Controls.Add(LoadControl(SideNavigationPanel.Location));
+            CreateButtonContent.Controls.Add(LoadControl(SideButtonsPanel.Location));
+
+            SidePanel.Controls.Add(LoadControl(SideNavigationPanel.Location));
 
             //UserMaker.AddOnlyOne(Page, ControlHolder);
-            ControlHolder.Controls.Add(new ImportUsersWebControl());
+            //ControlHolder.Controls.Add(new ImportUsersWebControl());
             ControlHolder.Controls.Add(LoadControl(ResendInvitesControl.Location));
 
-            Page.RegisterClientScript(typeof(ClientScripts.ClientTemplateResources));
-            Page.RegisterClientScript(typeof(ClientScripts.ClientCustomResources));
-            Page.RegisterClientLocalizationScript(typeof(ClientScripts.ClientLocalizationResources));
+            Master
+                .AddClientScript(
+                    new ClientSettingsResources(),
+                    new ClientCustomResources(),
+                    new ClientLocalizationResources());
         }
 
         private void InitScripts()
         {
-            Page.RegisterStyle(CommonLinkUtility.ToAbsolute, "~/products/people/app_themes/default/css/people.master.less");
-            Page.RegisterBodyScripts(ResolveUrl, 
-                                      "~/products/people/js/peopleCore.js",
-                                      "~/products/people/js/departmentmanagement.js",
-                                      "~/products/people/js/peopleActions.js");
-            Page.RegisterInlineScript("jQuery(document.body).children('form').bind('submit', function() { return false; });");
+            Master
+                .AddStaticStyles(GetStaticStyleSheet())
+                .AddStaticBodyScripts(GetStaticJavaScript())
+                .RegisterInlineScript(
+                    "jQuery(document.body).children('form').bind('submit', function() { return false; });");
+        }
+
+        public ScriptBundleData GetStaticJavaScript()
+        {
+            return (ScriptBundleData)
+                new ScriptBundleData("people", "people")
+                    .AddSource(ResolveUrl, new ClientTemplateResources())
+                    .AddSource(ResolveUrl,
+                        "~/Products/People/js/peoplemanager.js",
+                        "~/Products/People/js/filterhandler.js",
+                        "~/Products/People/js/navigatorhandler.js",
+                        "~/Products/People/js/peoplecontroller.js",
+                        "~/Products/People/js/peoplecore.js",
+                        "~/Products/People/js/departmentmanagement.js",
+                        "~/Products/People/js/peopleactions.js",
+                        "~/Products/People/js/reassigns.js",
+                        "~/Products/People/js/sidenavigationpanel.js");
+        }
+
+        public StyleBundleData GetStaticStyleSheet()
+        {
+            return (StyleBundleData)
+                new StyleBundleData("people", "people")
+                    .AddSource(ResolveUrl,
+                        "~/Products/People/App_Themes/default/css/people.master.less");
         }
     }
 }

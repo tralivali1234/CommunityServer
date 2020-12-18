@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,6 +18,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.IO;
 using System.Linq;
 using ASC.Common.Data;
@@ -84,24 +76,24 @@ namespace ASC.Data.Backup.Tasks.Modules
             }
         }
 
-        public IDbCommand CreateSelectCommand(IDbConnection connection, int tenantId, TableInfo table)
+        public DbCommand CreateSelectCommand(DbConnection connection, int tenantId, TableInfo table, int limit, int offset)
         {
-            return connection.CreateCommand(string.Format("select t.* from {0} as t {1};", table.Name, GetSelectCommandConditionText(tenantId, table)));
+            return connection.CreateCommand(string.Format("select t.* from {0} as t {1} limit {2},{3};", table.Name, GetSelectCommandConditionText(tenantId, table), offset, limit));
         }
 
-        public IDbCommand CreateDeleteCommand(IDbConnection connection, int tenantId, TableInfo table)
+        public DbCommand CreateDeleteCommand(DbConnection connection, int tenantId, TableInfo table)
         {
             var commandText = string.Format("delete t.* from {0} as t {1};", table.Name, GetDeleteCommandConditionText(tenantId, table));
             return connection.CreateCommand(commandText);
         }
 
-        public IDbCommand CreateInsertCommand(IDbConnection connection, ColumnMapper columnMapper, TableInfo table, DataRowInfo row)
+        public DbCommand CreateInsertCommand(bool dump, DbConnection connection, ColumnMapper columnMapper, TableInfo table, DataRowInfo row)
         {
             if (table.InsertMethod == InsertMethod.None)
                 return null;
 
             Dictionary<string, object> valuesForInsert;
-            if (!TryPrepareRow(connection, columnMapper, table, row, out valuesForInsert))
+            if (!TryPrepareRow(dump, connection, columnMapper, table, row, out valuesForInsert))
                 return null;
 
             var columns = valuesForInsert.Keys.Intersect(table.Columns).ToArray();
@@ -114,7 +106,7 @@ namespace ASC.Data.Backup.Tasks.Modules
                                                   string.Join(",", columns),
                                                   string.Join(",", columns.Select(c => "@" + c)));
 
-            IDbCommand command = connection.CreateCommand(insertCommantText);
+            var command = connection.CreateCommand(insertCommantText);
             foreach (var parameter in valuesForInsert)
             {
                 command.AddParameter(parameter.Key, parameter.Value);
@@ -122,7 +114,7 @@ namespace ASC.Data.Backup.Tasks.Modules
             return command;
         }
 
-        public virtual bool TryAdjustFilePath(ColumnMapper columnMapper, ref string filePath)
+        public virtual bool TryAdjustFilePath(bool dump, ColumnMapper columnMapper, ref string filePath)
         {
             return true;
         }
@@ -140,7 +132,7 @@ namespace ASC.Data.Backup.Tasks.Modules
             return GetSelectCommandConditionText(tenantId, table);
         }
 
-        protected virtual bool TryPrepareRow(IDbConnection connection, ColumnMapper columnMapper, TableInfo table, DataRowInfo row, out Dictionary<string, object> preparedRow)
+        protected virtual bool TryPrepareRow(bool dump, DbConnection connection, ColumnMapper columnMapper, TableInfo table, DataRowInfo row, out Dictionary<string, object> preparedRow)
         {
             preparedRow = new Dictionary<string, object>();
 
@@ -162,7 +154,7 @@ namespace ASC.Data.Backup.Tasks.Modules
                 }
                 else
                 {
-                    if (!TryPrepareValue(connection, columnMapper, table, columnName, parentRelations[columnName], ref val))
+                    if (!TryPrepareValue(dump, connection, columnMapper, table, columnName, parentRelations[columnName], ref val))
                         return false;
 
                     if (!table.HasIdColumn() && !table.HasTenantColumn() && val == row[columnName])
@@ -175,7 +167,7 @@ namespace ASC.Data.Backup.Tasks.Modules
             return true;
         }
 
-        protected virtual bool TryPrepareValue(IDbConnection connection, ColumnMapper columnMapper, TableInfo table, string columnName, ref object value)
+        protected virtual bool TryPrepareValue(DbConnection connection, ColumnMapper columnMapper, TableInfo table, string columnName, ref object value)
         {
             if (columnName.Equals(table.TenantColumn, StringComparison.OrdinalIgnoreCase))
             {
@@ -203,12 +195,12 @@ namespace ASC.Data.Backup.Tasks.Modules
             return true;
         }
 
-        protected virtual bool TryPrepareValue(IDbConnection connection, ColumnMapper columnMapper, TableInfo table, string columnName, IEnumerable<RelationInfo> relations, ref object value)
+        protected virtual bool TryPrepareValue(bool dump, DbConnection connection, ColumnMapper columnMapper, TableInfo table, string columnName, IEnumerable<RelationInfo> relations, ref object value)
         {
             return TryPrepareValue(connection, columnMapper, relations.Single(), ref value);
         }
 
-        protected virtual bool TryPrepareValue(IDbConnection connection, ColumnMapper columnMapper, RelationInfo relation, ref object value)
+        protected virtual bool TryPrepareValue(DbConnection connection, ColumnMapper columnMapper, RelationInfo relation, ref object value)
         {
             var mappedValue = columnMapper.GetMapping(relation.ParentTable, relation.ParentColumn, value);
             if (mappedValue != null)

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,13 +20,14 @@ using System.Globalization;
 using System.Net.Mail;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
+using System.Web;
 using ASC.Core;
 using ASC.Core.Tenants;
 using ASC.Core.Users;
-using ASC.Web.Core.Utility.Settings;
+using ASC.MessagingSystem;
+using ASC.Web.Core.Utility;
 using ASC.Web.Studio.Core.Notify;
-using ASC.Web.Studio.Utility;
+using Resources;
 
 namespace ASC.Web.Studio.Core.Users
 {
@@ -48,13 +40,13 @@ namespace ASC.Web.Studio.Core.Users
         {
             if (String.IsNullOrEmpty(uniqueName))
                 return false;
-            return Equals(CoreContext.UserManager.GetUserByUserName(uniqueName), ASC.Core.Users.Constants.LostUser);
+            return Equals(CoreContext.UserManager.GetUserByUserName(uniqueName), Constants.LostUser);
         }
 
         private static string MakeUniqueName(UserInfo userInfo)
         {
             if (string.IsNullOrEmpty(userInfo.Email))
-                throw new ArgumentException(Resources.Resource.ErrorEmailEmpty, "userInfo");
+                throw new ArgumentException(Resource.ErrorEmailEmpty, "userInfo");
 
             var uniqueName = new MailAddress(userInfo.Email).User;
             var startUniqueName = uniqueName;
@@ -66,20 +58,21 @@ namespace ASC.Web.Studio.Core.Users
             return uniqueName;
         }
 
-        public static bool CheckUniqueEmail(Guid userID, string email)
+        public static bool CheckUniqueEmail(Guid userId, string email)
         {
             var foundUser = CoreContext.UserManager.GetUserByEmail(email);
-            return Equals(foundUser, ASC.Core.Users.Constants.LostUser) || foundUser.ID == userID;
+            return Equals(foundUser, Constants.LostUser) || foundUser.ID == userId;
         }
 
-        public static UserInfo AddUser(UserInfo userInfo, string password, bool afterInvite = false, bool notify = true, bool isVisitor = false, bool fromInviteLink = false, bool makeUniqueName = true)
+        public static UserInfo AddUser(UserInfo userInfo, string passwordHash, bool afterInvite = false, bool notify = true, bool isVisitor = false, bool fromInviteLink = false, bool makeUniqueName = true)
         {
             if (userInfo == null) throw new ArgumentNullException("userInfo");
 
-            CheckPasswordPolicy(password);
+            if (!UserFormatter.IsValidUserName(userInfo.FirstName, userInfo.LastName))
+                throw new Exception(Resource.ErrorIncorrectUserName);
 
             if (!CheckUniqueEmail(userInfo.ID, userInfo.Email))
-                throw new Exception(CustomNamingPeople.Substitute<Resources.Resource>("ErrorEmailAlreadyExists"));
+                throw new Exception(CustomNamingPeople.Substitute<Resource>("ErrorEmailAlreadyExists"));
             if (makeUniqueName)
             {
                 userInfo.UserName = MakeUniqueName(userInfo);
@@ -95,7 +88,7 @@ namespace ASC.Web.Studio.Core.Users
             }
 
             var newUserInfo = CoreContext.UserManager.SaveUserInfo(userInfo, isVisitor);
-            CoreContext.Authentication.SetUserPassword(newUserInfo.ID, password);
+            SecurityContext.SetUserPasswordHash(newUserInfo.ID, passwordHash);
 
             if (CoreContext.Configuration.Personal)
             {
@@ -110,11 +103,11 @@ namespace ASC.Web.Studio.Core.Users
                 {
                     if (isVisitor)
                     {
-                        StudioNotifyService.Instance.GuestInfoAddedAfterInvite(newUserInfo, password);
+                        StudioNotifyService.Instance.GuestInfoAddedAfterInvite(newUserInfo);
                     }
                     else
                     {
-                        StudioNotifyService.Instance.UserInfoAddedAfterInvite(newUserInfo, password);
+                        StudioNotifyService.Instance.UserInfoAddedAfterInvite(newUserInfo);
                     }
 
                     if (fromInviteLink)
@@ -139,7 +132,7 @@ namespace ASC.Web.Studio.Core.Users
 
             if (isVisitor)
             {
-                CoreContext.UserManager.AddUserIntoGroup(newUserInfo.ID, ASC.Core.Users.Constants.GroupVisitor.ID);
+                CoreContext.UserManager.AddUserIntoGroup(newUserInfo.ID, Constants.GroupVisitor.ID);
             }
 
             return newUserInfo;
@@ -147,81 +140,72 @@ namespace ASC.Web.Studio.Core.Users
 
         #region Password
 
-        public static void SetUserPassword(Guid userID, string password)
-        {
-            CheckPasswordPolicy(password);
-
-            SecurityContext.SetUserPassword(userID, password);
-            StudioNotifyService.Instance.UserPasswordChanged(userID, password);
-        }
-
         public static void CheckPasswordPolicy(string password)
         {
-            if (String.IsNullOrEmpty(password))
-                throw new Exception(Resources.Resource.ErrorPasswordEmpty);
+            if (String.IsNullOrWhiteSpace(password))
+                throw new Exception(Resource.ErrorPasswordEmpty);
 
-            var passwordSettingsObj =
-                SettingsManager.Instance.LoadSettings<StudioPasswordSettings>(TenantProvider.CurrentTenantID);
+            var passwordSettingsObj = PasswordSettings.Load();
 
-            if (!CheckPasswordRegex(passwordSettingsObj, password))
+            if (!PasswordSettings.CheckPasswordRegex(passwordSettingsObj, password))
                 throw new Exception(GenerateErrorMessage(passwordSettingsObj));
         }
 
-        public static void SendUserPassword(string email)
+        public static string SendUserPassword(string email)
         {
-            if (String.IsNullOrEmpty(email)) throw new ArgumentNullException("email");
+            email = (email ?? "").Trim();
+            if (!email.TestEmailRegex()) throw new ArgumentNullException("email", Resource.ErrorNotCorrectEmail);
+
+            var tenant = CoreContext.TenantManager.GetCurrentTenant();
+            var settings = IPRestrictionsSettings.Load();
+            if (settings.Enable && !IPSecurity.IPSecurity.Verify(tenant))
+            {
+                throw new Exception(Resource.ErrorAccessRestricted);
+            }
 
             var userInfo = CoreContext.UserManager.GetUserByEmail(email);
             if (!CoreContext.UserManager.UserExists(userInfo.ID) || string.IsNullOrEmpty(userInfo.Email))
             {
-                throw new Exception(String.Format(Resources.Resource.ErrorUserNotFoundByEmail, email));
+                return String.Format(Resource.ErrorUserNotFoundByEmail, email);
             }
             if (userInfo.Status == EmployeeStatus.Terminated)
             {
-                throw new Exception(Resources.Resource.ErrorDisabledProfile);
+                return Resource.ErrorDisabledProfile;
             }
-            StudioNotifyService.Instance.UserPasswordChange(userInfo);
-        }
+            if (userInfo.IsLDAP())
+            {
+                return Resource.CouldNotRecoverPasswordForLdapUser;
+            }
+            if (userInfo.IsSSO())
+            {
+                return Resource.CouldNotRecoverPasswordForSsoUser;
+            }
 
-        private const string Noise = "1234567890mnbasdflkjqwerpoiqweyuvcxnzhdkqpsdk@%&;";
+            StudioNotifyService.Instance.UserPasswordChange(userInfo);
+
+            var displayUserName = userInfo.DisplayUserName(false);
+            MessageService.Send(HttpContext.Current.Request, MessageAction.UserSentPasswordChangeInstructions, displayUserName);
+
+            return null;
+        }
 
         public static string GeneratePassword()
         {
-            var ps = SettingsManager.Instance.LoadSettings<StudioPasswordSettings>(TenantProvider.CurrentTenantID);
-
-            return String.Format("{0}{1}{2}{3}",
-                                 GeneratePassword(ps.MinLength, ps.MinLength, Noise.Substring(0, Noise.Length - 4)),
-                                 ps.Digits ? GeneratePassword(1, 1, Noise.Substring(0, 10)) : String.Empty,
-                                 ps.UpperCase ? GeneratePassword(1, 1, Noise.Substring(10, 20).ToUpper()) : String.Empty,
-                                 ps.SpecSymbols ? GeneratePassword(1, 1, Noise.Substring(Noise.Length - 4, 4).ToUpper()) : String.Empty);
+            return Guid.NewGuid().ToString();
         }
 
-        private static Random rnd = new Random();
-
-        internal static string GeneratePassword(int minLength, int maxLength, string noise)
-        {
-            var length = rnd.Next(minLength, maxLength + 1);
-
-            var pwd = string.Empty;
-            while (length-- > 0)
-            {
-                pwd += noise.Substring(rnd.Next(noise.Length - 1), 1);
-            }
-            return pwd;
-        }
-
-        internal static string GenerateErrorMessage(StudioPasswordSettings passwordSettings)
+        internal static string GenerateErrorMessage(PasswordSettings passwordSettings)
         {
             var error = new StringBuilder();
 
-            error.AppendFormat("{0} ", Resources.Resource.ErrorPasswordMessage);
-            error.AppendFormat(Resources.Resource.ErrorPasswordShort, passwordSettings.MinLength);
+            error.AppendFormat("{0} ", Resource.ErrorPasswordMessage);
+            error.AppendFormat(Resource.ErrorPasswordLength, passwordSettings.MinLength, PasswordSettings.MaxLength);
             if (passwordSettings.UpperCase)
-                error.AppendFormat(", {0}", Resources.Resource.ErrorPasswordNoUpperCase);
+                error.AppendFormat(", {0}", Resource.ErrorPasswordNoUpperCase);
             if (passwordSettings.Digits)
-                error.AppendFormat(", {0}", Resources.Resource.ErrorPasswordNoDigits);
+                error.AppendFormat(", {0}", Resource.ErrorPasswordNoDigits);
             if (passwordSettings.SpecSymbols)
-                error.AppendFormat(", {0}", Resources.Resource.ErrorPasswordNoSpecialSymbols);
+                error.AppendFormat(", {0}", Resource.ErrorPasswordNoSpecialSymbols);
 
             return error.ToString();
         }
@@ -229,37 +213,17 @@ namespace ASC.Web.Studio.Core.Users
         public static string GetPasswordHelpMessage()
         {
             var info = new StringBuilder();
-            var passwordSettings = SettingsManager.Instance.LoadSettings<StudioPasswordSettings>(TenantProvider.CurrentTenantID);
-            info.AppendFormat("{0} ", Resources.Resource.ErrorPasswordMessageStart);
-            info.AppendFormat(Resources.Resource.ErrorPasswordShort, passwordSettings.MinLength);
+            var passwordSettings = PasswordSettings.Load();
+            info.AppendFormat("{0} ", Resource.ErrorPasswordMessageStart);
+            info.AppendFormat(Resource.ErrorPasswordLength, passwordSettings.MinLength, PasswordSettings.MaxLength);
             if (passwordSettings.UpperCase)
-                info.AppendFormat(", {0}", Resources.Resource.ErrorPasswordNoUpperCase);
+                info.AppendFormat(", {0}", Resource.ErrorPasswordNoUpperCase);
             if (passwordSettings.Digits)
-                info.AppendFormat(", {0}", Resources.Resource.ErrorPasswordNoDigits);
+                info.AppendFormat(", {0}", Resource.ErrorPasswordNoDigits);
             if (passwordSettings.SpecSymbols)
-                info.AppendFormat(", {0}", Resources.Resource.ErrorPasswordNoSpecialSymbols);
+                info.AppendFormat(", {0}", Resource.ErrorPasswordNoSpecialSymbols);
 
             return info.ToString();
-        }
-
-        internal static bool CheckPasswordRegex(StudioPasswordSettings passwordSettings, string password)
-        {
-            var pwdBuilder = new StringBuilder(@"^(?=.*\p{Ll}{0,})");
-
-            if (passwordSettings.Digits)
-                pwdBuilder.Append(@"(?=.*\d)");
-
-            if (passwordSettings.UpperCase)
-                pwdBuilder.Append(@"(?=.*\p{Lu})");
-
-            if (passwordSettings.SpecSymbols)
-                pwdBuilder.Append(@"(?=.*[\W])");
-
-            pwdBuilder.Append(@".{");
-            pwdBuilder.Append(passwordSettings.MinLength);
-            pwdBuilder.Append(@",}$");
-
-            return new Regex(pwdBuilder.ToString()).IsMatch(password);
         }
 
         #endregion

@@ -12,19 +12,24 @@
             <%= FilesUCResource.CaptionCopyConvertOpen %>
         </header>
         <body>
-            <div id="copyConvertDescript">
-                <div class="confirm-store-panel">
-                    <%= FilesUCResource.ConfirmStoreOriginalOpenTitle %>
-                    <br/>
-                    <br/>
-                    <label id="confirmCopyConvertLabelText">
-                        <input type="checkbox" class="store-original checkbox" <%= FilesSettings.StoreOriginalFiles ? "checked=\"checked\"" : string.Empty %> />
-                        <%= FilesUCResource.ConfirmStoreOriginalOpenCbxLabelText %>
-                    </label>
-                    <div id="confirmCopyConvertToMyText">
-                        <%= string.Format(FilesUCResource.ConfirmStoreOriginalOpenToMyText, "<b>", "</b>")%>
-                    </div>
+            <div id="copyConvertDescript" class="confirm-convert-panel">
+                <%= FilesUCResource.ConfirmStoreOriginalOpenTitle.HtmlEncode() %>
+                <br/>
+                <br/>
+                <label id="confirmCopyConvertLabelText">
+                    <input type="checkbox" class="store-original checkbox" <%= FilesSettings.StoreOriginalFiles ? "checked=\"checked\"" : string.Empty %> />
+                    <%= FilesUCResource.ConfirmStoreOriginalOpenCbxLabelText %>
+                </label>
+                <div id="confirmCopyConvertToMyText">
+                    <%= string.Format(FilesUCResource.ConfirmStoreOriginalOpenToMyText, "<b>", "</b>")%>
                 </div>
+            </div>
+
+            <div id="convertPasswordPanel" class="confirm-convert-panel">
+                <%= FilesUCResource.CaptionConvertPassword %>
+                <br/>
+                <br/>
+                <input type="password" id="convertPassword" class="textEdit" name="convert-field" autocomplete="new-password" />
             </div>
 
             <div id="progressCopyConvert">
@@ -74,7 +79,8 @@
         <body>
             <div><%=FilesUCResource.ChooseFormatToDownload%></div>
             <div id="convertFileList" class="compact cnvrt-list-file-block"></div>
-            <div><%= String.Format(FilesUCResource.FilesWillBeCompressed, "<b>", "</b>")%></div>
+            <div id="convertFileZip"><%= String.Format(FilesUCResource.FilesWillBeCompressed, "<b>", "</b>")%></div>
+            <div class="text-medium-describe"><%= FilesUCResource.LostDataConvert %></div>
             <div class="middle-button-container">
                 <a id="buttonStartConvert" class="button blue middle">
                     <%=FilesUCResource.ButtonDownload%>

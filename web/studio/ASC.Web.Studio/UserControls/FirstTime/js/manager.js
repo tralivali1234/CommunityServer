@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -59,26 +50,31 @@ ASC.Controls.EmailAndPasswordManager = new function() {
     };
 
     var uploadInit = function () {
-        var upload =
-            new AjaxUpload("licenseKey", {
-                action: 'ajaxupload.ashx?type=ASC.Web.Studio.HttpHandlers.LicenseUploader,ASC.Web.Studio',
-                onChange: function (file, ext) {
-                    jq("#licenseKeyText").removeClass("error");
-                    LoadingBanner.showLoaderBtn(".step");
-                },
-                onComplete: function (file, response) {
-                    LoadingBanner.hideLoaderBtn(".step");
-                    try {
-                        var result = jq.parseJSON(response);
-                    } catch (e) {
-                        result = { Success: false };
-                    }
 
-                    if (result.Success) {
-                        jq("#licenseKeyText").text(result.Message);
-                    } else {
-                        jq("#licenseKeyText").text(ASC.Resources.Master.Resource.LicenseKeyError).addClass("error");
-                    }
+        jq("#licenseKey").click(function (e) {
+            e.preventDefault();
+            jq("#uploadButton").click();
+        });
+
+        var upload = jq("#uploadButton")
+            .fileupload({
+                url: "ajaxupload.ashx?type=ASC.Web.Studio.HttpHandlers.LicenseUploader,ASC.Web.Studio",
+            })
+            .bind("fileuploadstart", function () {
+                jq("#licenseKeyText").removeClass("error");
+                LoadingBanner.showLoaderBtn(".step");
+            })
+            .bind("fileuploaddone", function (e, data) {
+                LoadingBanner.hideLoaderBtn(".step");
+                try {
+                    var result = jq.parseJSON(data.result);
+                } catch (e) {
+                    result = {Success: false};
+                }
+
+                jq("#licenseKeyText").html(result.Message);
+                if (!result.Success) {
+                    jq("#licenseKeyText").addClass("error");
                 }
             });
     };
@@ -113,6 +109,7 @@ ASC.Controls.EmailAndPasswordManager = new function() {
         var pwd = jq('.passwordBlock .pwd #newPwd').val();
         var cpwd = jq('.passwordBlock .pwd #confPwd').val();
         var promocode = jq('.passwordBlock .promocode #promocode_input').val();
+        var amiid = jq("#amiid").val();
 
         if (email == '' || !jq.isValidEmail(email)) {
             var res = { "Status": 0, "Message": ASC.Controls.EmailAndPasswordManager.wrongEmail };
@@ -121,17 +118,28 @@ ASC.Controls.EmailAndPasswordManager = new function() {
             return;
         }
 
-        if (pwd != cpwd || pwd == '') {
+        if (pwd == '') {
+            jq(".passwordBlock .pwd #newPwd").css("border-color", "#DF1B1B");
 
-            if (pwd != cpwd) {
-                jq(".passwordBlock .pwd #newPwd ,.passwordBlock .pwd #confPwd").css("border-color", "#DF1B1B");
-            }
+            res = { "Status": 0, "Message": ASC.Controls.EmailAndPasswordManager.emptyPass };
+            if (parentCallback != null)
+                parentCallback(res);
+            return;
+        }
 
-            if (pwd == '') {
-                jq(".passwordBlock .pwd #newPwd").css("border-color", "#DF1B1B");
-            }
+        if (!(new XRegExp(jq(".passwordBlock .pwd #newPwd").data("regex"), "ig")).test(pwd)) {
+            jq(".passwordBlock .pwd #newPwd").css("border-color", "#DF1B1B");
 
-            res = { "Status": 0, "Message": pwd == '' ? ASC.Controls.EmailAndPasswordManager.emptyPass : ASC.Controls.EmailAndPasswordManager.wrongPass };
+            res = { "Status": 0, "Message": jq(".passwordBlock .pwd #newPwd").data("help") };
+            if (parentCallback != null)
+                parentCallback(res);
+            return;
+        }
+
+        if (pwd != cpwd) {
+            jq(".passwordBlock .pwd #newPwd ,.passwordBlock .pwd #confPwd").css("border-color", "#DF1B1B");
+
+            res = { "Status": 0, "Message": ASC.Controls.EmailAndPasswordManager.wrongPass };
             if (parentCallback != null)
                 parentCallback(res);
             return;
@@ -149,12 +157,24 @@ ASC.Controls.EmailAndPasswordManager = new function() {
             return;
         }
 
-        window.onbeforeunload = null;
-        AjaxPro.timeoutPeriod = 1800000;
-        EmailAndPasswordController.SaveData(email, pwd, jq('#studio_lng').val(), promocode, function (result) {
+        var analytics = jq("#analyticsAcceptedOpenSource").is(":checked");
+        var subscribeFromSite = jq("#subscribeFromSite").is(":checked");
 
-            if (parentCallback != null)
-                parentCallback(result.value);
+        window.hashPassword(pwd, function (passwordHash) {
+            window.onbeforeunload = null;
+            AjaxPro.timeoutPeriod = 1800000;
+
+            EmailAndPasswordController.SaveData(email,
+                passwordHash,
+                jq('#studio_lng').val() || jq('#studio_lng').data('default'),
+                promocode,
+                amiid,
+                analytics,
+                subscribeFromSite,
+                function (result) {
+                    if (parentCallback != null)
+                        parentCallback(result.value);
+                });
         });
     };
 };

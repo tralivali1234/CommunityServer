@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -42,8 +33,8 @@ namespace ASC.CRM.Core.Dao
     {
         private readonly HttpRequestDictionary<InvoiceTax> _invoiceTaxCache = new HttpRequestDictionary<InvoiceTax>("crm_invoice_tax");
 
-        public CachedInvoiceTaxDao(int tenantID, string storageKey)
-            : base(tenantID, storageKey)
+        public CachedInvoiceTaxDao(int tenantID)
+            : base(tenantID)
         {
         }
 
@@ -80,19 +71,17 @@ namespace ASC.CRM.Core.Dao
 
     public class InvoiceTaxDao : AbstractDao
     {
-        public InvoiceTaxDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public InvoiceTaxDao(int tenantID)
+            : base(tenantID)
         {
         }
 
 
         public Boolean IsExist(int invoiceTaxID)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<bool>(@"select exists(select 1 from crm_invoice_tax where tenant_id = @tid and id = @id)",
-                                new { tid = TenantID, id = invoiceTaxID });
-            }
+            return Db.ExecuteScalar<bool>(
+                    @"select exists(select 1 from crm_invoice_tax where tenant_id = @tid and id = @id)",
+                    new {tid = TenantID, id = invoiceTaxID});
         }
 
         public Boolean IsExist(String invoiceName)
@@ -103,51 +92,41 @@ namespace ASC.CRM.Core.Dao
                 .Where("name", invoiceName)
                 .SetMaxResults(1);
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<bool>(q);
-            }
+            return Db.ExecuteScalar<bool>(q);
         }
 
         public Boolean CanDelete(int invoiceTaxID)
         {
-            using (var db = GetDb())
-            {
-                var count1 = db.ExecuteScalar<int>(@"select count(*) from crm_invoice_item where tenant_id = @tid and (invoice_tax1_id = @id or invoice_tax2_id = @id)",
-                    new { tid = TenantID, id = invoiceTaxID });
-                var count2 = db.ExecuteScalar<int>(@"select count(*) from crm_invoice_line where tenant_id = @tid and (invoice_tax1_id = @id or invoice_tax2_id = @id)", 
-                    new { tid = TenantID, id = invoiceTaxID });
+            var count1 = Db.ExecuteScalar<int>(@"select count(*) from crm_invoice_item where tenant_id = @tid and (invoice_tax1_id = @id or invoice_tax2_id = @id)",
+                new { tid = TenantID, id = invoiceTaxID });
+            var count2 = Db.ExecuteScalar<int>(@"select count(*) from crm_invoice_line where tenant_id = @tid and (invoice_tax1_id = @id or invoice_tax2_id = @id)", 
+                new { tid = TenantID, id = invoiceTaxID });
 
-                return count1 == 0 && count2 == 0;
-            }
+            return count1 == 0 && count2 == 0;
         }
 
         #region Get
 
         public virtual List<InvoiceTax> GetAll()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceTaxSqlQuery(null)).ConvertAll(ToInvoiceTax);
-            }
+            return Db.ExecuteList(GetInvoiceTaxSqlQuery(null)).ConvertAll(ToInvoiceTax);
+        }
+
+        public DateTime GetMaxLastModified()
+        {
+            return Db.ExecuteScalar<DateTime>(Query("crm_invoice_tax").Select("last_modifed_on"));
         }
 
         public virtual List<InvoiceTax> GetByID(int[] ids)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceTaxSqlQuery(Exp.In("id", ids))).ConvertAll(ToInvoiceTax);
-            }
+            return Db.ExecuteList(GetInvoiceTaxSqlQuery(Exp.In("id", ids))).ConvertAll(ToInvoiceTax);
         }
 
         public virtual InvoiceTax GetByID(int id)
         {
-            using (var db = GetDb())
-            {
-                var invoiceTaxes = db.ExecuteList(GetInvoiceTaxSqlQuery(Exp.Eq("id", id))).ConvertAll(ToInvoiceTax);
+            var invoiceTaxes = Db.ExecuteList(GetInvoiceTaxSqlQuery(Exp.Eq("id", id))).ConvertAll(ToInvoiceTax);
 
-                return invoiceTaxes.Count > 0 ? invoiceTaxes[0] : null;
-            }
+            return invoiceTaxes.Count > 0 ? invoiceTaxes[0] : null;
         }
 
         #endregion
@@ -159,13 +138,10 @@ namespace ASC.CRM.Core.Dao
             /*_cache.Remove(_invoiceItemCacheKey);
             _cache.Insert(_invoiceTaxCacheKey, String.Empty);*/
 
-            using (var db = GetDb())
-            {
-                return SaveOrUpdateInvoiceTax(invoiceTax, db);
-            }
+            return SaveOrUpdateInvoiceTaxInDb(invoiceTax);
         }
 
-        private InvoiceTax SaveOrUpdateInvoiceTax(InvoiceTax invoiceTax, DbManager db)
+        private InvoiceTax SaveOrUpdateInvoiceTaxInDb(InvoiceTax invoiceTax)
         {
             if (String.IsNullOrEmpty(invoiceTax.Name))
                 throw new ArgumentException();
@@ -173,12 +149,12 @@ namespace ASC.CRM.Core.Dao
             invoiceTax.LastModifedBy = SecurityContext.CurrentAccount.ID;
             invoiceTax.LastModifedOn = DateTime.UtcNow;
 
-            if (db.ExecuteScalar<int>(Query("crm_invoice_tax").SelectCount().Where(Exp.Eq("id", invoiceTax.ID))) == 0)
+            if (Db.ExecuteScalar<int>(Query("crm_invoice_tax").SelectCount().Where(Exp.Eq("id", invoiceTax.ID))) == 0)
             {
                 invoiceTax.CreateOn = DateTime.UtcNow;
                 invoiceTax.CreateBy = SecurityContext.CurrentAccount.ID;
 
-                invoiceTax.ID = db.ExecuteScalar<int>(
+                invoiceTax.ID = Db.ExecuteScalar<int>(
                                Insert("crm_invoice_tax")
                               .InColumnValue("id", 0)
                               .InColumnValue("name", invoiceTax.Name)
@@ -192,13 +168,13 @@ namespace ASC.CRM.Core.Dao
             }
             else
             {
-                var oldInvoiceTax = db.ExecuteList(GetInvoiceTaxSqlQuery(Exp.Eq("id", invoiceTax.ID)))
+                var oldInvoiceTax = Db.ExecuteList(GetInvoiceTaxSqlQuery(Exp.Eq("id", invoiceTax.ID)))
                     .ConvertAll(ToInvoiceTax)
                     .FirstOrDefault();
 
                 CRMSecurity.DemandEdit(oldInvoiceTax);
 
-                db.ExecuteNonQuery(
+                Db.ExecuteNonQuery(
                     Update("crm_invoice_tax")
                         .Set("name", invoiceTax.Name)
                         .Set("description", invoiceTax.Description)
@@ -224,10 +200,7 @@ namespace ASC.CRM.Core.Dao
 
             CRMSecurity.DemandDelete(invoiceTax);
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_invoice_tax").Where("id", invoiceTaxID));
-            }
+            Db.ExecuteNonQuery(Delete("crm_invoice_tax").Where("id", invoiceTaxID));
 
            /* _cache.Remove(_invoiceItemCacheKey);
             _cache.Insert(_invoiceTaxCacheKey, String.Empty);*/
@@ -246,7 +219,7 @@ namespace ASC.CRM.Core.Dao
                     ID = Convert.ToInt32(row[0]),
                     Name = Convert.ToString(row[1]),
                     Description = Convert.ToString(row[2]),
-                    Rate = Convert.ToInt32(row[3]),
+                    Rate = Convert.ToDecimal(row[3]),
                     CreateOn = TenantUtil.DateTimeFromUtc(DateTime.Parse(row[4].ToString())),
                     CreateBy = ToGuid(row[5]),
                     LastModifedOn = TenantUtil.DateTimeFromUtc(DateTime.Parse(row[6].ToString())),

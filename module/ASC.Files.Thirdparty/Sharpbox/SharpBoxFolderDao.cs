@@ -1,25 +1,16 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,11 +18,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Security;
+using System.Threading;
+using AppLimit.CloudComputing.SharpBox;
+using AppLimit.CloudComputing.SharpBox.Exceptions;
 using ASC.Common.Data.Sql.Expressions;
 using ASC.Core;
 using ASC.Files.Core;
+using ASC.Web.Files.Resources;
 using ASC.Web.Studio.Core;
-using AppLimit.CloudComputing.SharpBox;
 
 namespace ASC.Files.Thirdparty.Sharpbox
 {
@@ -69,25 +65,22 @@ namespace ASC.Files.Thirdparty.Sharpbox
             return parentFolder.OfType<ICloudDirectoryEntry>().Select(ToFolder).ToList();
         }
 
-        public List<Folder> GetFolders(object parentId, OrderBy orderBy, FilterType filterType, Guid subjectID, string searchText, bool withSubfolders = false)
+        public List<Folder> GetFolders(object parentId, OrderBy orderBy, FilterType filterType, bool subjectGroup, Guid subjectID, string searchText, bool withSubfolders = false)
         {
-            if (filterType == FilterType.FilesOnly || filterType == FilterType.ByExtension) return new List<Folder>();
+            if (filterType == FilterType.FilesOnly || filterType == FilterType.ByExtension
+                || filterType == FilterType.DocumentsOnly || filterType == FilterType.ImagesOnly
+                || filterType == FilterType.PresentationsOnly || filterType == FilterType.SpreadsheetsOnly
+                || filterType == FilterType.ArchiveOnly || filterType == FilterType.MediaOnly)
+                return new List<Folder>();
 
             var folders = GetFolders(parentId).AsEnumerable(); //TODO:!!!
+
             //Filter
-            switch (filterType)
+            if (subjectID != Guid.Empty)
             {
-                case FilterType.ByUser:
-                    folders = folders.Where(x => x.CreateBy == subjectID);
-                    break;
-                case FilterType.ByDepartment:
-                    folders = folders.Where(x => CoreContext.UserManager.IsUserInGroup(x.CreateBy, subjectID));
-                    break;
-                case FilterType.FoldersOnly:
-                case FilterType.None:
-                    break;
-                default:
-                    return new List<Folder>();
+                folders = folders.Where(x => subjectGroup
+                                                 ? CoreContext.UserManager.IsUserInGroup(x.CreateBy, subjectID)
+                                                 : x.CreateBy == subjectID);
             }
 
             if (!string.IsNullOrEmpty(searchText))
@@ -104,6 +97,9 @@ namespace ASC.Files.Thirdparty.Sharpbox
                     folders = orderBy.IsAsc ? folders.OrderBy(x => x.Title) : folders.OrderByDescending(x => x.Title);
                     break;
                 case SortedByType.DateAndTime:
+                    folders = orderBy.IsAsc ? folders.OrderBy(x => x.ModifiedOn) : folders.OrderByDescending(x => x.ModifiedOn);
+                    break;
+                case SortedByType.DateAndTimeCreation:
                     folders = orderBy.IsAsc ? folders.OrderBy(x => x.CreateOn) : folders.OrderByDescending(x => x.CreateOn);
                     break;
                 default:
@@ -114,9 +110,27 @@ namespace ASC.Files.Thirdparty.Sharpbox
             return folders.ToList();
         }
 
-        public List<Folder> GetFolders(object[] folderIds, string searchText = "", bool searchSubfolders = false)
+        public List<Folder> GetFolders(object[] folderIds, FilterType filterType = FilterType.None, bool subjectGroup = false, Guid? subjectID = null, string searchText = "", bool searchSubfolders = false, bool checkShare = true)
         {
-            return folderIds.Select(GetFolder).ToList();
+            if (filterType == FilterType.FilesOnly || filterType == FilterType.ByExtension
+                || filterType == FilterType.DocumentsOnly || filterType == FilterType.ImagesOnly
+                || filterType == FilterType.PresentationsOnly || filterType == FilterType.SpreadsheetsOnly
+                || filterType == FilterType.ArchiveOnly || filterType == FilterType.MediaOnly)
+                return new List<Folder>();
+
+            var folders = folderIds.Select(GetFolder);
+
+            if (subjectID.HasValue && subjectID != Guid.Empty)
+            {
+                folders = folders.Where(x => subjectGroup
+                                                 ? CoreContext.UserManager.IsUserInGroup(x.CreateBy, subjectID.Value)
+                                                 : x.CreateBy == subjectID);
+            }
+
+            if (!string.IsNullOrEmpty(searchText))
+                folders = folders.Where(x => x.Title.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) != -1);
+
+            return folders.ToList();
         }
 
         public List<Folder> GetParentFolders(object folderId)
@@ -136,20 +150,39 @@ namespace ASC.Files.Thirdparty.Sharpbox
 
         public object SaveFolder(Folder folder)
         {
-            if (folder.ID != null)
+            try
             {
-                //Create with id
-                var savedfolder = SharpBoxProviderInfo.Storage.CreateFolder(MakePath(folder.ID));
-                return MakeId(savedfolder);
+                if (folder.ID != null)
+                {
+                    //Create with id
+                    var savedfolder = SharpBoxProviderInfo.Storage.CreateFolder(MakePath(folder.ID));
+                    return MakeId(savedfolder);
+                }
+                if (folder.ParentFolderID != null)
+                {
+                    var parentFolder = GetFolderById(folder.ParentFolderID);
+
+                    folder.Title = GetAvailableTitle(folder.Title, parentFolder, IsExist);
+
+                    var newFolder = SharpBoxProviderInfo.Storage.CreateFolder(folder.Title, parentFolder);
+                    return MakeId(newFolder);
+                }
             }
-            if (folder.ParentFolderID != null)
+            catch (SharpBoxException e)
             {
-                var parentFolder = GetFolderById(folder.ParentFolderID);
-
-                folder.Title = GetAvailableTitle(folder.Title, parentFolder, IsExist);
-
-                var newFolder = SharpBoxProviderInfo.Storage.CreateFolder(folder.Title, parentFolder);
-                return MakeId(newFolder);
+                var webException = (WebException)e.InnerException;
+                if (webException != null)
+                {
+                    var response = ((HttpWebResponse)webException.Response);
+                    if (response != null)
+                    {
+                        if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
+                        {
+                            throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_Create);
+                        }
+                    }
+                    throw;
+                }
             }
             return null;
         }
@@ -196,20 +229,24 @@ namespace ASC.Files.Thirdparty.Sharpbox
             return false;
         }
 
-        public object MoveFolder(object folderId, object toFolderId)
+        public object MoveFolder(object folderId, object toFolderId, CancellationToken? cancellationToken)
         {
-            var oldIdValue = MakeId(GetFolderById(folderId));
+            var entry = GetFolderById(folderId);
+            var folder = GetFolderById(toFolderId);
 
-            SharpBoxProviderInfo.Storage.MoveFileSystemEntry(MakePath(folderId), MakePath(toFolderId));
+            var oldFolderId = MakeId(entry);
 
-            var newIdValue = MakeId(GetFolderById(folderId));
+            if (!SharpBoxProviderInfo.Storage.MoveFileSystemEntry(entry, folder))
+                throw new Exception("Error while moving");
 
-            UpdatePathInDB(oldIdValue, newIdValue);
+            var newFolderId = MakeId(entry);
 
-            return newIdValue;
+            UpdatePathInDB(oldFolderId, newFolderId);
+
+            return newFolderId;
         }
 
-        public Folder CopyFolder(object folderId, object toFolderId)
+        public Folder CopyFolder(object folderId, object toFolderId, CancellationToken? cancellationToken)
         {
             var folder = GetFolderById(folderId);
             if (!SharpBoxProviderInfo.Storage.CopyFileSystemEntry(MakePath(folderId), MakePath(toFolderId)))
@@ -295,7 +332,11 @@ namespace ASC.Files.Thirdparty.Sharpbox
 
         #region Only for TMFolderDao
 
-        public IEnumerable<Folder> Search(string text, params FolderType[] folderTypes)
+        public void ReassignFolders(object[] folderIds, Guid newOwnerId)
+        {
+        }
+
+        public IEnumerable<Folder> Search(string text, bool bunch)
         {
             return null;
         }
@@ -315,7 +356,7 @@ namespace ASC.Files.Thirdparty.Sharpbox
             return null;
         }
 
-        public object GetFolderIDUser(bool createIfNotExists)
+        public object GetFolderIDUser(bool createIfNotExists, Guid? userId)
         {
             return null;
         }
@@ -325,7 +366,27 @@ namespace ASC.Files.Thirdparty.Sharpbox
             return null;
         }
 
-        public object GetFolderIDTrash(bool createIfNotExists)
+        public object GetFolderIDRecent(bool createIfNotExists)
+        {
+            return null;
+        }
+
+        public object GetFolderIDFavorites(bool createIfNotExists)
+        {
+            return null;
+        }
+
+        public object GetFolderIDTemplates(bool createIfNotExists)
+        {
+            return null;
+        }
+
+        public object GetFolderIDPrivacy(bool createIfNotExists, Guid? userId)
+        {
+            return null;
+        }
+
+        public object GetFolderIDTrash(bool createIfNotExists, Guid? userId)
         {
             return null;
         }
@@ -341,6 +402,11 @@ namespace ASC.Files.Thirdparty.Sharpbox
         }
 
         public string GetBunchObjectID(object folderID)
+        {
+            return null;
+        }
+
+        public Dictionary<string, string> GetBunchObjectIDs(List<object> folderIDs)
         {
             return null;
         }

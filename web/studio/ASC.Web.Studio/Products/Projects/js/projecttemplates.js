@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -43,35 +34,98 @@ ASC.Projects.Templates = (function () {
 })(jQuery);
 
 ASC.Projects.ListProjectsTemplates = (function () {
-    var idDeleteTempl;
-    var init = function () {
-        Teamlab.getPrjTemplates({}, { success: displayListTemplates, before: LoadingBanner.displayLoading, after: LoadingBanner.hideLoading });
+    var idDeleteTempl, templates;
+    var targetAttr = "target", openClass = "open", templateClass = ".template";
+    var $listTemplates, $templateActionPanel;
+    var teamlab, loadingBanner, resources = ASC.Projects.Resources;
 
-        jq('#questionWindow .cancel').bind('click', function() {
-            jq.unblockUI();
-            idDeleteTempl = 0;
-            return false;
-        });
-        jq('#questionWindow .remove').bind('click', function() {
-            removeTemplate();
-            jq.unblockUI();
-            return false;
-        });
+    var init = function () {
+        teamlab = Teamlab;
+        loadingBanner = LoadingBanner;
+        $listTemplates = jq("#listTemplates");
+
+        jq("#CommonListContainer").show();
+        ASC.Projects.Base.initActionPanel(showEntityMenu, $listTemplates);
+
+        teamlab.getPrjTemplates({}, { success: displayListTemplates, before: loadingBanner.displayLoading, after: loadingBanner.hideLoading });
     };
 
-    var onDeleteTemplate = function(params, data) {
+    function showEntityMenu(selectedActionCombobox) {
+        var resources = ASC.Projects.Resources.ProjectTemplatesResource;
+        var id = parseInt(selectedActionCombobox.attr("id"));
+        var template = templates.find(function (item) { return item.id === id });
+
+        var ActionMenuItem = ASC.Projects.ActionMenuItem;
+        var menuItems = [];
+
+        if (template.canEdit) {
+            menuItems.push(new ActionMenuItem("editTmpl", resources.Edit, taEdit.bind(null, id), "edit"));
+        }
+
+        if (ASC.Projects.Master.CanCreateProject) {
+            menuItems.push(new ActionMenuItem("createProj", resources.CreateProject, taCreate.bind(null, id), "project"));
+        }
+
+        if (template.canEdit) {
+            menuItems.push(new ActionMenuItem("deleteTmpl", resources.Delete, taDelete.bind(null, id), "delete"));
+        }
+        return { menuItems: menuItems };
+    }
+
+    function taEdit(tmplId) {
+        buttonOnClick();
+        window.location.replace('ProjectTemplates.aspx?id=' + tmplId + '&action=edit');
+    }
+
+    function taDelete(tmplId) {
+        buttonOnClick();
+        idDeleteTempl = parseInt(tmplId);
+        ASC.Projects.Base.showCommonPopup("projectTemplateRemoveWarning",
+            function () {
+                teamlab.removePrjTemplate({ tmplId: idDeleteTempl }, idDeleteTempl, { success: onDeleteTemplate });
+            },
+            function () {
+                idDeleteTempl = 0;
+            });
+    }
+
+    function taCreate(tmplId) {
+        buttonOnClick(true);
+        window.location.replace('Projects.aspx?tmplid=' + tmplId + '&action=add');
+    }
+
+    function onDeleteTemplate() {
         jq("#" + idDeleteTempl).remove();
         idDeleteTempl = 0;
-        var list = jq("#listTemplates").find(".template");
+        var list = $listTemplates.find(templateClass);
         if (!list.length) {
-            jq("#listTemplates").hide();
-            jq("#emptyListTemplates").show();
+            $listTemplates.hide();
+            showEmptyScreen();
         }
+        jq.unblockUI();
     };
-    var removeTemplate = function() {
-        Teamlab.removePrjTemplate({ tmplId: idDeleteTempl }, idDeleteTempl, { success: onDeleteTemplate });
-    };
-    var createTemplateTmpl = function(template) {
+
+    function showEmptyScreen() {
+        var emptyScreen = {
+            img: "templates",
+            header: resources.ProjectTemplatesResource.EmptyListTemplateHeader,
+            description: resources.ProjectTemplatesResource.EmptyListTemplateDescr,
+            button: {
+                title: resources.ProjectTemplatesResource.EmptyListTemplateButton,
+                onclick: function () {
+                    location.href = "ProjectTemplates.aspx?action=add";
+                },
+                canCreate: function() {
+                    return true;
+                }
+            }
+        };
+
+        jq("#emptyScrCtrlPrj").html(jq.tmpl("projects_emptyScreen", emptyScreen)).show();
+        jq("#emptyScrCtrlPrj .addFirstElement").off("click").on("click", emptyScreen.button.onclick);
+    }
+
+    function createTemplateTmpl(template) {
         var mCount = 0, tCount = 0;
 
         var description = { tasks: [], milestones: [] };
@@ -96,14 +150,16 @@ ASC.Projects.ListProjectsTemplates = (function () {
         return { title: template.title, id: template.id, milestones: mCount, tasks: tCount };
     };
 
-    var displayListTemplates = function (params, templates) {
+    function displayListTemplates(params, data) {
+        templates = data;
+
         if (templates.length) {
             for (var i = 0; i < templates.length; i++) {
                 var tmpl = createTemplateTmpl(templates[i]);
-                jq.tmpl("projects_templateTmpl", tmpl).appendTo("#listTemplates");
+                jq.tmpl("projects_templateTmpl", tmpl).appendTo($listTemplates);
             }
         } else {
-            jq("#emptyListTemplates").show();
+            showEmptyScreen();
         }
 
         jq.dropdownToggle({
@@ -113,44 +169,31 @@ ASC.Projects.ListProjectsTemplates = (function () {
             addLeft: 10,
             rightPos: true,
             showFunction: function (switcherObj, dropdownItem) {
-                var $tmpl = jq(switcherObj).closest('.template'),
-                    $openItem = jq("#listTemplates .template.open");
-                dropdownItem.attr('target', $tmpl.attr('id'));
-                $openItem.removeClass("open");
+                var $tmpl = jq(switcherObj).closest(templateClass),
+                    $openItem = $listTemplates.find(templateClass + "." + openClass);
+                dropdownItem.attr(targetAttr, $tmpl.attr('id'));
+                $openItem.removeClass(openClass);
                 if (!$openItem.is($tmpl)) {
                     dropdownItem.hide();
                 }
                 if (dropdownItem.is(":hidden")) {
-                    $tmpl.addClass("open");
+                    $tmpl.addClass(openClass);
                 }
             },
             hideFunction: function () {
-                jq("#listTemplates .template.open").removeClass("open");
+                $listTemplates.find(templateClass).removeClass(openClass);
             }
-        });
-
-        jq("#templateActionPanel #editTmpl").bind('click', function () {
-            var tmplId = jq("#templateActionPanel").attr('target');
-            jq(".studio-action-panel").hide();
-            jq(".template").removeClass('open');
-            window.onbeforeunload = null;
-            window.location.replace('projectTemplates.aspx?id=' + tmplId + '&action=edit');
-        });
-        jq("#templateActionPanel #deleteTmpl").bind('click', function () {
-            idDeleteTempl = parseInt(jq("#templateActionPanel").attr('target'));
-            jq(".studio-action-panel").hide();
-            jq(".template").removeClass('open');
-            StudioBlockUIManager.blockUI(jq('#questionWindow'), 400, 400, 0, "absolute");
-        });
-        jq("#templateActionPanel #createProj").bind('click', function () {
-            var tmplId = jq("#templateActionPanel").attr('target');
-            jq(".studio-action-panel").hide();
-            jq(".template").removeClass('open');
-            window.onbeforeunload = null;
-            window.location.replace('projects.aspx?tmplid=' + tmplId + '&action=add');
         });
     };
     
+    function buttonOnClick(clearOnbeforeunload) {
+        jq(".studio-action-panel").hide();
+        jq(templateClass).removeClass(openClass);
+        if (clearOnbeforeunload) {
+            window.onbeforeunload = null;
+        }
+    }
+
     return {
         init: init
     };
@@ -159,55 +202,74 @@ ASC.Projects.ListProjectsTemplates = (function () {
 
 ASC.Projects.EditProjectTemplates = (function() {
     var tmplId = null;
+    var clickEventName = "click", requiredFieldErrorClass = "requiredFieldError";
+    var $templateTitle, $templateTitleContainer;
+    var teamlab, loadingBanner;
 
-    var action = "";
+    var init = function () {
+        teamlab = Teamlab;
+        loadingBanner = LoadingBanner;
+        $templateTitle = jq("#templateTitle");
+        $templateTitleContainer = jq("#templateTitleContainer");
 
-    var init = function() {
+        var month = [];
+
+        for (var i = 1; i <= 12; i = i + 0.5) {
+            month.push(i);
+        }
+
+        jq("#amContainer")
+            .html(jq.tmpl("projects_action_template",
+            {
+                edit: true,
+                month: month
+            }));
         ASC.Projects.MilestoneContainer.init();
         tmplId = jq.getURLParam('id');
         if (tmplId) {
-            Teamlab.getPrjTemplate({}, tmplId, { success: onGetTemplate, before: LoadingBanner.displayLoading, after: LoadingBanner.hideLoading });
+            teamlab.getPrjTemplate({}, tmplId, { success: onGetTemplate, before: loadingBanner.displayLoading, after: loadingBanner.hideLoading });
         }
 
-        jq('#templateTitle').focus();
+        $templateTitle.focus();
 
-        jq("#saveTemplate").bind("click", function () {
+        jq("#saveTemplate").on(clickEventName, function () {
             generateAndSaveTemplate.call(this, 'save');
             return false;
         });
 
-        jq('#createProject').bind('click', function () {
+        jq('#createProject').on(clickEventName, function () {
             generateAndSaveTemplate.call(this, 'saveAndCreateProj');
             return false;
         });
 
-        jq("#cancelCreateProjectTemplate").on("click", function() {
+        jq("#cancelCreateProjectTemplate").on(clickEventName, function () {
             window.onbeforeunload = null;
-            window.location.replace('projectTemplates.aspx');
+            window.location.replace('ProjectTemplates.aspx');
         });
+
         jq.confirmBeforeUnload(confirmBeforeUnloadCheck);
     };
 
-    var confirmBeforeUnloadCheck = function () {
-        return jq("#templateTitle").val().length ||
+    function confirmBeforeUnloadCheck() {
+        return $templateTitle.val().length ||
             jq("#listAddedMilestone .milestone").length ||
             jq('#noAssignTaskContainer .task').length;
     };
 
-    var onGetTemplate = function(params, tmpl) {
+    function onGetTemplate(params, tmpl) {
         tmplId = tmpl.id;
         ASC.Projects.EditMilestoneContainer.showTmplStructure(tmpl);
-        jq("#templateTitle").val(tmpl.title);
+        $templateTitle.val(tmpl.title);
     };
 
-    var generateAndSaveTemplate = function (mode) {
+    function generateAndSaveTemplate(mode) {
         if (jq(this).hasClass("disable")) return;
-        jq(".requiredFieldError").removeClass("requiredFieldError");
+        jq("." + requiredFieldErrorClass).removeClass(requiredFieldErrorClass);
 
-        if (jq.trim(jq("#templateTitle").val()) == "") {
-            jq("#templateTitleContainer").addClass("requiredFieldError");
-            jq.scrollTo("#templateTitleContainer");
-            jq("#templateTitle").focus();
+        if (jq.trim($templateTitle.val()) == "") {
+            $templateTitleContainer.addClass(requiredFieldErrorClass);
+            jq.scrollTo($templateTitleContainer);
+            $templateTitle.focus();
             return;
         }
         jq(this).addClass("disable");
@@ -241,7 +303,7 @@ ASC.Projects.EditProjectTemplates = (function() {
             description.milestones.push(milestone);
         }
         var data = {
-            title: jq.trim(jq("#templateTitle").val()),
+            title: jq.trim($templateTitle.val()),
             description: JSON.stringify(description)
         };
 
@@ -253,22 +315,22 @@ ASC.Projects.EditProjectTemplates = (function() {
 
         if (tmplId) {
             data.id = tmplId;
-            Teamlab.updatePrjTemplate({}, data.id, data, { success: success, before: LoadingBanner.displayLoading, after: LoadingBanner.hideLoading });
+            teamlab.updatePrjTemplate({}, data.id, data, { success: success, before: loadingBanner.displayLoading, after: loadingBanner.hideLoading });
         }
         else {
-            Teamlab.createPrjTemplate({}, data, { success: success, before: LoadingBanner.displayLoading, after: LoadingBanner.hideLoading });
+            teamlab.createPrjTemplate({}, data, { success: success, before: loadingBanner.displayLoading, after: loadingBanner.hideLoading });
         }
     };
 
-    var onSave = function () {
+    function onSave() {
         window.onbeforeunload = null;
-        document.location.replace("projectTemplates.aspx");
+        document.location.replace("ProjectTemplates.aspx");
     };
     
-    var onSaveAndCreate = function(params, tmpl) {
+    function onSaveAndCreate(params, tmpl) {
         if (tmpl.id) {
             window.onbeforeunload = null;
-            document.location.replace("projects.aspx?tmplid=" + tmpl.id + "&action=add");
+            document.location.replace("Projects.aspx?tmplid=" + tmpl.id + "&action=add");
         }
     };
     

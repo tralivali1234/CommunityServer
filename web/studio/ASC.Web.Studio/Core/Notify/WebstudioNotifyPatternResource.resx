@@ -117,991 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="subject_change_pwd" xml:space="preserve">
-    <value>[outdated]</value>
-  </data>
-  <data name="pattern_change_pwd" xml:space="preserve">
-    <value>[outdated]</value>
-  </data>
-  <data name="subject_you_added_like_guest" xml:space="preserve">
-    <value>Welcome to Your ${LetterLogoTextTM} Portal!</value>
-  </data>
-  <data name="pattern_you_added_like_guest" xml:space="preserve">
-    <value>Dear $UserName,
-
-Your guest profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
-
-h3.Get started with your portal
-
-# Edit your "profile":"$MyStaffLink" to add personal and contact details.
-# View and comment the content open available for all portal users in the "Community":"${__VirtualRootPath}/products/community/", "Projects":"${__VirtualRootPath}/products/projects/" modules.
-# Add and download files available for you in the "Documents":"${__VirtualRootPath}/products/files/" module.
-# Organize your schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
-# Start "Talk":"${__VirtualRootPath}/addons/talk/" to chat with other portal users online.
-
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_you_added_after_invite" xml:space="preserve">
-    <value>Welcome to Your ${LetterLogoTextTM} Portal!</value>
-  </data>
-  <data name="pattern_you_added_after_invite" xml:space="preserve">
-    <value>Dear $UserName,
-
-Your user profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
-
-h3.Get started with your portal
-
-# Edit your "profile":"$MyStaffLink" to add personal and contact details.
-# Create, edit and organize "Documents":"${__VirtualRootPath}/products/files/".
-# Add your email account to "${LetterLogoTextTM} Mail":"${__VirtualRootPath}/addons/mail/".
-# Create "Projects":"${__VirtualRootPath}/products/projects/" and manage your workflow by adding milestones and tasks.
-# Manage your customer relations using "CRM":"${__VirtualRootPath}/products/crm/" module, identify priority contacts, track communication history and sales performance.
-# Use "Community":"${__VirtualRootPath}/products/community/" to start your blogs, forums, add events, share bookmarks.
-# Organize your work schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
-# Start "Talk":"${__VirtualRootPath}/addons/talk/" to chat with your teammates online.
-
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_profile_updated" xml:space="preserve">
-    <value>Your Profile at ${__VirtualRootPath} has been Changed</value>
-  </data>
-  <data name="pattern_profile_updated" xml:space="preserve">
-    <value>h1.Your Profile at "$__VirtualRootPath":"$__VirtualRootPath" has been Changed
-
-Dear $UserName,
-
-Your user profile details at "$__VirtualRootPath":"$__VirtualRootPath" have been changed by "$__AuthorName":"$__AuthorUrl".
-
-To view your profile follow the link below:
-"$UserName":"$MyStaffLink"
-
-
-^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.^
-</value>
-  </data>
-  <data name="subject_pwd_reminder" xml:space="preserve">
-    <value>[outdated]</value>
-  </data>
-  <data name="pattern_pwd_reminder" xml:space="preserve">
-    <value>[outdated]</value>
-  </data>
-  <data name="subject_invite" xml:space="preserve">
-    <value>Invitation to Join ${LetterLogoTextTM} Portal</value>
-  </data>
-  <data name="pattern_invite" xml:space="preserve">
-    <value>h1.Invitation to Join ${LetterLogoTextTM} Portal
-
-Dear $UserDisplayName,
-
-$__AuthorName has invited you to join ${LetterLogoTextTM} - your team's portal that would enchance internal cooperation. Your portal address is "${__VirtualRootPath}":"$InviteLink" (adding this link to your bookmarks is a good idea, you are most likely to get to use it a lot).
-
-You can accept the invitation by following the link below, it is only valid for 7 days:
-
-p=. "Click here to join the portal":"$InviteLink"</value>
-  </data>
-  <data name="subject_join" xml:space="preserve">
-    <value>Invitation to Join ${__VirtualRootPath} Portal</value>
-  </data>
-  <data name="pattern_join" xml:space="preserve">
-    <value>h1.Invitation to Join "${__VirtualRootPath}":"$InviteLink" Portal
-
-Hello,
-
-You have requested to join the "${__VirtualRootPath}":"$InviteLink" portal at ${LetterLogoTextTM} - a platform for document and project management. Join the portal and start collaborating with your colleagues or friends right away.
-
-To accept the invitation please enter your name and password following this link:
-p=. "Join Portal":"$InviteLink"
-
-*Note*: this link is valid for 48 hours only. Please complete the operation within that period.
-
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_self_profile_updated" xml:space="preserve">
-    <value>${__VirtualRootPath} Portal Profile Change Notification</value>
-  </data>
-  <data name="pattern_self_profile_updated" xml:space="preserve">
-    <value>h1."${__VirtualRootPath}":"${__VirtualRootPath}" Portal Profile Change Notification
-
-"$__AuthorName":"$__AuthorUrl" has changed his/her profile details at the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
-
-
-^You receive this email because you are an administrator of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal. If you do not want to receive the notifications about profile updates, please manage your "subscription settings":"$RecipientSubscriptionConfigURL".^</value>
-  </data>
-  <data name="subject_user_has_join" xml:space="preserve">
-    <value>New User Added to ${LetterLogoTextTM} Portal</value>
-  </data>
-  <data name="pattern_user_has_join" xml:space="preserve">
-    <value>h1.New User Added to "${__VirtualRootPath}":"${__VirtualRootPath}" Portal
-
-"$__AuthorName":"$__AuthorUrl" has joined your portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
-
-
-^You receive this email because you are an administrator user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal. If you do not want to receive the notifications about new users, please manage your "subscription settings":"$RecipientSubscriptionConfigURL".^</value>
-  </data>
-  <data name="subject_send_whats_new" xml:space="preserve">
-    <value>What's New on Your Portal for $Date</value>
-  </data>
-  <data name="pattern_send_whats_new" xml:space="preserve">
-    <value>h1.What's New on "${__VirtualRootPath}":"${__VirtualRootPath}" Portal for $Date
-
-#foreach($activity in $Activities)
-
-h2.$activity.Key
-
-#foreach($whatsNewActivity in $activity.Value)
-#foreach($b in $whatsNewActivity.BreadCrumbs) h3.$b
-#end "$whatsNewActivity.Title":"$whatsNewActivity.URL"
-*Author*: "$whatsNewActivity.UserName":"$whatsNewActivity.UserAbsoluteURL", $whatsNewActivity.Action: $whatsNewActivity.Date.ToShortTimeString()
-
-
-#end
-
-#end
-
-
-^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal. If you do not want to receive the notifications about the new events on the "${__VirtualRootPath}":"${__VirtualRootPath}" portal, please manage your "subscription settings":"$RecipientSubscriptionConfigURL".^</value>
-  </data>
-  <data name="subject_backup_created" xml:space="preserve">
-    <value>${LetterLogoTextTM}. ${__VirtualRootPath} Portal Backup Created</value>
-  </data>
-  <data name="pattern_backup_created" xml:space="preserve">
-    <value>h1."${__VirtualRootPath}":"${__VirtualRootPath}" Portal Backup Created
-
-Dear $OwnerName,
-
-A backup file containing data from your "${__VirtualRootPath}":"${__VirtualRootPath}" portal has been created.
-
-To learn more on the backup/restore procedure please refer to our "How to Create and Restore the ${LetterLogoTextTM} Portal Backup":"https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=3750480&amp;doc=dXBNQXpvdFNtelNUOHlYSWFnZG92ZmIzUDdDa3ovbjM5bElvNjkzOTVPMD0_IjM3NTA0ODAi0" user guide.
-
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_portal_deactivate" xml:space="preserve">
-    <value>Deactivation of the ${__VirtualRootPath} Portal</value>
-  </data>
-  <data name="pattern_portal_deactivate" xml:space="preserve">
-    <value>h1.Deactivation of the "${__VirtualRootPath}":"${__VirtualRootPath}" Portal
-
-Dear $OwnerName,
-
-You have requested a temporary deactivation of your "${__VirtualRootPath}":"${__VirtualRootPath}" portal. Please follow the link below to confirm the operation:
-p=. "Deactivate Portal":"$DeactivateUrl"
-
-*Note*: this link is valid for 7 days only. Please complete the portal deactivation process within that period.
-
-You can reactivate your portal any time by clicking the following link:
-p=. "Reactivate Portal":"$ActivateUrl" (this link has no time limit)
-
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_portal_delete" xml:space="preserve">
-    <value>Deletion of the ${__VirtualRootPath} Portal</value>
-  </data>
-  <data name="pattern_portal_delete" xml:space="preserve">
-    <value>h1.Deletion of the "${__VirtualRootPath}":"${__VirtualRootPath}" Portal
-
-Dear $OwnerName,
-
-You have requested to permanently delete your "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
-
-*Important! All the data stored on your portal, as well as your registration details will be lost and cannot be recovered.*
-
-If you still want to delete your "${__VirtualRootPath}":"${__VirtualRootPath}" portal please follow the link below to confirm the operation:
-p=. "Delete Portal":"$DeleteUrl"
-
-*Note*: this link is valid for 7 days only. Please complete the portal deletion process within that period.
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_dns_change" xml:space="preserve">
-    <value>${LetterLogoTextTM}. Change of Portal Address</value>
-  </data>
-  <data name="pattern_dns_change" xml:space="preserve">
-    <value>h1.Change of Portal Address
-
-Dear $OwnerName,
-
-There has been a request to change the "${__VirtualRootPath}":"${__VirtualRootPath}" portal address to "$PortalAddress":"$PortalAddress" #if($PortalDns != "") ("$PortalDns":"$PortalDns" )#end.
-
-Please follow the link below to confirm the operation:
-p=. "Confirm Portal Address Change":"$ConfirmDnsUpdate"
-
-*Note*: this link is valid for 7 days only. Please complete the portal address change process within that period.
-
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="pattern_confirm_owner_change" xml:space="preserve">
-    <value>h1.Change of "${__VirtualRootPath}":"${__VirtualRootPath}" Portal Owner
-
-Dear $OwnerName,
-
-There has been a request to change the "${__VirtualRootPath}":"${__VirtualRootPath}" portal owner to $UserName.
-
-Please follow the link below to confirm the operation:
-p=. "Confirm Portal Owner Update":"$ConfirmPortalOwnerUpdate"
-
-*Note*: this link is valid for 7 days only. Please complete the portal owner change process within that period.
-
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_confirm_owner_change" xml:space="preserve">
-    <value>${LetterLogoTextTM}. Change of Portal Owner</value>
-  </data>
-  <data name="pattern_activate" xml:space="preserve">
-    <value>Dear $UserName,
-
- $__AuthorName has invited you to join ${LetterLogoTextTM} - your team's portal that would enchance internal cooperation. Your portal address is "${__VirtualRootPath}":"$InviteLink" (adding this link to your bookmarks is a good idea, you are most likely to get to use it a lot).
-
- You can accept the invitation by following the link below, it is only valid for 7 days:
-
-p=. "Click here to join the portal":"$InviteLink"
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="pattern_change_email" xml:space="preserve">
-    <value>h1.Email Address Change Request
-
-You have requested to change your email address used to enter the ${LetterLogoTextTM} portal.
-
-Please follow the link below to change your email address:
-p=. "Change Email Address":"$InviteLink"
-
-*Note*: this link is valid for 7 days only. Please complete your email change process within that period.
-
-You might need your old email address to access the portal when you follow the link. If you do not remember the old email address, please contact your portal administrator.
-
-If you do not want to change your email or received this email by mistake, please ignore it or contact your portal administrator to find out the details.
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_activate" xml:space="preserve">
-    <value>Invitation from $__AuthorName to Join ${__VirtualRootPath} Portal</value>
-  </data>
-  <data name="subject_change_email" xml:space="preserve">
-    <value>${LetterLogoTextTM}. Email change request</value>
-  </data>
-  <data name="pattern_change_password" xml:space="preserve">
-    <value>h1.Password Change Request for the "${__VirtualRootPath}":"${__VirtualRootPath}" Portal
-
-There has been a request to change your password used to enter the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
-
-Please follow the link below to change your password:
-p=. "Change Password":"$InviteLink"
-
-*Note*: this link is valid for 7 days only. Please complete the password change process within that period.
-
-If you do not want to change your password or received this email by mistake, please ignore it or contact your "${__VirtualRootPath}":"${__VirtualRootPath}" portal administrator to find out the details.
-
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_change_password" xml:space="preserve">
-    <value>${LetterLogoTextTM} Password Assistance</value>
-  </data>
-  <data name="pattern_activate_email" xml:space="preserve">
-    <value>h1.Activate Your Email for "${__VirtualRootPath}":"$InviteLink" Portal.
-
-Hello $UserDisplayName,
-
-To start participating in the "${__VirtualRootPath}":"$InviteLink" portal life you need to activate your email address. This is done for security reasons.
-
-p=. "Click here to activate your email address":"$InviteLink"
-
-This link is valid for 7 days only. Please complete your email activation within that period.</value>
-  </data>
-  <data name="subject_activate_email" xml:space="preserve">
-    <value>${LetterLogoTextTM}. Please activate your email address</value>
-  </data>
-  <data name="pattern_change_phone" xml:space="preserve">
-    <value>h1.Mobile Phone Change Request
-
-You have requested to change your mobile phone used to enter the ${LetterLogoTextTM} portal.
-
-Please follow the link below to change your mobile phone:
-
-p.= "Change mobile phone number":"$InviteLink"
-
-If you do not want to change your mobile phone or received this email by mistake, please ignore it or contact your portal administrator to find out the details.</value>
-  </data>
-  <data name="pattern_profile_delete" xml:space="preserve">
-    <value>h1.Removal of the Profile from the "${__VirtualRootPath}":"${__VirtualRootPath}" Portal
-
-You have requested to permanently delete your profile from the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
-
-If you still want to delete your profile please follow the link below to confirm the operation:
-p=. "Remove profile":"$InviteLink"
-
-*Note*: this link is valid for 7 days only. Please complete the profile deletion process within that period.
- 
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_change_phone" xml:space="preserve">
-    <value>${LetterLogoText}. Mobile Phone Change Request</value>
-  </data>
-  <data name="subject_profile_delete" xml:space="preserve">
-    <value>Deletion of Your Profile from ${__VirtualRootPath} Portal</value>
-  </data>
-  <data name="pattern_for_admin_notify" xml:space="preserve">
-    <value>h1.Message from the "${__VirtualRootPath}":"${__VirtualRootPath}" Portal
-Email: $UserEmail
-
-$Body</value>
-  </data>
-  <data name="subject_for_admin_notify" xml:space="preserve">
-    <value>User message to administrators</value>
-  </data>
-  <data name="pattern_admin_sms_balance" xml:space="preserve">
-    <value>h1.Message from the "${__VirtualRootPath}":"${__VirtualRootPath}" Portal
-Current SMS balance: $Body
-
-*Please note* that when you are out of SMS the two-factor authentication portal access option will be automatically disabled. Do not forget to buy additional SMS package in good time.</value>
-  </data>
-  <data name="subject_admin_sms_balance" xml:space="preserve">
-    <value>Notification to administrators about SMS balance</value>
-  </data>
-  <data name="pattern_congratulations" xml:space="preserve">
-    <value>Dear $UserName,
-
-You have just created the ${LetterLogoText} portal, your team's portal that would enhance internal cooperation. Your portal address is "${__VirtualRootPath}":"${__VirtualRootPath}" (adding this link to your bookmarks is a good idea, you are most likely to get to use it a lot). Follow the link below to confirm your email address:
-$GreenButton
-
-Please, complete your email activation within a week as the link is valid for 7 days only.
-
-Note: we do not send out confidential information (like your password) in emails for safety reasons. You may change your email or password in your "personal profile page":"$MyStaffLink".
-
-For more information we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_congratulations" xml:space="preserve">
-    <value>Welcome to ${LetterLogoTextTM} Portal!</value>
-  </data>
-  <data name="pattern_tariff_warning_trial2" xml:space="preserve">
-    <value>Dear $UserName,
-
-Thank you for having given ${LetterLogoTextTM} a try. The free plan for your portal at "${__VirtualRootPath}":"${__VirtualRootPath}" is due to expire today.
-
-To continue using your account, proceed to the "Pricing page":"$PricingPage", where you can check out all the models and choose the most suitable for you.
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="pattern_tariff_warning_trial" xml:space="preserve">
-    <value>Dear $UserName,
-
-Thank you for checking out ${LetterLogoTextTM} service. Hope, everything's going fine. We just want to remind you that the trial period for your account at "${__VirtualRootPath}":"${__VirtualRootPath}" will be over in five days.
-
-At the moment the number of active users at the portal is $ActiveUsers.
-
-If you're not going to increase it considerably, we can recommend you a $$Price/$PricePeriod plan.
-
-Please, check all the available options and choose the most suitable rate for your business.
-
-$GreenButton
-
-$BlueButton
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_tariff_warning_trial2" xml:space="preserve">
-    <value>Your ${LetterLogoTextTM} trial expires today</value>
-  </data>
-  <data name="subject_tariff_warning_trial" xml:space="preserve">
-    <value>How is your trial going so far?</value>
-  </data>
-  <data name="pattern_activate_personal" xml:space="preserve">
-    <value>Hello, $UserName
-You’ve been successfully registered at ${LetterLogoTextTM} Personal "${__VirtualRootPath}":"${__VirtualRootPath}".
-
-Connect your favorite cloud storage: Dropbox, Google Drive, OneDrive or Box to create a single workspace for your documents accessible from anywhere.
-
-Learn more about ${LetterLogoTextTM} Personal in "our blog":"$TagBlogLink".
-
-We're glad you're here. Stay tuned!
-
-Sincerely,
-ONLYOFFICE™ Team.</value>
-  </data>
-  <data name="subject_activate_personal" xml:space="preserve">
-    <value>Welcome to ${LetterLogoTextTM} for Personal Use!</value>
-  </data>
-  <data name="pattern_activate_guest" xml:space="preserve">
-    <value>Dear $UserName,
-
-You have been invited as a guest user to the portal at "${__VirtualRootPath}":"$InviteLink". Please accept the invitation by following the link below, it is only valid for 7 days:
-
-p=. "Click here to join the portal":"$InviteLink"
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_activate_guest" xml:space="preserve">
-    <value>Invitation from $__AuthorName to Join ${__VirtualRootPath} Portal</value>
-  </data>
-  <data name="pattern_migration_start" xml:space="preserve">
-    <value>h1.Another Region Portal Migration Started
-
-The portal migration to the $RegionName region is started. It might take some time depending on your data amount.
-
-*Note*: the portal will not be available during the migration process. After the migration is complete the portal URL will be changed and all the shared documents links will be inaccessible.
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"
-
-^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.^</value>
-  </data>
-  <data name="pattern_migration_success" xml:space="preserve">
-    <value>h1.Another Region Portal Migration Successfully Completed
-
-The portal migration to the $RegionName region is successfully completed.
-Your portal is now available at "$PortalUrl":"$PortalUrl"
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"
-
-^You receive this email because you are a registered user of the "$PortalUrl":"$PortalUrl" portal.^</value>
-  </data>
-  <data name="subject_migration_start" xml:space="preserve">
-    <value>${LetterLogoTextTM}. Another Region Portal Migration Started</value>
-  </data>
-  <data name="subject_migration_success" xml:space="preserve">
-    <value>${LetterLogoTextTM}. Another Region Portal Migration Successfully Completed</value>
-  </data>
-  <data name="pattern_migration_error" xml:space="preserve">
-    <value>h1.Another Region Portal Migration Error
-
-An error has occurred while migrating to the $RegionName region. Please, try once again later.
-Your portal is now available at the old address "$PortalUrl":"$PortalUrl"
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"
-
-^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal. To change the notification type, please manage your "subscription settings":"$RecipientSubscriptionConfigURL".^</value>
-  </data>
-  <data name="subject_migration_error" xml:space="preserve">
-    <value>${LetterLogoTextTM}. Another Region Portal Migration Error</value>
-  </data>
-  <data name="pattern_migration_server_failure" xml:space="preserve">
-    <value>h1.Another Region Portal Migration Error
-
-An error has occurred while migrating to another region. Please, try once again later.
-Your portal is now available at the old address "$PortalUrl":"$PortalUrl"
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"
-
-^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal. To change the notification type, please manage your "subscription settings":"$RecipientSubscriptionConfigURL".^</value>
-  </data>
-  <data name="pattern_tariff_warning_trial3" xml:space="preserve">
-    <value>h1.Need to Extend Your ${LetterLogoTextTM} Trial?
-
-We know, business days can be crazy sometimes. If you haven't got an opportunity to take a closer look at ${LetterLogoTextTM} and would like to get a little bit more of your trial period, we're in!
-
-Today you have a chance to get *20 additional days* for your "${__VirtualRootPath}":"${__VirtualRootPath}" portal and push your trial to the limit.
-
-$GreenButton
-
-$BlueButton
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_tariff_warning_trial3" xml:space="preserve">
-    <value>Need to Extend Your ${LetterLogoTextTM} Trial?</value>
-  </data>
-  <data name="ButtonExtendTrialButton" xml:space="preserve">
-    <value>Extend Your ${LetterLogoTextTM} Trial Now</value>
-  </data>
-  <data name="ButtonRequestCallButton" xml:space="preserve">
-    <value>Request a Call</value>
-  </data>
-  <data name="ButtonSelectPricingPlans" xml:space="preserve">
-    <value>Select the Pricing Plans Right Now</value>
-  </data>
-  <data name="pattern_after_creation2" xml:space="preserve">
-    <value>Email is still the best and most popular way to communicate with customers and partners. Every day we receive a great amount of messages using multiple email accounts from different services and it may seem impossible not to miss anything important.
-
-Make use of these 5 tips and tricks to get organized and improve your email experience:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-$GreenButton
-
-Still not yet configured the mail server using your own domain name? - Follow the instructions "here":"https://helpcenter.onlyoffice.com/ru/gettingstarted/mail.aspx#MailServer_block".
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="pattern_after_creation3" xml:space="preserve">
-    <value>Dear $UserName,
-
-Sometimes the most useful tools are not the most obvious. There is always much to be discovered, so we do our best to guide you through the every single corner of your cloud office. 
-
-Here is the Top 5 ${LetterLogoText} CRM features which you might have missed:
-
-*Our goal is to transfer all of your paperwork to the cloud*
-
-These 5 tips will move you closer to the aim:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_after_creation1" xml:space="preserve">
-    <value>Invite your teammates to the cloud office!</value>
-  </data>
-  <data name="subject_after_creation2" xml:space="preserve">
-    <value>5 Tips to Improve Your Mail Experience</value>
-  </data>
-  <data name="subject_after_creation3" xml:space="preserve">
-    <value>Features You Might Have Missed in ${LetterLogoText} CRM</value>
-  </data>
-  <data name="pattern_after_creation4" xml:space="preserve">
-    <value>Dear $UserName,
-
-With ${LetterLogoText} you have all your data stored in one place available from the cloud. There is no more need for additional desktop software or flash drives. Be productive and access your office at "${__VirtualRootPath}":"${__VirtualRootPath}" from anywhere!
-
-Start your migration to the cloud office with these 5 steps:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_after_creation4" xml:space="preserve">
-    <value>Move your office to the cloud. What to start with?</value>
-  </data>
-  <data name="ItemAddEmailAccount" xml:space="preserve">
-    <value>Add your email account to ${LetterLogoTextTM} Mail and manage all correspondence in one place</value>
-  </data>
-  <data name="ItemAddFilesCreatWorkspace" xml:space="preserve">
-    <value>Add files from your cloud storages to create a single workspace for all your docs</value>
-  </data>
-  <data name="ItemAddTeamlabMail" xml:space="preserve">
-    <value>Add your email account to ${LetterLogoTextTM} Mail</value>
-  </data>
-  <data name="ItemARM" xml:space="preserve">
-    <value>ARM</value>
-  </data>
-  <data name="ItemCreateWorkspaceDocs" xml:space="preserve">
-    <value>Create a single workspace for all your docs</value>
-  </data>
-  <data name="ItemFeatureMailboxAliases" xml:space="preserve">
-    <value>Mailbox Aliases</value>
-  </data>
-  <data name="ItemFeatureMailboxAliasesText" xml:space="preserve">
-    <value>Use the aliases if you need to change your email address without creating a new mailbox.</value>
-  </data>
-  <data name="ItemFeatureLinksVSAttachments" xml:space="preserve">
-    <value>Links Instead of Attachments</value>
-  </data>
-  <data name="ItemFeatureLinksVSAttachmentsText" xml:space="preserve">
-    <value>Insert a link to a file instead of attaching it and manage access rights to it to reduce the mail traffic and send a large file.</value>
-  </data>
-  <data name="ItemFeatureMailGroups" xml:space="preserve">
-    <value>Mail Groups</value>
-  </data>
-  <data name="ItemFeatureMailGroupsText" xml:space="preserve">
-    <value>Creating a mail group is a great way to make certain emails available for a group of users. No need to duplicate messages, which incredibly reduces the mail storage space.</value>
-  </data>
-  <data name="ItemFeatureFolderForAtts" xml:space="preserve">
-    <value>Folder for Attachments</value>
-  </data>
-  <data name="ItemFeatureFolderForAttsText" xml:space="preserve">
-    <value>Set up a folder to automatically save all the future attachments into it.</value>
-  </data>
-  <data name="ItemFeatureEmailSignature" xml:space="preserve">
-    <value>Email Signature</value>
-  </data>
-  <data name="ItemFeatureEmailSignatureText" xml:space="preserve">
-    <value>Create an effective email signature using text, picture, link or even generated html code.</value>
-  </data>
-  <data name="ItemImportProjectsBasecamp" xml:space="preserve">
-    <value>Import projects from Basecamp</value>
-  </data>
-  <data name="ItemIntegrateIM" xml:space="preserve">
-    <value>Integrate your IM client with ${LetterLogoTextTM} talk and stay tuned</value>
-  </data>
-  <data name="ItemCustomization" xml:space="preserve">
-    <value>Customization</value>
-  </data>
-  <data name="ItemTryOnlineDocEditor" xml:space="preserve">
-    <value>Try full-featured online document editing in your browser</value>
-  </data>
-  <data name="ItemUploadCrmContacts" xml:space="preserve">
-    <value>Upload CRM contacts to ${LetterLogoTextTM} to access them everywhere</value>
-  </data>
-  <data name="ItemUploadCrmContactsCsv" xml:space="preserve">
-    <value>Upload CRM contacts from a csv. file</value>
-  </data>
-  <data name="ItemWebToLead" xml:space="preserve">
-    <value>Web-to-Lead</value>
-  </data>
-  <data name="pattern_after_creation1" xml:space="preserve">
-    <value>Dear $UserName,
-
-The cloud office for your team is already created at "${__VirtualRootPath}":"${__VirtualRootPath}". It's time to invite your teammates to join it. 
-The easiest way to do that is to distribute the invitation link using the *Invite users to portal* option.
-
-$GreenButton
-
-If you have access to the detailed contact information of the people, add your teammates manually one by one using the *Create New...* button in the *People* module. "Learn more &gt;&gt;":"http://helpcenter.onlyoffice.com/gettingstarted/people.aspx#AddingUsers_block"
-
-Or add users all at once from:
-    "your Yahoo or Google account":"http://helpcenter.onlyoffice.com/administratorguides/import-contacts-from-web.aspx",
-    "your mail client address book":"http://helpcenter.onlyoffice.com/administratorguides/import-contacts-from-mail-client.aspx",
-    "a CSV file":"http://helpcenter.onlyoffice.com/administratorguides/import-contacts-from-csv.aspx". 
-
-Finally, you can allow your teammates self-registration configuring the *Trusted Mail Domain* settings. "Learn more &gt;&gt;":"http://helpcenter.onlyoffice.com/gettingstarted/configuration.aspx#TrustedDomain"
-
-Once added, manage their access rights. For more information about ARM, visit our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="ButtonAccessCRMSystem" xml:space="preserve">
-    <value>Access CRM System</value>
-  </data>
-  <data name="ItemImportProjects" xml:space="preserve">
-    <value>Import projects</value>
-  </data>
-  <data name="ItemIntegrateDocs" xml:space="preserve">
-    <value>Integrate documents</value>
-  </data>
-  <data name="ItemUploadCrm" xml:space="preserve">
-    <value>Upload CRM contacts</value>
-  </data>
-  <data name="pattern_portal_delete_success" xml:space="preserve">
-    <value>Dear $OwnerName,
-
-Your portal "${__VirtualRootPath}":"${__VirtualRootPath}" has been successfully deleted but we would highly appreciate your feedback. Please share your experience of using ${LetterLogoTextTM} and give us a hint on how could we make it better. Your opinion is very impotant for us!
-
-Please, fill this form to leave your feedback:
-p=. "Leave Feedback":"$FeedBackUrl"
-
-It will take you just a minute.
-
-Thank you and good luck!
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_portal_delete_success" xml:space="preserve">
-    <value>Successful deletion of the ${__VirtualRootPath} Portal</value>
-  </data>
-  <data name="ButtonSignUpPersonal" xml:space="preserve">
-    <value>Sign Up to ${LetterLogoTextTM} Personal</value>
-  </data>
-  <data name="pattern_tariff_warning_trial4" xml:space="preserve">
-    <value>Dear $UserName,
-
-Even if you have no team or project to manage, ${LetterLogoText} still has a lot to offer! 
-
-We'd like to invite you to ${LetterLogoTextTM} Personal, a *free workspace to manage your documents*, combining the convenience and mobility of online apps with the rich toolset of desktop solutions.
-
-Be productive and access your office at "${__VirtualRootPath}":"${__VirtualRootPath}" from anywhere!
-
-To get a quick start all you do is sign up via your Facebook or Google account. As soon as you're there you'll be able to:
-
-# Connect your favorite cloud storage: Dropbox, Google Drive, OneDrive or Box.
-# Work with texts, spreadsheets and presentations and share them with your friends.
-# Co-edit and comment files, collaborate on them in real-time.
-# Embed documents to your web page.
-
-$GreenButton
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_tariff_warning_trial4" xml:space="preserve">
-    <value>Use ${LetterLogoTextTM} Personal for Free! Cloud Workspace for Your Documents</value>
-  </data>
-  <data name="TextForPartnerFooter" xml:space="preserve">
-    <value>Your ${LetterLogoTextTM} partner</value>
-  </data>
-  <data name="SalesDepartment" xml:space="preserve">
-    <value>Sales department</value>
-  </data>
-  <data name="TechnicalSupport" xml:space="preserve">
-    <value>Technical support</value>
-  </data>
-  <data name="pattern_restore_completed" xml:space="preserve">
-    <value />
-  </data>
-  <data name="subject_restore_completed" xml:space="preserve">
-    <value>${LetterLogoText}. Restore completed</value>
-  </data>
-  <data name="pattern_smtp_test" xml:space="preserve">
-    <value>SMTP Test Message
-
-This message was generated automatically to test your SMTP settings. If you are viewing it this means that the settings are correct and you can use them on your portal.
-
-
-Best regards,
-ONLYOFFICE Team</value>
-  </data>
-  <data name="subject_smtp_test" xml:space="preserve">
-    <value>SMTP Test Message</value>
-  </data>
-  <data name="pattern_after_registration_personal1" xml:space="preserve">
-    <value>$HeaderStart Welcome to ${LetterLogoText} Personal $HeaderEnd
-
-You have just created your personal office in the cloud.
-
-It's a desktopless workspace available in your browser, where you can store documents, work with them anywhere providing access to your friends or colleagues.
-
-$FrameStart ${LetterLogoText} is compatible with Microsoft Office™ document formats. We promise to relieve you from formatting fidelity headache. $FrameEnd
-
-$StrongStart Here are the basic features for a quick start: $StrongEnd
-
-$MarkerStart Upload files from your computer or create new. $MarkerEnd
-
-$MarkerStart Edit *.docx*, *.xlsx* and *.pptx* documents online. $MarkerEnd
-
-$MarkerStart Download files in any popular format. $MarkerEnd
-
-$SignatureStart Have a good start!
-
-Sincerely,
-ONLYOFFICE team $SignatureEnd</value>
-  </data>
-  <data name="pattern_after_registration_personal14" xml:space="preserve">
-    <value>$HeaderStart A few tips for freelance work $HeaderEnd
-
-${LetterLogoTextTM} provides a good number of features for freelance community whether you are a contractor or hiring somebody for a project. Let's see what might be of the most interest for you:
-
-$MarkerStart Read Only/Full Access files sharing $MarkerEnd
-
-$MarkerStart Realtime collaborative editing and commenting $MarkerEnd
-
-$MarkerStart Version &amp; revision control $MarkerEnd
-
-There is no need to download files and send them via email. Simply share them from your cloud office and collaborate wherever you are.
-
-$StrongStart Need more collaborative functionality? $StrongEnd
-
-${LetterLogoText} business edition is free for a 30 day trial period and provides you with even more opportunities for freelance or distant work. For instance, you can create and submit invoices to your clients. Would like to learn more? Proceed to our "CRM overview":"http://www.onlyoffice.com/crm.aspx".
-
-$SignatureStart Sincerely,
-ONLYOFFICE team $SignatureEnd</value>
-  </data>
-  <data name="pattern_after_registration_personal21" xml:space="preserve">
-    <value>$HeaderStart Give a try to ${LetterLogoText} for teams $HeaderEnd
-
-In case you need to collaborate with a team or manage a project, we offer you to try the business edition of ${LetterLogoText}. In addition to the online editors and document management features, you'll be able to:
-
-$MarkerStart control tasks and use Gantt chart in the Project Management module; $MarkerEnd
-
-$MarkerStart track sales, relations with customers and create invoices in CRM; $MarkerEnd
-
-$MarkerStart manage all your email accounts in one Email aggregator $MarkerEnd
-
-and do many other operations that aim at creating a single collaborative work space and your teammates. See details "here":"http://www.onlyoffice.com/highlights.aspx".
-
-For a start you can create a trial account that is free for 30 days. It doesn't have any functional restrictions.
-
-$SignatureStart Sincerely,
-ONLYOFFICE team $SignatureEnd</value>
-  </data>
-  <data name="pattern_after_registration_personal7" xml:space="preserve">
-    <value>$HeaderStart Connect your favorite cloud storage to ${LetterLogoTextTM} $HeaderEnd
-
-It has been a week since you created your cloud office, so we believe it's time to unveil some beneficial features you might have missed.
-
-$FrameStart Connect Dropbox, Google Drive, Box or OneDrive cloud storage to ${LetterLogoText} and create a single workspace for all your documents. You'll be able to edit external files by means of ${LetterLogoText} without any additional downloads. See details how to do it "here":"http://helpcenter.onlyoffice.com/tipstricks/add-resource.aspx". $FrameEnd
-
-$StrongStart Need more document management options? $StrongEnd
-
-Our "business edition":"http://www.onlyoffice.com/" is free for a 30 day trial period and provides extended document management opportunities together with a business toolset:
-
-$MarkerStart Project documentation tracking. $MarkerEnd
-
-$MarkerStart Close integration with CRM and Email. $MarkerEnd
-
-$MarkerStart Individual and group sharing. $MarkerEnd
-
-Interested? Learn more about "${LetterLogoTextTM} for business":"http://www.onlyoffice.com/document-management.aspx".
-
-$SignatureStart Sincerely,
-ONLYOFFICE team $SignatureEnd</value>
-  </data>
-  <data name="subject_after_registration_personal1" xml:space="preserve">
-    <value>Welcome to ${LetterLogoText} Personal</value>
-  </data>
-  <data name="subject_after_registration_personal14" xml:space="preserve">
-    <value>A few tips for freelance work</value>
-  </data>
-  <data name="subject_after_registration_personal21" xml:space="preserve">
-    <value>Need more features? Give a try to ${LetterLogoText} for teams</value>
-  </data>
-  <data name="subject_after_registration_personal7" xml:space="preserve">
-    <value>Connect your favorite cloud storage to ${LetterLogoText}</value>
-  </data>
-  <data name="pattern_confirmation_personal" xml:space="preserve">
-    <value>Hello,
-
-you've just registered an account at the ${LetterLogoText} solution for personal use. Click "here":"$InviteLink" to confirm the registration and create a password.
-
-If you can't open the link, please copy the following "$InviteLink":"$InviteLink" and paste it into your browser address bar.
-
-$SignatureStart Sincerely,
-ONLYOFFICE team $SignatureEnd</value>
-  </data>
-  <data name="subject_confirmation_personal" xml:space="preserve">
-    <value>${LetterLogoText} Personal. Please activate your email address</value>
-  </data>
-  <data name="pattern_change_password_personal" xml:space="preserve">
-    <value>There has been a request to change your password used to enter the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
-
-Please follow the link below to change your password:
-p=. "Change password":"$InviteLink"
-
-*Note*: this link is valid for 7 days only. Please complete the password change process within that period.
-
-If you do not want to change your password or received this email by mistake, please ignore it.
-
-$SignatureStart Sincerely,
-ONLYOFFICE team $SignatureEnd</value>
-  </data>
-  <data name="subject_change_password_personal" xml:space="preserve">
-    <value>${LetterLogoText} Personal Password Assistance</value>
-  </data>
-  <data name="pattern_change_email_personal" xml:space="preserve">
-    <value>You have requested to change your email address used to enter the ${LetterLogoText} portal.
-
-Please follow the link below to change your email address:
-p=. "Change email address":"$InviteLink"
-
-*Note*: this link is valid for 7 days only. Please complete your email change process within that period.
-
-If you do not want to change your email or received this email by mistake, please ignore it.
-
-$SignatureStart Sincerely,
-ONLYOFFICE team $SignatureEnd</value>
-  </data>
-  <data name="subject_change_email_personal" xml:space="preserve">
-    <value>${LetterLogoText} Personal. Email change request</value>
-  </data>
-  <data name="pattern_admin_voip_blocked" xml:space="preserve">
-    <value>h1.Message from the "${__VirtualRootPath}":"${__VirtualRootPath}" VoIP Disabled</value>
-  </data>
-  <data name="pattern_admin_voip_warning" xml:space="preserve">
-    <value>h1.Message from the "${__VirtualRootPath}":"${__VirtualRootPath}" Portal
-VoIP Balance: $Body</value>
-  </data>
-  <data name="subject_admin_voip_blocked" xml:space="preserve">
-    <value>VoIP disabled</value>
-  </data>
-  <data name="subject_admin_voip_warning" xml:space="preserve">
-    <value>Notification to administrators about VoIP balance</value>
-  </data>
-  <data name="pattern_restore_started" xml:space="preserve">
-    <value>h1.Portal Restoration Started
-
-The portal restoration is started. It might take some time depending on your data amount.
-
-*Note*: the portal will not be available during the restoration process.
-
-If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
-
-Best regards,
-ONLYOFFICE™ Support Team
-"www.onlyoffice.com":"http://onlyoffice.com/"
-
-^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal. To change the notification type, please manage your "subscription settings":"$RecipientSubscriptionConfigURL".^</value>
-  </data>
-  <data name="subject_restore_started" xml:space="preserve">
-    <value>${LetterLogoText}. Restore completed.</value>
-  </data>
   <data name="ActionCreateBlog" xml:space="preserve">
     <value>Blog was created at</value>
   </data>
@@ -1138,6 +153,12 @@ ONLYOFFICE™ Support Team
   <data name="ActionCreateForum" xml:space="preserve">
     <value>Forum was created at</value>
   </data>
+  <data name="ActionCreateForumPoll" xml:space="preserve">
+    <value>Poll was created at</value>
+  </data>
+  <data name="ActionCreateForumPost" xml:space="preserve">
+    <value>Post was created at</value>
+  </data>
   <data name="ActionCreateMilestone" xml:space="preserve">
     <value>Milestone was created at</value>
   </data>
@@ -1147,55 +168,188 @@ ONLYOFFICE™ Support Team
   <data name="ActionCreateTask" xml:space="preserve">
     <value>Task was created at</value>
   </data>
-  <data name="pattern_after_payment1" xml:space="preserve">
-    <value>Hi $UserName,
+  <data name="ButtonAccessControlPanel" xml:space="preserve">
+    <value>Access Control Panel</value>
+  </data>
+  <data name="ButtonAccessYourPortal" xml:space="preserve">
+    <value>Access Your Portal</value>
+  </data>
+  <data name="ButtonAccessYouWebOffice" xml:space="preserve">
+    <value>Access Your Web-Office</value>
+  </data>
+  <data name="ButtonConfigureRightNow" xml:space="preserve">
+    <value>Configure Right Now</value>
+  </data>
+  <data name="ButtonInviteRightNow" xml:space="preserve">
+    <value>Invite Right Now</value>
+  </data>
+  <data name="ButtonMoveRightNow" xml:space="preserve">
+    <value>Move Right Now</value>
+  </data>
+  <data name="ButtonRequestCallButton" xml:space="preserve">
+    <value>Request a Call</value>
+  </data>
+  <data name="ButtonSelectPricingPlans" xml:space="preserve">
+    <value>Select the Pricing Plans Right Now</value>
+  </data>
+  <data name="ItemAddEmailAccount" xml:space="preserve">
+    <value>Add your email account to ${LetterLogoText} Mail and manage all correspondence in one place</value>
+  </data>
+  <data name="ItemAddFilesCreatWorkspace" xml:space="preserve">
+    <value>Connect cloud storages you use to ONLYOFFICE to create a single workspace for all your docs.</value>
+  </data>
+  <data name="ItemAddTeamlabMail" xml:space="preserve">
+    <value>Add your email account and manage all correspondence in one place</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_regional_hdr" xml:space="preserve">
+    <value>Tip #2: Adjust the regional settings</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_regional" xml:space="preserve">
+    <value>Choose the language and set the correct time zone. It's particularly important for the notifications and the correct calendar work. Go to Settings &gt;&gt; Common &gt;&gt; Customization.</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_brand_hdr" xml:space="preserve">
+    <value>Tip #1: Brand it</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_brand" xml:space="preserve">
+    <value>Uploading your company's logos in the Control Panel. To change the default portal title displayed on the Welcome page, go to Settings &gt;&gt; Common &gt;&gt; Customization &gt;&gt; Welcome Page Settings.</value>
+  </data>
+  <data name="ItemCreateWorkspaceDocs" xml:space="preserve">
+    <value>Create a single workspace for all your docs</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_customize_hdr" xml:space="preserve">
+    <value>Tip #3: Customize interface</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_customize" xml:space="preserve">
+    <value>Name the portal groups, its members and their activities following Settings &gt;&gt; Common &gt;&gt; Customization &gt;&gt; Team Template. Select the color theme that best suits your company brand.</value>
+  </data>
+  <data name="ItemImportProjects" xml:space="preserve">
+    <value>Import projects</value>
+  </data>
+  <data name="ItemImportProjectsBasecamp" xml:space="preserve">
+    <value>Import projects from Basecamp</value>
+  </data>
+  <data name="ItemIntegrateDocs" xml:space="preserve">
+    <value>Integrate documents</value>
+  </data>
+  <data name="ItemIntegrateIM" xml:space="preserve">
+    <value>Integrate your IM client with ONLYOFFICE talk and stay tuned</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_modules_hdr" xml:space="preserve">
+    <value>Tip #4: Select your tools</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_modules" xml:space="preserve">
+    <value>Enable instruments you need for work following Settings &gt;&gt; Common &gt;&gt; Modules &amp; Tools. The disabled ones will be hidden.</value>
+  </data>
+  <data name="ItemTryOnlineDocEditor" xml:space="preserve">
+    <value>Try full-featured online document editing in your browser</value>
+  </data>
+  <data name="ItemUploadCrm" xml:space="preserve">
+    <value>Upload CRM contacts</value>
+  </data>
+  <data name="ItemUploadCrmContacts" xml:space="preserve">
+    <value>Upload CRM contacts to ONLYOFFICE to access them everywhere</value>
+  </data>
+  <data name="ItemUploadCrmContactsCsv" xml:space="preserve">
+    <value>Upload CRM contacts from a csv. file</value>
+  </data>
+  <data name="LinkLearnMore" xml:space="preserve">
+    <value>Learn More &gt;&gt;</value>
+  </data>
+  <data name="pattern_activate_email" xml:space="preserve">
+    <value>h1.Activate your email for "${__VirtualRootPath}":"$InviteLink" portal.
 
-You selected a monthly ${LetterLogoText} subscription for the third time already.
+Hello!
 
-Why pay more? As you are our returning customer, we would like to offer you the 10% for the 1 year pricing plan.
+To start participating in the "${__VirtualRootPath}":"$InviteLink" portal life you need to activate your email address. This is done for security reasons.
 
-To pay with the discount please apply the coupon at the payment page: ==&lt;b&gt;10%yearlysubsc2015 &lt;/b&gt;==
+$GreenButton
 
-If you have any questions feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com". We will be glad to help you!
- 
+This link is valid for 7 days only. Please complete your email activation within that period.</value>
+  </data>
+  <data name="pattern_admin_voip_blocked" xml:space="preserve">
+    <value>h1.Message from the "${__VirtualRootPath}":"${__VirtualRootPath}" VoIP disabled</value>
+  </data>
+  <data name="pattern_admin_voip_warning" xml:space="preserve">
+    <value>h1.Message from the "${__VirtualRootPath}":"${__VirtualRootPath}" portal
 
-Truly yours,
-ONLYOFFICE Team
+VoIP Balance: $Body</value>
+  </data>
+  <data name="pattern_backup_created" xml:space="preserve">
+    <value>h1."${__VirtualRootPath}":"${__VirtualRootPath}" portal backup created
+
+Dear $OwnerName,
+
+A backup file containing data from your "${__VirtualRootPath}":"${__VirtualRootPath}" portal has been created.
+
+To learn more on the backup procedure please refer to our "Data backup":"${__HelpLink}/tipstricks/data-backup-restore.aspx" user guide.
+
+If you have any questions or need assistance please feel free to contact us at "support.onlyoffice.com":"http://support.onlyoffice.com"
+
+Best regards,
+ONLYOFFICE™ Support Team
 "www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="subject_after_payment1" xml:space="preserve">
-    <value>Your special offer for ${LetterLogoText}</value>
+  <data name="pattern_change_email" xml:space="preserve">
+    <value>h1.Email address change request
+
+You have requested to change your email address used to enter the ${LetterLogoText} portal.
+
+Please follow the link below to change your email address:
+
+$GreenButton
+
+*Note*: this link is valid for 7 days only. Please complete your email change process within that period.
+
+You might need your old email address to access the portal when you follow the link. If you do not remember the old email address, please contact your portal administrator.
+
+If you do not want to change your email or received this email by mistake, please ignore it or contact your portal administrator to find out the details.</value>
   </data>
-  <data name="ActionCreateForumPoll" xml:space="preserve">
-    <value>Poll was created at</value>
+  <data name="pattern_change_password" xml:space="preserve">
+    <value>h1.Password change request for the "${__VirtualRootPath}":"${__VirtualRootPath}" portal
+
+There has been a request to change your password used to enter the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
+
+Please follow the link below to change your password:
+
+$GreenButton
+
+*Note*: this link is valid for 7 days only. Please complete the password change process within that period.
+
+If you do not want to change your password or received this email by mistake, please ignore it or contact your "${__VirtualRootPath}":"${__VirtualRootPath}" portal administrator to find out the details.</value>
   </data>
-  <data name="ActionCreateForumPost" xml:space="preserve">
-    <value>Post was created at</value>
+  <data name="pattern_change_phone" xml:space="preserve">
+    <value>h1.Mobile phone change request
+
+You have requested to change your mobile phone used to enter the ${LetterLogoText} portal.
+
+Please follow the link below to change your mobile phone:
+
+$GreenButton
+
+If you do not want to change your mobile phone or received this email by mistake, please ignore it or contact your portal administrator to find out the details.</value>
   </data>
-  <data name="pattern_after_creation5" xml:space="preserve">
-    <value>Hello $UserName,
+  <data name="pattern_change_tfa" xml:space="preserve">
+    <value>h1.Backup codes change request
 
-My name is Tim and I work for ${LetterLogoText}. I started my work here long time ago, at the very beginning of the project. Believe me, I know everything about this application!
+You have requested to change your backup codes used to enter the ${LetterLogoText} portal.
 
-How is it going there? Is everything clear? Please share with me your impression. The feedback is the best contribution!
+Please follow the link below to change your backup codes:
 
-If you have questions regarding how to use ${LetterLogoText} or need help to start using it, just let me know. You can also send me feedback or ideas to help improve ${LetterLogoText}.
-
-Be productive and access your office at "${__VirtualRootPath}":"${__VirtualRootPath}" from anywhere!
-
-Mail me at "support@onlyoffice.com":"mailto:support@onlyoffice.com" whenever you need help.</value>
+$GreenButton
+</value>
   </data>
-  <data name="subject_after_creation5" xml:space="preserve">
-    <value>Hey, how is it going with ${LetterLogoText}?</value>
-  </data>
-  <data name="pattern_portal_rename" xml:space="preserve">
-    <value>h1.Change of Portal Address
+  <data name="pattern_confirm_owner_change" xml:space="preserve">
+    <value>h1.Change of "${__VirtualRootPath}":"${__VirtualRootPath}" portal owner
 
-Dear $UserDisplayName,
+Dear $OwnerName,
 
-Your "$PortalUrl" portal address was changed to the new "${__VirtualRootPath}":"${__VirtualRootPath}" address.
+There has been a request to change the "${__VirtualRootPath}":"${__VirtualRootPath}" portal owner to $UserName.
 
-*Note*: All the shared documents links are inaccessible now, as well as DNS settings and single sign-on options stop working until you change them. The third party iCal links added to your calendar will also stop updating until you reload them.
+Please follow the link below to confirm the operation:
+
+$GreenButton
+
+*Note*: this link is valid for 7 days only. Please complete the portal owner change process within that period.
 
 If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
 
@@ -1203,264 +357,240 @@ Best regards,
 ONLYOFFICE™ Support Team
 "www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="subject_portal_rename" xml:space="preserve">
-    <value>${LetterLogoText}. Change of Portal Address</value>
-  </data>
-  <data name="pattern_activate_freecloud" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_dns_change" xml:space="preserve">
+    <value>h1.Change of portal address
 
-$__AuthorName has invited you to join ${LetterLogoText} Free Cloud - your team's portal that would enchance internal cooperation. Your portal address is "${__VirtualRootPath}":"$InviteLink" (adding this link to your bookmarks is a good idea, you are most likely to get to use it a lot).
+Dear $OwnerName,
 
-You can accept the invitation by following the link below, it is only valid for 7 days:
+There has been a request to change the "${__VirtualRootPath}":"${__VirtualRootPath}" portal address to "$PortalAddress":"$PortalAddress" #if($PortalDns != "") ("$PortalDns":"$PortalDns" )#end.
 
-p=. "Click here to join the portal":"$InviteLink"</value>
-  </data>
-  <data name="pattern_activate_guest_freecloud" xml:space="preserve">
-    <value>Dear $UserName,
+Please follow the link below to confirm the operation:
 
-You have been invited as a guest user to the portal at "${__VirtualRootPath}":"$InviteLink". Please accept the invitation by following the link below, it is only valid for 7 days:
+$GreenButton
 
-p=. "Click here to join the portal":"$InviteLink"
+*Note*: this link is valid for 7 days only. Please complete the portal address change process within that period.
 
-If you need help with your portal, we invite you to browse our "Help Center":"http://teamlab.com/help/helpcenter.aspx" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Best regards,
-ONLYOFFICE Support Team
-"www.onlyoffice.com":"http://www.onlyoffice.com/"</value>
-  </data>
-  <data name="pattern_after_creation1_freecloud" xml:space="preserve">
-    <value>Dear $UserName,
-
-Recently a cloud office "${__VirtualRootPath}":"${__VirtualRootPath}" has been created for your team. To add colleagues distribute the invitation link available in your cloud office. Please follow these instructions:
-
-    # Click the *Settings* option on the left-side panel within the *People* module
-    # Switch to the *General* option
-    # Roll down the page till you see the *Invitation Link* caption
-    # Check the *Add users as guests* box to invite people who will have view-only permissions on your portal (if you want these people to create portal content, leave this box unchecked)
-    # Copy the link and send it to your teammates
-
-h2. What to start your work with?
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItemsBtm</value>
-  </data>
-  <data name="pattern_congratulations_freecloud" xml:space="preserve">
-    <value>Dear $UserName,
-
-You have just created your ${LetterLogoText} portal at  "${__VirtualRootPath}":"${__VirtualRootPath}". Starting from now you will have an opportunity to explore ${LetterLogoText} Free Cloud without any time limitations. Follow the link below to confirm your email address:
-
- p=. "Click here for confirmation":"$InviteLink"
-
-Please, complete your email activation within a week as the link is valid for 7 days only.
-
-Note: we do not send out confidential information (like your password) in emails for safety reasons. You may change your email or password in your "personal profile page":"$MyStaffLink".
-Language and time zone can be altered in "general settings":"$SettingsLink".
-After the portal customization you may start inviting your team members to the portal.
-Enjoy the flight! </value>
-  </data>
-  <data name="pattern_you_added_after_invite_freecloud" xml:space="preserve">
-    <value>Dear $UserName,
-
-Your user profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
-
-h3.Get started with your portal
-
-# Edit your "profile":"$MyStaffLink" to add personal and contact details.
-# Use "Community":"${__VirtualRootPath}/products/community/" to start your blogs, forums, add events, photos, and more.
-# Create "Projects":"${__VirtualRootPath}/products/projects/" and manage your workflow by adding milestones and tasks.
-# Upload, edit and organize "Documents":"${__VirtualRootPath}/products/files/".
-# Manage your customer relations using "CRM":"${__VirtualRootPath}/products/crm/" module, identify priority contacts, track communication history and sales performance.
-# Organize your work schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/" tracking tasks and milestones due dates.
-# Start "Talk":"${__VirtualRootPath}/addons/talk/" to chat with your team members online.
-# Add your email account to "${LetterLogoText} Mail":"${__VirtualRootPath}/addons/mail/".
-
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or our "Forum":"http://cloud.onlyoffice.com".
-
-Best regards,
-ONLYOFFICE Support Team
-"www.onlyoffice.com":"http://www.onlyoffice.com/"</value>
-  </data>
-  <data name="subject_you_added_after_invite_freecloud" xml:space="preserve">
-    <value>Welcome to ${LetterLogoText} Free Cloud</value>
-  </data>
-  <data name="pattern_after_creation30_freecloud" xml:space="preserve">
-    <value>Dear $UserName,
-
-Thank you for using ${LetterLogoText} service. Hope, everything's going fine.
-Is everything clear? Please share your impression. The feedback is the best contribution!
-
-At this moment the number of active users in the portal is $ActiveUsers
-
-If you're planning to increase the amount of disc space on your portal, need some extra possibilities or security measures, you can migrate to ${LetterLogoText} Commercial.
-
-"Learn more":"http://www.onlyoffice.com/saas.aspx"
-
-$BlueButton</value>
-  </data>
-  <data name="pattern_portal_delete_success_freecloud" xml:space="preserve">
-    <value>Dear  $OwnerName,
-
-Thank you for giving ${LetterLogoText} Free Cloud a try. Your portal "${__VirtualRootPath}":"${__VirtualRootPath}" has been successfully deactivated and we would highly appreciate your feedback. Please share your experience of using ${LetterLogoText} Office and give us a hint on how could we make it better. Your opinion is very important for us!
-
-Please, fill this form to leave your feedback - "$FeedBackUrl":"$FeedBackUrl"
-
-It will take you just a minute.
-
-Thank you and good luck!
-ONLYOFFICE Team.</value>
-  </data>
-  <data name="subject_after_creation30_freecloud" xml:space="preserve">
-    <value>Discover New Opportunities with ${LetterLogoText} Commercial</value>
-  </data>
-  <data name="pattern_you_added_like_guest_freecloud" xml:space="preserve">
-    <value>Dear $UserName,
-
-You have been invited as guest user to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
-
-h3.Get started with your portal
-
-# Edit your "profile":"$MyStaffLink" to add personal and contact details.
-# View and comment the content open available for all portal users in the "Community":"${__VirtualRootPath}/products/community/", "Projects":"${__VirtualRootPath}/products/projects/" modules.
-# Add and download files available for you in the "Documents":"${__VirtualRootPath}/products/files/" module.
-# Organize your schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
-# Start "Talk":"${__VirtualRootPath}/addons/talk/" to chat with other portal users online.
-
-
-If you need help with your portal, we invite you to browse our "Help Center":"http://onlyoffice.com/help/helpcenter.aspx" or visit our "Forum":"http://cloud.onlyoffice.org/".
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
 
 Best regards,
 ONLYOFFICE™ Support Team
 "www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="subject_payment_warning_before7" xml:space="preserve">
-    <value>${LetterLogoText} renewal notification</value>
-  </data>
-  <data name="pattern_payment_warning_before7" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_for_admin_notify" xml:space="preserve">
+    <value>h1.Message from the "${__VirtualRootPath}":"${__VirtualRootPath}" portal
 
-Please note that your Office Edition Subscription license is about to expire on $DueDate.
+Email: $UserEmail
 
-In order to extend your license, you need to purchase a product renewal for Office Edition Subscription.
-
-Click on the link below to start the renewal process:
-"Pricing page":"$PricingPage"
-
-For your convenience, when you purchase your next renewal, you can also enable the "auto-renew" license option, in which case your license will be renewed automatically at expiration time.
-
-For any further product installation, activation and technical support issues, please contact our support team at "http://support.onlyoffice.com/":"http://support.onlyoffice.com/"
-
-For payment related issues please contact Avangate by email at "support@avangate.com":"support@avangate.com"
-
-Sincerely,
-ONLYOFFICE Team</value>
-  </data>
-  <data name="subject_payment_warning" xml:space="preserve">
-    <value>${LetterLogoText} renewal notification</value>
-  </data>
-  <data name="pattern_payment_warning" xml:space="preserve">
-    <value>Dear $UserName,
-
-Please note that your Office Edition Subscription license is due to expire today.
-
-In order to extend your license, you need to purchase a product renewal for Office Edition Subscription.
-
-Click on the link below to start the renewal process:
-"Pricing page":"$PricingPage"
-
-For your convenience, when you purchase your next renewal, you can also enable the "auto-renew" license option, in which case your license will be renewed automatically at expiration time.
-
-For any further product installation, activation and technical support issues, please contact our support team at "http://support.onlyoffice.com/":"http://support.onlyoffice.com/"
-
-For payment related issues please contact Avangate by email at "support@avangate.com":"support@avangate.com"
-
-Sincerely,
-ONLYOFFICE Team</value>
-  </data>
-  <data name="subject_payment_warning_after3" xml:space="preserve">
-    <value>${LetterLogoText} renewal notification</value>
-  </data>
-  <data name="pattern_payment_warning_after3" xml:space="preserve">
-    <value>Dear $UserName,
-
-Please note that your Office Edition Subscription license has expired on $DueDate.
-
-In order to extend your license, you need to purchase a product renewal for Office Edition Subscription.
-
-Click on the link below to start the renewal process:
-"Pricing page":"$PricingPage"
-
-Please renew your license till $DelayDueDate, otherwise, you will not be able to access your web-office data. 
-
-For your convenience, when you purchase your next renewal, you can also enable the "auto-renew" license option, in which case your license will be renewed automatically at expiration time.
-
-For any further product installation, activation and technical support issues, please contact our support team at "http://support.onlyoffice.com/":"http://support.onlyoffice.com/"
-
-For payment related issues please contact Avangate by email at "support@avangate.com":"support@avangate.com"
-
-Sincerely,
-ONLYOFFICE Team</value>
-  </data>
-  <data name="subject_payment_warning_delaydue" xml:space="preserve">
-    <value>${LetterLogoText} renewal notification</value>
-  </data>
-  <data name="pattern_payment_warning_delaydue" xml:space="preserve">
-    <value>Dear $UserName,
-
-Please note that your Office Edition Subscription license has expired on $DueDate and the access to your web-office is currently blocked.
-
-In order to extend your license and continue to use your web-office, you need to purchase a product renewal for Office Edition Subscription.
-
-Click on the link below to start the renewal process:
-"Pricing page":"$PricingPage"
-
-Please renew your license till $DelayDueDate, otherwise, you will not be able to access your web-office data. 
-
-For your convenience, when you purchase your next renewal, you can also enable the "auto-renew" license option, in which case your license will be renewed automatically at expiration time.
-
-For any further product installation, activation and technical support issues, please contact our support team at "http://support.onlyoffice.com/":"http://support.onlyoffice.com/"
-
-For payment related issues please contact Avangate by email at "support@avangate.com":"support@avangate.com"
-
-Sincerely,
-ONLYOFFICE Team</value>
-  </data>
-  <data name="subject_request_tariff" xml:space="preserve">
-    <value>SAAS Tariff Request</value>
-  </data>
-  <data name="pattern_request_tariff" xml:space="preserve">
-    <value>h1.SAAS Tariff Request for "${__VirtualRootPath}":"${__VirtualRootPath}"
-
-h3.First name
-$UserName
-
-h3.Last name
-$UserLastName
-
-h3.Position
-$Position
-
-h3.Email
-"$UserEmail":"mailto:$UserEmail"
-
-h3.Phone
-$Phone
-
-h3.Company Website
-$Website
-
-h3.Company name
-$CompanyTitle
-
-h3.Company size
-$CompanySize
-
-h3.Request content
 $Body</value>
   </data>
-  <data name="subject_request_license" xml:space="preserve">
-    <value>Enterprise License Request</value>
+  <data name="pattern_join" xml:space="preserve">
+    <value>h1.Invitation to join "${__VirtualRootPath}":"$InviteLink" portal
+
+Hello,
+
+You have requested to join the "${__VirtualRootPath}":"$InviteLink" portal at ${LetterLogoText} - a platform for document and project management. Join the portal and start collaborating with your colleagues or friends right away.
+
+To accept the invitation please enter your name and password following this link:
+
+$GreenButton
+
+*Note*: this link is valid for 48 hours only. Please complete the operation within that period.</value>
+  </data>
+  <data name="pattern_mailbox_created" xml:space="preserve">
+    <value>
+      Dear $UserName,
+
+      Administrator has created a new &lt;b&gt;$Address&lt;/b&gt; mailbox for you at the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
+
+      Use the following settings for other email clients:
+
+      Login: &lt;b&gt;$Login&lt;/b&gt;
+      Password: "&lt;b&gt;set password&lt;/b&gt;":"$MyStaffLink"
+
+      Incoming Mail (IMAP): 
+      Server: &lt;b&gt;$Server&lt;/b&gt;
+      Port: &lt;b&gt;$ImapPort&lt;/b&gt;
+      SSL/TLS: &lt;b&gt;$Encryption&lt;/b&gt;
+
+      Outgoing Mail (SMTP): 
+      Server: &lt;b&gt;$Server&lt;/b&gt;
+      Port: &lt;b&gt;$SmtpPort&lt;/b&gt;
+      SSL/TLS: &lt;b&gt;$Encryption&lt;/b&gt;
+      Requires Authentication: &lt;b&gt;Yes&lt;/b&gt;
+
+      If you received this email by mistake, please ignore it or contact your portal administrator to find out the details.
+    </value>
+  </data>
+  <data name="pattern_mailbox_without_settings_created" xml:space="preserve">
+    <value>
+      Dear $UserName,
+
+      Administrator has created a new &lt;b&gt;$Address&lt;/b&gt; mailbox for you at the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
+
+      If you received this email by mistake, please ignore it or contact your portal administrator to find out the details.
+    </value>
+  </data>
+  <data name="pattern_mailbox_password_changed" xml:space="preserve">
+    <value>
+      Dear $UserName,
+
+      The password for the &lt;b&gt;$Address&lt;/b&gt; mailbox has been changed.
+
+      If you received this email by mistake, please ignore it or contact your portal administrator to find out the details.
+    </value>
+  </data>
+  <data name="pattern_migration_error" xml:space="preserve">
+    <value>h1.Another region portal migration error
+
+An error has occurred while migrating to the $RegionName region. Please, try once again later.
+Your portal is now available at the old address "$PortalUrl":"$PortalUrl"
+
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Best regards,
+ONLYOFFICE™ Support Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_migration_server_failure" xml:space="preserve">
+    <value>h1.Another region portal migration error
+
+An error has occurred while migrating to another region. Please, try once again later.
+Your portal is now available at the old address "$PortalUrl":"$PortalUrl"
+
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Best regards,
+ONLYOFFICE™ Support Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_migration_start" xml:space="preserve">
+    <value>h1.Another region portal migration started
+
+The portal migration to the $RegionName region is started. It might take some time depending on your data amount.
+
+*Note*: the portal will not be available during the migration process. After the migration is complete the portal URL will be changed and all the shared documents links will be inaccessible.
+
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Best regards,
+ONLYOFFICE™ Support Team
+"www.onlyoffice.com":"http://onlyoffice.com/"
+
+^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.^</value>
+  </data>
+  <data name="pattern_migration_success" xml:space="preserve">
+    <value>h1.Another region portal migration successfully completed
+
+The portal migration to the $RegionName region is successfully completed.
+Your portal is now available at "$PortalUrl":"$PortalUrl"
+
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Best regards,
+ONLYOFFICE™ Support Team
+"www.onlyoffice.com":"http://onlyoffice.com/"
+
+^You receive this email because you are a registered user of the "$PortalUrl":"$PortalUrl" portal.^</value>
+  </data>
+  <data name="pattern_portal_deactivate" xml:space="preserve">
+    <value>h1.Deactivation of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal
+
+Dear $OwnerName,
+
+You have requested a temporary deactivation of your "${__VirtualRootPath}":"${__VirtualRootPath}" portal. Please follow the link below to confirm the operation:
+
+$GreenButton
+
+*Note*: this link is valid for 7 days only. Please complete the portal deactivation process within that period.
+
+You can reactivate your portal any time by clicking the following link:
+p=. "Reactivate Portal":"$ActivateUrl" (this link has no time limit)
+
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Best regards,
+ONLYOFFICE™ Support Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_portal_delete" xml:space="preserve">
+    <value>h1.Deletion of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal
+
+Dear $OwnerName,
+
+You have requested to permanently delete your "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
+
+*Important! All the data stored on your portal, as well as your registration details will be lost and cannot be recovered.*
+
+#if($AutoRenew == "True")
+Before you delete the portal, please make sure that automatic billing is turned off. You may check the status of automatic billing in your "Avangate account":"https://secure.avangate.com/myaccount/".
+#end
+
+If you still want to delete your "${__VirtualRootPath}":"${__VirtualRootPath}" portal please follow the link below to confirm the operation:
+
+$GreenButton
+
+*Note*: this link is valid for 7 days only. Please complete the portal deletion process within that period.
+
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Best regards,
+ONLYOFFICE™ Support Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_portal_delete_success_v10" xml:space="preserve">
+    <value>Your ONLYOFFICE has been successfully deactivated. Please note that all of your data will be deleted in accordance with "our Privacy statement":"https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=5048502&amp;doc=SXhWMEVzSEYxNlVVaXJJeUVtS0kyYk14YWdXTEFUQmRWL250NllHNUFGbz0_IjUwNDg1MDIi0". 
+
+Why have you decided to leave? Share your experience with us.
+
+$GreenButton
+
+Thank you and good luck! 
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_portal_rename" xml:space="preserve">
+    <value>h1.Change of portal address
+
+Dear $UserDisplayName,
+
+Your $PortalUrl portal address was changed to the new "${__VirtualRootPath}":"${__VirtualRootPath}" address.
+
+*Note*: All the shared documents links are inaccessible now, as well as DNS settings and single sign-on options stop working until you change them. The third party iCal links added to your calendar will also stop updating until you reload them.</value>
+  </data>
+  <data name="pattern_profile_delete" xml:space="preserve">
+    <value>h1.Removal of the profile from the "${__VirtualRootPath}":"${__VirtualRootPath}" portal
+
+You have requested to permanently delete your profile from the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
+
+If you still want to delete your profile please follow the link below to confirm the operation:
+
+$GreenButton
+
+*Note*: this link is valid for 7 days only. Please complete the profile deletion process within that period.
+
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_profile_updated" xml:space="preserve">
+    <value>h1.Your profile at "$__VirtualRootPath":"$__VirtualRootPath" has been changed
+
+Dear $UserName,
+
+Your user profile details at "$__VirtualRootPath":"$__VirtualRootPath" have been changed by "$__AuthorName":"$__AuthorUrl".
+
+To view your profile follow the link below:
+"$UserName":"$MyStaffLink"
+
+^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.^
+</value>
   </data>
   <data name="pattern_request_license" xml:space="preserve">
-    <value>h1.Enterprise License Request
+    <value>h1.Enterprise license request
 
 h3.First name
 $UserName
@@ -1492,552 +622,1644 @@ $Body
 h3.Portal address
 "${__VirtualRootPath}":"${__VirtualRootPath}"</value>
   </data>
-  <data name="pattern_admin_welcome" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_request_tariff1" xml:space="preserve">
+    <value>h1.SAAS Tariff Request for "${__VirtualRootPath}":"${__VirtualRootPath}"
 
-Recently a cloud office "${__VirtualRootPath}":"${__VirtualRootPath}" has been created for your team. To add colleagues distribute the invitation link available in your cloud office. Please follow these instructions:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
+h3.First name
+$UserName
+
+h3.Last name
+$UserLastName
+
+h3.Position
+$Position
+
+h3.Email
+"$UserEmail":"mailto:$UserEmail"
+
+h3.Phone
+$Phone
+
+h3.Company Website
+$Website
+
+h3.Company name
+$CompanyTitle
+
+h3.Company size
+$CompanySize
+
+h3.Request content
+$Body</value>
+  </data>
+  <data name="pattern_restore_completed" xml:space="preserve">
+    <value>h1.Portal restoration completed
+
+The portal restoration process has been successfully completed.
+
+Your portal is available again.
+
+Best regards,
+ONLYOFFICE™ Support Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_restore_started" xml:space="preserve">
+    <value>h1.Portal restoration started
+
+The portal restoration is started. It might take some time depending on your data amount.
+
+*Note*: the portal will not be available during the restoration process.
+
+If you have any questions or need assistance please feel free to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Best regards,
+ONLYOFFICE™ Support Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_self_profile_updated" xml:space="preserve">
+    <value>h1."${__VirtualRootPath}":"${__VirtualRootPath}" portal profile change notification
+
+"$__AuthorName":"$__AuthorUrl" has changed his/her profile details at the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.</value>
+  </data>
+  <data name="pattern_send_whats_new" xml:space="preserve">
+    <value>h1.What's new on "${__VirtualRootPath}":"${__VirtualRootPath}" portal for $Date
+
+#foreach($activity in $Activities)
+
+h2.$activity.Key
+
+#foreach($whatsNewActivity in $activity.Value)
+#foreach($b in $whatsNewActivity.BreadCrumbs) h3.$b
+#end "$whatsNewActivity.Title":"$whatsNewActivity.URL"
+*Author*: "$whatsNewActivity.UserName":"$whatsNewActivity.UserAbsoluteURL", $whatsNewActivity.Action: $whatsNewActivity.Date.ToShortTimeString()
+
+
+#end
+
+#end</value>
+  </data>
+  <data name="pattern_smtp_test" xml:space="preserve">
+    <value>SMTP test message
+
+This message was generated automatically to test your SMTP settings. If you are viewing it this means that the settings are correct and you can use them on your portal.
+
+
+Best regards,
+ONLYOFFICE Team</value>
+  </data>
+  <data name="pattern_user_has_join" xml:space="preserve">
+    <value>h1.New user added to "${__VirtualRootPath}":"${__VirtualRootPath}" portal
+
+"$__AuthorName":"$__AuthorUrl" has joined your portal at "${__VirtualRootPath}":"${__VirtualRootPath}".</value>
+  </data>
+  <data name="subject_activate_email" xml:space="preserve">
+    <value>${LetterLogoText}. Please activate your email address</value>
+  </data>
+  <data name="subject_admin_voip_blocked" xml:space="preserve">
+    <value>VoIP disabled</value>
+  </data>
+  <data name="subject_admin_voip_warning" xml:space="preserve">
+    <value>Notification to administrators about VoIP balance</value>
+  </data>
+  <data name="subject_backup_created" xml:space="preserve">
+    <value>${LetterLogoText}. ${__VirtualRootPath} portal backup created</value>
+  </data>
+  <data name="subject_change_email" xml:space="preserve">
+    <value>${LetterLogoText}. Email change request</value>
+  </data>
+  <data name="subject_change_password" xml:space="preserve">
+    <value>${LetterLogoText} password assistance</value>
+  </data>
+  <data name="subject_change_phone" xml:space="preserve">
+    <value>${LetterLogoText}. Mobile phone change request</value>
+  </data>
+  <data name="subject_change_tfa" xml:space="preserve">
+    <value>${LetterLogoText}. Backup codes change request</value>
+  </data>
+  <data name="subject_mailbox_created" xml:space="preserve">
+    <value>${LetterLogoText}. Mailbox creation</value>
+  </data>
+  <data name="subject_mailbox_password_changed" xml:space="preserve">
+    <value>${LetterLogoText}. Change of mailbox password</value>
+  </data>
+  <data name="subject_confirm_owner_change" xml:space="preserve">
+    <value>${LetterLogoText}. Change of portal owner</value>
+  </data>
+  <data name="subject_dns_change" xml:space="preserve">
+    <value>${LetterLogoText}. Change of portal address</value>
+  </data>
+  <data name="subject_for_admin_notify" xml:space="preserve">
+    <value>User message to administrators</value>
+  </data>
+  <data name="subject_join" xml:space="preserve">
+    <value>Invitation to join ${__VirtualRootPath} portal</value>
+  </data>
+  <data name="subject_migration_error" xml:space="preserve">
+    <value>${LetterLogoText}. Another region portal migration error</value>
+  </data>
+  <data name="subject_migration_start" xml:space="preserve">
+    <value>${LetterLogoText}. Another region portal migration started</value>
+  </data>
+  <data name="subject_migration_success" xml:space="preserve">
+    <value>${LetterLogoText}. Another region portal migration successfully completed</value>
+  </data>
+  <data name="subject_portal_deactivate" xml:space="preserve">
+    <value>Deactivation of the ${__VirtualRootPath} portal</value>
+  </data>
+  <data name="subject_portal_delete" xml:space="preserve">
+    <value>Deletion of the ${__VirtualRootPath} portal</value>
+  </data>
+  <data name="subject_portal_delete_success_v10" xml:space="preserve">
+    <value>ONLYOFFICE has been deactivated</value>
+  </data>
+  <data name="subject_portal_rename" xml:space="preserve">
+    <value>${LetterLogoText}. Change of portal address</value>
+  </data>
+  <data name="subject_profile_delete" xml:space="preserve">
+    <value>Deletion of your profile from ${__VirtualRootPath} portal</value>
+  </data>
+  <data name="subject_profile_updated" xml:space="preserve">
+    <value>Your profile at ${__VirtualRootPath} has been changed</value>
+  </data>
+  <data name="subject_request_license" xml:space="preserve">
+    <value>Enterprise license request</value>
+  </data>
+  <data name="subject_request_tariff" xml:space="preserve">
+    <value>SaaS pricing plan request</value>
+  </data>
+  <data name="subject_restore_completed" xml:space="preserve">
+    <value>${LetterLogoText}. Restore completed</value>
+  </data>
+  <data name="subject_restore_started" xml:space="preserve">
+    <value>${LetterLogoText}. Restore started</value>
+  </data>
+  <data name="subject_self_profile_updated" xml:space="preserve">
+    <value>${__VirtualRootPath} portal profile change notification</value>
+  </data>
+  <data name="subject_send_whats_new" xml:space="preserve">
+    <value>What's new on your portal for $Date</value>
+  </data>
+  <data name="subject_smtp_test" xml:space="preserve">
+    <value>SMTP test message</value>
+  </data>
+  <data name="subject_user_has_join" xml:space="preserve">
+    <value>New user added to ${LetterLogoText} portal</value>
+  </data>
+  <data name="pattern_saas_admin_activation_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+You have just created the ONLYOFFICE portal, your team's cloud office that would enhance internal cooperation. Its address is "${__VirtualRootPath}":"${__VirtualRootPath}". 
+
+Please, confirm your email: 
+
+$GreenButton
+
+The link will be valid for 7 days.
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="subject_saas_admin_activation_v10" xml:space="preserve">
+    <value>Welcome to ONLYOFFICE cloud!</value>
+  </data>
+  <data name="pattern_enterprise_admin_activation_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+You have just created the ONLYOFFICE portal, your team's cloud office that would enhance internal cooperation. Its address is "${__VirtualRootPath}":"${__VirtualRootPath}".
+
+Please, confirm your email:
+
+$GreenButton
+
+You may change your email or password in your "personal profile page":"$MyStaffLink".
+
+To send notifications, we use the SMTP settings of ONLYOFFICE mail server. To change them, please follow the instructions "here":"${__HelpLink}/server/windows/community/smtp-settings.aspx".
+
+More information in ONLYOFFICE "Help Center":"${__HelpLink}".</value>
+  </data>
+  <data name="subject_enterprise_admin_activation_v10" xml:space="preserve">
+    <value>Confirm your email</value>
+  </data>
+  <data name="pattern_enterprise_whitelabel_admin_activation_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+You have just created your corporate web-office, your team's cloud office that would enhance internal cooperation.  Its address is "${__VirtualRootPath}":"${__VirtualRootPath}".
+
+Please, confirm your email:
+
+$GreenButton
+
+You may change your email or password in your "personal profile page":"$MyStaffLink".</value>
+  </data>
+  <data name="subject_enterprise_whitelabel_admin_activation_v10" xml:space="preserve">
+    <value>Confirm your email</value>
+  </data>
+  <data name="pattern_enterprise_admin_welcome_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Here’s what you can do to make your web-office even more secure:
+
+*Get an SSL certificate* if you are going to provide not only local but also external portal access for your users. Generate a new signed certificate in the Control Panel or purchase one from the provider you trust.
+
+*Enable automatic backups* in the Control Panel. We also recommend that you use third-party services and make a backup copy of the server with ONLYOFFICE installed from time to time. Instructions in our "Help Center":"${__HelpLink}/server/controlpanel/enterprise/backup-restore.aspx".
+
+*Adjust portal security settings*: restrict access using IP whitelisting, specify trusted mail domains, set password length and more. "More information &gt;&gt;":"${__HelpLink}/server/enterprise/configure-enterprise.aspx" 
+
+*Enable 2-factor authentication* via SMS or authenticator app. Instructions "here":"${__HelpLink}/guides/two-factor-authentication.aspx".
+
+*Use LDAP for access centralization*. Easily import the necessary users and groups from your LDAP server (e.g. OpenLDAP Server or Microsoft Active Directory) to your portal. Learn more "here":"${__HelpLink}/server/windows/community/ldap-settings.aspx".
+
+*Use own SMPT server*. By default notifications for ONLYOFFICE Enterprise Edition users (for example, if they are granted access to a document) are provided by means of standard ONLYOFFICE SMPT server. Configure your own SMTP server so that your notifications won’t pass through any third-party server. "Instructions &gt;&gt;":"${__HelpLink}/server/enterprise/configure-enterprise.aspx"
+
+*Close all the unnecessary ports*. The list of all the ports which must be opened for ONLYOFFICE is "here":"${__HelpLink}/server/docker/community/open-ports.aspx".
+
+Make your ONLYOFFICE more secure now.
+
+$GreenButton
+
+More information in our "Help Center":"${__HelpLink}".</value>
+  </data>
+  <data name="pattern_enterprise_whitelabel_admin_welcome_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Here’s what you can do to make your web-office even more secure:
+
+*Get an SSL certificate* if you are going to provide not only local but also external portal access for your users. Generate a new signed certificate in the Control Panel or purchase one from the provider you trust.
+
+*Enable automatic backups* in the Control Panel. We also recommend that you use third-party services and make a backup copy of the server from time to time.
+
+*Adjust portal security settings*: restrict access using IP whitelisting, specify trusted mail domains, set password length and more.
+
+*Enable 2-factor authentication* via SMS or authenticator app.
+
+*Use LDAP for access centralization*. Easily import the necessary users and groups from your LDAP server (e.g. OpenLDAP Server or Microsoft Active Directory) to your portal.
+
+*Use own SMPT server* and close all the unnecessary ports.
+
+Make your ONLYOFFICE more secure now.
+
+$GreenButton</value>
+  </data>
+  <data name="pattern_saas_admin_welcome_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Customize and manage your ONLYOFFICE to make it more comfortable and secure:
+
+$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItem6 $TableItem7 $TableItemsBtm
+
+And that’s not the full list of what you can do! 
+
 $GreenButton
    
-Done. It's time to invite teammates to your web-office!
-
-For more information we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
+Visit our "Help Center":"${__HelpLink}" to learn more about customizing your office. Always consult it when you have questions about the functionality and encourage your users to do so.
 
 Truly yours,
 ONLYOFFICE Team
 "www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="subject_admin_welcome" xml:space="preserve">
-    <value>Configuring Your ${LetterLogoText} Portal for the First Time</value>
+  <data name="subject_enterprise_admin_welcome_v10" xml:space="preserve">
+    <value>Make your ONLYOFFICE more secure</value>
   </data>
-  <data name="ButtonAccessYouWebOffice" xml:space="preserve">
-    <value>Access Your Web-Office</value>
+  <data name="subject_enterprise_whitelabel_admin_welcome_v10" xml:space="preserve">
+    <value>Make your online office more secure</value>
   </data>
-  <data name="ButtonConfigureRightNow" xml:space="preserve">
-    <value>Configure Right Now</value>
+  <data name="subject_saas_admin_welcome_v10" xml:space="preserve">
+    <value>Configure your ONLYOFFICE</value>
   </data>
-  <data name="ButtonInviteRightNow" xml:space="preserve">
-    <value>Invite Right Now</value>
-  </data>
-  <data name="ButtonAccessMail" xml:space="preserve">
-    <value>Access Your Mail</value>
-  </data>
-  <data name="ButtonMoveRightNow" xml:space="preserve">
-    <value>Move Right Now</value>
-  </data>
-  <data name="ItemFeatureTips1CoEditingText" xml:space="preserve">
-    <value>&lt;b&gt;Tip #1.&lt;/b&gt; Use the &lt;b&gt;Real-time Co-editing&lt;/b&gt; feature to avoid the manual tracking changes and merging and speed up the interaction process when specifying details or proofreading a document.</value>
-  </data>
-  <data name="ItemFeatureTips2VersionHistoryText" xml:space="preserve">
-    <value>&lt;b&gt;Tip #2.&lt;/b&gt; Use the &lt;b&gt;Version History&lt;/b&gt; option to check the changes made to a file by you and your teammates or see who made the specific edits.</value>
-  </data>
-  <data name="ItemFeatureTips3ShareDocsText" xml:space="preserve">
-    <value>&lt;b&gt;Tip #3. Share documents&lt;/b&gt; with other users or people outside your cloud office. Attach documents as links to your email to reduce the mail traffic.</value>
-  </data>
-  <data name="ItemFeatureTips4MailMergeText" xml:space="preserve">
-    <value>&lt;b&gt;Tip #4.&lt;/b&gt; Use the &lt;b&gt;Mail Merge&lt;/b&gt; function to create a set of personalized messages or a templates and save time you usually spend on writing the same text several times.</value>
-  </data>
-  <data name="ItemFeatureTips5iOSText" xml:space="preserve">
-    <value>&lt;b&gt;Tip #5.&lt;/b&gt; Download &lt;b&gt;${LetterLogoText} Documents app&lt;/b&gt; and install it on your iOS device to work with documents anywhere, anytime, even on the go.</value>
-  </data>
-  <data name="LinkLearnMore" xml:space="preserve">
-    <value>Learn More &gt;&gt;</value>
-  </data>
-  <data name="pattern_after_creation6" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_enterprise_user_activation_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-In almost every business are we are to deal with documents every day - contracts, reports, white papers, invoices, etc. - and waste a lot of time moving it around. To help you work more efficiently and reduce time and efforts spent on paperwork, make use of these 5 simple tips and tricks.
+$__AuthorName has invited you to join your company's safe and secure web-office that would enhance your collaboration. Its address is "${__VirtualRootPath}":"${__VirtualRootPath}".
 
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_after_creation6" xml:space="preserve">
-    <value>5 Tips and Tricks to Work More Effectively in ${LetterLogoText} Documents</value>
-  </data>
-  <data name="ButtonGoToAppStore" xml:space="preserve">
-    <value>Go to the App Store &gt;&gt;</value>
-  </data>
-  <data name="ItemARMText" xml:space="preserve">
-    <value>Set up individual access rights for each contact - person or company.</value>
-  </data>
-  <data name="ItemCustomizationText" xml:space="preserve">
-    <value>Set up CRM system according to your company needs. Customize user fields, set opportunity stages and task categories, create the company profile to include this information into invoices, etc.</value>
-  </data>
-  <data name="ItemFeatureCommunity" xml:space="preserve">
-    <value>Community</value>
-  </data>
-  <data name="ItemFeatureCommunityText" xml:space="preserve">
-    <value>&lt;b&gt;Create an internal social network&lt;/b&gt; with blogs, forums, polls, etc. to organize an efficient two-way communication. Moreover it allows you to discover hidden talents, creative persons, able to organize and lead.</value>
-  </data>
-  <data name="ItemFeatureDocCoAuthoring" xml:space="preserve">
-    <value>Document Co-authoring</value>
-  </data>
-  <data name="ItemFeatureDocCoAuthoringText" xml:space="preserve">
-    <value>Share docs with your team and edit them together in real time. Add comments and interact with your co-authors using the integrated chat.</value>
-  </data>
-  <data name="ItemFeatureGanttChart" xml:space="preserve">
-    <value>Gantt Chart</value>
-  </data>
-  <data name="ItemFeatureGanttChartText" xml:space="preserve">
-    <value>&lt;b&gt;Define processes, priorities and dependencies&lt;/b&gt; to help your team to better perform tasks. Monitor progress and perform changes in time using a visualized picture of your project.</value>
-  </data>
-  <data name="ItemFeatureProjectDiscussions" xml:space="preserve">
-    <value>Project Discussions</value>
-  </data>
-  <data name="ItemFeatureProjectDiscussionsText" xml:space="preserve">
-    <value>&lt;b&gt;Discuss issues&lt;/b&gt; - any sort of problems and outstanding questions that occur - with your team to find a better solution together.</value>
-  </data>
-  <data name="ItemFeatureTalk" xml:space="preserve">
-    <value>Talk</value>
-  </data>
-  <data name="ItemFeatureTalkText" xml:space="preserve">
-    <value>Use &lt;b&gt;chat rooms&lt;/b&gt; to create a conference in real time, &lt;b&gt;mailing lists&lt;/b&gt; to send a message to many people at once, &lt;b&gt;notifications&lt;/b&gt; to follow news.</value>
-  </data>
-  <data name="ItemLinkWithProjects" xml:space="preserve">
-    <value>Link with projects</value>
-  </data>
-  <data name="ItemLinkWithProjectsText" xml:space="preserve">
-    <value>Working on an opportunity might require the involvement of the whole team of the specialists. Create a project and link it with the opportunity to coordinate the work more efficiently.</value>
-  </data>
-  <data name="ItemMailIntegration" xml:space="preserve">
-    <value>Mail Integration</value>
-  </data>
-  <data name="ItemMailIntegrationText" xml:space="preserve">
-    <value>Keep all the information about contacts, opportunities and cases in one place including email correspondence. Link a conversation or a single message with a necessary CRM element.</value>
-  </data>
-  <data name="ItemWebToLeadText" xml:space="preserve">
-    <value>Create and embed the contact form into your company website. Gather new lead information automatically and gain more prospective customers effortlessly.</value>
-  </data>
-  <data name="pattern_after_creation7" xml:space="preserve">
-    <value>Collaboration is the most effective way to solve a problem. But working as a team is not always easy. ${LetterLogoText} offers you a set of tools designed to help you to improve your team collaboration:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com" or visit our "Forum":"http://cloud.onlyoffice.org".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="subject_after_creation7" xml:space="preserve">
-    <value>5 Tools to Encourage Collaboration in Your Team</value>
-  </data>
-  <data name="ButtonAccessControlPanel" xml:space="preserve">
-    <value>Access Control Panel</value>
-  </data>
-  <data name="ButtonAccessYourPortal" xml:space="preserve">
-    <value>Access Your Portal</value>
-  </data>
-  <data name="pattern_activate_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
-
- $__AuthorName has invited you to join ${LetterLogoTextTM} - your team's portal that would enchance internal cooperation. Your portal address is "${__VirtualRootPath}":"$InviteLink" (adding this link to your bookmarks is a good idea, you are most likely to get to use it a lot).
-
- You can accept the invitation by following the link below, it is only valid for 7 days:
-
-p=. "Click here to join the portal":"$InviteLink"
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="pattern_activate_guest_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
-
-You have been invited as a guest user to the portal at "${__VirtualRootPath}":"$InviteLink". Please accept the invitation by following the link below, it is only valid for 7 days:
-
-p=. "Click here to join the portal":"$InviteLink"
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="pattern_admin_welcome_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
-
-To make the portal management quick and easy, ${LetterLogoText} provides you with Control Panel, a set of automation tools that allows you to:
-
-- Change the default portal logos to brand your web-office;
-
-- Turn on HTTPS to keep your portal data secure;
-
-- Import users from your LDAP server;
-
-- Backup your portal data on a regular basis to avoid any data-loss;
-
-- Check for available ${LetterLogoText} updates;
-
-- Track login history and receive the audit trail data.
+Accept the invitation by clicking the link:
 
 $GreenButton
 
-For more information we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
+The link is only valid for 7 days.
 
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+You will get more tips on how to use your we-office. You can cancel the subscriptions on your Profile page at any moment as well as re-enable them.</value>
   </data>
-  <data name="pattern_congratulations_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_enterprise_user_welcome_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-You have just created the ${LetterLogoText} portal, your team's portal that would enhance internal cooperation. Your portal address is "${__VirtualRootPath}":"${__VirtualRootPath}" (adding this link to your bookmarks is a good idea, you are most likely to get to use it a lot). Follow the link below to confirm your email address:
-$GreenButton
+Your user profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}". Now you can:
 
-Please, complete your email activation within a week as the link is valid for 7 days only.
-
-Note: we do not send out confidential information (like your password) in emails for safety reasons. You may change your email or password in your "personal profile page":"$MyStaffLink".
-
-To send messages, we used SMTP settings of our default notify.onlyoffice.com mail server. You may change the SMTP settings following the instructions "here":"http://helpcenter.onlyoffice.com/ru/server/windows/community/smtp-settings.aspx".
-
-For more information we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
-  </data>
-  <data name="pattern_you_added_after_invite_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
-
-Your user profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
-
-h3.Get started with your portal
-
-# Edit your "profile":"$MyStaffLink" to add personal and contact details.
-# Create, edit and organize "Documents":"${__VirtualRootPath}/products/files/".
-# Add your email account to "${LetterLogoTextTM} Mail":"${__VirtualRootPath}/addons/mail/".
-# Create "Projects":"${__VirtualRootPath}/products/projects/" and manage your workflow by adding milestones and tasks.
-# Manage your customer relations using "CRM":"${__VirtualRootPath}/products/crm/" module, identify priority contacts, track communication history and sales performance.
-# Use "Community":"${__VirtualRootPath}/products/community/" to start your blogs, forums, add events, share bookmarks.
+# Create and edit "Documents":"${__VirtualRootPath}/Products/Files/", share them with teammates, and collaborate in real time.
+# Add your email accounts and manage all correspondence in one place with "Mail":"${__VirtualRootPath}/addons/mail/".
+# Manage your workflow with "Projects":"${__VirtualRootPath}/Products/Projects/" and your customer relationships using "CRM":"${__VirtualRootPath}/Products/CRM/".
+# Use "Community":"${__VirtualRootPath}/Products/Community/" to start your blogs, forums, add events, share bookmarks.
 # Organize your work schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
-# Start "Talk":"${__VirtualRootPath}/addons/talk/" to chat with your teammates online.
+# Use "Chat":"${__VirtualRootPath}/addons/talk/" to exchange instant messages.
+
+$GreenButton</value>
+  </data>
+  <data name="pattern_enterprise_whitelabel_user_activation_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+$__AuthorName has invited you to join your company's safe and secure web-office that would enhance your collaboration. Its address is "${__VirtualRootPath}":"${__VirtualRootPath}".
+
+Accept the invitation by clicking the link:
 
 $GreenButton
 
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
+The link is only valid for 7 days.
+
+You will get more tips on how to use your we-office. You can cancel the subscriptions on your Profile page at any moment as well as re-enable them.</value>
+  </data>
+  <data name="pattern_enterprise_whitelabel_user_welcome_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Your user profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}". Now you can:
+
+# Create and edit "Documents":"${__VirtualRootPath}/Products/Files/", share them with teammates, and collaborate in real time.
+# Add your email accounts and manage all correspondence in one place with "Mail":"${__VirtualRootPath}/addons/mail/".
+# Manage your workflow with "Projects":"${__VirtualRootPath}/Products/Projects/" and your customer relationships using "CRM":"${__VirtualRootPath}/Products/CRM/".
+# Use "Community":"${__VirtualRootPath}/Products/Community/" to start your blogs, forums, add events, share bookmarks.
+# Organize your work schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
+# Use "Chat":"${__VirtualRootPath}/addons/talk/" to exchange instant messages.
+
+$GreenButton</value>
+  </data>
+  <data name="pattern_saas_user_activation_v10" xml:space="preserve">
+    <value>Hello!
+
+You are invited to join ONLYOFFICE at "${__VirtualRootPath}":"${__VirtualRootPath}". Accept the invitation by clicking the link:
+
+$GreenButton
+
+We will also send you useful tips, latest ONLYOFFICE news and special offers once in a while. You can cancel the subscriptions on your Profile page at any moment as well as re-enable them.
 
 Truly yours,
 ONLYOFFICE Team
 "www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="pattern_you_added_like_guest_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_saas_user_welcome_v10" xml:space="preserve">
+    <value>Hello!
 
-Your guest profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
+Welcome to ONLYOFFICE! Your user profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}". Now you can:
 
-h3.Get started with your portal
+# Create and edit "Documents":"${__VirtualRootPath}/Products/Files/", share them with teammates, and collaborate in real time.
+# Add your email accounts and manage all correspondence in one place with "Mail":"${__VirtualRootPath}/addons/mail/".
+# Manage your workflow with "Projects":"${__VirtualRootPath}/Products/Projects/" and your customer relationships using "CRM":"${__VirtualRootPath}/Products/CRM/".
+# Use "Community":"${__VirtualRootPath}/Products/Community/" to start your blogs, forums, add events, share bookmarks.
+# Organize your work schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
+# Use "Chat":"${__VirtualRootPath}/addons/talk/" to exchange instant messages.
 
-# Edit your "profile":"$MyStaffLink" to add personal and contact details.
-# View and comment the content open available for all portal users in the "Community":"${__VirtualRootPath}/products/community/", "Projects":"${__VirtualRootPath}/products/projects/" modules.
-# Add and download files available for you in the "Documents":"${__VirtualRootPath}/products/files/" module.
+$GreenButton
+
+If you need help, browse our "Help Center":"${__HelpLink}" or ask our "support team":"https://support.onlyoffice.com".
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="subject_enterprise_user_activation_v10" xml:space="preserve">
+    <value>Join ${__VirtualRootPath}</value>
+  </data>
+  <data name="subject_enterprise_user_welcome_v10" xml:space="preserve">
+    <value>Welcome to your web-office</value>
+  </data>
+  <data name="subject_enterprise_whitelabel_user_activation_v10" xml:space="preserve">
+    <value>Join ${__VirtualRootPath}</value>
+  </data>
+  <data name="subject_enterprise_whitelabel_user_welcome_v10" xml:space="preserve">
+    <value>Welcome to your web-office</value>
+  </data>
+  <data name="subject_saas_user_activation_v10" xml:space="preserve">
+    <value>Join ${__VirtualRootPath}</value>
+  </data>
+  <data name="subject_saas_user_welcome_v10" xml:space="preserve">
+    <value>Welcome to your ONLYOFFICE</value>
+  </data>
+  <data name="pattern_enterprise_guest_activation_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+$__AuthorName has invited you as a guest user to "${__VirtualRootPath}":"${__VirtualRootPath}". Accept the invitation by clicking the link:
+
+$GreenButton
+
+The link is only valid for 7 days.
+
+You will get more tips on how to use your web-office. You can cancel the subscriptions on your Profile page at any moment as well as re-enable them.</value>
+  </data>
+  <data name="pattern_enterprise_guest_welcome_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Your guest profile has been successfully added to "${__VirtualRootPath}":"${__VirtualRootPath}". Now you can:
+
+# Edit your "profile":"$MyStaffLink".
+# View and comment the content available in the "Community":"${__VirtualRootPath}/Products/Community/" and "Projects":"${__VirtualRootPath}/Products/Projects/".
+# Add and download files available for you in the "Documents":"${__VirtualRootPath}/Products/Files/".
 # Organize your schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
-# Start "Talk":"${__VirtualRootPath}/addons/talk/" to chat with other portal users online.
+# Use "Chat":"${__VirtualRootPath}/addons/talk/" to exchange instant messages.
+
+$GreenButton</value>
+  </data>
+  <data name="pattern_enterprise_whitelabel_guest_activation_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+$__AuthorName has invited you as a guest user to "${__VirtualRootPath}":"${__VirtualRootPath}". Accept the invitation by clicking the link:
 
 $GreenButton
 
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
+The link is only valid for 7 days.
+
+You will get more tips on how to use your web-office. You can cancel the subscriptions on your Profile page at any moment as well as re-enable them.</value>
+  </data>
+  <data name="pattern_enterprise_whitelabel_guest_welcome_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Your guest profile has been successfully added to "${__VirtualRootPath}":"${__VirtualRootPath}". Now you can:
+
+# Edit your "profile":"$MyStaffLink".
+# View and comment the content available in the "Community":"${__VirtualRootPath}/Products/Community/" and "Projects":"${__VirtualRootPath}/Products/Projects/".
+# Add and download files available for you in the "Documents":"${__VirtualRootPath}/Products/Files/".
+# Organize your schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
+# Use "Chat":"${__VirtualRootPath}/addons/talk/" to exchange instant messages.
+
+$GreenButton</value>
+  </data>
+  <data name="pattern_saas_guest_activation_v10" xml:space="preserve">
+    <value>Hello!
+
+You are invited to join "${__VirtualRootPath}":"${__VirtualRootPath}" as a guest user. Accept the invitation by clicking the link:
+
+$GreenButton
+
+We will also send you useful tips, latest ONLYOFFICE news, and special offers once in a while. You can cancel the subscriptions on your Profile page at any moment as well as re-enable them.
 
 Truly yours,
 ONLYOFFICE Team
 "www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="subject_admin_welcome_enterprise" xml:space="preserve">
-    <value>Easy Way to Manage Your Portal</value>
-  </data>
-  <data name="ItemFeatureTips3ShareDocsTextEnterprise" xml:space="preserve">
-    <value>&lt;b&gt;Tip #3. Share documents&lt;/b&gt; with other users. Attach documents as links to your email to reduce the mail traffic.</value>
-  </data>
-  <data name="ItemFeatureTips4CloudStoragesText" xml:space="preserve">
-    <value>&lt;b&gt;Tip #4.&lt;/b&gt; Integrate your Web Office with different *Cloud Storages* to manage all your documents inside the portal.</value>
-  </data>
-  <data name="pattern_after_creation1_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_saas_guest_welcome_v10" xml:space="preserve">
+    <value>Hello!
 
-Recently a cloud office "${__VirtualRootPath}":"${__VirtualRootPath}" has been created for your team. To add colleagues distribute the invitation link available in your cloud office. Please follow these instructions:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItemsBtm
+Your guest profile has been successfully added to "${__VirtualRootPath}":"${__VirtualRootPath}".  Now you can:
+
+# Edit your "profile":"$MyStaffLink".
+# View and comment the content available in the "Community":"${__VirtualRootPath}/Products/Community/" and "Projects":"${__VirtualRootPath}/Products/Projects/".
+# Add and download files available for you in the "Documents":"${__VirtualRootPath}/Products/Files/".
+# Organize your schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
+# Use "Chat":"${__VirtualRootPath}/addons/talk/" to exchange instant messages.
+
+$GreenButton
+
+If you need help, browse our "Help Center":"${__HelpLink}" or ask our "support team":"https://support.onlyoffice.com".
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="subject_enterprise_guest_activation_v10" xml:space="preserve">
+    <value>Join ${__VirtualRootPath}</value>
+  </data>
+  <data name="subject_enterprise_guest_welcome_v10" xml:space="preserve">
+    <value>Welcome to your web-office</value>
+  </data>
+  <data name="subject_enterprise_whitelabel_guest_activation_v10" xml:space="preserve">
+    <value>Join ${__VirtualRootPath}</value>
+  </data>
+  <data name="subject_enterprise_whitelabel_guest_welcome_v10" xml:space="preserve">
+    <value>Welcome to your web-office</value>
+  </data>
+  <data name="subject_saas_guest_activation_v10" xml:space="preserve">
+    <value>Join ${__VirtualRootPath}</value>
+  </data>
+  <data name="subject_saas_guest_welcome_v10" xml:space="preserve">
+    <value>Welcome to your ONLYOFFICE</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+You can customize ONLYOFFICE for your needs, for example:
+
+$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
+
 $GreenButton
    
 Done. It's time to invite teammates to your web-office!
 
-For more information we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+More information in our "Help Center":"${__HelpLink}".</value>
   </data>
-  <data name="pattern_after_creation2_enterprise" xml:space="preserve">
-    <value>Email is still the best and most popular way to communicate with customers and partners. Every day we receive a great amount of messages using multiple email accounts from different services and it may seem impossible not to miss anything important.
+  <data name="pattern_enterprise_admin_invite_teammates_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-Make use of these 5 tips and tricks to get organized and improve your email experience:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
+Your cloud office is ready at "${__VirtualRootPath}":"${__VirtualRootPath}". It's time to invite your teammates!
+
+The easiest way to add your team is to import the necessary users and groups from an LDAP Server (e.g. OpenLDAP Server or Microsoft Active Directory). The LDAP settings are available in your Control Panel. Instructions are available in our "Help Center":"${__HelpLink}/server/windows/community/ldap-settings.aspx".
+
+You can also distribute the invitation link using the Invite users to portal option or add your teammates manually one by one using the *Create New...* button in the *People* module or export users from:
+    "your Yahoo or Google account":"${__HelpLink}/administratorguides/import-contacts-from-web.aspx";
+    "your mail client address book":"${__HelpLink}/administratorguides/import-contacts-from-mail-client.aspx";
+    "a CSV file":"${__HelpLink}/administratorguides/import-contacts-from-csv.aspx".</value>
+  </data>
+  <data name="pattern_enterprise_admin_without_activity_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+We hope you enjoy using ONLYOFFICE. How everything is going with your trial? We would really appreciate you feedback!
+
+Please, don’t hesitate to contact us at "support.onlyoffice.com":"https://support.onlyoffice.com" whenever you have questions or ideas.</value>
+  </data>
+  <data name="subject_enterprise_admin_customize_portal_v10" xml:space="preserve">
+    <value>Customize ONLYOFFICE</value>
+  </data>
+  <data name="subject_enterprise_admin_invite_teammates_v10" xml:space="preserve">
+    <value>Invite your teammates</value>
+  </data>
+  <data name="subject_enterprise_admin_without_activity_v10" xml:space="preserve">
+    <value>Follow up from ONLYOFFICE team</value>
+  </data>
+  <data name="pattern_enterprise_admin_user_docs_tips_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+We hope you enjoy using document editors available in your web-office. Here are some tips on how to make it more effective.
+
+$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItem6 $TableItem7 $TableItemsBtm</value>
+  </data>
+  <data name="subject_enterprise_admin_user_docs_tips_v10" xml:space="preserve">
+    <value>7 tips for effective work on your docs</value>
+  </data>
+  <data name="pattern_enterprise_admin_payment_warning_before7_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Please note that your ONLYOFFICE subscription is about to expire in a week. To extend your subscription, you need to purchase a product renewal for ONLYOFFICE.
+
+Click on the link below to start the renewal process:
+"Pricing page":"$PricingPage"
+
+For any further ONLYOFFICE installation, activation and technical support issues, please contact our support team  at "https://support.onlyoffice.com/":"https://support.onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_enterprise_admin_trial_warning_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Thanks for choosing ONLYOFFICE Workspace. Your trial expires today. To continue using pro features, purchase the full license.
+
+Buy now: "https://www.onlyoffice.com/enterprise-edition.aspx":"https://www.onlyoffice.com/enterprise-edition.aspx"
+
+For any purchase questions, contact us at "sales@onlyoffice.com":"mailto:sales@onlyoffice.com". For solving any technical problems, write to "support@onlyoffice.com":"mailto:support@onlyoffice.com"</value>
+  </data>
+  <data name="pattern_enterprise_admin_trial_warning_before7_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Thanks for choosing ONLYOFFICE. We just want to remind you that the trial period for your Enterprise Edition will be over in seven days.
+
+Please, check all the available pricing plans for ONLYOFFICE Workspace Enterprise and choose the most suitable one for your business.
+
 $GreenButton
 
-Still not yet configured the mail server using your own domain name? - Follow the instructions "here":"https://helpcenter.onlyoffice.com/ru/gettingstarted/mail.aspx#MailServer_block".
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
+$BlueButton
 
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+For any purchase questions, contact us at "sales@onlyoffice.com":"mailto:sales@onlyoffice.com". For solving any technical problems, write to "support@onlyoffice.com":"mailto:support@onlyoffice.com"</value>
   </data>
-  <data name="pattern_after_creation3_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_enterprise_whitelabel_admin_payment_warning_before7_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-Sometimes the most useful tools are not the most obvious. There is always much to be discovered, so we do our best to guide you through the every single corner of your cloud office. 
+Please note that your web-office subscription is about to expire in a week. To extend your subscription, you need to purchase a product renewal.
 
-Here is the Top 5 ${LetterLogoText} CRM features which you might have missed:
-
-*Our goal is to transfer all of your paperwork to the cloud*
-
-These 5 tips will move you closer to the aim:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+Click on the link below to start the renewal process:
+"Pricing page":"$PricingPage"</value>
   </data>
-  <data name="pattern_after_creation4_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
-
-With ${LetterLogoText} you have all your data stored in one place. There is no more need for additional desktop software or flash drives. Be productive and access your office at "${__VirtualRootPath}":"${__VirtualRootPath}" from anywhere!
-
-Start your migration to the cloud office with these 5 steps:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  <data name="subject_enterprise_admin_payment_warning_before7_v10" xml:space="preserve">
+    <value>ONLYOFFICE Renewal Notification</value>
   </data>
-  <data name="pattern_after_creation6_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
-
-In almost every business are we are to deal with documents every day - contracts, reports, white papers, invoices, etc. - and waste a lot of time moving it around. To help you work more efficiently and reduce time and efforts spent on paperwork, make use of these 5 simple tips and tricks.
-
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  <data name="subject_enterprise_admin_trial_warning_v10" xml:space="preserve">
+    <value>Your Enterprise Edition trial expires today</value>
   </data>
-  <data name="pattern_after_creation7_enterprise" xml:space="preserve">
-    <value>Collaboration is the most effective way to solve a problem. But working as a team is not always easy. ${LetterLogoText} offers you a set of tools designed to help you to improve your team collaboration:
-$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
-$GreenButton
-
-If you need help with your portal, we invite you to browse our "Help Center":"https://helpcenter.onlyoffice.com".
-
-Truly yours,
-ONLYOFFICE Team
-"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  <data name="subject_enterprise_admin_trial_warning_before7_v10" xml:space="preserve">
+    <value>How is your trial going so far?</value>
   </data>
-  <data name="pattern_after_creation8_enterprise" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="subject_enterprise_whitelabel_admin_payment_warning_before7_v10" xml:space="preserve">
+    <value>Your web-office renewal notification</value>
+  </data>
+  <data name="pattern_enterprise_admin_payment_warning_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-The cloud office for your team is already created at "${__VirtualRootPath}":"${__VirtualRootPath}". It's time to invite your teammates to join it. 
+Please note that your ONLYOFFICE subscription expires today. To extend your subscription, you need to purchase a product renewal for ONLYOFFICE.
+
+Click on the link below to start the renewal process:
+"Pricing page":"$PricingPage"
+
+For any further product installation, activation and technical support issues, please contact our support team at "https://support.onlyoffice.com/":"https://support.onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_enterprise_whitelabel_admin_payment_warning_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Please note that your your web-office subscription expires today. To extend your subscription, you need to purchase a product renewal.
+
+Click on the link below to start the renewal process:
+"Pricing page":"$PricingPage"</value>
+  </data>
+  <data name="subject_enterprise_admin_payment_warning_v10" xml:space="preserve">
+    <value>ONLYOFFICE Renewal Notification</value>
+  </data>
+  <data name="subject_enterprise_whitelabel_admin_payment_warning_v10" xml:space="preserve">
+    <value>Your web-office renewal notification</value>
+  </data>
+  <data name="pattern_saas_admin_invite_teammates_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The cloud office is ready at "${__VirtualRootPath}":"${__VirtualRootPath}". It's time to invite your teammates! 
+
 The easiest way to do that is to distribute the invitation link using the *Invite users to portal* option.
 
 $GreenButton
 
-If you have access to the detailed contact information of the people, add your teammates manually one by one using the *Create New...* button in the *People* module. "Learn more &gt;&gt;":"http://helpcenter.onlyoffice.com/gettingstarted/people.aspx#AddingUsers_block"
+You can also add your teammates manually one by one using the *Create New...* button in the *People* module or export users from:
+    "your Yahoo or Google account":"${__HelpLink}/administratorguides/import-contacts-from-web.aspx",
+    "your mail client address book":"${__HelpLink}/administratorguides/import-contacts-from-mail-client.aspx",
+    "a CSV file":"${__HelpLink}/administratorguides/import-contacts-from-csv.aspx". 
 
-Or add users all at once from:
-    "your LDAP database":"http://helpcenter.onlyoffice.com/ru/server/windows/community/ldap-settings.aspx",
-    "your Yahoo or Google account":"http://helpcenter.onlyoffice.com/administratorguides/import-contacts-from-web.aspx",
-    "your mail client address book":"http://helpcenter.onlyoffice.com/administratorguides/import-contacts-from-mail-client.aspx",
-    "a CSV file":"http://helpcenter.onlyoffice.com/administratorguides/import-contacts-from-csv.aspx". 
-
-Once added, manage their access rights. For more information about ARM, visit our "Help Center":"https://helpcenter.onlyoffice.com".
+Learn more about adding users in our "Help Center":"${__HelpLink}".
 
 Truly yours,
 ONLYOFFICE Team
 "www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="subject_after_creation1_enterprise" xml:space="preserve">
-    <value>Customize Your ${LetterLogoText} Portal</value>
-  </data>
-  <data name="subject_after_creation4_enterprise" xml:space="preserve">
-    <value>5 Steps to Organize Your Workplace</value>
-  </data>
-  <data name="subject_after_creation8_enterprise" xml:space="preserve">
-    <value>Invite Teammates to Your Portal</value>
-  </data>
-  <data name="ButtonClickForConfirm" xml:space="preserve">
-    <value>Click here for confirmation</value>
-  </data>
-  <data name="ItemAdjustRegionalSettings" xml:space="preserve">
-    <value>Tip #2: Adjust the regional settings</value>
-  </data>
-  <data name="ItemAdjustRegionalSettingsText" xml:space="preserve">
-    <value>Choose the language for your web-office interface and set the correct time zone. It's particularly important for the notifications and the correct calendar work. Go to Settings &gt;&gt; Common &gt;&gt; Customization.</value>
-  </data>
-  <data name="ItemBrandYourWebOffice" xml:space="preserve">
-    <value>Tip #1: Brand your web-office</value>
-  </data>
-  <data name="ItemBrandYourWebOfficeText" xml:space="preserve">
-    <value>Change the portal logo settings following Settings &gt;&gt; Common &gt;&gt; White Label and uploading your company's logos of the specified sizes. To change the default portal title displayed on the Welcome page, go to Settings &gt;&gt; Common &gt;&gt; Customization &gt;&gt; Welcome Page Settings.</value>
-  </data>
-  <data name="ItemCustomizeWebOfficeInterface" xml:space="preserve">
-    <value>Tip #3: Customize your web-office interface</value>
-  </data>
-  <data name="ItemCustomizeWebOfficeInterfaceText" xml:space="preserve">
-    <value>Name the portal groups, its members and their activities following Settings &gt;&gt; Common &gt;&gt; Customization &gt;&gt; Team Template. Select the color theme that best suits your company brand.</value>
-  </data>
-  <data name="ItemModulesAndTools" xml:space="preserve">
-    <value>Tip #4: Select the ${LetterLogoText} modules and tools</value>
-  </data>
-  <data name="ItemModulesAndToolsText" xml:space="preserve">
-    <value>${LetterLogoText} provides you with a complete set of tools for office collaboration allowing you to enable those you need for your work following  Settings &gt;&gt; Common &gt;&gt; Modules &amp; Tools. The disabled ones will be hidden.</value>
-  </data>
-  <data name="ItemSecureAccess" xml:space="preserve">
-    <value>Tip #5: Secure the access to your web-office</value>
-  </data>
-  <data name="ItemSecureAccessText" xml:space="preserve">
-    <value>${LetterLogoText} portals are hosted on Amazon Web Services, which is one of the most well-established cloud computing platform today. But you can always make use of an extra security level by enabling the confirmation SMS code option. Go to Settings &gt;&gt; Security &gt;&gt; Portal Access</value>
-  </data>
-  <data name="pattern_congratulations_whitelabel" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_saas_admin_user_apps_tips_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-You have just created the ${LetterLogoText} portal, your team's portal that would enhance internal cooperation. Your portal address is "${__VirtualRootPath}":"${__VirtualRootPath}" (adding this link to your bookmarks is a good idea, you are most likely to get to use it a lot). Follow the link below to confirm your email address:
-$GreenButton
+Get free ONLYOFFICE apps to work on documents and projects from any of your devices.
 
-Please, complete your email activation within a week as the link is valid for 7 days only.
-
-Note: we do not send out confidential information (like your password) in emails for safety reasons. You may change your email or password in your "personal profile page":"$MyStaffLink".
-
-To send messages, we used SMTP settings of our default notify.onlyoffice.com mail server.
+# To work on documents offline on Windows, Linux and Mac, download "ONLYOFFICE Desktop Editors":"https://www.onlyoffice.com/apps.aspx".
+# To edit documents on mobile devices, ONLYOFFICE Documents app for "iOS":"https://itunes.apple.com/us/app/onlyoffice-documents/id944896972" or "Android":"https://play.google.com/store/apps/details?id=com.onlyoffice.documents".
+# To manage your team performance on the go, get ONLYOFFICE Projects for "iOS":"https://itunes.apple.com/us/app/onlyoffice-projects/id1353395928".
 
 Truly yours,
-ONLYOFFICE Team</value>
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="pattern_admin_welcome_whitelabel" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_saas_admin_user_docs_tips_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-To make the portal management quick and easy, ${LetterLogoText} provides you with Control Panel, a set of automation tools that allows you to:
+We hope you enjoy using ONLYOFFICE editors. Here are some tips on how to make it more effective.
 
-- Change the default portal logos to brand your web-office;
-
-- Turn on HTTPS to keep your portal data secure;
-
-- Import users from your LDAP server;
-
-- Backup your portal data on a regular basis to avoid any data-loss;
-
-- Check for available ${LetterLogoText} updates;
-
-- Track login history and receive the audit trail data.
+$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItem6 $TableItem7 $TableItemsBtm
 
 $GreenButton
 
-Truly yours,
-ONLYOFFICE Team</value>
-  </data>
-  <data name="pattern_activate_whitelabel" xml:space="preserve">
-    <value>Dear $UserName,
-
- $__AuthorName has invited you to join ${LetterLogoTextTM} - your team's portal that would enchance internal cooperation. Your portal address is "${__VirtualRootPath}":"$InviteLink" (adding this link to your bookmarks is a good idea, you are most likely to get to use it a lot).
-
- You can accept the invitation by following the link below, it is only valid for 7 days:
-
-p=. "Click here to join the portal":"$InviteLink"
+By the way, have you noticed using the most powerful editors in the cloud? Compare to other online editors to "learn more":"https://www.onlyoffice.com/document-editor-comparison.aspx".
 
 Truly yours,
-ONLYOFFICE Team</value>
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="pattern_you_added_after_invite_whitelabel" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_saas_admin_user_comfort_tips_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-Your user profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
+We have prepared several tips to make your work with ONLYOFFICE  more comfortable.
 
-h3.Get started with your portal
+*#1 Find quick answers about ONLYOFFICE functionality*
 
-# Edit your "profile":"$MyStaffLink" to add personal and contact details.
-# Create, edit and organize "Documents":"${__VirtualRootPath}/products/files/".
-# Add your email account to "${LetterLogoTextTM} Mail":"${__VirtualRootPath}/addons/mail/".
-# Create "Projects":"${__VirtualRootPath}/products/projects/" and manage your workflow by adding milestones and tasks.
-# Manage your customer relations using "CRM":"${__VirtualRootPath}/products/crm/" module, identify priority contacts, track communication history and sales performance.
-# Use "Community":"${__VirtualRootPath}/products/community/" to start your blogs, forums, add events, share bookmarks.
-# Organize your work schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
-# Start "Talk":"${__VirtualRootPath}/addons/talk/" to chat with your teammates online.
+Browse "Help Center":"${__HelpLink}" when you are not sure how to perform your task. The answers to the most popular question like "how to import contacts to CRM":"${__HelpLink}/guides/import-contacts.aspx" or "how to export data from CRM":"${__HelpLink}/tipstricks/crm-export.aspx", or "how to add a recurring event":"${__HelpLink}/guides/add-recurring-event.aspx" can easily be found there.
+
+*#2 Don’t forget about 3rd party extensions*
+
+ONLYOFFICE functionality can be enhanced with 3rd party extensions. For example, you can easily publish documents on your WordPress website thanks to WordPress integration or e-sign your documents with DocuSign. "Find out more &gt;&gt;":"${__HelpLink}/server/windows/community/authorization-keys.aspx"  
+
+*#3 Manage your subscriptions*
+
+You’ll get notified about shared docs, projects updates, and your colleagues birthdays. Switch notifications on and off on your Profile page. Pick those that are useful for you and choose whether you want to get them via email, Chat, or both. You can also unsubscribe from these emails with tips and tricks there or, vice versa, re-enable them. "Learn more &gt;&gt;":"${__HelpLink}/tipstricks/managing-subscriptions.aspx"
+
+*#4 Request special training*
+
+To get a real quick start with ONLYOFFICE, ask us to teach your whole team to use all the modules and features. This is a paid option. "Contact us &gt;&gt;":"https://support.onlyoffice.com" 
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_saas_admin_without_activity_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+We hope you enjoy using ONLYOFFICE. How everything is going with your trial? We would really appreciate you feedback!
+
+Please, don’t hesitate to contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com" whenever you have questions or ideas.
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="subject_saas_admin_invite_teammates_v10" xml:space="preserve">
+    <value>Invite people to the cloud office</value>
+  </data>
+  <data name="subject_saas_admin_user_apps_tips_v10" xml:space="preserve">
+    <value>Get free ONLYOFFICE apps</value>
+  </data>
+  <data name="subject_saas_admin_user_docs_tips_v10" xml:space="preserve">
+    <value>7 tips for effective work on your docs</value>
+  </data>
+  <data name="subject_saas_admin_user_comfort_tips_v10" xml:space="preserve">
+    <value>Tips for comfortable work</value>
+  </data>
+  <data name="subject_saas_admin_without_activity_v10" xml:space="preserve">
+    <value>Follow up from ONLYOFFICE Team</value>
+  </data>
+  <data name="pattern_saas_admin_trial_warning_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The trial period for your portal at "${__VirtualRootPath}":"${__VirtualRootPath}" is due to expire today. To continue using it "buy subscription":"$PricingPage".
+
+*Note*: you can deploy ONLYOFFICE on your private network to get full control over your data. "Learn more":"https://www.onlyoffice.com/server-solutions.aspx"
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_saas_admin_trial_warning_before5_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The trial period for your account at "${__VirtualRootPath}":"${__VirtualRootPath}" will be over in 5 days.
+
+*Buy a subscription today with 10% off!*
+
+Just use this coupon code while purchasing: *$Coupon*
+
+It will be valid within the next 10 days. At this moment the number of active users in the portal is $ActiveUsers.
+
+We recommend you a $$Price/$PricePeriod plan.
 
 $GreenButton
 
 Truly yours,
-ONLYOFFICE Team</value>
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="pattern_activate_guest_whitelabel" xml:space="preserve">
-    <value>Dear $UserName,
-
-You have been invited as a guest user to the portal at "${__VirtualRootPath}":"$InviteLink". Please accept the invitation by following the link below, it is only valid for 7 days:
-
-p=. "Click here to join the portal":"$InviteLink"
-
-Truly yours,
-ONLYOFFICE Team</value>
+  <data name="subject_saas_admin_trial_warning_v10" xml:space="preserve">
+    <value>Your ONLYOFFICE Trial Expires Today</value>
   </data>
-  <data name="pattern_you_added_like_guest_whitelabel" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="subject_saas_admin_trial_warning_before5_v10" xml:space="preserve">
+    <value>Use this discount before your trial ends</value>
+  </data>
+  <data name="pattern_saas_admin_trial_warning_after5_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-Your guest profile has been successfully added to the portal at "${__VirtualRootPath}":"${__VirtualRootPath}".
+Didn’t manage to have a closer look at ONLYOFFICE? Extend your trial today! Even more - pay less if your decision is quick and positive!
 
-h3.Get started with your portal
-
-# Edit your "profile":"$MyStaffLink" to add personal and contact details.
-# View and comment the content open available for all portal users in the "Community":"${__VirtualRootPath}/products/community/", "Projects":"${__VirtualRootPath}/products/projects/" modules.
-# Add and download files available for you in the "Documents":"${__VirtualRootPath}/products/files/" module.
-# Organize your schedule with the built-in "Calendar":"${__VirtualRootPath}/addons/calendar/".
-# Start "Talk":"${__VirtualRootPath}/addons/talk/" to chat with other portal users online.
+Get 20 additional days of the trial or a 20% discount on 1 or 3-year subscription. You will be able to use the discount within 5 days after receiving this message.
 
 $GreenButton
 
+You can also deploy ONLYOFFICE on your private network to get full control over your data. "Learn more":"https://www.onlyoffice.com/server-solutions.aspx"
+
 Truly yours,
-ONLYOFFICE Team</value>
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
   </data>
-  <data name="pattern_payment_warning_before7_whitelabel" xml:space="preserve">
+  <data name="subject_saas_admin_trial_warning_after5_v10" xml:space="preserve">
+    <value>Extend your ONLYOFFICE trial and get discounts</value>
+  </data>
+  <data name="pattern_saas_admin_payment_after_monthly_subscriptions_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Earlier you have paid for a monthly subscription. If you are planning to continue using ONLYOFFICE, we recommend you purchasing longer subscriptions. 
+
+Here’s our special offer - use this coupon *10%discountyear* to get 10% discount on 1-year subscription or this one *upgradethreeyears20%* to buy 3-year subscription with 20% off.
+
+$GreenButton
+
+If you need assistance, contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com". We will be happy to help!
+ 
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_saas_admin_payment_warning_after1_v10" xml:space="preserve">
+    <value>Your ONLYOFFICE subscription has expired. Renew your ONLYOFFICE subscription to continue using it.
+    
+$GreenButton
+
+Enable the "Auto-renew" license option to automatically renew your license at expiration time and never worry about your payment time again. You can disable it any time "here":"https://secure.avangate.com/myaccount/?lang=en&amp;e=example@customer-email.com&amp;k=xxxxxxxxxx"
+
+For payment related issues, contact Avangate at "support@avangate.com":"mailto:support@avangate.com"
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_saas_admin_payment_warning_before5_v10" xml:space="preserve">
+    <value>Your ONLYOFFICE subscription is about to expire in 5 days. Renew your ONLYOFFICE subscription to continue using it.
+
+$GreenButton
+
+Enable the "Auto-renew" license option to automatically renew your license at expiration time and never worry about your payment time again. You can disable it any time "here":"https://secure.avangate.com/myaccount/?lang=en&amp;e=example@customer-email.com&amp;k=xxxxxxxxxx":"https://secure.avangate.com/myaccount/?lang=en&amp;e=example@customer-email.com&amp;k=xxxxxxxxxx". 
+
+For payment related issues, contact Avangate at "support@avangate.com":"mailto:support@avangate.com"
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="pattern_saas_admin_trial_warning_after30_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+You haven’t added any teammates, so maybe ONLYOFFICE Personal suits you more? It free and you will be able to:
+
+# Work with text documents, spreadsheets, and presentations.
+# Share docs with your friends and collaborate on them in real-time.
+# Embed documents to your web page.
+# Connect 3rd party cloud storage like Dropbox or Google Drive to manage docs from one place.
+
+To get a quick start, sign up via your Facebook or Google account.
+
+$GreenButton
+
+You can also install this "Chrome extension":"https://chrome.google.com/webstore/detail/onlyoffice-personal/ohdlcmpahmacjddiaokoogleflddlahc?hl=en-US" to get quick access to ONLYOFFICE Personal or "this application":"https://chrome.google.com/webstore/detail/onlyoffice-personal/iohfebkcjhlelaoibebeohcgkohkcgpn" to use ONLYOFFICE editors within Google Drive.
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="subject_saas_admin_payment_after_monthly_subscriptions_v10" xml:space="preserve">
+    <value>Your special offer for ONLYOFFICE</value>
+  </data>
+  <data name="subject_saas_admin_payment_warning_after1_v10" xml:space="preserve">
+    <value>ONLYOFFICE renewal notification</value>
+  </data>
+  <data name="subject_saas_admin_payment_warning_before5_v10" xml:space="preserve">
+    <value>Renew ONLYOFFICE subscription</value>
+  </data>
+  <data name="subject_saas_admin_trial_warning_after30_v10" xml:space="preserve">
+    <value>Switch to free ONLYOFFICE Personal</value>
+  </data>
+  <data name="pattern_saas_admin_trial_warning_after_half_year_v10" xml:space="preserve">
+    <value>You haven't entered your ONLYOFFICE "${__VirtualRootPath}":"${__VirtualRootPath}" for more than half a year. Since you have decided not to use it anymore, your web-office and all the data will be deleted in accordance with "our Privacy statement":"https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=5048502&amp;doc=SXhWMEVzSEYxNlVVaXJJeUVtS0kyYk14YWdXTEFUQmRWL250NllHNUFGbz0_IjUwNDg1MDIi0".
+
+We would appreciate your feedback. Why have you decided to stop using ONLYOFFICE?
+
+$GreenButton
+
+If you think this is a mistake and want to continue using ONLYOFFICE, please contact our "support team":"mailto:support@onlyoffice.com".
+
+Truly yours,
+ONLYOFFICE Team
+"www.onlyoffice.com":"http://onlyoffice.com/"</value>
+  </data>
+  <data name="subject_saas_admin_trial_warning_after_half_year_v10" xml:space="preserve">
+    <value>Your ONLYOFFICE will be deleted</value>
+  </data>
+  <data name="ButtonSendRequest" xml:space="preserve">
+    <value>Send Request</value>
+  </data>
+  <data name="pattern_reassigns_completed" xml:space="preserve">
     <value>Dear $UserName,
 
-Please note that your Office Edition Subscription license is about to expire on $DueDate.
+The process of reassign data from user "$FromUserName":"$FromUserLink" to user "$ToUserName":"$ToUserLink" has been successfully completed.
 
-In order to extend your license, you need to purchase a product renewal for Office Edition Subscription.
+^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.^</value>
+  </data>
+  <data name="subject_reassigns_completed" xml:space="preserve">
+    <value>${LetterLogoText}. Reassigns user data is completed</value>
+  </data>
+  <data name="ItemCoAuthoringDocuments" xml:space="preserve">
+    <value>Explore different ways of co-authoring documents - real-time co-editing, chat, comments, review.</value>
+  </data>
+  <data name="ItemShareDocuments" xml:space="preserve">
+    <value>Share documents with your teammates.</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_3rdparty_hdr" xml:space="preserve">
+    <value>Tip #5: Connect 3rd-party services</value>
+  </data>
+  <data name="pattern_enterprise_admin_customize_portal_v10_item_3rdparty" xml:space="preserve">
+    <value>Let your team members use Facebook, Twitter, Google or LinkedIn to sign in. Link up your portal with Box, Dropbox, OneDrive and Google to transfer your documents. Connect DocuSign to use e-signature, Twilio - for VoIP, Bitly - to shorten links and Firebase to get notifications when you're offline.</value>
+  </data>
+  <data name="pattern_enterprise_admin_user_apps_tips_v10" xml:space="preserve">
+    <value>Hello, $UserName!
 
-Click on the link below to start the renewal process:
-"Pricing page":"$PricingPage"
+Get free ONLYOFFICE apps to work on documents and projects from any of your devices.
 
-For your convenience, when you purchase your next renewal, you can also enable the "auto-renew" license option, in which case your license will be renewed automatically at expiration time.
+# To work on documents offline on Windows, Linux and Mac, download "ONLYOFFICE Desktop Editors":"https://www.onlyoffice.com/apps.aspx".
+# To edit documents on mobile devices, ONLYOFFICE Documents app for "iOS":"https://itunes.apple.com/us/app/onlyoffice-documents/id944896972" or "Android":"https://play.google.com/store/apps/details?id=com.onlyoffice.documents".
+# To manage your team performance on the go, get ONLYOFFICE Projects for "iOS":"https://itunes.apple.com/us/app/onlyoffice-projects/id1353395928".</value>
+  </data>
+  <data name="subject_enterprise_admin_user_apps_tips_v10" xml:space="preserve">
+    <value>Get free ONLYOFFICE apps</value>
+  </data>
+  <data name="ButtonStartFreeTrial" xml:space="preserve">
+    <value>Start free trial</value>
+  </data>
+  <data name="pattern_opensource_admin_activation_v11" xml:space="preserve">
+    <value>Hello, $UserName!
+
+You have just created the ONLYOFFICE portal, your team's cloud office that would enhance internal cooperation.  Its address is "${__VirtualRootPath}":"${__VirtualRootPath}".
+
+Please, confirm your email following the "link":"$ActivateUrl".
+
+You can change your email or password in your "personal profile page":"$MyStaffLink".
+
+To send notifications, we use the SMTP settings of ONLYOFFICE mail server. To change them, follow the instructions "here":"${__HelpLink}/server/windows/community/smtp-settings.aspx".
+
+More information in ONLYOFFICE "Help Center":"${__HelpLink}".</value>
+  </data>
+  <data name="subject_opensource_admin_activation_v11" xml:space="preserve">
+    <value>Confirm your email</value>
+  </data>
+  <data name="pattern_reassigns_failed" xml:space="preserve">
+    <value>Dear $UserName,
+
+The process of reassign data from user "$FromUserName":"$FromUserLink" to user "$ToUserName":"$ToUserLink" has been failed.
+
+Exception message: $Message
+
+^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.^</value>
+  </data>
+  <data name="subject_reassigns_failed" xml:space="preserve">
+    <value>${LetterLogoText}. Reassigns user data is failed</value>
+  </data>
+  <data name="pattern_remove_user_data_completed" xml:space="preserve">
+    <value>Dear $UserName,
+
+The process of removing data from user "$FromUserName":"$FromUserLink" has been successfully completed.
+
+The deletion of personal data allowed to free:
+
+# Documents - $DocsSpace
+# CRM - $CrmSpace
+# Mail - $MailSpace
+# Talk - $TalkSpace
+
+^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.^</value>
+  </data>
+  <data name="pattern_remove_user_data_failed" xml:space="preserve">
+    <value>Dear $UserName,
+
+The process of removing data from user "$FromUserName":"$FromUserLink" has been failed.
+
+Exception message: $Message
+
+^You receive this email because you are a registered user of the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.^</value>
+  </data>
+  <data name="subject_remove_user_data_completed" xml:space="preserve">
+    <value>${LetterLogoText}. Remove user data is completed</value>
+  </data>
+  <data name="subject_remove_user_data_failed" xml:space="preserve">
+    <value>${LetterLogoText}. Remove user data is failed</value>
+  </data>
+  <data name="pattern_personal_activate" xml:space="preserve">
+    <value>Hello, $UserName
+You’ve been successfully registered at ONLYOFFICE Personal "${__VirtualRootPath}":"${__VirtualRootPath}".
+
+Connect your favorite cloud storage: Dropbox, Google Drive, OneDrive or Box to create a single workspace for your documents accessible from anywhere.
+
+Learn more about ONLYOFFICE Personal in "our blog":"$TagBlogLink".
+
+We're glad you're here. Stay tuned!
 
 Sincerely,
-ONLYOFFICE Team</value>
+ONLYOFFICE team</value>
   </data>
-  <data name="pattern_payment_warning_whitelabel" xml:space="preserve">
-    <value>Dear $UserName,
+  <data name="pattern_personal_after_registration1" xml:space="preserve">
+    <value>h1.Welcome to ONLYOFFICE Personal
 
-Please note that your Office Edition Subscription license is due to expire today.
+You have just created your personal office in the cloud.
 
-In order to extend your license, you need to purchase a product renewal for Office Edition Subscription.
+h3.It's a virtual workspace where you can edit and store documents, work with them from anywhere providing access to your friends or colleagues.
 
-Click on the link below to start the renewal process:
-"Pricing page":"$PricingPage"
+ONLYOFFICE is compatible with Microsoft Office™ document formats and guarantees no loss of formatting or quality of created objects. We promise to relieve you from formatting fidelity headache and give full professional editing toolset in your hands.
 
-For your convenience, when you purchase your next renewal, you can also enable the "auto-renew" license option, in which case your license will be renewed automatically at expiration time.
+h3.For a quick start, here's what you can do in ONLYOFFICE:
+
+- Upload files from your computer or create new;
+
+- Work with all popular file formats;
+
+- Edit autoshapes, charts, tables, equations and other objects;
+
+- Use various addons for extended editing features;
+
+- Easily access your Personal cloud via "Chrome extension":"https://chrome.google.com/webstore/detail/onlyoffice-personal/ohdlcmpahmacjddiaokoogleflddlahc?hl=en-US". 
+
+You can also edit documents offline with our free "desktop editors":"https://www.onlyoffice.com/download-desktop.aspx" or get a "mobile editing suite":"https://www.onlyoffice.com/mobile.aspx" for your iOS or Android device.
 
 Sincerely,
-ONLYOFFICE Team</value>
+ONLYOFFICE team</value>
+  </data>
+  <data name="pattern_personal_after_registration14" xml:space="preserve">
+    <value>$PersonalHeaderStart A few tips for freelancers $PersonalHeaderEnd
+
+h3.ONLYOFFICE provides a number of features for freelance community whether you are on a contract or hiring for a project yourself:
+
+- Sharing for reads, reviews or collaboration;
+
+- Real-time collaborative editing and commenting in Fast mode;
+
+- Strict co-editing mode for editing parts of the document privately;
+
+- Version History;
+
+- Change tracking &amp; suggesting;
+
+- built-in chat.
+
+No need to download files and send them via email. Simply share them from your cloud office with external links and collaborate from wherever you are.  
+
+Need more work instruments?  
+
+ONLYOFFICE solutions for business are free for a 30 day trial period and provide you with even more opportunities for freelance and distant work. For instance, you can create and submit invoices to your clients, contact them with email and VoIP. To learn more about ONLYOFFICE for commerce proceed to our "CRM overview":"http://www.onlyoffice.com/crm.aspx".
+
+Sincerely,
+ONLYOFFICE team</value>
+  </data>
+  <data name="pattern_personal_after_registration21" xml:space="preserve">
+    <value>$PersonalHeaderStart Need more features and automation? Give a try to ONLYOFFICE for teams $PersonalHeaderEnd
+
+h3.In case you collaborate with a team or manage a project, we suggest you to try ONLYOFFICE for business. In addition to the online editors and document management features, you'll be able to:
+
+- Control tasks and use *Gantt* chart in the project management module;
+
+- Track sales, relations with customers and create invoices in *CRM*;
+
+- Manage all your email accounts in the email *aggregator*;
+
+- Set up team communication with messenger, blog, forums and wiki.
+
+Create a single collaborative workspace for you and your teammates.
+
+Register a trial "in the cloud":"https://www.onlyoffice.com/registration.aspx" or "on your server":"https://www.onlyoffice.com/enterprise-edition-free.aspx?from=enterprise-edition" without any functional restrictions for 30 days and see how your workflow would immediately improve! 
+
+Sincerely,
+ONLYOFFICE team</value>
+  </data>
+  <data name="pattern_personal_after_registration28" xml:space="preserve">
+    <value>$PersonalHeaderStart How to enhance security of your web office $PersonalHeaderEnd
+
+Looking for the ways to protect your data?
+
+h3.Сonsider additional instruments for keeping your documents safe and secure offered in our private server solutions:
+
+- Get full control over your data with *a private cloud* on your own server;
+
+- Set up *two-factor authentication* and use *Single Sign-On* with third-party services;
+
+- Apply multi-level *log-in security settings*;
+
+- Monitor *user activity* in your web office;
+
+- Perform manual or automatic *back up* of your data.
+
+$GreenButton
+
+Learn more about how ONLYOFFICE keeps your data safe in our security overview.
+
+Sincerely,
+ONLYOFFICE team</value>
+  </data>
+  <data name="pattern_personal_after_registration8" xml:space="preserve">
+    <value>$PersonalHeaderStart Connect your favorite cloud storage to ONLYOFFICE $PersonalHeaderEnd
+
+It has been a week since you created your cloud office, so we believe it's time to unveil some beneficial features you might have missed.
+
+Connect *Dropbox*, *Google Drive*, *Box*, *OneDrive*, *Nextcloud*, *ownCloud*, *kDrive* or *Yandex.Disk* to ONLYOFFICE and create a single document management space for all your documents. You'll be able to edit external files in ONLYOFFICE and save them to the storage you keep documents in. Read details about connecting file storages to ONLYOFFICE "here":"${__HelpLink}/tipstricks/add-resource.aspx".
+
+You can also integrate ONLYOFFICE editors into Google Drive using our "connector app":"https://chrome.google.com/webstore/detail/onlyoffice-personal/iohfebkcjhlelaoibebeohcgkohkcgpn".
+
+Need more of document management?
+
+h3.Try ONLYOFFICE for business "in the cloud":"https://www.onlyoffice.com/cloud-office.aspx" or "on your server":"https://www.onlyoffice.com/server-solutions.aspx" for free for 30 days and check out extended document management opportunities together with a business toolset:
+
+- Manage team documents in projects;
+
+- Integrate documents with CRM and Email;
+
+- Share files to groups of users;
+
+- Optimize your workflow with team communication tools.
+
+Interested? Learn more about "ONLYOFFICE for business":"http://www.onlyoffice.com/document-management.aspx".
+
+Sincerely,
+ONLYOFFICE team</value>
+  </data>
+  <data name="pattern_personal_change_email" xml:space="preserve">
+    <value>You have requested to change your email address used to enter the ${LetterLogoText} portal.
+
+Please follow the link below to change your email address:
+
+$GreenButton
+
+*Note*: this link is valid for 7 days only. Please complete your email change process within that period.
+
+If you do not want to change your email or received this email by mistake, please ignore it.
+
+Sincerely,
+ONLYOFFICE team</value>
+  </data>
+  <data name="pattern_personal_change_password" xml:space="preserve">
+    <value>There has been a request to change your password used to enter the "${__VirtualRootPath}":"${__VirtualRootPath}" portal.
+
+Please follow the link below to change your password:
+
+$GreenButton
+
+*Note*: this link is valid for 7 days only. Please complete the password change process within that period.
+
+If you do not want to change your password or received this email by mistake, please ignore it.
+
+Sincerely,
+ONLYOFFICE team</value>
+  </data>
+  <data name="pattern_personal_confirmation" xml:space="preserve">
+    <value>Hello,
+
+you've just registered an account at the ONLYOFFICE solution for personal use. Click "here":"$InviteLink" to confirm the registration and create a password.
+
+If you can't open the link, please copy the following "$InviteLink":"$InviteLink" and paste it into your browser address bar.
+
+Sincerely,
+ONLYOFFICE team</value>
+  </data>
+  <data name="subject_personal_activate" xml:space="preserve">
+    <value>Welcome to ONLYOFFICE for personal use!</value>
+  </data>
+  <data name="subject_personal_after_registration1" xml:space="preserve">
+    <value>Welcome to ONLYOFFICE Personal</value>
+  </data>
+  <data name="subject_personal_after_registration14" xml:space="preserve">
+    <value>A few tips for freelance work</value>
+  </data>
+  <data name="subject_personal_after_registration21" xml:space="preserve">
+    <value>Need more features? Give a try to ONLYOFFICE for teams</value>
+  </data>
+  <data name="subject_personal_after_registration28" xml:space="preserve">
+    <value>How to enhance security of your web office</value>
+  </data>
+  <data name="subject_personal_after_registration7" xml:space="preserve">
+    <value>Connect your favorite cloud storage to ONLYOFFICE</value>
+  </data>
+  <data name="subject_personal_change_email" xml:space="preserve">
+    <value>ONLYOFFICE Personal. Email change request</value>
+  </data>
+  <data name="subject_personal_change_password" xml:space="preserve">
+    <value>ONLYOFFICE Personal password assistance</value>
+  </data>
+  <data name="subject_personal_confirmation" xml:space="preserve">
+    <value>ONLYOFFICE Personal. Please activate your email address</value>
+  </data>
+  <data name="ButtonActivateEmail" xml:space="preserve">
+    <value>Click here to activate your email address</value>
+  </data>
+  <data name="ButtonConfirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="ButtonJoin" xml:space="preserve">
+    <value>Click here to join the portal</value>
+  </data>
+  <data name="ButtonChangePassword" xml:space="preserve">
+    <value>Change password</value>
+  </data>
+  <data name="ButtonChangeEmail" xml:space="preserve">
+    <value>Change email address</value>
+  </data>
+  <data name="ButtonChangePhone" xml:space="preserve">
+    <value>Change mobile phone number</value>
+  </data>
+  <data name="ButtonChangeTfa" xml:space="preserve">
+    <value>Change backup codes</value>
+  </data>
+  <data name="ButtonRemoveProfile" xml:space="preserve">
+    <value>Remove profile</value>
+  </data>
+  <data name="ButtonConfirmPortalAddressChange" xml:space="preserve">
+    <value>Confirm Portal Address Change</value>
+  </data>
+  <data name="ButtonConfirmPortalOwnerUpdate" xml:space="preserve">
+    <value>Confirm Portal Owner Update</value>
+  </data>
+  <data name="ButtonDeactivatePortal" xml:space="preserve">
+    <value>Deactivate Portal</value>
+  </data>
+  <data name="ButtonDeletePortal" xml:space="preserve">
+    <value>Delete Portal</value>
+  </data>
+  <data name="ButtonLeaveFeedback" xml:space="preserve">
+    <value>Leave Feedback</value>
+  </data>
+  <data name="pattern_personal_profile_delete" xml:space="preserve">
+    <value>You have requested a termination of your account at personal.onlyoffice.com. Follow the link to complete the request (the link is active for a 7-day period): 
+
+$GreenButton
+
+*Note*: After the deletion, your account and all data associated with it will be erased permanently in accordance with our "Privacy statement":"https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=5048502&amp;doc=SXhWMEVzSEYxNlVVaXJJeUVtS0kyYk14YWdXTEFUQmRWL250NllHNUFGbz0_IjUwNDg1MDIi0".
+
+Ignore this email if you do not want to proceed. 
+
+If you have any questions, please contact us at "support@onlyoffice.com":"mailto:support@onlyoffice.com"
+
+Sincerely,
+ONLYOFFICE team</value>
+  </data>
+  <data name="subject_personal_profile_delete" xml:space="preserve">
+    <value>ONLYOFFICE Personal account termination</value>
+  </data>
+  <data name="ButtonConfirmTermination" xml:space="preserve">
+    <value>Confirm account termination</value>
+  </data>
+  <data name="pattern_saas_admin_welcome_v10_item_backup" xml:space="preserve">
+    <value>Do data backups.</value>
+  </data>
+  <data name="pattern_saas_admin_welcome_v10_item_brand" xml:space="preserve">
+    <value>Customize ONLYOFFICE with your team name and logo, select a color theme, set an alternative URL.</value>
+  </data>
+  <data name="pattern_user_ldap_activation" xml:space="preserve">
+    <value>Dear $UserName,
+
+You have been invited to join your company's safe and secure web-office that would enhance your collaboration. Its address is "${__VirtualRootPath}":"${__VirtualRootPath}". Adding this link to your bookmarks is a good idea, you are likely to use it a lot.
+
+Accept the invitation by following the link below and use your login and password from the corporate account to sign in. 
+
+$GreenButton
+
+The link is only valid for 7 days.</value>
+  </data>
+  <data name="subject_user_ldap_activation" xml:space="preserve">
+    <value>You’re invited to join ${__VirtualRootPath}</value>
+  </data>
+  <data name="pattern_saas_admin_welcome_v10_item_customize" xml:space="preserve">
+    <value>Choose which modules your users need, add your own links to the navigation menu, select a default start page.</value>
+  </data>
+  <data name="pattern_saas_admin_welcome_v10_item_regional" xml:space="preserve">
+    <value>Set the language and time zone.</value>
+  </data>
+  <data name="pattern_saas_admin_welcome_v10_item_security" xml:space="preserve">
+    <value>Determine security settings, like the password strength and trusted mail domains, and set up access rights.</value>
+  </data>
+  <data name="pattern_saas_admin_welcome_v10_item_telephony" xml:space="preserve">
+    <value>Connect 3rd-party services - Twilio for VoIP, DocuSign for e-signatures, and many others.</value>
+  </data>
+  <data name="pattern_saas_admin_welcome_v10_item_usertrack" xml:space="preserve">
+    <value>Track user logins and other actions.</value>
+  </data>
+  <data name="ButtonAccept" xml:space="preserve">
+    <value>Accept</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_3rdparty" xml:space="preserve">
+    <value>Connect Dropbox, Google Drive or other services to manage your files in one place.</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_3rdparty_hdr" xml:space="preserve">
+    <value>Connect 3rd party clouds</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_apps" xml:space="preserve">
+    <value>Download the apps to work on docs &lt;a target="_blank" style="color: #0078bd; font-family: Arial; font-size: 14px;" href="https://www.onlyoffice.com/apps.aspx"&gt;offline&lt;/a&gt; as well as on &lt;a target="_blank" style="color: #0078bd; font-family: Arial; font-size: 14px;" href="https://itunes.apple.com/us/app/onlyoffice-documents/id944896972"&gt;iOS&lt;/a&gt; and &lt;a target="_blank" style="color: #0078bd; font-family: Arial; font-size: 14px;" href="https://play.google.com/store/apps/details?id=com.onlyoffice.documents"&gt;Android&lt;/a&gt; devices.</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_apps_hdr" xml:space="preserve">
+    <value>Get the apps</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_coediting" xml:space="preserve">
+    <value>While co-editing a doc with your team in real time, switch to Fast mode to see changes as your co-author is typing or to Strict mode to get more privacy.</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_coediting_hdr" xml:space="preserve">
+    <value>Choose co-editing mode</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_formatting" xml:space="preserve">
+    <value>ONLYOFFICE provides you with the most complete set of styling and formatting tools.</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_formatting_hdr" xml:space="preserve">
+    <value>Explore advanced formatting</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_attach" xml:space="preserve">
+    <value>Documents are integrated with all the other ONLYOFFICE modules, so you’ll forget about downloading docs and uploading them somewhere else forever.</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_attach_hdr" xml:space="preserve">
+    <value>Attach docs to projects and emails</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_review" xml:space="preserve">
+    <value>Use Review to suggest changes without modifying the original doc, add Comments to share your thoughts on a specific extract, or chat inside your doc via instant messages.</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_review_hdr" xml:space="preserve">
+    <value>Review, comment, and chat</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_share" xml:space="preserve">
+    <value>Share docs to individuals or user groups. Choose their access level - Read Only, Comment, Form Filling, Review or Full Access.</value>
+  </data>
+  <data name="pattern_saas_admin_user_docs_tips_v10_item_share_hdr" xml:space="preserve">
+    <value>Share documents</value>
+  </data>
+  <data name="ButtonUseDiscount" xml:space="preserve">
+    <value>Use discount</value>
+  </data>
+  <data name="ButtonStartNow" xml:space="preserve">
+    <value>Start now</value>
+  </data>
+  <data name="ButtonRenewNow" xml:space="preserve">
+    <value>Renew now</value>
+  </data>
+  <data name="ButtonBuyNow" xml:space="preserve">
+    <value>Buy now</value>
+  </data>
+  <data name="pattern_enterprise_whitelabel_admin_customize_portal_v10" xml:space="preserve">
+    <value>Hello, $UserName!
+
+You can customize your web-office, for example:
+
+$TableItemsTop $TableItem1 $TableItem2 $TableItem3 $TableItem4 $TableItem5 $TableItemsBtm
+
+$GreenButton
+
+Done. It's time to invite teammates to your web-office!</value>
+  </data>
+  <data name="subject_enterprise_whitelabel_admin_customize_portal_v10" xml:space="preserve">
+    <value>Customize your web-office</value>
+  </data>
+  <data name="pattern_profile_has_deleted_itself" xml:space="preserve">
+    <value>User "$FromUserName":"$FromUserLink" has deleted his/her profile, and this profile is now blocked. All user’s files are still assigned to him/her and occupy disk space. 
+
+You can reassign the user’s documents shared with others to another active user or remove them to free up the portal disk space.
+
+Please go to the user profile using "this link":"$FromUserLink" to reassign documents to another user or remove the data.</value>
+  </data>
+  <data name="subject_profile_has_deleted_itself" xml:space="preserve">
+    <value>User has deleted his/her profile</value>
+  </data>
+  <data name="pattern_backup_created_tg" xml:space="preserve">
+    <value>[${__VirtualRootPath}](${__VirtualRootPath}) portal backup created
+
+Dear $OwnerName,
+
+A backup file containing data from your [${__VirtualRootPath}](${__VirtualRootPath}) portal has been created.
+
+To learn more on the backup procedure please refer to our [Data backup](${__HelpLink}/tipstricks/data-backup-restore.aspx) user guide.
+
+If you have any questions or need assistance please feel free to contact us at [support.onlyoffice.com](http://support.onlyoffice.com)
+
+Best regards,
+ONLYOFFICE™ Support Team
+[www.onlyoffice.com](http://onlyoffice.com/)</value>
+  </data>
+  <data name="pattern_for_admin_notify_tg" xml:space="preserve">
+    <value>Message from the [${__VirtualRootPath}](${__VirtualRootPath}) portal
+
+Email: $UserEmail
+
+$Body</value>
+  </data>
+  <data name="pattern_portal_deactivate_tg" xml:space="preserve">
+    <value>Deactivation of the [${__VirtualRootPath}](${__VirtualRootPath}) portal
+
+Dear $OwnerName,
+
+You have requested a temporary deactivation of your [${__VirtualRootPath}](${__VirtualRootPath}) portal. Please follow the link below to confirm the operation:
+
+$GreenButton
+
+_Note_: this link is valid for 7 days only. Please complete the portal deactivation process within that period.
+
+You can reactivate your portal any time by clicking the following link:
+[Reactivate Portal]($ActivateUrl) (this link has no time limit)
+
+If you have any questions or need assistance please feel free to contact us at [support@onlyoffice.com](mailto:support@onlyoffice.com)
+
+Best regards,
+ONLYOFFICE™ Support Team
+[www.onlyoffice.com](http://onlyoffice.com/)</value>
+  </data>
+  <data name="pattern_portal_delete_tg" xml:space="preserve">
+    <value>Deletion of the [${__VirtualRootPath}](${__VirtualRootPath}) portal
+
+Dear $OwnerName,
+
+You have requested to permanently delete your [${__VirtualRootPath}](${__VirtualRootPath}) portal.
+
+_Important! All the data stored on your portal, as well as your registration details will be lost and cannot be recovered._
+
+#if($AutoRenew == "True")
+Before you delete the portal, please make sure that automatic billing is turned off. You may check the status of automatic billing in your [Avangate account](https://secure.avangate.com/myaccount/").
+#end
+
+If you still want to delete your [${__VirtualRootPath}](${__VirtualRootPath}) portal please follow the link below to confirm the operation:
+
+$GreenButton
+
+_Note_: this link is valid for 7 days only. Please complete the portal deletion process within that period.
+
+If you have any questions or need assistance please feel free to contact us at [support@onlyoffice.com](mailto:support@onlyoffice.com)
+
+Best regards,
+ONLYOFFICE™ Support Team
+[www.onlyoffice.com](http://onlyoffice.com/)</value>
+  </data>
+  <data name="pattern_profile_updated_tg" xml:space="preserve">
+    <value>Your profile at [${__VirtualRootPath}](${__VirtualRootPath}) has been changed
+
+Dear $UserName,
+
+Your user profile details at [${__VirtualRootPath}](${__VirtualRootPath}) have been changed by [$__AuthorName]($__AuthorUrl).
+
+To view your profile follow the link below:
+[$UserName]($MyStaffLink)
+
+You receive this email because you are a registered user of the [${__VirtualRootPath}](${__VirtualRootPath}) portal.</value>
+  </data>
+  <data name="pattern_self_profile_updated_tg" xml:space="preserve">
+    <value>[${__VirtualRootPath}](${__VirtualRootPath}) portal profile change notification
+
+[$__AuthorName]($__AuthorUrl) has changed his/her profile details at the [${__VirtualRootPath}](${__VirtualRootPath}) portal.</value>
+  </data>
+  <data name="pattern_user_has_join_tg" xml:space="preserve">
+    <value>New user added to [${__VirtualRootPath}](${__VirtualRootPath}) portal
+[$__AuthorName]($__AuthorUrl) has joined your portal at [${__VirtualRootPath}](${__VirtualRootPath}).</value>
+  </data>
+  <data name="pattern_storage_encryption_error" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The file encryption process on your portal "${PortalUrl}":"${PortalUrl}" has been failed.
+
+Some files could not be encrypted. Find more details in the "Control Panel":"${ControlPanelUrl}/storage".</value>
+  </data>
+  <data name="pattern_storage_encryption_start" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The file encryption process has been started on your portal "${PortalUrl}":"${PortalUrl}".
+
+The encryption might take some time, so the portal will be temporarily unavailable. As soon as the decryption is over, you will be able to work with your data again.</value>
+  </data>
+  <data name="pattern_storage_encryption_success" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The file encryption process on your portal "${PortalUrl}":"${PortalUrl}" has been successfully completed.
+
+Your portal is available again.</value>
+  </data>
+  <data name="subject_storage_encryption_error" xml:space="preserve">
+    <value>${LetterLogoText}. Encryption process failed</value>
+  </data>
+  <data name="subject_storage_encryption_start" xml:space="preserve">
+    <value>${LetterLogoText}. Encryption process started</value>
+  </data>
+  <data name="subject_storage_encryption_success" xml:space="preserve">
+    <value>${LetterLogoText}. Encryption process completed</value>
+  </data>
+  <data name="pattern_storage_decryption_error" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The file decryption process on your portal "${PortalUrl}":"${PortalUrl}" has been failed.
+
+Some files could not be decrypted. Find more details in the "Control Panel":"${ControlPanelUrl}/storage".</value>
+  </data>
+  <data name="pattern_storage_decryption_start" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The file decryption process has been started on your portal "${PortalUrl}":"${PortalUrl}".
+
+The decryption might take some time, so the portal will be temporarily unavailable. As soon as the decryption is over, you will be able to work with your data again.</value>
+  </data>
+  <data name="pattern_storage_decryption_success" xml:space="preserve">
+    <value>Hello, $UserName!
+
+The file decryption process on your portal "${PortalUrl}":"${PortalUrl}" has been successfully completed.
+
+Your portal is available again.</value>
+  </data>
+  <data name="subject_storage_decryption_error" xml:space="preserve">
+    <value>${LetterLogoText}. Decryption process failed</value>
+  </data>
+  <data name="subject_storage_decryption_start" xml:space="preserve">
+    <value>${LetterLogoText}. Decryption process started</value>
+  </data>
+  <data name="subject_storage_decryption_success" xml:space="preserve">
+    <value>${LetterLogoText}. Decryption process completed</value>
+  </data>
+  <data name="pattern_opensource_admin_welcome_v11" xml:space="preserve">
+    <value>Hello, $UserName!
+
+Here’s what you can do to make your web-office even more secure:
+
+*Get an SSL certificate* if you are going to provide not only local but also external portal access for your users. Generate a new signed certificate in the Control Panel or purchase one from the provider you trust.
+
+*Enable automatic backups* in the Control Panel. We also recommend that you use 3rd services and make a backup copy of the server with ONLYOFFICE installed from time to time. Instructions in our "Help Center":"${__HelpLink}/server/controlpanel/enterprise/backup-restore.aspx".
+
+*Adjust portal security settings*: restrict access using IP whitelisting, specify trusted mail domains, set password length and more. "More information&gt;&gt;":"${__HelpLink}/server/enterprise/configure-enterprise.aspx?_ga=2.111477636.160074001.1555312634-699576329.1539952318"
+
+*Enable 2-factor authentication* via SMS or authenticator app. Instructions "here":"${__HelpLink}/guides/two-factor-authentication.aspx?_ga=2.115795846.160074001.1555312634-699576329.1539952318".
+
+*Use LDAP for access centralization*. Easily import the necessary users and groups from your LDAP server (e.g. OpenLDAP Server or Microsoft Active Directory) to your portal. Learn more "here":"${__HelpLink}/server/windows/community/ldap-settings.aspx".
+
+*Use own SMPT server*. By default notifications for users (for example, if they are granted access to a document) are provided by means of standard ONLYOFFICE SMPT server. Configure your own SMTP server so that your notifications won’t pass through any third-party server. "Instructions&gt;&gt;":"${__HelpLink}/server/windows/community/smtp-settings.aspx"
+
+*Close all the unnecessary ports*. The list of all the ports which must be opened for ONLYOFFICE is "here":"${__HelpLink}/server/docker/community/open-ports.aspx".
+
+*Encrypt your data at rest*. To do so, follow "the instructions":"${__HelpLink}". If you want to protect collaboration process, activate Private Rooms. "Learn more":"${__HelpLink}"
+
+To secure your web-office, follow "the link":"$ControlPanelUrl"
+
+More information in our "Help Center":"${__HelpLink}".</value>
+  </data>
+  <data name="pattern_opensource_user_activation_v11" xml:space="preserve">
+    <value>Hello!
+
+You are invited to join your company's safe and secure web-office that would enhance your collaboration. Its address is "${__VirtualRootPath}":"${__VirtualRootPath}".
+
+Accept the invitation by following the "link":"$ActivateUrl"
+
+The link is only valid for 7 days.
+
+You will get more tips on how to use your web-office. You can cancel the subscriptions on your Profile page at any moment as well as re-enable them.</value>
+  </data>
+  <data name="pattern_opensource_user_welcome_v11" xml:space="preserve">
+    <value>Congratulations, $UserName!
+
+You have officially joined your team’s web-office at "${__VirtualRootPath}":"${__VirtualRootPath}". Now you can:
+
+*Store, manage and share documents*. View pictures, play videos and audios. "Learn more":"${__HelpLink}/gettingstarted/documents.aspx"
+
+*Edit and co-author documents, spreadsheets, and presentations* using integrated ONLYOFFICE editors. Use hundreds of formatting tools and collaborate efficiently. "Watch video":"https://youtu.be/ep1VLGlmsdI"
+
+*Manage your tasks*. Use "ONLYOFFICE Projects":"${__HelpLink}/projects.aspx" to plan activities, set tasks and deadlines. 
+
+*Customer relationships*. Build your customer database, manage business processes, analyse potential deal success rate, and track sales with "ONLYOFFICE CRM":"${__HelpLink}/crm.aspx".
+
+*Create personal and shared calendars*. Arrange meetings, set reminders, create to-do lists! "Learn more":"${__HelpLink}/calendar.aspx"
+
+*Use internal wiki and social network*. Maintain an internal knowledge base to help new members get involved quickly. Share your thoughts with blogs, forums, and polls. "Learn more":"${__HelpLink}/community.aspx"
+
+*Handle all emails and create project mailboxes*. Gather correspondence from different accounts in one workspace or ask your admin to create a new corporate mailbox. "Learn more":"${__HelpLink}/mail.aspx"
+
+*Exchange instant messages* and quickly share files using Talk. "Learn more":"${__HelpLink}/talk.aspx"
+
+To access your web-office, follow the "link":"${__VirtualRootPath}".</value>
+  </data>
+  <data name="subject_opensource_admin_welcome_v11" xml:space="preserve">
+    <value>Make your ONLYOFFICE more secure</value>
+  </data>
+  <data name="subject_opensource_user_activation_v11" xml:space="preserve">
+    <value>Join ${__VirtualRootPath}</value>
+  </data>
+  <data name="subject_opensource_user_welcome_v11" xml:space="preserve">
+    <value>Welcome to your web-office</value>
+  </data>
+  <data name="pattern_opensource_admin_docs_tips_v11" xml:space="preserve">
+    <value>Hello, $UserName!
+
+We hope you enjoy using integrated ONLYOFFICE document editors. Here are some tips that might be useful: 
+
+*#1. Share documents* to individuals and groups. Choose their access level - Read Only, Comment, Form Filling, Review or Full Access. Let other users apply their own filters in spreadsheets without disturbing co-authors. Restrict downloading and printing using "ONLYOFFICE API":"https://api.onlyoffice.com/editors/config/document/permissions". 
+
+*#2. Learn how document saving works* and adjust it to your own needs. "Learn more":"https://www.onlyoffice.com/blog/2020/04/save-and-force-save-in-onlyoffice-never-lose-a-document/"
+
+*#3. Get help* from the community by creating issues on "GitHub":"https://github.com/ONLYOFFICE/DocumentServer/issues" or asking questions on "our forum":"https://dev.onlyoffice.org/".  You can also buy subscription to premium support or just ask our support team to help in certain cases. "Learn more":"https://github.com/ONLYOFFICE/DocumentServer/issues"
+
+*#4. Get the free apps*.  To work on documents offline on Windows, Linux and macOS, download "this free desktop app":"https://www.onlyoffice.com/apps.aspx". To edit documents on mobile devices, get free Documents app for "iOS":"https://itunes.apple.com/us/app/onlyoffice-documents/id944896972" or "Android":"https://play.google.com/store/apps/details?id=com.onlyoffice.documents".
+
+*#5. Activate private rooms for encrypted collaboration*. All the docs stored in these rooms as well as data transfer while collaboration are encrypted using the AES-256 encryption algorithm to prevent unwanted access. "Learn more":"${__HelpLink}".</value>
+  </data>
+  <data name="pattern_opensource_guest_activation_v11" xml:space="preserve">
+    <value>Hello!
+
+You are invited to join "${__VirtualRootPath}":"${__VirtualRootPath}" as a guest user. Accept the invitation by clicking the link:
+
+"$ActivateUrl":"$ActivateUrl"
+
+The link is only valid for 7 days.
+
+You will get more tips on how to use your web-office. You can cancel the subscriptions on your Profile page at any moment as well as re-enable them.</value>
+  </data>
+  <data name="pattern_opensource_guest_welcome_v11" xml:space="preserve">
+    <value>Hello, $UserName!
+
+You are now a guest user at"${__VirtualRootPath}":"${__VirtualRootPath}". Now you can:
+
+*Introduce yourself* to the team by editing your profile.
+
+*View shared documents* as well as download them and upload new files to shared folders.
+
+*View and comment projects* you’ve been invited to as well as blog and forum posts.
+
+*Exchange instant messages* and quickly share files using Talk.
+
+*Use personal and shared calendars* to arrange meetings, set reminders, and create to-do lists!
+
+To access your web-office, follow "the link":"${__VirtualRootPath}".
+
+If you want to create your own web-office, visit "ONLYOFFICE official website":"https://www.onlyoffice.com/". 
+</value>
+  </data>
+  <data name="pattern_opensource_user_docs_tips_v11" xml:space="preserve">
+    <value>Hello, $UserName!
+
+We hope you enjoy using integrated ONLYOFFICE document editors. Here are some tips that might be useful:
+
+*#1. Explore advanced formatting*. The doc editors provide you with the most complete set of styling and formatting tools.  
+
+*#2. Share documents* to individuals or user groups. Choose their access level - Read Only, Comment, Form Filling, Review or Full Access. 
+
+*#3. Choose co-editing mode*. While co-editing a doc with your team in real time, switch to Fast mode to see changes as your co-author is typing or to Strict mode to get more privacy. "Watch video":"https://youtu.be/8z1iLv32J2M"
+
+*#4. Review, comment, and chat*. Use "Review":"https://youtu.be/D1tbffuQeUA" to suggest changes without modifying the original doc, add Comments to share your thoughts on a specific extract, or chat inside your doc via instant messages.
+
+*#5. Connect 3rd party clouds*, like Dropbox or Google Drive, to manage your files in one place.
+
+*#6. Get the apps*. To work on documents offline on Windows, Linux and macOS, download "this free desktop app":"https://www.onlyoffice.com/apps.aspx". To edit documents on mobile devices, get free Documents app for "iOS":"https://itunes.apple.com/us/app/onlyoffice-documents/id944896972" or "Android":"https://play.google.com/store/apps/details?id=com.onlyoffice.documents".</value>
+  </data>
+  <data name="subject_opensource_admin_docs_tips_v11" xml:space="preserve">
+    <value>5 tips for effective work on your docs</value>
+  </data>
+  <data name="subject_opensource_guest_activation_v11" xml:space="preserve">
+    <value>Join ${__VirtualRootPath}</value>
+  </data>
+  <data name="subject_opensource_guest_welcome_v11" xml:space="preserve">
+    <value>Welcome to your web-office</value>
+  </data>
+  <data name="subject_opensource_user_docs_tips_v11" xml:space="preserve">
+    <value>6 tips for effective work on your docs</value>
   </data>
 </root>

@@ -1,29 +1,30 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Security;
+using System.Text;
+using System.Threading;
+using System.Web;
+using System.Web.Caching;
 using ASC.Common.Caching;
 using ASC.Core;
 using ASC.Core.Users;
@@ -32,22 +33,14 @@ using ASC.Web.Core.Files;
 using ASC.Web.Files.Api;
 using ASC.Web.Files.Classes;
 using ASC.Web.Files.Core;
-using ASC.Web.Files.Import;
+using ASC.Web.Files.Helpers;
 using ASC.Web.Files.Resources;
 using ASC.Web.Files.Services.DocumentService;
 using ASC.Web.Files.ThirdPartyApp;
 using ASC.Web.Studio.Core;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Security;
-using System.Text;
-using System.Web;
-using System.Web.Caching;
 using File = ASC.Files.Core.File;
+using FileShare = ASC.Files.Core.Security.FileShare;
 using SecurityContext = ASC.Core.SecurityContext;
 
 namespace ASC.Web.Files.Utils
@@ -56,21 +49,25 @@ namespace ASC.Web.Files.Utils
     {
         private const string UPDATE_LIST = "filesUpdateList";
         private static readonly ICache cache = AscCache.Default;
-        
-        
-        public static IEnumerable<FileEntry> GetEntries(IFolderDao folderDao, IFileDao fileDao, Folder parent, FilterType filter, Guid subjectId, OrderBy orderBy, String searchText, int from, int count, out int total)
+
+
+        public static IEnumerable<FileEntry> GetEntries(IFolderDao folderDao, IFileDao fileDao, Folder parent, int from, int count, FilterType filter, bool subjectGroup, Guid subjectId, String searchText, bool searchInContent, bool withSubfolders, OrderBy orderBy, out int total)
         {
             total = 0;
 
             if (parent == null) throw new ArgumentNullException("parent", FilesCommonResource.ErrorMassage_FolderNotFound);
+            if (parent.ProviderEntry && !FilesSettings.EnableThirdParty) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_ReadFolder);
+            if (parent.RootFolderType == FolderType.Privacy && (!PrivacyRoomSettings.Available || !PrivacyRoomSettings.Enabled)) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_ReadFolder);
 
             var fileSecurity = Global.GetFilesSecurity();
             var entries = Enumerable.Empty<FileEntry>();
 
+            searchInContent = searchInContent && filter != FilterType.ByExtension && !Equals(parent.ID, Global.FolderTrash);
+
             if (parent.FolderType == FolderType.Projects && parent.ID.Equals(Global.FolderProjects))
             {
                 var apiServer = new ASC.Api.ApiServer();
-                var apiUrl = String.Format("{0}project/maxlastmodified.json", SetupInfo.WebApiBaseUrl);
+                var apiUrl = string.Format("{0}project/maxlastmodified.json", SetupInfo.WebApiBaseUrl);
 
                 var responseBody = apiServer.GetApiResponse(apiUrl, "GET");
                 if (responseBody != null)
@@ -84,12 +81,12 @@ namespace ASC.Web.Files.Utils
                         HttpRuntime.Cache.Remove(projectLastModifiedCacheKey);
                         HttpRuntime.Cache.Insert(projectLastModifiedCacheKey, projectLastModified);
                     }
-                    var projectListCacheKey = String.Format("documents/projectFolders/{0}", SecurityContext.CurrentAccount.ID);
-                    var fromCache = HttpRuntime.Cache.Get(projectListCacheKey);
+                    var projectListCacheKey = string.Format("documents/projectFolders/{0}", SecurityContext.CurrentAccount.ID);
+                    var folderIDProjectTitle = (Dictionary<object, KeyValuePair<int, string>>)HttpRuntime.Cache.Get(projectListCacheKey);
 
-                    if (fromCache == null || !string.IsNullOrEmpty(searchText))
+                    if (folderIDProjectTitle == null)
                     {
-                        apiUrl = String.Format("{0}project/filter.json?sortBy=title&sortOrder=ascending&status=open", SetupInfo.WebApiBaseUrl);
+                        apiUrl = string.Format("{0}project/filter.json?sortBy=title&sortOrder=ascending&status=open&fields=id,title,security,projectFolder", SetupInfo.WebApiBaseUrl);
 
                         responseApi = JObject.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(apiServer.GetApiResponse(apiUrl, "GET"))));
 
@@ -97,13 +94,11 @@ namespace ASC.Web.Files.Utils
 
                         if (!(responseData is JArray)) return entries.ToList();
 
-                        var folderIDProjectTitle = new Dictionary<object, String>();
-
+                        folderIDProjectTitle = new Dictionary<object, KeyValuePair<int, string>>();
                         foreach (JObject projectInfo in responseData.Children())
                         {
-                            var projectID = projectInfo["id"].Value<String>();
+                            var projectID = projectInfo["id"].Value<int>();
                             var projectTitle = Global.ReplaceInvalidCharsAndTruncate(projectInfo["title"].Value<String>());
-                            int projectFolderID;
 
                             JToken projectSecurityJToken;
                             if (projectInfo.TryGetValue("security", out projectSecurityJToken))
@@ -119,79 +114,134 @@ namespace ASC.Web.Files.Utils
                                 }
                             }
 
-                            JToken projectFolderIDJToken;
-
-                            if (projectInfo.TryGetValue("projectFolder", out projectFolderIDJToken))
-                                projectFolderID = projectInfo["projectFolder"].Value<int>();
+                            int projectFolderID;
+                            JToken projectFolderIDjToken;
+                            if (projectInfo.TryGetValue("projectFolder", out projectFolderIDjToken))
+                                projectFolderID = projectFolderIDjToken.Value<int>();
                             else
-                                projectFolderID = (int)FilesIntegration.RegisterBunch("projects", "project", projectID);
+                                projectFolderID = (int)FilesIntegration.RegisterBunch("projects", "project", projectID.ToString());
 
                             if (!folderIDProjectTitle.ContainsKey(projectFolderID))
-                                folderIDProjectTitle.Add(projectFolderID, projectTitle);
-                            HttpRuntime.Cache.Remove("documents/folders/" + projectFolderID.ToString());
-                            HttpRuntime.Cache.Insert("documents/folders/" + projectFolderID.ToString(), projectTitle, null, Cache.NoAbsoluteExpiration, TimeSpan.FromMinutes(30));
+                                folderIDProjectTitle.Add(projectFolderID, new KeyValuePair<int, string>(projectID, projectTitle));
+
+                            AscCache.Default.Remove("documents/folders/" + projectFolderID);
+                            AscCache.Default.Insert("documents/folders/" + projectFolderID, projectTitle, TimeSpan.FromMinutes(30));
                         }
 
-                        var folders = folderDao.GetFolders(folderIDProjectTitle.Keys.ToArray(), searchText, !string.IsNullOrEmpty(searchText));
+                        HttpRuntime.Cache.Remove(projectListCacheKey);
+                        HttpRuntime.Cache.Insert(projectListCacheKey, folderIDProjectTitle, new CacheDependency(null, new[] { projectLastModifiedCacheKey }), Cache.NoAbsoluteExpiration, TimeSpan.FromMinutes(15));
+                    }
+
+                    var rootKeys = folderIDProjectTitle.Keys.ToArray();
+                    if (filter == FilterType.None || filter == FilterType.FoldersOnly)
+                    {
+                        var folders = folderDao.GetFolders(rootKeys, filter, subjectGroup, subjectId, searchText, withSubfolders, false);
+
+                        var emptyFilter = string.IsNullOrEmpty(searchText) && filter == FilterType.None && subjectId == Guid.Empty;
+                        if (!emptyFilter)
+                        {
+                            var projectFolderIds =
+                                folderIDProjectTitle
+                                    .Where(projectFolder => string.IsNullOrEmpty(searchText)
+                                                            || (projectFolder.Value.Value ?? "").ToLower().Trim().Contains(searchText.ToLower().Trim()))
+                                    .Select(projectFolder => projectFolder.Key);
+
+                            folders.RemoveAll(folder => rootKeys.Contains(folder.ID));
+
+                            var projectFolders = folderDao.GetFolders(projectFolderIds.ToArray(), filter, subjectGroup, subjectId, null, false, false);
+                            folders.AddRange(projectFolders);
+                        }
+
                         folders.ForEach(x =>
                             {
-                                x.Title = folderIDProjectTitle.ContainsKey(x.ID) ? folderIDProjectTitle[x.ID] : x.Title;
-                                x.FolderUrl = PathProvider.GetFolderUrl(x);
+                                x.Title = folderIDProjectTitle.ContainsKey(x.ID) ? folderIDProjectTitle[x.ID].Value : x.Title;
+                                x.FolderUrl = folderIDProjectTitle.ContainsKey(x.ID) ? PathProvider.GetFolderUrl(x, folderIDProjectTitle[x.ID].Key) : string.Empty;
                             });
 
-                        folders = fileSecurity.FilterRead(folders).ToList();
+                        if (withSubfolders)
+                        {
+                            folders = fileSecurity.FilterRead(folders).ToList();
+                        }
 
                         entries = entries.Concat(folders);
-
-                        if (!string.IsNullOrEmpty(searchText))
-                        {
-                            var files = fileDao.GetFiles(folderIDProjectTitle.Keys.ToArray(), searchText, !string.IsNullOrEmpty(searchText)).ToList();
-                            files = fileSecurity.FilterRead(files).ToList();
-                            entries = entries.Concat(files);
-                        }
-
-                        if (entries.Any() && string.IsNullOrEmpty(searchText))
-                        {
-                            HttpRuntime.Cache.Remove(projectListCacheKey);
-                            HttpRuntime.Cache.Insert(projectListCacheKey, entries, new CacheDependency(null, new[] { projectLastModifiedCacheKey }), Cache.NoAbsoluteExpiration, TimeSpan.FromMinutes(15));
-                        }
                     }
-                    else
+
+                    if (filter != FilterType.FoldersOnly && withSubfolders)
                     {
-                        entries = entries.Concat((IEnumerable<FileEntry>)fromCache);
+                        var files = fileDao.GetFiles(rootKeys, filter, subjectGroup, subjectId, searchText, searchInContent).ToList();
+                        files = fileSecurity.FilterRead(files).ToList();
+                        entries = entries.Concat(files);
                     }
                 }
 
-                entries = FilterEntries(entries, filter, subjectId, searchText);
-
-                parent.TotalFiles = entries.Aggregate(0, (a, f) => a + (f is Folder ? ((Folder)f).TotalFiles : 1));
-                parent.TotalSubFolders = entries.Aggregate(0, (a, f) => a + (f is Folder ? ((Folder)f).TotalSubFolders + 1 : 0));
+                parent.TotalFiles = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalFiles : 1));
+                parent.TotalSubFolders = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalSubFolders + 1 : 0));
             }
             else if (parent.FolderType == FolderType.SHARE)
             {
                 //share
-                var shared = (IEnumerable<FileEntry>) fileSecurity.GetSharesForMe(searchText, !string.IsNullOrEmpty(searchText));
-                if (CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsVisitor())
-                {
-                    shared = shared.Where(r => !r.ProviderEntry);
-                }
+                var shared = (IEnumerable<FileEntry>)fileSecurity.GetSharesForMe(filter, subjectGroup, subjectId, searchText, searchInContent, withSubfolders);
 
-                shared = FilterEntries(shared, filter, subjectId, searchText)
-                    .Where(f => f.CreateBy != SecurityContext.CurrentAccount.ID && // don't show my files
-                                f.RootFolderType == FolderType.USER); // don't show common files (common files can read)
                 entries = entries.Concat(shared);
 
-                parent.TotalFiles = entries.Aggregate(0, (a, f) => a + (f is Folder ? ((Folder)f).TotalFiles : 1));
-                parent.TotalSubFolders = entries.Aggregate(0, (a, f) => a + (f is Folder ? ((Folder)f).TotalSubFolders + 1 : 0));
+                parent.TotalFiles = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalFiles : 1));
+                parent.TotalSubFolders = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalSubFolders + 1 : 0));
             }
-            else
+            else if (parent.FolderType == FolderType.Recent)
             {
-                var folders = folderDao.GetFolders(parent.ID, orderBy, filter, subjectId, searchText, !string.IsNullOrEmpty(searchText) && parent.FolderType != FolderType.TRASH).Cast<FileEntry>();
+                var files = GetRecent(fileDao, filter, subjectGroup, subjectId, searchText, searchInContent);
+                entries = entries.Concat(files);
+
+                parent.TotalFiles = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalFiles : 1));
+            }
+            else if (parent.FolderType == FolderType.Favorites)
+            {
+                IEnumerable<Folder> folders;
+                IEnumerable<File> files;
+                GetFavorites(folderDao, fileDao, filter, subjectGroup, subjectId, searchText, searchInContent, out folders, out files);
+
+                entries = entries.Concat(folders);
+                entries = entries.Concat(files);
+
+                parent.TotalFiles = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalFiles : 1));
+                parent.TotalSubFolders = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalSubFolders + 1 : 0));
+            }
+            else if (parent.FolderType == FolderType.Templates)
+            {
+                var files = GetTemplates(fileDao, filter, subjectGroup, subjectId, searchText, searchInContent);
+                entries = entries.Concat(files);
+
+                parent.TotalFiles = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalFiles : 1));
+                parent.TotalSubFolders = 0;
+            }
+            else if (parent.FolderType == FolderType.Privacy)
+            {
+                var folders = folderDao.GetFolders(parent.ID, orderBy, filter, subjectGroup, subjectId, searchText, withSubfolders).Cast<FileEntry>();
                 folders = fileSecurity.FilterRead(folders);
                 entries = entries.Concat(folders);
 
-                //TODO:Optimize
-                var files = fileDao.GetFiles(parent.ID, orderBy, filter, subjectId, searchText, !string.IsNullOrEmpty(searchText) && parent.FolderType != FolderType.TRASH).Cast<FileEntry>();
+                var files = fileDao.GetFiles(parent.ID, orderBy, filter, subjectGroup, subjectId, searchText, searchInContent, withSubfolders).Cast<FileEntry>();
+                files = fileSecurity.FilterRead(files);
+                entries = entries.Concat(files);
+
+                //share
+                var shared = (IEnumerable<FileEntry>)fileSecurity.GetPrivacyForMe(filter, subjectGroup, subjectId, searchText, searchInContent, withSubfolders);
+
+                entries = entries.Concat(shared);
+
+                parent.TotalFiles = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalFiles : 1));
+                parent.TotalSubFolders = entries.Aggregate(0, (a, f) => a + (f.FileEntryType == FileEntryType.Folder ? ((Folder)f).TotalSubFolders + 1 : 0));
+            }
+            else
+            {
+                if (parent.FolderType == FolderType.TRASH)
+                    withSubfolders = false;
+
+                var folders = folderDao.GetFolders(parent.ID, orderBy, filter, subjectGroup, subjectId, searchText, withSubfolders).Cast<FileEntry>();
+                folders = fileSecurity.FilterRead(folders);
+                entries = entries.Concat(folders);
+
+                var files = fileDao.GetFiles(parent.ID, orderBy, filter, subjectGroup, subjectId, searchText, searchInContent, withSubfolders).Cast<FileEntry>();
                 files = fileSecurity.FilterRead(files);
                 entries = entries.Concat(files);
 
@@ -199,14 +249,17 @@ namespace ASC.Web.Files.Utils
                 {
                     var folderList = GetThirpartyFolders(parent, searchText);
 
-                    var thirdPartyFolder = FilterEntries(folderList, filter, subjectId, searchText);
+                    var thirdPartyFolder = FilterEntries(folderList, filter, subjectGroup, subjectId, searchText, searchInContent);
                     entries = entries.Concat(thirdPartyFolder);
                 }
             }
 
             if (orderBy.SortedBy != SortedByType.New)
             {
-                entries = SortEntries(entries, orderBy);
+                if (parent.FolderType != FolderType.Recent)
+                {
+                    entries = SortEntries(entries, orderBy);
+                }
 
                 total = entries.Count();
                 if (0 < from) entries = entries.Skip(from);
@@ -225,9 +278,26 @@ namespace ASC.Web.Files.Utils
                 if (0 < count) entries = entries.Take(count);
             }
 
-            SetFileStatus(entries.Select(r => r as File).Where(r => r != null && r.ID != null));
+            SetFileStatus(entries.Where(r => r != null && r.ID != null && r.FileEntryType == FileEntryType.File).Select(r => r as File).ToList());
 
             return entries;
+        }
+
+        public static IEnumerable<File> GetTemplates(IFileDao fileDao, FilterType filter, bool subjectGroup, Guid subjectId, String searchText, bool searchInContent)
+        {
+            using (var tagDao = Global.DaoFactory.GetTagDao())
+            {
+                var tags = tagDao.GetTags(SecurityContext.CurrentAccount.ID, TagType.Template);
+
+                var fileIds = tags.Where(tag => tag.EntryType == FileEntryType.File).Select(tag => tag.EntryId).ToArray();
+
+                var files = fileDao.GetFilesFiltered(fileIds, filter, subjectGroup, subjectId, searchText, searchInContent);
+                files = files.Where(file => file.RootFolderType != FolderType.TRASH).ToList();
+
+                files = Global.GetFilesSecurity().FilterRead(files).ToList();
+
+                return files;
+            }
         }
 
         public static IEnumerable<Folder> GetThirpartyFolders(Folder parent, string searchText = null)
@@ -235,39 +305,19 @@ namespace ASC.Web.Files.Utils
             var folderList = new List<Folder>();
 
             if ((parent.ID.Equals(Global.FolderMy) || parent.ID.Equals(Global.FolderCommon))
-                && ImportConfiguration.SupportInclusion
-                && (Global.IsAdministrator
-                    || CoreContext.Configuration.Personal
-                    || FilesSettings.EnableThirdParty))
+                && ThirdpartyConfiguration.SupportInclusion
+                && (FilesSettings.EnableThirdParty
+                    || CoreContext.Configuration.Personal))
             {
                 using (var providerDao = Global.DaoFactory.GetProviderDao())
                 {
+                    if (providerDao == null) return folderList;
+
                     var fileSecurity = Global.GetFilesSecurity();
 
                     var providers = providerDao.GetProvidersInfo(parent.RootFolderType, searchText);
                     folderList = providers
-                        .Select(providerInfo =>
-                                //Fake folder. Don't send request to third party
-                                new Folder
-                                {
-                                    ID = providerInfo.RootFolderId,
-                                    ParentFolderID = parent.ID,
-                                    CreateBy = providerInfo.Owner,
-                                    CreateOn = providerInfo.CreateOn,
-                                    FolderType = FolderType.DEFAULT,
-                                    ModifiedBy = providerInfo.Owner,
-                                    ModifiedOn = providerInfo.CreateOn,
-                                    ProviderId = providerInfo.ID,
-                                    ProviderKey = providerInfo.ProviderKey,
-                                    RootFolderCreator = providerInfo.Owner,
-                                    RootFolderId = providerInfo.RootFolderId,
-                                    RootFolderType = providerInfo.RootFolderType,
-                                    Shareable = false,
-                                    Title = providerInfo.CustomerTitle,
-                                    TotalFiles = 0,
-                                    TotalSubFolders = 0
-                                }
-                        )
+                        .Select(providerInfo => GetFakeThirdpartyFolder(providerInfo, parent.ID))
                         .Where(fileSecurity.CanRead).ToList();
                 }
 
@@ -275,11 +325,11 @@ namespace ASC.Web.Files.Utils
                     using (var securityDao = Global.DaoFactory.GetSecurityDao())
                     {
                         securityDao.GetPureShareRecords(folderList.Cast<FileEntry>().ToArray())
-                                   .Where(x => x.Owner == SecurityContext.CurrentAccount.ID)
+                                   //.Where(x => x.Owner == SecurityContext.CurrentAccount.ID)
                                    .Select(x => x.EntryId).Distinct().ToList()
                                    .ForEach(id =>
                                        {
-                                           folderList.First(y => y.ID.Equals(id)).SharedByMe = true;
+                                           folderList.First(y => y.ID.Equals(id)).Shared = true;
                                        });
                     }
             }
@@ -287,45 +337,98 @@ namespace ASC.Web.Files.Utils
             return folderList;
         }
 
-        public static IEnumerable<FileEntry> FilterEntries(IEnumerable<FileEntry> entries, FilterType filter, Guid subjectId, String searchText)
+        public static IEnumerable<File> GetRecent(IFileDao fileDao, FilterType filter, bool subjectGroup, Guid subjectId, String searchText, bool searchInContent)
+        {
+            using (var tagDao = Global.DaoFactory.GetTagDao())
+            {
+                var tags = tagDao.GetTags(SecurityContext.CurrentAccount.ID, TagType.Recent).ToList();
+
+                var fileIds = tags.Where(tag => tag.EntryType == FileEntryType.File).Select(tag => tag.EntryId).ToArray();
+                var files = fileDao.GetFilesFiltered(fileIds, filter, subjectGroup, subjectId, searchText, searchInContent);
+                files = files.Where(file => file.RootFolderType != FolderType.TRASH).ToList();
+
+                files = Global.GetFilesSecurity().FilterRead(files).ToList();
+
+                var listFileIds = fileIds.ToList();
+                files = files.OrderBy(file => listFileIds.IndexOf(file.ID)).ToList();
+
+                return files;
+            }
+        }
+
+        public static void GetFavorites(IFolderDao folderDao, IFileDao fileDao, FilterType filter, bool subjectGroup, Guid subjectId, String searchText, bool searchInContent, out IEnumerable<Folder> folders, out IEnumerable<File> files)
+        {
+            folders = new List<Folder>();
+            files = new List<File>();
+            var fileSecurity = Global.GetFilesSecurity();
+            using (var tagDao = Global.DaoFactory.GetTagDao())
+            {
+                var tags = tagDao.GetTags(SecurityContext.CurrentAccount.ID, TagType.Favorite);
+
+                if (filter == FilterType.None || filter == FilterType.FoldersOnly)
+                {
+                    var folderIds = tags.Where(tag => tag.EntryType == FileEntryType.Folder).Select(tag => tag.EntryId).ToArray();
+                    folders = folderDao.GetFolders(folderIds, filter, subjectGroup, subjectId, searchText, false, false);
+                    folders = folders.Where(folder => folder.RootFolderType != FolderType.TRASH).ToList();
+
+                    folders = fileSecurity.FilterRead(folders).ToList();
+                }
+
+                if (filter != FilterType.FoldersOnly)
+                {
+                    var fileIds = tags.Where(tag => tag.EntryType == FileEntryType.File).Select(tag => tag.EntryId).ToArray();
+                    files = fileDao.GetFilesFiltered(fileIds, filter, subjectGroup, subjectId, searchText, searchInContent);
+                    files = files.Where(file => file.RootFolderType != FolderType.TRASH).ToList();
+
+                    files = fileSecurity.FilterRead(files).ToList();
+                }
+            }
+        }
+
+        public static IEnumerable<FileEntry> FilterEntries(IEnumerable<FileEntry> entries, FilterType filter, bool subjectGroup, Guid subjectId, String searchText, bool searchInContent)
         {
             if (entries == null || !entries.Any()) return entries;
+
+            if (subjectId != Guid.Empty)
+            {
+                entries = entries.Where(f =>
+                                        subjectGroup
+                                            ? CoreContext.UserManager.GetUsersByGroup(subjectId).Any(s => s.ID == f.CreateBy)
+                                            : f.CreateBy == subjectId
+                    )
+                                 .ToList();
+            }
 
             Func<FileEntry, bool> where = null;
 
             switch (filter)
             {
-                case FilterType.ByUser:
-                    where = f => f.CreateBy == subjectId;
-                    break;
-                case FilterType.ByDepartment:
-                    where = f => CoreContext.UserManager.GetUsersByGroup(subjectId).Any(s => s.ID == f.CreateBy);
-                    break;
                 case FilterType.SpreadsheetsOnly:
                 case FilterType.PresentationsOnly:
                 case FilterType.ImagesOnly:
                 case FilterType.DocumentsOnly:
                 case FilterType.ArchiveOnly:
                 case FilterType.FilesOnly:
-                    where = f => f is File && (((File)f).FilterType == filter || filter == FilterType.FilesOnly);
+                case FilterType.MediaOnly:
+                    where = f => f.FileEntryType == FileEntryType.File && (((File)f).FilterType == filter || filter == FilterType.FilesOnly);
                     break;
                 case FilterType.FoldersOnly:
-                    where = f => f is Folder;
+                    where = f => f.FileEntryType == FileEntryType.Folder;
                     break;
                 case FilterType.ByExtension:
                     var filterExt = (searchText ?? string.Empty).ToLower().Trim();
-                    where = f => !string.IsNullOrEmpty(filterExt) && f is File && FileUtility.GetFileExtension(f.Title).Contains(filterExt);
+                    where = f => !string.IsNullOrEmpty(filterExt) && f.FileEntryType == FileEntryType.File && FileUtility.GetFileExtension(f.Title).Contains(filterExt);
                     break;
             }
 
             if (where != null)
             {
-                entries = entries.Where(where);
+                entries = entries.Where(where).ToList();
             }
 
-            if (!string.IsNullOrEmpty(searchText = (searchText ?? string.Empty).ToLower().Trim()))
+            if ((!searchInContent || filter == FilterType.ByExtension) && !string.IsNullOrEmpty(searchText = (searchText ?? string.Empty).ToLower().Trim()))
             {
-                entries = entries.Where(f => f.Title.ToLower().Contains(searchText));
+                entries = entries.Where(f => f.Title.ToLower().Contains(searchText)).ToList();
             }
             return entries;
         }
@@ -336,7 +439,10 @@ namespace ASC.Web.Files.Utils
 
             Comparison<FileEntry> sorter;
 
-            if (orderBy == null) orderBy = new OrderBy(SortedByType.DateAndTime, false);
+            if (orderBy == null)
+            {
+                orderBy = FilesSettings.DefaultOrder;
+            }
 
             var c = orderBy.IsAsc ? 1 : -1;
             switch (orderBy.SortedBy)
@@ -345,63 +451,61 @@ namespace ASC.Web.Files.Utils
                     sorter = (x, y) =>
                              {
                                  var cmp = 0;
-                                 if (x is File && y is File)
+                                 if (x.FileEntryType == FileEntryType.File && y.FileEntryType == FileEntryType.File)
                                      cmp = c * (FileUtility.GetFileExtension((x.Title)).CompareTo(FileUtility.GetFileExtension(y.Title)));
-                                 return cmp == 0 ? x.Title.CompareTo(y.Title) : cmp;
+                                 return cmp == 0 ? x.Title.EnumerableComparer(y.Title) : cmp;
                              };
                     break;
                 case SortedByType.Author:
                     sorter = (x, y) =>
                              {
                                  var cmp = c * string.Compare(x.ModifiedByString, y.ModifiedByString);
-                                 return cmp == 0 ? x.Title.CompareTo(y.Title) : cmp;
+                                 return cmp == 0 ? x.Title.EnumerableComparer(y.Title) : cmp;
                              };
                     break;
                 case SortedByType.Size:
                     sorter = (x, y) =>
                              {
                                  var cmp = 0;
-                                 if (x is File && y is File)
+                                 if (x.FileEntryType == FileEntryType.File && y.FileEntryType == FileEntryType.File)
                                      cmp = c * ((File)x).ContentLength.CompareTo(((File)y).ContentLength);
-                                 return cmp == 0 ? x.Title.CompareTo(y.Title) : cmp;
+                                 return cmp == 0 ? x.Title.EnumerableComparer(y.Title) : cmp;
                              };
                     break;
                 case SortedByType.AZ:
-                    sorter = (x, y) => c * x.Title.CompareTo(y.Title);
+                    sorter = (x, y) => c * x.Title.EnumerableComparer(y.Title);
                     break;
                 case SortedByType.DateAndTime:
                     sorter = (x, y) =>
                              {
                                  var cmp = c * DateTime.Compare(x.ModifiedOn, y.ModifiedOn);
-                                 return cmp == 0 ? x.Title.CompareTo(y.Title) : cmp;
+                                 return cmp == 0 ? x.Title.EnumerableComparer(y.Title) : cmp;
                              };
+                    break;
+                case SortedByType.DateAndTimeCreation:
+                    sorter = (x, y) =>
+                    {
+                        var cmp = c * DateTime.Compare(x.CreateOn, y.CreateOn);
+                        return cmp == 0 ? x.Title.EnumerableComparer(y.Title) : cmp;
+                    };
                     break;
                 case SortedByType.New:
                     sorter = (x, y) =>
                         {
-                            var isNewSortResult = c * x.IsNew.CompareTo(y.IsNew);
-                            if (isNewSortResult == 0)
-                            {
-                                var dataTimeSortResult = (-1) * DateTime.Compare(x.ModifiedOn, y.ModifiedOn);
-
-                                return dataTimeSortResult == 0
-                                    ? String.Compare(x.Title, y.Title, StringComparison.Ordinal)
-                                    : dataTimeSortResult;
-                            }
-
-                            return isNewSortResult;
+                            var isNewSortResult = x.IsNew.CompareTo(y.IsNew);
+                            return c * (isNewSortResult == 0 ? DateTime.Compare(x.ModifiedOn, y.ModifiedOn) : isNewSortResult);
                         };
                     break;
                 default:
-                    sorter = (x, y) => c * x.Title.CompareTo(y.Title);
+                    sorter = (x, y) => c * x.Title.EnumerableComparer(y.Title);
                     break;
             }
 
             if (orderBy.SortedBy != SortedByType.New)
             {
                 // folders on top
-                var folders = entries.OfType<Folder>().Cast<FileEntry>().ToList();
-                var files = entries.OfType<File>().Cast<FileEntry>().ToList();
+                var folders = entries.Where(r => r.FileEntryType == FileEntryType.Folder).ToList();
+                var files = entries.Where(r => r.FileEntryType == FileEntryType.File).ToList();
                 folders.Sort(sorter);
                 files.Sort(sorter);
 
@@ -413,6 +517,31 @@ namespace ASC.Web.Files.Utils
             result.Sort(sorter);
 
             return result;
+        }
+
+        public static Folder GetFakeThirdpartyFolder(IProviderInfo providerInfo, object parentFolderId = null)
+        {
+            //Fake folder. Don't send request to third party
+            return new Folder
+                {
+                    ParentFolderID = parentFolderId,
+
+                    ID = providerInfo.RootFolderId,
+                    CreateBy = providerInfo.Owner,
+                    CreateOn = providerInfo.CreateOn,
+                    FolderType = FolderType.DEFAULT,
+                    ModifiedBy = providerInfo.Owner,
+                    ModifiedOn = providerInfo.CreateOn,
+                    ProviderId = providerInfo.ID,
+                    ProviderKey = providerInfo.ProviderKey,
+                    RootFolderCreator = providerInfo.Owner,
+                    RootFolderId = providerInfo.RootFolderId,
+                    RootFolderType = providerInfo.RootFolderType,
+                    Shareable = false,
+                    Title = providerInfo.CustomerTitle,
+                    TotalFiles = 0,
+                    TotalSubFolders = 0
+                };
         }
 
 
@@ -480,19 +609,33 @@ namespace ASC.Web.Files.Utils
         {
             if (file == null || file.ID == null) return;
 
-            SetFileStatus(new List<File> { file });
+            SetFileStatus(new List<File>(1) { file });
         }
 
         public static void SetFileStatus(IEnumerable<File> files)
         {
             using (var tagDao = Global.DaoFactory.GetTagDao())
             {
-                var tagsNew = tagDao.GetNewTags(SecurityContext.CurrentAccount.ID, files.ToArray());
+                var tagsFavorite = tagDao.GetTags(SecurityContext.CurrentAccount.ID, TagType.Favorite, files);
+
+                var tagsTemplate = tagDao.GetTags(SecurityContext.CurrentAccount.ID, TagType.Template, files);
+
+                var tagsNew = tagDao.GetNewTags(SecurityContext.CurrentAccount.ID, files);
 
                 var tagsLocked = tagDao.GetTags(TagType.Locked, files.ToArray());
 
                 foreach (var file in files)
                 {
+                    if (tagsFavorite.Any(r => r.EntryId.Equals(file.ID)))
+                    {
+                        file.IsFavorite = true;
+                    }
+
+                    if (tagsTemplate.Any(r => r.EntryId.Equals(file.ID)))
+                    {
+                        file.IsTemplate = true;
+                    }
+
                     if (tagsNew.Any(r => r.EntryId.Equals(file.ID)))
                     {
                         file.IsNew = true;
@@ -532,7 +675,7 @@ namespace ASC.Web.Files.Utils
         }
 
 
-        public static File SaveEditing(String fileId, int version, Guid tabId, string fileExtension, string downloadUri, Stream stream, bool asNew, String shareLinkKey, string comment = null, bool checkRight = true)
+        public static File SaveEditing(String fileId, string fileExtension, string downloadUri, Stream stream, String doc, string comment = null, bool checkRight = true, bool encrypted = false, ForcesaveType? forcesave = null)
         {
             var newExtension = string.IsNullOrEmpty(fileExtension)
                               ? FileUtility.GetFileExtension(downloadUri)
@@ -548,7 +691,7 @@ namespace ASC.Web.Files.Utils
             File file;
             using (var fileDao = Global.DaoFactory.GetFileDao())
             {
-                var editLink = FileShareLink.Check(shareLinkKey, false, fileDao, out file);
+                var editLink = FileShareLink.Check(doc, false, fileDao, out file);
                 if (file == null)
                 {
                     file = fileDao.GetFile(fileId);
@@ -556,26 +699,58 @@ namespace ASC.Web.Files.Utils
 
                 if (file == null) throw new FileNotFoundException(FilesCommonResource.ErrorMassage_FileNotFound);
                 var fileSecurity = Global.GetFilesSecurity();
-                if (checkRight && !editLink && (!(fileSecurity.CanEdit(file) || fileSecurity.CanReview(file)) || CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsVisitor())) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_EditFile);
+                if (checkRight && !editLink && (!fileSecurity.CanEdit(file) || CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsVisitor())) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_EditFile);
                 if (checkRight && FileLockedForMe(file.ID)) throw new Exception(FilesCommonResource.ErrorMassage_LockedFile);
+                if (checkRight && (!forcesave.HasValue || forcesave.Value == ForcesaveType.None) && FileTracker.IsEditing(file.ID)) throw new Exception(FilesCommonResource.ErrorMassage_SecurityException_UpdateEditingFile);
                 if (file.RootFolderType == FolderType.TRASH) throw new Exception(FilesCommonResource.ErrorMassage_ViewTrashItem);
 
                 var currentExt = file.ConvertedExtension;
                 if (string.IsNullOrEmpty(newExtension)) newExtension = FileUtility.GetInternalExtension(file.Title);
 
-                if ((file.Version <= version || !newExtension.Equals(currentExt) || version < 1)
-                    && (file.Version > 1 || !asNew)
-                    && !FileTracker.FixedVersion(file.ID))
+                var replaceVersion = false;
+                if (file.Forcesave != ForcesaveType.None)
                 {
-                    file.Version++;
-                    if (string.IsNullOrEmpty(comment))
-                        comment = FilesCommonResource.CommentEdit;
+                    if (file.Forcesave == ForcesaveType.User && FilesSettings.StoreForcesave
+                        || encrypted)
+                    {
+                        file.Version++;
+                    }
+                    else
+                    {
+                        replaceVersion = true;
+                    }
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(comment))
-                        comment = FilesCommonResource.CommentCreate;
+                    if (file.Version != 1)
+                    {
+                        file.VersionGroup++;
+                    }
+                    else
+                    {
+                        var storeTemplate = Global.GetStoreTemplate();
+
+                        var path = FileConstant.NewDocPath + Thread.CurrentThread.CurrentCulture + "/";
+                        if (!storeTemplate.IsDirectory(path))
+                        {
+                            path = FileConstant.NewDocPath + "default/";
+                        }
+                        path += "new" + FileUtility.GetInternalExtension(file.Title);
+
+                        //todo: think about the criteria for saving after creation
+                        if (file.ContentLength != storeTemplate.GetFileSize("", path))
+                        {
+                            file.VersionGroup++;
+                        }
+                    }
+                    file.Version++;
                 }
+                file.Forcesave = forcesave.HasValue ? forcesave.Value : ForcesaveType.None;
+
+                if (string.IsNullOrEmpty(comment))
+                    comment = FilesCommonResource.CommentEdit;
+
+                file.Encrypted = encrypted;
 
                 file.ConvertedType = FileUtility.GetFileExtension(file.Title) != newExtension ? newExtension : null;
 
@@ -584,17 +759,14 @@ namespace ASC.Web.Files.Utils
                     if (FileUtility.ExtsConvertible.Keys.Contains(newExtension)
                         && FileUtility.ExtsConvertible[newExtension].Contains(currentExt))
                     {
-                        var key = DocumentServiceConnector.GenerateRevisionId(downloadUri ?? Guid.NewGuid().ToString());
                         if (stream != null)
                         {
-                            using (var tmpStream = new MemoryStream())
-                            {
-                                stream.CopyTo(tmpStream);
-                                downloadUri = DocumentServiceConnector.GetExternalUri(tmpStream, newExtension, key);
-                            }
+                            downloadUri = PathProvider.GetTempUrl(stream, newExtension);
+                            downloadUri = DocumentServiceConnector.ReplaceCommunityAdress(downloadUri);
                         }
 
-                        DocumentServiceConnector.GetConvertedUri(downloadUri, newExtension, currentExt, key, false, out downloadUri);
+                        var key = DocumentServiceConnector.GenerateRevisionId(downloadUri);
+                        DocumentServiceConnector.GetConvertedUri(downloadUri, newExtension, currentExt, key, null, false, out downloadUri);
 
                         stream = null;
                     }
@@ -631,24 +803,28 @@ namespace ASC.Web.Files.Utils
 
                     file.ContentLength = tmpStream.Length;
                     file.Comment = string.IsNullOrEmpty(comment) ? null : comment;
-                    file = fileDao.SaveFile(file, tmpStream);
+                    if (replaceVersion)
+                    {
+                        file = fileDao.ReplaceFileVersion(file, tmpStream);
+                    }
+                    else
+                    {
+                        file = fileDao.SaveFile(file, tmpStream);
+                    }
                 }
             }
-
-            checkRight = FileTracker.ProlongEditing(file.ID, tabId, true, SecurityContext.CurrentAccount.ID);
-            if (checkRight) FileTracker.ChangeRight(file.ID, SecurityContext.CurrentAccount.ID, false);
 
             FileMarker.MarkAsNew(file);
             FileMarker.RemoveMarkAsNew(file);
             return file;
         }
 
-        public static void TrackEditing(string fileId, Guid tabId, Guid userId, bool fixedVersion, string shareLinkKey, bool editingAlone = false)
+        public static void TrackEditing(string fileId, Guid tabId, Guid userId, string doc, bool editingAlone = false)
         {
             bool checkRight;
             if (FileTracker.GetEditingBy(fileId).Contains(userId))
             {
-                checkRight = FileTracker.ProlongEditing(fileId, tabId, fixedVersion, userId, editingAlone);
+                checkRight = FileTracker.ProlongEditing(fileId, tabId, userId, editingAlone);
                 if (!checkRight) return;
             }
 
@@ -656,18 +832,27 @@ namespace ASC.Web.Files.Utils
             bool editLink;
             using (var fileDao = Global.DaoFactory.GetFileDao())
             {
-                editLink = FileShareLink.Check(shareLinkKey, false, fileDao, out file);
+                editLink = FileShareLink.Check(doc, false, fileDao, out file);
                 if (file == null)
                     file = fileDao.GetFile(fileId);
             }
 
             if (file == null) throw new FileNotFoundException(FilesCommonResource.ErrorMassage_FileNotFound);
             var fileSecurity = Global.GetFilesSecurity();
-            if (!editLink && (!fileSecurity.CanEdit(file, userId) && !fileSecurity.CanReview(file, userId) || CoreContext.UserManager.GetUsers(userId).IsVisitor())) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_EditFile);
+            if (!editLink
+                && (!fileSecurity.CanEdit(file, userId)
+                    && !fileSecurity.CanCustomFilterEdit(file, userId)
+                    && !fileSecurity.CanReview(file, userId)
+                    && !fileSecurity.CanFillForms(file, userId)
+                    && !fileSecurity.CanComment(file, userId)
+                    || CoreContext.UserManager.GetUsers(userId).IsVisitor()))
+            {
+                throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_EditFile);
+            }
             if (FileLockedForMe(file.ID, userId)) throw new Exception(FilesCommonResource.ErrorMassage_LockedFile);
             if (file.RootFolderType == FolderType.TRASH) throw new Exception(FilesCommonResource.ErrorMassage_ViewTrashItem);
 
-            checkRight = FileTracker.ProlongEditing(fileId, tabId, fixedVersion, userId, editingAlone);
+            checkRight = FileTracker.ProlongEditing(fileId, tabId, userId, editingAlone);
             if (checkRight)
             {
                 FileTracker.ChangeRight(fileId, userId, false);
@@ -675,23 +860,30 @@ namespace ASC.Web.Files.Utils
         }
 
 
-        public static File UpdateToVersionFile(object fileId, int version, bool checkRight = true)
+        public static File UpdateToVersionFile(object fileId, int version, String doc = null, bool checkRight = true)
         {
             using (var fileDao = Global.DaoFactory.GetFileDao())
             {
                 if (version < 1) throw new ArgumentNullException("version");
 
-                var fromFile = fileDao.GetFile(fileId);
+                File fromFile;
+                var editLink = FileShareLink.Check(doc, false, fileDao, out fromFile);
+
+                if (fromFile == null)
+                    fromFile = fileDao.GetFile(fileId);
+
                 if (fromFile == null) throw new FileNotFoundException(FilesCommonResource.ErrorMassage_FileNotFound);
 
                 if (fromFile.Version != version)
                     fromFile = fileDao.GetFile(fromFile.ID, Math.Min(fromFile.Version, version));
 
                 if (fromFile == null) throw new FileNotFoundException(FilesCommonResource.ErrorMassage_FileNotFound);
-                if (checkRight && (!Global.GetFilesSecurity().CanEdit(fromFile) || CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsVisitor())) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_EditFile);
+                if (checkRight && !editLink && (!Global.GetFilesSecurity().CanEdit(fromFile) || CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsVisitor())) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_EditFile);
                 if (FileLockedForMe(fromFile.ID)) throw new Exception(FilesCommonResource.ErrorMassage_LockedFile);
                 if (checkRight && FileTracker.IsEditing(fromFile.ID)) throw new Exception(FilesCommonResource.ErrorMassage_SecurityException_UpdateEditingFile);
                 if (fromFile.RootFolderType == FolderType.TRASH) throw new Exception(FilesCommonResource.ErrorMassage_ViewTrashItem);
+                if (fromFile.ProviderEntry) throw new Exception(FilesCommonResource.ErrorMassage_BadRequest);
+                if (fromFile.Encrypted) throw new Exception(FilesCommonResource.ErrorMassage_NotSupportedFormat);
 
                 var exists = cache.Get<string>(UPDATE_LIST + fileId.ToString()) != null;
                 if (exists)
@@ -711,26 +903,41 @@ namespace ASC.Web.Files.Utils
                         ID = fromFile.ID,
                         Version = currFile.Version + 1,
                         VersionGroup = currFile.VersionGroup,
-                        Title = fromFile.Title,
-                        ContentLength = fromFile.ContentLength,
-                        FileStatus = fromFile.FileStatus,
-                        FolderID = fromFile.FolderID,
-                        CreateBy = fromFile.CreateBy,
-                        CreateOn = fromFile.CreateOn,
+                        Title = FileUtility.ReplaceFileExtension(currFile.Title, FileUtility.GetFileExtension(fromFile.Title)),
+                        FileStatus = currFile.FileStatus,
+                        FolderID = currFile.FolderID,
+                        CreateBy = currFile.CreateBy,
+                        CreateOn = currFile.CreateOn,
                         ModifiedBy = fromFile.ModifiedBy,
                         ModifiedOn = fromFile.ModifiedOn,
                         ConvertedType = fromFile.ConvertedType,
                         Comment = string.Format(FilesCommonResource.CommentRevert, fromFile.ModifiedOnString),
+                        Encrypted = fromFile.Encrypted,
                     };
 
                     using (var stream = fileDao.GetFileStream(fromFile))
                     {
+                        newFile.ContentLength = stream.CanSeek ? stream.Length : fromFile.ContentLength;
                         newFile = fileDao.SaveFile(newFile, stream);
                     }
 
                     FileMarker.MarkAsNew(newFile);
 
                     SetFileStatus(newFile);
+
+                    newFile.Access = fromFile.Access;
+
+                    if (newFile.IsTemplate
+                        && !FileUtility.ExtsWebTemplate.Contains(FileUtility.GetFileExtension(newFile.Title), StringComparer.CurrentCultureIgnoreCase))
+                    {
+                        var tagTemplate = Tag.Template(SecurityContext.CurrentAccount.ID, newFile);
+                        using (var tagDao = Global.DaoFactory.GetTagDao())
+                        {
+                            tagDao.RemoveTags(tagTemplate);
+                        }
+
+                        newFile.IsTemplate = false;
+                    }
 
                     return newFile;
                 }
@@ -763,8 +970,11 @@ namespace ASC.Web.Files.Utils
 
                 if (continueVersion)
                 {
-                    fileDao.ContinueVersion(fileVersion.ID, fileVersion.Version);
-                    lastVersionFile.VersionGroup--;
+                    if (lastVersionFile.VersionGroup > 1)
+                    {
+                        fileDao.ContinueVersion(fileVersion.ID, fileVersion.Version);
+                        lastVersionFile.VersionGroup--;
+                    }
                 }
                 else
                 {
@@ -772,7 +982,7 @@ namespace ASC.Web.Files.Utils
                     {
                         if (fileVersion.Version == lastVersionFile.Version)
                         {
-                            lastVersionFile = UpdateToVersionFile(fileVersion.ID, fileVersion.Version, checkRight);
+                            lastVersionFile = UpdateToVersionFile(fileVersion.ID, fileVersion.Version, null, checkRight);
                         }
 
                         fileDao.CompleteVersion(fileVersion.ID, fileVersion.Version);
@@ -784,6 +994,126 @@ namespace ASC.Web.Files.Utils
 
                 return lastVersionFile;
             }
+        }
+
+        public static bool FileRename(object fileId, String title, out File file)
+        {
+            using (var fileDao = Global.DaoFactory.GetFileDao())
+            {
+                file = fileDao.GetFile(fileId);
+                if (file == null) throw new FileNotFoundException(FilesCommonResource.ErrorMassage_FileNotFound);
+                if (!Global.GetFilesSecurity().CanEdit(file)) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_RenameFile);
+                if (!Global.GetFilesSecurity().CanDelete(file) && CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsVisitor()) throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException_RenameFile);
+                if (FileLockedForMe(file.ID)) throw new Exception(FilesCommonResource.ErrorMassage_LockedFile);
+                if (file.ProviderEntry && FileTracker.IsEditing(file.ID)) throw new Exception(FilesCommonResource.ErrorMassage_UpdateEditingFile);
+                if (file.RootFolderType == FolderType.TRASH) throw new Exception(FilesCommonResource.ErrorMassage_ViewTrashItem);
+
+                title = Global.ReplaceInvalidCharsAndTruncate(title);
+
+                var ext = FileUtility.GetFileExtension(file.Title);
+                if (string.Compare(ext, FileUtility.GetFileExtension(title), true) != 0)
+                {
+                    title += ext;
+                }
+
+                var fileAccess = file.Access;
+
+                var renamed = false;
+                if (String.Compare(file.Title, title, false) != 0)
+                {
+                    var newFileID = fileDao.FileRename(file, title);
+
+                    file = fileDao.GetFile(newFileID);
+                    file.Access = fileAccess;
+
+                    DocumentServiceHelper.RenameFile(file, fileDao);
+
+                    renamed = true;
+                }
+
+                SetFileStatus(file);
+
+                return renamed;
+            }
+        }
+
+
+        public static void MarkAsRecent(FileEntry fileEntry)
+        {
+            using (var tagDao = Global.DaoFactory.GetTagDao())
+            {
+                var userID = SecurityContext.CurrentAccount.ID;
+
+                var tag = Tag.Recent(userID, fileEntry);
+                tagDao.SaveTags(tag);
+            }
+        }
+
+        //Long operation
+        public static void DeleteSubitems(object parentId, IFolderDao folderDao, IFileDao fileDao)
+        {
+            var folders = folderDao.GetFolders(parentId);
+            foreach (var folder in folders)
+            {
+                DeleteSubitems(folder.ID, folderDao, fileDao);
+
+                Global.Logger.InfoFormat("Delete folder {0} in {1}", folder.ID, parentId);
+                folderDao.DeleteFolder(folder.ID);
+            }
+
+            var files = fileDao.GetFiles(parentId, null, FilterType.None, false, Guid.Empty, string.Empty, true);
+            foreach (var file in files)
+            {
+                Global.Logger.InfoFormat("Delete file {0} in {1}", file.ID, parentId);
+                fileDao.DeleteFile(file.ID);
+            }
+        }
+
+        public static void MoveSharedItems(object parentId, object toId, IFolderDao folderDao, IFileDao fileDao)
+        {
+            var fileSecurity = Global.GetFilesSecurity();
+
+            var folders = folderDao.GetFolders(parentId);
+            foreach (var folder in folders)
+            {
+                var shared = folder.Shared
+                             && fileSecurity.GetShares(folder).Any(record => record.Share != FileShare.Restrict);
+                if (shared)
+                {
+                    Global.Logger.InfoFormat("Move shared folder {0} from {1} to {2}", folder.ID, parentId, toId);
+                    folderDao.MoveFolder(folder.ID, toId, null);
+                }
+                else
+                {
+                    MoveSharedItems(folder.ID, toId, folderDao, fileDao);
+                }
+            }
+
+            var files = fileDao.GetFiles(parentId, null, FilterType.None, false, Guid.Empty, string.Empty, true);
+            foreach (var file
+                in files.Where(file =>
+                               file.Shared
+                               && fileSecurity.GetShares(file)
+                                              .Any(record =>
+                                                   record.Subject != FileConstant.ShareLinkId
+                                                   && record.Share != FileShare.Restrict)))
+            {
+                Global.Logger.InfoFormat("Move shared file {0} from {1} to {2}", file.ID, parentId, toId);
+                fileDao.MoveFile(file.ID, toId);
+            }
+        }
+
+        public static void ReassignItems(object parentId, Guid fromUserId, Guid toUserId, IFolderDao folderDao, IFileDao fileDao)
+        {
+            var fileIds = fileDao.GetFiles(parentId, new OrderBy(SortedByType.AZ, true), FilterType.ByUser, false, fromUserId, null, true, true)
+                                 .Where(file => file.CreateBy == fromUserId).Select(file => file.ID);
+
+            fileDao.ReassignFiles(fileIds.ToArray(), toUserId);
+
+            var folderIds = folderDao.GetFolders(parentId, new OrderBy(SortedByType.AZ, true), FilterType.ByUser, false, fromUserId, null, true)
+                                     .Where(folder => folder.CreateBy == fromUserId).Select(folder => folder.ID);
+
+            folderDao.ReassignFolders(folderIds.ToArray(), toUserId);
         }
     }
 }

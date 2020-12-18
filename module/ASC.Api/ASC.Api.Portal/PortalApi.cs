@@ -1,58 +1,64 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Security;
+using System.Threading;
+using System.Web;
 using ASC.Api.Attributes;
+using ASC.Api.Collections;
 using ASC.Api.Impl;
 using ASC.Api.Interfaces;
+using ASC.Common.Logging;
 using ASC.Core;
 using ASC.Core.Billing;
 using ASC.Core.Common.Contracts;
+using ASC.Core.Common.Notify.Jabber;
 using ASC.Core.Common.Notify.Push;
 using ASC.Core.Notify.Jabber;
 using ASC.Core.Tenants;
 using ASC.Core.Users;
+using ASC.ElasticSearch;
+using ASC.ElasticSearch.Core;
+using ASC.Geolocation;
+using ASC.MessagingSystem;
+using ASC.Security.Cryptography;
+using ASC.Web.Core;
+using ASC.Web.Core.Helpers;
 using ASC.Web.Core.Mobile;
+using ASC.Web.Core.Utility;
+using ASC.Web.Core.Utility.Settings;
 using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Core.Backup;
-using ASC.Web.Studio.Utility;
-using System;
-using System.Linq;
-using Resources;
-using System.Security;
-using SecurityContext = ASC.Core.SecurityContext;
-using System.Net;
-using System.IO;
-using Newtonsoft.Json.Linq;
-using System.Configuration;
-using System.Security.Cryptography;
-using System.Text;
-using System.Web;
 using ASC.Web.Studio.Core.Notify;
+using ASC.Web.Studio.Core.SMS;
+using ASC.Web.Studio.Core.TFA;
 using ASC.Web.Studio.PublicResources;
+using ASC.Web.Studio.UserControls.FirstTime;
+using ASC.Web.Studio.UserControls.Statistics;
+using ASC.Web.Studio.Utility;
+using Resources;
+using SecurityContext = ASC.Core.SecurityContext;
+using UrlShortener = ASC.Web.Core.Utility.UrlShortener;
 
 namespace ASC.Api.Portal
 {
@@ -89,7 +95,6 @@ namespace ASC.Api.Portal
         ///<short>
         ///Current portal
         ///</short>
-        /// <category>Portal info</category>
         ///<returns>Portal</returns>
         [Read("")]
         public Tenant Get()
@@ -103,7 +108,7 @@ namespace ASC.Api.Portal
         ///<short>
         ///User with specified userID
         ///</short>
-        /// <category>Portal info</category>
+        /// <category>Users</category>
         ///<returns>User</returns>
         [Read("users/{userID}")]
         public UserInfo GetUser(Guid userID)
@@ -121,15 +126,17 @@ namespace ASC.Api.Portal
         /// <param name="employeeType">
         ///  User or Visitor
         /// </param>
-        ///<category>
-        /// Portal info
-        ///</category>
+        ///<category>Users</category>
         ///<returns>
         /// Invite link
         ///</returns>
         [Read("users/invite/{employeeType}")]
         public string GeInviteLink(EmployeeType employeeType)
         {
+            if (!CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsAdmin()
+                && !WebItemSecurity.IsProductAdministrator(WebItemManager.PeopleProductID, SecurityContext.CurrentAccount.ID))
+                throw new SecurityException("Method not available");
+
             return CommonLinkUtility.GetConfirmationUrl(string.Empty, ConfirmType.LinkInvite, (int)employeeType, SecurityContext.CurrentAccount.ID)
                    + String.Format("&emplType={0}", (int)employeeType);
         }
@@ -143,7 +150,15 @@ namespace ASC.Api.Portal
         [Update("getshortenlink")]
         public String GetShortenLink(string link)
         {
-            return ASC.Common.Utils.LinkShorterUtil.GetShortenLink(link, log4net.LogManager.GetLogger("ASC.Web"));
+            try
+            {
+                return UrlShortener.Instance.GetShortenLink(link);
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Web").Error("getshortenlink", ex);
+                return link;
+            }
         }
 
 
@@ -153,7 +168,7 @@ namespace ASC.Api.Portal
         ///<short>
         ///Used space of the current portal
         ///</short>
-        /// <category>Portal info</category>
+        /// <category>Quota</category>
         ///<returns>Used space</returns>
         [Read("usedspace")]
         public double GetUsedSpace()
@@ -170,12 +185,156 @@ namespace ASC.Api.Portal
         ///<short>
         ///Users count of the current portal
         ///</short>
-        /// <category>Portal info</category>
+        /// <category>Users</category>
         ///<returns>Users count</returns>
         [Read("userscount")]
         public long GetUsersCount()
         {
             return CoreContext.UserManager.GetUserNames(EmployeeStatus.Active).Count();
+        }
+
+        ///<visible>false</visible>
+        [Create("uploadlicense")]
+        public FileUploadResult UploadLicense(IEnumerable<HttpPostedFileBase> attachments)
+        {
+            if (!CoreContext.Configuration.Standalone) throw new NotSupportedException();
+
+            var license = attachments.FirstOrDefault();
+
+            if (license == null) throw new Exception(Resource.ErrorEmptyUploadFileSelected);
+
+            var result = new FileUploadResult();
+
+            try
+            {
+                var dueDate = LicenseReader.SaveLicenseTemp(license.InputStream);
+
+                result.Message = dueDate >= DateTime.UtcNow.Date
+                                         ? Resource.LicenseUploaded
+                                         : string.Format(Resource.LicenseUploadedOverdue,
+                                                         string.Empty,
+                                                         string.Empty,
+                                                         dueDate.Date.ToLongDateString());
+                result.Success = true;
+            }
+            catch (LicenseExpiredException ex)
+            {
+                LogManager.GetLogger("ASC").Error("License upload", ex);
+                result.Message = Resource.LicenseErrorExpired;
+            }
+            catch (LicenseQuotaException ex)
+            {
+                LogManager.GetLogger("ASC").Error("License upload", ex);
+                result.Message = Resource.LicenseErrorQuota;
+            }
+            catch (LicensePortalException ex)
+            {
+                LogManager.GetLogger("ASC").Error("License upload", ex);
+                result.Message = Resource.LicenseErrorPortal;
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC").Error("License upload", ex);
+                result.Message = Resource.LicenseError;
+            }
+
+            return result;
+        }
+
+        ///<visible>false</visible>
+        [Create("activatelicense")]
+        public FileUploadResult ActivateLicense()
+        {
+            if (!CoreContext.Configuration.Standalone) throw new NotSupportedException();
+
+            var result = new FileUploadResult();
+
+            try
+            {
+                LicenseReader.RefreshLicense();
+                Web.Studio.UserControls.Management.TariffSettings.LicenseAccept = true;
+                MessageService.Send(HttpContext.Current.Request, MessageAction.LicenseKeyUploaded);
+                result.Success = true;
+            }
+            catch (BillingNotFoundException ex)
+            {
+                LogManager.GetLogger("ASC").Error("License activate", ex);
+                result.Message = UserControlsCommonResource.LicenseKeyNotFound;
+            }
+            catch (BillingNotConfiguredException ex)
+            {
+                LogManager.GetLogger("ASC").Error("License activate", ex);
+                result.Message = UserControlsCommonResource.LicenseKeyNotCorrect;
+            }
+            catch (BillingException ex)
+            {
+                LogManager.GetLogger("ASC").Error("License activate", ex);
+                result.Message = UserControlsCommonResource.LicenseException;
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC").Error("License activate", ex);
+                result.Message = ex.Message;
+            }
+
+            return result;
+        }
+
+
+        ///<visible>false</visible>
+        [Create("activatetrial")]
+        public bool ActivateTrial()
+        {
+            if (!CoreContext.Configuration.Standalone) throw new NotSupportedException();
+            if (!CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).IsAdmin()) throw new SecurityException();
+
+            var curQuota = TenantExtra.GetTenantQuota();
+            if (curQuota.Id != Tenant.DEFAULT_TENANT) return false;
+            if (curQuota.Trial) return false;
+
+            var curTariff = TenantExtra.GetCurrentTariff();
+            if (curTariff.DueDate.Date != DateTime.MaxValue.Date) return false;
+
+            var quota = new TenantQuota(-1000)
+            {
+                Name = "apirequest",
+                ActiveUsers = curQuota.ActiveUsers,
+                MaxFileSize = curQuota.MaxFileSize,
+                MaxTotalSize = curQuota.MaxTotalSize,
+                Features = curQuota.Features
+            };
+            quota.Trial = true;
+
+            CoreContext.TenantManager.SaveTenantQuota(quota);
+
+            var DEFAULT_TRIAL_PERIOD = 30;
+
+            var tariff = new Tariff
+            {
+                QuotaId = quota.Id,
+                DueDate = DateTime.Today.AddDays(DEFAULT_TRIAL_PERIOD)
+            };
+
+            CoreContext.PaymentManager.SetTariff(-1, tariff);
+
+            MessageService.Send(HttpContext.Current.Request, MessageAction.LicenseKeyUploaded);
+
+            return true;
+        }
+
+        ///<visible>false</visible>
+        [Read("tenantextra")]
+        public object GetTenantExtra()
+        {
+            return new
+            {
+                opensource = TenantExtra.Opensource,
+                enterprise = TenantExtra.Enterprise,
+                tariff = TenantExtra.GetCurrentTariff(),
+                quota = TenantExtra.GetTenantQuota(),
+                notPaid = TenantStatisticsProvider.IsNotPaid(),
+                licenseAccept = Web.Studio.UserControls.Management.TariffSettings.LicenseAccept
+            };
         }
 
         ///<summary>
@@ -184,7 +343,7 @@ namespace ASC.Api.Portal
         ///<short>
         ///Tariff of the current portal
         ///</short>
-        /// <category>Portal info</category>
+        /// <category>Quota</category>
         ///<returns>Tariff</returns>
         [Read("tariff")]
         public Tariff GetTariff()
@@ -198,7 +357,7 @@ namespace ASC.Api.Portal
         ///<short>
         ///Quota of the current portal
         ///</short>
-        /// <category>Portal info</category>
+        /// <category>Quota</category>
         ///<returns>Quota</returns>
         [Read("quota")]
         public TenantQuota GetQuota()
@@ -212,7 +371,7 @@ namespace ASC.Api.Portal
         ///<short>
         ///Quota of the current portal
         ///</short>
-        /// <category>Portal info</category>
+        /// <category>Quota</category>
         ///<returns>Quota</returns>
         [Read("quota/right")]
         public TenantQuota GetRightQuota()
@@ -233,7 +392,6 @@ namespace ASC.Api.Portal
         ///<short>
         ///path
         ///</short>
-        ///<category>Portal info</category>
         ///<returns>path</returns>
         ///<visible>false</visible>
         [Read("path")]
@@ -248,8 +406,7 @@ namespace ASC.Api.Portal
         {
             try
             {
-                var username = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).UserName;
-                return new JabberServiceClient().GetNewMessagesCount(TenantProvider.CurrentTenantID, username);
+                return new JabberServiceClient().GetNewMessagesCount();
             }
             catch
             {
@@ -257,6 +414,137 @@ namespace ASC.Api.Portal
             return 0;
         }
 
+        ///<visible>false</visible>
+        [Delete("talk/connection")]
+        public int RemoveXmppConnection(string connectionId)
+        {
+            try
+            {
+                return new JabberServiceClient().RemoveXmppConnection(connectionId);
+            }
+            catch
+            {
+            }
+            return 0;
+        }
+
+        ///<visible>false</visible>
+        [Create("talk/connection")]
+        public byte AddXmppConnection(string connectionId, byte state)
+        {
+            try
+            {
+                return new JabberServiceClient().AddXmppConnection(connectionId, state);
+            }
+            catch
+            {
+            }
+            return 0;
+        }
+
+        ///<visible>false</visible>
+        [Read("talk/state")]
+        public int GetState(string userName)
+        {
+            try
+            {
+                return new JabberServiceClient().GetState(userName);
+            }
+            catch
+            {
+            }
+            return 0;
+        }
+
+        ///<visible>false</visible>
+        [Create("talk/state")]
+        public byte SendState(byte state)
+        {
+            try
+            {
+                return new JabberServiceClient().SendState(state);
+            }
+            catch
+            {
+            }
+            return 4;
+        }
+
+        ///<visible>false</visible>
+        [Create("talk/message")]
+        public void SendMessage(string to, string text, string subject)
+        {
+            try
+            {
+                var username = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).UserName;
+                new JabberServiceClient().SendMessage(TenantProvider.CurrentTenantID, username, to, text, subject);
+            }
+            catch
+            {
+            }
+        }
+
+        ///<visible>false</visible>
+        [Read("talk/states")]
+        public Dictionary<string, byte> GetAllStates()
+        {
+            try
+            {
+                return new JabberServiceClient().GetAllStates();
+            }
+            catch
+            {
+            }
+
+            return new Dictionary<string, byte>();
+        }
+
+        ///<visible>false</visible>
+        [Read("talk/recentMessages")]
+        public MessageClass[] GetRecentMessages(string calleeUserName, int id)
+        {
+            try
+            {
+                var userName = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).UserName;
+                var recentMessages = new JabberServiceClient().GetRecentMessages(calleeUserName, id);
+
+                if (recentMessages == null) return null;
+
+                foreach (var mc in recentMessages)
+                {
+                    mc.DateTime = TenantUtil.DateTimeFromUtc(mc.DateTime.AddMilliseconds(1));
+                    if (mc.UserName == null || string.Equals(mc.UserName, calleeUserName, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        mc.UserName = calleeUserName;
+                    }
+                    else
+                    {
+                        mc.UserName = userName;
+                    }
+                }
+
+                return recentMessages;
+            }
+            catch
+            {
+            }
+            return new MessageClass[0];
+        }
+
+        ///<visible>false</visible>
+        [Create("talk/ping")]
+        public void Ping(byte state)
+        {
+            try
+            {
+                new JabberServiceClient().Ping(state);
+            }
+            catch
+            {
+            }
+        }
+
+        ///<visible>false</visible>
         [Create("mobile/registration")]
         public void RegisterMobileAppInstall(MobileAppType type)
         {
@@ -268,10 +556,16 @@ namespace ASC.Api.Portal
         /// <summary>
         /// Returns the backup schedule of the current portal
         /// </summary>
+        /// <category>Backup</category>
         /// <returns>Backup Schedule</returns>
         [Read("getbackupschedule")]
         public BackupAjaxHandler.Schedule GetBackupSchedule()
         {
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
             return backupHandler.GetSchedule();
         }
 
@@ -283,18 +577,30 @@ namespace ASC.Api.Portal
         /// <param name="backupsStored">Max of the backup's stored copies</param>
         /// <param name="cronParams">Cron parameters</param>
         /// <param name="backupMail">Include mail in the backup</param>
+        /// <category>Backup</category>
         [Create("createbackupschedule")]
-        public void CreateBackupSchedule(BackupStorageType storageType, BackupAjaxHandler.StorageParams storageParams, int backupsStored, BackupAjaxHandler.CronParams cronParams, bool backupMail)
+        public void CreateBackupSchedule(BackupStorageType storageType, IEnumerable<ItemKeyValuePair<string, string>> storageParams, int backupsStored, BackupAjaxHandler.CronParams cronParams, bool backupMail)
         {
-            backupHandler.CreateSchedule(storageType, storageParams, backupsStored, cronParams, backupMail);
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
+            backupHandler.CreateSchedule(storageType, storageParams.ToDictionary(r=> r.Key, r=> r.Value), backupsStored, cronParams, backupMail);
         }
 
         /// <summary>
         /// Delete the backup schedule of the current portal
         /// </summary>
+        /// <category>Backup</category>
         [Delete("deletebackupschedule")]
         public void DeleteBackupSchedule()
         {
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
             backupHandler.DeleteSchedule();
         }
 
@@ -304,49 +610,79 @@ namespace ASC.Api.Portal
         /// <param name="storageType">Storage Type</param>
         /// <param name="storageParams">Storage Params</param>
         /// <param name="backupMail">Include mail in the backup</param>
+        /// <category>Backup</category>
         /// <returns>Backup Progress</returns>
         [Create("startbackup")]
-        public BackupProgress StartBackup(BackupStorageType storageType, BackupAjaxHandler.StorageParams storageParams, bool backupMail)
+        public BackupProgress StartBackup(BackupStorageType storageType, IEnumerable<ItemKeyValuePair<string, string>> storageParams, bool backupMail)
         {
-            return backupHandler.StartBackup(storageType, storageParams, backupMail);
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
+            return backupHandler.StartBackup(storageType, storageParams.ToDictionary(r=> r.Key, r=> r.Value), backupMail);
         }
 
         /// <summary>
         /// Returns the progress of the started backup
         /// </summary>
+        /// <category>Backup</category>
         /// <returns>Backup Progress</returns>
         [Read("getbackupprogress")]
         public BackupProgress GetBackupProgress()
         {
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
             return backupHandler.GetBackupProgress();
         }
 
         /// <summary>
         /// Returns the backup history of the started backup
         /// </summary>
+        /// <category>Backup</category>
         /// <returns>Backup History</returns>
         [Read("getbackuphistory")]
         public List<BackupHistoryRecord> GetBackupHistory()
         {
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
             return backupHandler.GetBackupHistory();
         }
 
         /// <summary>
         /// Delete the backup with the specified id
         /// </summary>
+        /// <category>Backup</category>
         [Delete("deletebackup/{id}")]
         public void DeleteBackup(Guid id)
         {
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
             backupHandler.DeleteBackup(id);
         }
 
         /// <summary>
         /// Delete all backups of the current portal
         /// </summary>
+        /// <category>Backup</category>
         /// <returns>Backup History</returns>
         [Delete("deletebackuphistory")]
         public void DeleteBackupHistory()
         {
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
             backupHandler.DeleteAllBackups();
         }
 
@@ -357,23 +693,46 @@ namespace ASC.Api.Portal
         /// <param name="storageType">Storage Type</param>
         /// <param name="storageParams">Storage Params</param>
         /// <param name="notify">Notify about backup to users</param>
+        /// <category>Backup</category>
         /// <returns>Restore Progress</returns>
         [Create("startrestore")]
-        public BackupProgress StartBackupRestore(string backupId, BackupStorageType storageType, BackupAjaxHandler.StorageParams storageParams, bool notify)
+        public BackupProgress StartBackupRestore(string backupId, BackupStorageType storageType, IEnumerable<ItemKeyValuePair<string, string>> storageParams, bool notify)
         {
-            return backupHandler.StartRestore(backupId, storageType, storageParams, notify);
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
+            return backupHandler.StartRestore(backupId, storageType, storageParams.ToDictionary(r => r.Key, r => r.Value), notify);
         }
 
         /// <summary>
         /// Returns the progress of the started restore
         /// </summary>
+        /// <category>Backup</category>
         /// <returns>Restore Progress</returns>
-        [Read("getrestoreprogress")]
+        [Read("getrestoreprogress", true, false)]  //NOTE: this method doesn't check payment!!!
         public BackupProgress GetRestoreProgress()
         {
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
             return backupHandler.GetRestoreProgress();
         }
 
+        ///<visible>false</visible>
+        [Read("backuptmp")]
+        public string GetTempPath(string alias)
+        {
+            if (CoreContext.Configuration.Standalone)
+            {
+                TenantExtra.DemandControlPanelPermission();
+            }
+
+            return backupHandler.GetTmpFolder();
+        }
 
 
         ///<visible>false</visible>
@@ -382,7 +741,7 @@ namespace ASC.Api.Portal
         {
             var enabled = SetupInfo.IsVisibleSettings("PortalRename");
             if (!enabled)
-                throw new SecurityException(Resources.Resource.PortalAccessSettingsTariffException);
+                throw new SecurityException(Resource.PortalAccessSettingsTariffException);
 
             if (CoreContext.Configuration.Personal)
                 throw new Exception(Resource.ErrorAccessDenied);
@@ -391,9 +750,10 @@ namespace ASC.Api.Portal
 
             if (String.IsNullOrEmpty(alias)) throw new ArgumentException();
 
-
             var tenant = CoreContext.TenantManager.GetCurrentTenant();
             var user = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
+
+            var localhost = CoreContext.Configuration.BaseDomain == "localhost" || tenant.TenantAlias == "localhost";
 
             var newAlias = alias.ToLowerInvariant();
             var oldAlias = tenant.TenantAlias;
@@ -401,32 +761,34 @@ namespace ASC.Api.Portal
 
             if (!String.Equals(newAlias, oldAlias, StringComparison.InvariantCultureIgnoreCase))
             {
-                var hostedSolution = new HostedSolution(ConfigurationManager.ConnectionStrings["default"]);
-                if (!String.IsNullOrEmpty(SetupInfo.ApiSystemUrl))
+                if (!String.IsNullOrEmpty(ApiSystemHelper.ApiSystemUrl))
                 {
-                    ValidatePortalName(newAlias);
+                    ApiSystemHelper.ValidatePortalName(newAlias);
                 }
                 else
                 {
-                    hostedSolution.CheckTenantAddress(newAlias.Trim());
+                    CoreContext.TenantManager.CheckTenantAddress(newAlias.Trim());
                 }
 
 
-                if (!String.IsNullOrEmpty(SetupInfo.ApiCacheUrl))
+                if (!String.IsNullOrEmpty(ApiSystemHelper.ApiCacheUrl))
                 {
-                    AddTenantToCache(newAlias);
+                    ApiSystemHelper.AddTenantToCache(newAlias);
                 }
 
                 tenant.TenantAlias = alias;
-                tenant = hostedSolution.SaveTenant(tenant);
+                tenant = CoreContext.TenantManager.SaveTenant(tenant);
 
 
-                if (!String.IsNullOrEmpty(SetupInfo.ApiCacheUrl))
+                if (!String.IsNullOrEmpty(ApiSystemHelper.ApiCacheUrl))
                 {
-                    RemoveTenantFromCache(oldAlias);
+                    ApiSystemHelper.RemoveTenantFromCache(oldAlias);
                 }
 
-                StudioNotifyService.Instance.PortalRenameNotify(oldVirtualRootPath);
+                if (!localhost || string.IsNullOrEmpty(tenant.MappedDomain))
+                {
+                    StudioNotifyService.Instance.PortalRenameNotify(oldVirtualRootPath);
+                }
             }
             else
             {
@@ -436,111 +798,35 @@ namespace ASC.Api.Portal
             var reference = CreateReference(Request, tenant.TenantDomain, tenant.TenantId, user.Email);
 
             return new {
-                message = Resources.Resource.SuccessfullyPortalRenameMessage,
+                message = Resource.SuccessfullyPortalRenameMessage,
                 reference = reference
             };
         }
 
-
-        private void ValidatePortalName(string domain)
+        ///<visible>false</visible>
+        [Update("portalanalytics")]
+        public bool UpdatePortalAnalytics(bool enable)
         {
-            var absoluteApiSystemUrl = SetupInfo.ApiSystemUrl;
-            Uri uri;
-            if (!Uri.TryCreate(absoluteApiSystemUrl, UriKind.Absolute, out uri))
+            SecurityContext.DemandPermissions(SecutiryConstants.EditPortalSettings);
+
+            if (!(TenantExtra.Opensource || (TenantExtra.Saas && SetupInfo.CustomScripts.Length != 0)) || CoreContext.Configuration.CustomMode)
+                throw new SecurityException();
+
+            if (TenantExtra.Opensource)
             {
-                var appUrl = CommonLinkUtility.GetFullAbsolutePath("/");
-                absoluteApiSystemUrl = string.Format("{0}/{1}", appUrl.TrimEnd('/'), absoluteApiSystemUrl.TrimStart('/')).TrimEnd('/');
+                var wizardSettings = WizardSettings.Load();
+                wizardSettings.Analytics = enable;
+                wizardSettings.Save();
+            }
+            else if (TenantExtra.Saas)
+            {
+                var analyticsSettings = TenantAnalyticsSettings.Load();
+                analyticsSettings.Analytics = enable;
+                analyticsSettings.Save();
             }
 
-            var data = string.Format("portalName={0}", domain);
-            var url = String.Format("{0}/registration/validateportalname", absoluteApiSystemUrl);
-
-            var webRequest = (HttpWebRequest)WebRequest.Create(url);
-            webRequest.Method = WebRequestMethods.Http.Post;
-            webRequest.ContentType = "application/x-www-form-urlencoded";
-            webRequest.ContentLength = data.Length;
-
-            using (var writer = new StreamWriter(webRequest.GetRequestStream()))
-            {
-                writer.Write(data);
-            }
-
-            var result = "";
-
-            using (var response = webRequest.GetResponse())
-            using (var stream = response.GetResponseStream())
-            using (var reader = new StreamReader(stream, Encoding.UTF8))
-            {
-                result = reader.ReadToEnd();
-
-                var resObj = JObject.Parse(result);
-                if (resObj["errors"] != null && resObj["errors"].HasValues)
-                {
-                    throw new Exception(result);
-                }
-            }
+            return enable;
         }
-
-        #region api cache
-
-        private static string CreateApiCacheAuthToken(string pkey)
-        {
-            var skey = ConfigurationManager.AppSettings["core.machinekey"];
-
-            using (var hasher = new HMACSHA1(Encoding.UTF8.GetBytes(skey)))
-            {
-                var now = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-                var hash = HttpServerUtility.UrlTokenEncode(hasher.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", now, pkey))));
-                return string.Format("ASC {0}:{1}:{2}", pkey, now, hash);
-            }
-        }
-
-        private void AddTenantToCache(string domain)
-        {
-            SendApiToCache("addportal", WebRequestMethods.Http.Post, string.Format("={0}", domain));
-        }
-
-        private void RemoveTenantFromCache(string domain)
-        {
-            SendApiToCache("removeportal", WebRequestMethods.Http.Post, string.Format("={0}", domain));
-        }
-
-        private void SendApiToCache(string apiPath, string httpMethod, string data)
-        {
-            var absoluteApiCacheUrl = SetupInfo.ApiCacheUrl;
-            Uri uri;
-            if (!Uri.TryCreate(absoluteApiCacheUrl, UriKind.Absolute, out uri)) {
-                var appUrl = CommonLinkUtility.GetFullAbsolutePath("/");
-                absoluteApiCacheUrl = string.Format("{0}/{1}", appUrl.TrimEnd('/'), absoluteApiCacheUrl.TrimStart('/')).TrimEnd('/');
-            }
-
-            var url = String.Format("{0}/cache/{1}", absoluteApiCacheUrl, apiPath);
-
-            var webRequest = (HttpWebRequest)WebRequest.Create(url);
-            webRequest.Method = httpMethod;
-            webRequest.ContentType = "application/x-www-form-urlencoded";
-            webRequest.ContentLength = data.Length;
-
-            webRequest.Headers.Add(HttpRequestHeader.Authorization, CreateApiCacheAuthToken(SecurityContext.CurrentAccount.ID.ToString()));
-
-            using (var writer = new StreamWriter(webRequest.GetRequestStream()))
-            {
-                writer.Write(data);
-            }
-
-            using (var webResponse = webRequest.GetResponse())
-            using (var reader = new StreamReader(webResponse.GetResponseStream()))
-            {
-                var response = reader.ReadToEnd();
-                var resObj = JObject.Parse(response);
-                if (resObj["errors"] != null && resObj["errors"].HasValues)
-                {
-                    throw new Exception(response);
-                }
-            }
-        }
-
-        #endregion
 
         #region create reference for auth on renamed tenant
 
@@ -555,6 +841,39 @@ namespace ASC.Api.Portal
         }
 
         #endregion
+
+        ///<visible>false</visible>
+        [Create("sendcongratulations", false)] //NOTE: this method doesn't requires auth!!!
+        public void SendCongratulations(Guid userid, string key)
+        {
+            var authInterval = TimeSpan.FromHours(1);
+            var checkKeyResult = EmailValidationKeyProvider.ValidateEmailKey(userid.ToString() + ConfirmType.Auth, key, authInterval);
+
+            switch (checkKeyResult)
+            {
+                case EmailValidationKeyProvider.ValidationResult.Ok:
+                    var currentUser = CoreContext.UserManager.GetUsers(userid);
+
+                    StudioNotifyService.Instance.SendCongratulations(currentUser);
+                    StudioNotifyService.Instance.SendRegData(currentUser);
+                    FirstTimeTenantSettings.SendInstallInfo(currentUser);
+
+                    if (!SetupInfo.IsSecretEmail(currentUser.Email))
+                    {
+                        if (SetupInfo.TfaRegistration == "sms")
+                        {
+                            StudioSmsNotificationSettings.Enable = true;
+                        }
+                        else if (SetupInfo.TfaRegistration == "code")
+                        {
+                            TfaAppAuthSettings.Enable = true;
+                        }
+                    }
+                    break;
+                default:
+                    throw new SecurityException("Access Denied.");
+            }
+        }
 
 
         ///<visible>false</visible>
@@ -604,6 +923,286 @@ namespace ASC.Api.Portal
             catch
             {
                 return 0;
+            }
+        }
+
+        ///<visible>false</visible>
+        [Read("bar/promotions")]
+        public string GetBarPromotions(string domain, string page, bool desktop)
+        {
+            try
+            {
+                var showPromotions = PromotionsSettings.Load().Show;
+
+                if (!showPromotions)
+                    return null;
+
+                var tenant = CoreContext.TenantManager.GetCurrentTenant();
+                var user = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
+
+                var uriBuilder = new UriBuilder(SetupInfo.NotifyAddress + "promotions/Get");
+
+                var query = HttpUtility.ParseQueryString(uriBuilder.Query);
+
+                if (string.IsNullOrEmpty(domain))
+                {
+                    domain = Request.UrlReferrer != null ? Request.UrlReferrer.Host : string.Empty;
+                }
+
+                if (string.IsNullOrEmpty(page))
+                {
+                    page = Request.UrlReferrer != null ? Request.UrlReferrer.PathAndQuery : string.Empty;
+                }
+
+                query["userId"] = user.ID.ToString();
+                query["language"] = Thread.CurrentThread.CurrentCulture.Name.ToLowerInvariant();
+                query["version"] = tenant.Version.ToString(CultureInfo.InvariantCulture);
+                query["tariff"] = TenantExtra.GetTenantQuota().Id.ToString(CultureInfo.InvariantCulture);
+                query["admin"] = user.IsAdmin().ToString();
+                query["userCreated"] = user.CreateDate.ToString(CultureInfo.InvariantCulture);
+                query["promo"] = true.ToString();
+                query["domain"] = domain;
+                query["page"] = page;
+                query["agent"] = Request.UserAgent ?? Request.Headers["User-Agent"];
+                query["desktop"] = desktop.ToString();
+
+                uriBuilder.Query = query.ToString();
+
+                using (var client = new WebClient())
+                {
+                    client.Encoding = System.Text.Encoding.UTF8;
+                    return client.DownloadString(uriBuilder.Uri);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Web").Error("GetBarTips", ex);
+                return null;
+            }
+        }
+
+        ///<visible>false</visible>
+        [Create("bar/promotions/mark/{id}")]
+        public void MarkBarPromotion(string id)
+        {
+            try
+            {
+                var url = string.Format("{0}promotions/Complete", SetupInfo.NotifyAddress);
+
+                using (var client = new WebClient())
+                {
+                    client.UploadValues(url, "POST", new NameValueCollection
+                        {
+                            {"id", id},
+                            {"userId", SecurityContext.CurrentAccount.ID.ToString()}
+                        });
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Web").Error("MarkBarPromotion", ex);
+            }
+        }
+
+        ///<visible>false</visible>
+        [Read("bar/tips")]
+        public string GetBarTips(string page, bool productAdmin, bool desktop)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(page))
+                    return null;
+
+                if (!TipsSettings.LoadForCurrentUser().Show)
+                    return null;
+
+                var tenant = CoreContext.TenantManager.GetCurrentTenant();
+                var user = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
+
+                var uriBuilder = new UriBuilder(SetupInfo.TipsAddress + "tips/Get");
+
+                var query = HttpUtility.ParseQueryString(uriBuilder.Query);
+
+                query["userId"] = user.ID.ToString();
+                query["tenantId"] = tenant.TenantId.ToString(CultureInfo.InvariantCulture);
+                query["page"] = page;
+                query["language"] = Thread.CurrentThread.CurrentCulture.Name.ToLowerInvariant();
+                query["admin"] = user.IsAdmin().ToString();
+                query["productAdmin"] = productAdmin.ToString();
+                query["visitor"] = user.IsVisitor().ToString();
+                query["userCreatedDate"] = user.CreateDate.ToString(CultureInfo.InvariantCulture);
+                query["tenantCreatedDate"] = tenant.CreatedDateTime.ToString(CultureInfo.InvariantCulture);
+                query["desktop"] = desktop.ToString();
+
+                uriBuilder.Query = query.ToString();
+
+                using (var client = new WebClient())
+                {
+                    client.Encoding = System.Text.Encoding.UTF8;
+                    return client.DownloadString(uriBuilder.Uri);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Web").Error("GetBarTips", ex);
+                return null;
+            }
+        }
+
+        ///<visible>false</visible>
+        [Create("bar/tips/mark/{id}")]
+        public void MarkBarTip(string id)
+        {
+            try
+            {
+                var url = string.Format("{0}tips/MarkRead", SetupInfo.TipsAddress);
+
+                using (var client = new WebClient())
+                {
+                    client.Headers[HttpRequestHeader.ContentType] = "application/x-www-form-urlencoded";
+                    client.UploadValues(url, "POST", new NameValueCollection
+                        {
+                            {"id", id},
+                            {"userId", SecurityContext.CurrentAccount.ID.ToString()},
+                            {"tenantId", CoreContext.TenantManager.GetCurrentTenant().TenantId.ToString(CultureInfo.InvariantCulture)}
+                        });
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Web").Error("MarkBarTip", ex);
+            }
+        }
+
+        ///<visible>false</visible>
+        [Delete("bar/tips")]
+        public void DeleteBarTips()
+        {
+            try
+            {
+                var url = string.Format("{0}tips/DeleteReaded", SetupInfo.TipsAddress);
+
+                using (var client = new WebClient())
+                {
+                    client.UploadValues(url, "POST", new NameValueCollection
+                        {
+                            {"userId", SecurityContext.CurrentAccount.ID.ToString()},
+                            {"tenantId", CoreContext.TenantManager.GetCurrentTenant().TenantId.ToString(CultureInfo.InvariantCulture)}
+                        });
+                }
+
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Web").Error("DeleteBarTips", ex);
+            }
+        }
+
+        [Read("search")]
+        public IEnumerable<object> GetSearchSettings()
+        {
+            TenantExtra.DemandControlPanelPermission();
+
+            return SearchSettings.GetAllItems().Select(r => new
+            {
+                id =r.ID,
+                title = r.Title,
+                enabled = r.Enabled
+            });
+        }
+
+        [Read("search/state")]
+        public object CheckSearchAvailable()
+        {
+            TenantExtra.DemandControlPanelPermission();
+
+            return FactoryIndexer.GetState();
+        }
+
+        [Create("search/reindex")]
+        public object Reindex(string name)
+        {
+            TenantExtra.DemandControlPanelPermission();
+
+            FactoryIndexer.Reindex(name);
+            return CheckSearchAvailable();
+        }
+
+        [Create("search")]
+        public void SetSearchSettings(List<SearchSettingsItem> items)
+        {
+            TenantExtra.DemandControlPanelPermission();
+
+            SearchSettings.Set(items);
+        }
+
+        /// <summary>
+        ///    Get random password
+        /// </summary>
+        /// <short>Get random password</short>
+        ///<visible>false</visible>
+        [Read(@"randompwd")]
+        public string GetRandomPassword()
+        {
+            var Noise = "1234567890mnbasdflkjqwerpoiqweyuvcxnzhdkqpsdk_-()=";
+
+            var ps = PasswordSettings.Load();
+
+            var maxLength = PasswordSettings.MaxLength
+                            - (ps.Digits ? 1 : 0)
+                            - (ps.UpperCase ? 1 : 0)
+                            - (ps.SpecSymbols ? 1 : 0);
+            var minLength = Math.Min(ps.MinLength, maxLength);
+
+            var password = String.Format("{0}{1}{2}{3}",
+                             GeneratePassword(minLength, minLength, Noise.Substring(0, Noise.Length - 4)),
+                             ps.Digits ? GeneratePassword(1, 1, Noise.Substring(0, 10)) : String.Empty,
+                             ps.UpperCase ? GeneratePassword(1, 1, Noise.Substring(10, 20).ToUpper()) : String.Empty,
+                             ps.SpecSymbols ? GeneratePassword(1, 1, Noise.Substring(Noise.Length - 4, 4).ToUpper()) : String.Empty);
+
+            return password;
+        }
+
+        private static readonly Random Rnd = new Random();
+
+        private static string GeneratePassword(int minLength, int maxLength, string noise)
+        {
+            var length = Rnd.Next(minLength, maxLength + 1);
+
+            var pwd = string.Empty;
+            while (length-- > 0)
+            {
+                pwd += noise.Substring(Rnd.Next(noise.Length - 1), 1);
+            }
+            return pwd;
+        }
+
+        /// <summary>
+        ///    Get information by IP address
+        /// </summary>
+        /// <short>Get information by IP address</short>
+        ///<visible>false</visible>
+        [Read("ip/{ipAddress}")]
+        public object GetIPInformation(string ipAddress)
+        {
+            GeolocationHelper helper = new GeolocationHelper("teamlabsite");
+            return helper.GetIPGeolocation(ipAddress);
+   
+        }
+
+        ///<visible>false</visible>
+        [Create("gift/mark")]
+        public void MarkGiftAsReaded()
+        {
+            try
+            {
+                var settings = OpensourceGiftSettings.LoadForCurrentUser();
+                settings.Readed = true;
+                settings.SaveForCurrentUser();
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger("ASC.Web").Error("MarkGiftAsReaded", ex);
             }
         }
     }

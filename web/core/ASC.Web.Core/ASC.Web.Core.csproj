@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ASC.Web.Core</RootNamespace>
     <AssemblyName>ASC.Web.Core</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SignAssembly>false</SignAssembly>
     <TrunkDir>..\..\..\</TrunkDir>
@@ -49,7 +49,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
+    <DebugType>none</DebugType>
     <Optimize>true</Optimize>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -57,68 +57,18 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="AjaxPro.2">
-      <HintPath>..\..\..\packages\AjaxPro.2.2.9.17.2\lib\net20\AjaxPro.2.dll</HintPath>
-    </Reference>
-    <Reference Include="AWSSDK">
-      <HintPath>..\..\..\packages\AWSSDK.2.3.5.0\lib\net45\AWSSDK.dll</HintPath>
-    </Reference>
-    <Reference Include="dotless.Core">
-      <HintPath>..\..\..\packages\dotless.1.5.1\lib\dotless.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="EcmaScript.NET">
-      <HintPath>..\..\..\packages\EcmaScript.Net.1.0.1.0\lib\net20\EcmaScript.NET.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="HtmlAgilityPack">
-      <HintPath>..\..\..\packages\HtmlAgilityPack.1.3.9.2\lib\net20\HtmlAgilityPack.dll</HintPath>
-    </Reference>
-    <Reference Include="Iesi.Collections">
-      <HintPath>..\..\..\packages\Iesi.Collections.1.0.1\lib\Iesi.Collections.dll</HintPath>
-    </Reference>
-    <Reference Include="log4net">
-      <HintPath>..\..\..\packages\log4net.2.0.3\lib\net40-client\log4net.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.configuration" />
-    <Reference Include="System.Core">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
     <Reference Include="System.Drawing" />
-    <Reference Include="System.Runtime.Serialization">
-      <RequiredTargetFramework>3.0</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.ServiceModel">
-      <RequiredTargetFramework>3.0</RequiredTargetFramework>
-    </Reference>
     <Reference Include="System.Web" />
-    <Reference Include="System.Web.Abstractions">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.Web.Optimization">
-      <HintPath>..\..\..\packages\Microsoft.AspNet.Web.Optimization.1.1.3\lib\net40\System.Web.Optimization.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.Routing">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.Xml" />
-    <Reference Include="System.Xml.Linq">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="Yahoo.Yui.Compressor">
-      <HintPath>..\..\..\packages\YUICompressor.NET.2.7.0.0\lib\NET20\Yahoo.Yui.Compressor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="AddonContext.cs" />
+    <Compile Include="BasePage.cs">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
     <Compile Include="Calendars\BaseCalendar.cs" />
     <Compile Include="Calendars\BaseEvent.cs" />
     <Compile Include="Calendars\CalendarColors.cs" />
     <Compile Include="Calendars\CalendarManager.cs" />
+    <Compile Include="Calendars\BaseTodo.cs" />
+    <Compile Include="Calendars\ITodo.cs" />
     <Compile Include="Calendars\IEvent.cs" />
     <Compile Include="Calendars\IExternalCalendar.cs" />
     <Compile Include="Calendars\IiCalFormatView.cs" />
@@ -127,19 +77,38 @@
     <Compile Include="Client\Bundling\BundleConfig.cs" />
     <Compile Include="Client\Bundling\ClientScriptRouteHandler.cs" />
     <Compile Include="Client\Bundling\CopyrigthTransform.cs" />
-    <Compile Include="Client\Bundling\CdnTransform.cs" />
+    <Compile Include="Client\Bundling\CloudFrontTransform.cs" />
     <Compile Include="Client\Bundling\DiscTransform.cs" />
+    <Compile Include="Client\Bundling\GoogleCloudStorageTransform.cs" />
+    <Compile Include="Client\Bundling\IStaticBundle.cs" />
     <Compile Include="Client\Bundling\NullOrderer.cs" />
     <Compile Include="Client\Bundling\JsTransform.cs" />
     <Compile Include="Client\Bundling\CssTransform.cs" />
+    <Compile Include="Client\Bundling\RackspaceCloudStorageTransform.cs" />
     <Compile Include="Client\Bundling\ResourceBundleControl.cs">
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
     <Compile Include="Client\Bundling\BundleHelper.cs" />
+    <Compile Include="Client\Bundling\SelectelStorageTransform.cs" />
+    <Compile Include="Client\Bundling\StorageTransform.cs" />
     <Compile Include="Client\ClientSettings.cs" />
     <Compile Include="Client\HttpHandlers\ClientScriptLocalization.cs" />
     <Compile Include="Client\Bundling\ClientScriptReference.cs" />
     <Compile Include="Client\HttpHandlers\ClientScriptCustom.cs" />
+    <Compile Include="Extensions\TimeZoneExtension.cs" />
+    <Compile Include="Helpers\ApiSystemHelper.cs" />
+    <Compile Include="Jabber\FireBase.cs" />
+    <Compile Include="Mail\MailServiceHelper.cs" />
+    <Compile Include="Sms\SmsKeyStorage.cs" />
+    <Compile Include="Sms\SmsProvider.cs" />
+    <Compile Include="Sms\SmsSender.cs" />
+    <Compile Include="Users\UserPhotoThumbnailSettings.cs" />
+    <Compile Include="Users\UserPhotoThumbnailManager.cs" />
+    <Compile Include="Utility\PasswordSettings.cs" />
+    <Compile Include="Utility\UrlShortener.cs" />
+    <Compile Include="WarmupPage.cs">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
     <Compile Include="WhiteLabel\AdditionalWhiteLabelSettings.cs" />
     <Compile Include="WhiteLabel\CompanyWhiteLabelSettings.cs" />
     <Compile Include="WhiteLabel\MailWhiteLabelSettings.cs" />
@@ -165,7 +134,6 @@
     </Compile>
     <Compile Include="Utility\Settings\TenantAccessSettings.cs" />
     <Compile Include="WebItemSecurityInfo.cs" />
-    <Compile Include="Extensions\ClientScriptManagerExtension.cs" />
     <Compile Include="Extensions\WebItemExtension.cs" />
     <Compile Include="Helpers\AuthorizationHelper.cs" />
     <Compile Include="IAddon.cs" />
@@ -173,7 +141,6 @@
     <Compile Include="Extensions\ProductModuleExtension.cs" />
     <Compile Include="Extensions\StringExtension.cs" />
     <Compile Include="Extensions\UserInfoExtension.cs" />
-    <Compile Include="Helpers\EXIFHelper.cs" />
     <Compile Include="Helpers\GrammaticalHelper.cs" />
     <Compile Include="Helpers\ImageHelpers.cs" />
     <Compile Include="Helpers\ResourceEnumConverter.cs" />
@@ -188,8 +155,6 @@
     <Compile Include="Product.cs" />
     <Compile Include="Security\SecurityAttribute.cs" />
     <Compile Include="SpaceUsageStatManager.cs" />
-    <Compile Include="Security\AntiXssModule.cs" />
-    <Compile Include="Security\HtmlSanitizer.cs" />
     <Compile Include="Subscriptions\IProductSubscriptionManager.cs" />
     <Compile Include="Subscriptions\ISubscriptionManager.cs" />
     <Compile Include="Subscriptions\SubscriptionGroup.cs" />
@@ -212,8 +177,6 @@
     <Compile Include="Utility\IFileUploadHandler.cs" />
     <Compile Include="Utility\SearchHandlerManager.cs" />
     <Compile Include="Utility\Settings\WebItemSettings.cs" />
-    <Compile Include="Utility\Settings\ISettings.cs" />
-    <Compile Include="Utility\Settings\SettingsManager.cs" />
     <Compile Include="Utility\Skins\ImageOptions.cs" />
     <Compile Include="Utility\Skins\WebSkinSettings.cs" />
     <Compile Include="Utility\Skins\WebImageSupplier.cs" />
@@ -255,6 +218,50 @@
       <Project>{3f6b420f-abd3-4b5a-9f4c-5d61ffbb01de}</Project>
       <Name>ASC.Data.Storage</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\module\ASC.Thrdparty\ASC.FederatedLogin\ASC.FederatedLogin.csproj">
+      <Project>{481b0d9c-b2f8-4de9-8597-ba8d24585099}</Project>
+      <Name>ASC.FederatedLogin</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\module\ASC.VoipService\ASC.VoipService.csproj">
+      <Project>{988536c1-4b89-4649-8f77-5c16f55d95d1}</Project>
+      <Name>ASC.VoipService</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AjaxMin">
+      <Version>5.14.5506.26202</Version>
+    </PackageReference>
+    <PackageReference Include="AjaxPro.2">
+      <Version>2.9.17.2</Version>
+    </PackageReference>
+    <PackageReference Include="AWSSDK.S3">
+      <Version>3.3.110.50</Version>
+    </PackageReference>
+    <PackageReference Include="dotless">
+      <Version>1.6.7</Version>
+    </PackageReference>
+    <PackageReference Include="HtmlAgilityPack">
+      <Version>1.6.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="JWT">
+      <Version>1.3.4</Version>
+    </PackageReference>
+    <PackageReference Include="SelectelSharp">
+      <Version>0.8.5</Version>
+    </PackageReference>
+    <PackageReference Include="Twilio">
+      <Version>5.6.0</Version>
+    </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="ChangeAliasesOfStrongNameAssemblies" BeforeTargets="FindReferenceAssembliesForReferences;ResolveReferences">
+    <ItemGroup>
+      <ReferencePath Condition="'%(FileName)' == 'WebGrease'">
+        <Aliases>signed</Aliases>
+      </ReferencePath>
+    </ItemGroup>
+  </Target>
 </Project>

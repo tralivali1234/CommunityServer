@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -116,6 +107,11 @@ namespace ASC.Core
                 .FirstOrDefault(u => u.Sid != null && string.Compare(u.Sid, sid, StringComparison.CurrentCultureIgnoreCase) == 0) ?? Constants.LostUser;
         }
 
+        public UserInfo GetSsoUserByNameId(string nameId)
+        {
+            return GetUsersInternal()
+                .FirstOrDefault(u => !string.IsNullOrEmpty(u.SsoNameId) && string.Compare(u.SsoNameId, nameId, StringComparison.CurrentCultureIgnoreCase) == 0) ?? Constants.LostUser;
+        }
         public bool IsUserNameExists(string username)
         {
             return GetUserNames(EmployeeStatus.All)
@@ -129,9 +125,9 @@ namespace ASC.Core
             return u != null && !u.Removed ? u : Constants.LostUser;
         }
 
-        public UserInfo GetUsers(int tenant, string login, string passwordHash)
+        public UserInfo GetUsersByPasswordHash(int tenant, string login, string passwordHash)
         {
-            var u = userService.GetUser(tenant, login, passwordHash);
+            var u = userService.GetUserByPasswordHash(tenant, login, passwordHash);
             return u != null && !u.Removed ? u : Constants.LostUser;
         }
 
@@ -194,6 +190,11 @@ namespace ASC.Core
             if (u.ID == Guid.Empty) SecurityContext.DemandPermissions(Constants.Action_AddRemoveUser);
             else SecurityContext.DemandPermissions(new UserSecurityProvider(u.ID), Constants.Action_EditUser);
 
+            if (Constants.MaxEveryoneCount <= GetUsersByGroup(Constants.GroupEveryone.ID).Length)
+            {
+                throw new TenantQuotaException("Maximum number of users exceeded");
+            }
+
             if (u.Status == EmployeeStatus.Active)
             {
                 var q = CoreContext.TenantManager.GetTenantQuota(CoreContext.TenantManager.GetCurrentTenant().TenantId);
@@ -201,6 +202,11 @@ namespace ASC.Core
                 {
                     throw new TenantQuotaException(string.Format("Exceeds the maximum active users ({0})", q.ActiveUsers));
                 }
+            }
+
+            if (u.Status == EmployeeStatus.Terminated && u.ID == CoreContext.TenantManager.GetCurrentTenant().OwnerId)
+            {
+                throw new InvalidOperationException("Can not disable tenant owner.");
             }
 
             var newUser = userService.SaveUser(CoreContext.TenantManager.GetCurrentTenant().TenantId, u);
@@ -220,7 +226,7 @@ namespace ASC.Core
             userService.RemoveUser(CoreContext.TenantManager.GetCurrentTenant().TenantId, id);
         }
 
-        public void SaveUserPhoto(Guid id, Guid notused, byte[] photo)
+        public void SaveUserPhoto(Guid id, byte[] photo)
         {
             if (IsSystemUser(id)) return;
             SecurityContext.DemandPermissions(new UserSecurityProvider(id), Constants.Action_EditUser);
@@ -228,43 +234,51 @@ namespace ASC.Core
             userService.SetUserPhoto(CoreContext.TenantManager.GetCurrentTenant().TenantId, id, photo);
         }
 
-        public byte[] GetUserPhoto(Guid id, Guid notused)
+        public byte[] GetUserPhoto(Guid id)
         {
             if (IsSystemUser(id)) return null;
             return userService.GetUserPhoto(CoreContext.TenantManager.GetCurrentTenant().TenantId, id);
         }
 
+        public IEnumerable<Guid> GetUserGroupsId(Guid id)
+        {
+            return GetUsers(id).GetUserGroupsId();
+        }
+
         public GroupInfo[] GetUserGroups(Guid id)
         {
-            return GetUserGroups(id, Guid.Empty);
+            return GetUsers(id).GetGroups(IncludeType.Distinct, Guid.Empty);
         }
 
         public GroupInfo[] GetUserGroups(Guid id, Guid categoryID)
         {
-            return GetUserGroups(id, IncludeType.Distinct, categoryID);
+            return GetUsers(id).GetGroups(IncludeType.Distinct, categoryID);
         }
 
         public GroupInfo[] GetUserGroups(Guid userID, IncludeType includeType)
         {
-            return GetUserGroups(userID, includeType, null);
+            return GetUsers(userID).GetGroups(includeType, null);
         }
 
-        private GroupInfo[] GetUserGroups(Guid userID, IncludeType includeType, Guid? categoryId)
+        internal GroupInfo[] GetUserGroups(Guid userID, IncludeType includeType, Guid? categoryId)
         {
             var result = new List<GroupInfo>();
             var distinctUserGroups = new List<GroupInfo>();
 
             var refs = GetRefsInternal();
             IEnumerable<UserGroupRef> userRefs = null;
-            if (refs is UserGroupRefStore)
+            var store = refs as UserGroupRefStore;
+            if (store != null)
             {
-                userRefs = ((UserGroupRefStore)refs).GetRefsByUser(userID);
+                userRefs = store.GetRefsByUser(userID);
             }
+
+            var userRefsContainsNotRemoved = userRefs != null ? userRefs.Where(r => !r.Removed && r.RefType == UserGroupRefType.Contains).ToList() : null;
 
             foreach (var g in GetGroupsInternal().Where(g => !categoryId.HasValue || g.CategoryID == categoryId))
             {
                 if (((g.CategoryID == Constants.SysGroupCategoryId || userRefs == null) && IsUserInGroupInternal(userID, g.ID, refs)) ||
-                    (userRefs != null && userRefs.Any(r => !r.Removed && r.RefType == UserGroupRefType.Contains && r.GroupId == g.ID)))
+                    (userRefsContainsNotRemoved != null && userRefsContainsNotRemoved.Any(r => r.GroupId == g.ID)))
                 {
                     distinctUserGroups.Add(g);
                 }
@@ -278,6 +292,30 @@ namespace ASC.Core
             result.Sort((group1, group2) => String.Compare(group1.Name, group2.Name, StringComparison.Ordinal));
 
             return result.ToArray();
+        }
+
+        internal IEnumerable<Guid> GetUserGroupsGuids(Guid userID)
+        {
+            var result = new List<Guid>();
+
+            var refs = GetRefsInternal();
+
+            var store = refs as UserGroupRefStore;
+            if (store != null)
+            {
+                var userRefs = store.GetRefsByUser(userID);
+
+                if (userRefs != null)
+                {
+                    var toAdd = userRefs.Where(r => !r.Removed && 
+                        r.RefType == UserGroupRefType.Contains && 
+                        !Constants.BuildinGroups.Any(g => g.ID.Equals(r.GroupId)))
+                        .Select(r => r.GroupId);
+                    result.AddRange(toAdd);
+                }
+            }
+
+            return result;
         }
 
         public bool IsUserInGroup(Guid userId, Guid groupId)
@@ -302,6 +340,8 @@ namespace ASC.Core
             userService.SaveUserGroupRef(
                 CoreContext.TenantManager.GetCurrentTenant().TenantId,
                 new UserGroupRef(userId, groupId, UserGroupRefType.Contains));
+
+            GetUsers(userId).ResetGroupCache();
         }
 
         public void RemoveUserFromGroup(Guid userId, Guid groupId)
@@ -310,6 +350,8 @@ namespace ASC.Core
             SecurityContext.DemandPermissions(Constants.Action_EditGroups);
 
             userService.RemoveUserGroupRef(CoreContext.TenantManager.GetCurrentTenant().TenantId, userId, groupId, UserGroupRefType.Contains);
+
+            GetUsers(userId).ResetGroupCache();
         }
 
         #endregion Users

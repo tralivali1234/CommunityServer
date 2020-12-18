@@ -10,12 +10,11 @@
     <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{11BA9805-752F-4F6F-A876-6BA56F0EB9DE}</ProjectGuid>
-    <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ASC.Web.Community</RootNamespace>
     <AssemblyName>ASC.Web.Community</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <SignAssembly>false</SignAssembly>
     <TrunkDir>..\..\..\..\..\</TrunkDir>
     <OutputPath>$(TrunkDir)\web\studio\ASC.Web.Studio\bin\</OutputPath>
@@ -36,7 +35,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
+    <DebugType>none</DebugType>
     <Optimize>true</Optimize>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -44,42 +43,13 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="AjaxPro.2">
-      <HintPath>..\..\..\..\..\packages\AjaxPro.2.2.9.17.2\lib\net20\AjaxPro.2.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="FredCK.FCKeditorV2, Version=2.6.3.19702, Culture=neutral, PublicKeyToken=4f86767c9b519a06, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\packages\FredCK.FCKeditorV2.2.6.3.19702\lib\net20\FredCK.FCKeditorV2.dll</HintPath>
-    </Reference>
-    <Reference Include="HtmlAgilityPack, Version=1.3.9.2, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\packages\HtmlAgilityPack.1.3.9.2\lib\net20\HtmlAgilityPack.dll</HintPath>
-    </Reference>
-    <Reference Include="log4net">
-      <HintPath>..\..\..\..\..\packages\log4net.2.0.3\lib\net40-client\log4net.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Runtime.Serialization">
-      <RequiredTargetFramework>3.0</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.ServiceModel.Web">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.Web" />
-    <Reference Include="System.Web.Extensions" />
-    <Reference Include="System.Xml" />
-    <Reference Include="System.Configuration" />
-  </ItemGroup>
-  <ItemGroup>
+    <Compile Include="Controls\ButtonSidePanel.ascx.cs">
+      <DependentUpon>ButtonSidePanel.ascx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Controls\ButtonSidePanel.ascx.designer.cs">
+      <DependentUpon>ButtonSidePanel.ascx</DependentUpon>
+    </Compile>
     <Compile Include="Controls\NavigationSidePanel.ascx.cs">
       <DependentUpon>NavigationSidePanel.ascx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -101,6 +71,9 @@
     <Compile Include="Help.aspx.designer.cs">
       <DependentUpon>Help.aspx</DependentUpon>
     </Compile>
+    <Compile Include="HttpHandlers\ThumbHandler.cs" />
+    <Compile Include="Master\ClientScripts\ClientLocalizationResources.cs" />
+    <Compile Include="Master\ClientScripts\ClientTemplateResources.cs" />
     <Compile Include="Master\Community.Master.cs">
       <DependentUpon>Community.Master</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -129,7 +102,6 @@
     <Compile Include="Modules\Blogs\Common\BlogsSearchHandler.cs" />
     <Compile Include="Modules\Blogs\Common\BlogsShortcutProvider.cs" />
     <Compile Include="Modules\Blogs\Common\BlogsSubscriptionManager.cs" />
-    <Compile Include="Modules\Blogs\Common\ImageHTMLHelper.cs" />
     <Compile Include="Modules\Blogs\Common\Subscriber.cs" />
     <Compile Include="Modules\Blogs\Core\BlogsEngine.cs" />
     <Compile Include="Modules\Blogs\Core\BlogsSettings.cs" />
@@ -330,6 +302,13 @@
     <Compile Include="Modules\Bookmarking\UserControls\Common\Util\IThumbnailHelper.cs" />
     <Compile Include="Modules\Bookmarking\UserControls\Common\Util\SortByEnum.cs" />
     <Compile Include="Modules\Bookmarking\UserControls\Common\Util\WebSiteThumbnailHelper.cs" />
+    <Compile Include="Modules\Bookmarking\UserControls\BookmarkingPagingUserControl.ascx.cs">
+      <DependentUpon>BookmarkingPagingUserControl.ascx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Modules\Bookmarking\UserControls\BookmarkingPagingUserControl.ascx.designer.cs">
+      <DependentUpon>BookmarkingPagingUserControl.ascx</DependentUpon>
+    </Compile>
     <Compile Include="Modules\Bookmarking\UserControls\CreateBookmarkUserControl.ascx.cs">
       <DependentUpon>CreateBookmarkUserControl.ascx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -462,6 +441,13 @@
     <Compile Include="Modules\Forum\UserControls\Common\PageLocation.cs" />
     <Compile Include="Modules\Forum\UserControls\Common\Settings.cs" />
     <Compile Include="Modules\Forum\UserControls\Common\TagSuggest.cs" />
+    <Compile Include="Modules\Forum\UserControls\PagingControl.ascx.cs">
+      <DependentUpon>PagingControl.ascx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Modules\Forum\UserControls\PagingControl.ascx.designer.cs">
+      <DependentUpon>PagingControl.ascx</DependentUpon>
+    </Compile>
     <Compile Include="Modules\Forum\UserControls\ForumEditor.ascx.cs">
       <DependentUpon>ForumEditor.ascx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -478,7 +464,6 @@
     </Compile>
     <Compile Include="Modules\Forum\UserControls\NewPostControl.ascx.cs">
       <DependentUpon>NewPostControl.ascx</DependentUpon>
-      <SubType>ASPXCodeBehind</SubType>
     </Compile>
     <Compile Include="Modules\Forum\UserControls\NewPostControl.ascx.designer.cs">
       <DependentUpon>NewPostControl.ascx</DependentUpon>
@@ -492,7 +477,6 @@
     </Compile>
     <Compile Include="Modules\Forum\UserControls\PostListControl.ascx.cs">
       <DependentUpon>PostListControl.ascx</DependentUpon>
-      <SubType>ASPXCodeBehind</SubType>
     </Compile>
     <Compile Include="Modules\Forum\UserControls\PostListControl.ascx.designer.cs">
       <DependentUpon>PostListControl.ascx</DependentUpon>
@@ -587,40 +571,40 @@
     <Compile Include="Modules\News\Controls\FeedView.ascx.designer.cs">
       <DependentUpon>FeedView.ascx</DependentUpon>
     </Compile>
-    <Compile Include="Modules\News\default.aspx.cs">
-      <DependentUpon>default.aspx</DependentUpon>
+    <Compile Include="Modules\News\Default.aspx.cs">
+      <DependentUpon>Default.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
-    <Compile Include="Modules\News\default.aspx.designer.cs">
-      <DependentUpon>default.aspx</DependentUpon>
+    <Compile Include="Modules\News\Default.aspx.designer.cs">
+      <DependentUpon>Default.aspx</DependentUpon>
     </Compile>
-    <Compile Include="Modules\News\editnews.aspx.cs">
-      <DependentUpon>editnews.aspx</DependentUpon>
+    <Compile Include="Modules\News\EditNews.aspx.cs">
+      <DependentUpon>EditNews.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
-    <Compile Include="Modules\News\editnews.aspx.designer.cs">
-      <DependentUpon>editnews.aspx</DependentUpon>
+    <Compile Include="Modules\News\EditNews.aspx.designer.cs">
+      <DependentUpon>EditNews.aspx</DependentUpon>
     </Compile>
-    <Compile Include="Modules\News\editpoll.aspx.cs">
-      <DependentUpon>editpoll.aspx</DependentUpon>
+    <Compile Include="Modules\News\EditPoll.aspx.cs">
+      <DependentUpon>EditPoll.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
-    <Compile Include="Modules\News\editpoll.aspx.designer.cs">
-      <DependentUpon>editpoll.aspx</DependentUpon>
+    <Compile Include="Modules\News\EditPoll.aspx.designer.cs">
+      <DependentUpon>EditPoll.aspx</DependentUpon>
     </Compile>
-    <Compile Include="Modules\News\news.aspx.cs">
-      <DependentUpon>news.aspx</DependentUpon>
+    <Compile Include="Modules\News\News.aspx.cs">
+      <DependentUpon>News.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
-    <Compile Include="Modules\News\news.aspx.designer.cs">
-      <DependentUpon>news.aspx</DependentUpon>
+    <Compile Include="Modules\News\News.aspx.designer.cs">
+      <DependentUpon>News.aspx</DependentUpon>
     </Compile>
-    <Compile Include="Modules\News\news.Master.cs">
-      <DependentUpon>news.Master</DependentUpon>
+    <Compile Include="Modules\News\News.Master.cs">
+      <DependentUpon>News.Master</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
-    <Compile Include="Modules\News\news.Master.designer.cs">
-      <DependentUpon>news.Master</DependentUpon>
+    <Compile Include="Modules\News\News.Master.designer.cs">
+      <DependentUpon>News.Master</DependentUpon>
     </Compile>
     <Compile Include="Modules\News\NewsConst.cs" />
     <Compile Include="Modules\News\NewsModule.cs" />
@@ -641,9 +625,7 @@
     </Compile>
     <Compile Include="Modules\Wiki\Code\ActionHelper.cs" />
     <Compile Include="Modules\Wiki\Code\BaseDao.cs" />
-    <Compile Include="Modules\Wiki\Code\BaseUserControl.cs">
-      <SubType>ASPXCodeBehind</SubType>
-    </Compile>
+    <Compile Include="Modules\Wiki\Code\BaseUserControl.cs" />
     <Compile Include="Modules\Wiki\Code\Category.cs" />
     <Compile Include="Modules\Wiki\Code\CategoryDao.cs" />
     <Compile Include="Modules\Wiki\Code\Comment.cs" />
@@ -691,7 +673,6 @@
     <Compile Include="Modules\Wiki\Handlers\WikiSection.cs" />
     <Compile Include="Modules\Wiki\ListCategories.aspx.cs">
       <DependentUpon>ListCategories.aspx</DependentUpon>
-      <SubType>ASPXCodeBehind</SubType>
     </Compile>
     <Compile Include="Modules\Wiki\ListCategories.aspx.designer.cs">
       <DependentUpon>ListCategories.aspx</DependentUpon>
@@ -761,7 +742,6 @@
     </Compile>
     <Compile Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\FileUploader.aspx.cs">
       <DependentUpon>FileUploader.aspx</DependentUpon>
-      <SubType>ASPXCodeBehind</SubType>
     </Compile>
     <Compile Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\FileUploader.aspx.designer.cs">
       <DependentUpon>FileUploader.aspx</DependentUpon>
@@ -843,6 +823,12 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>BlogPatternsResource.resx</DependentUpon>
     </Compile>
+    <Compile Include="Search\BlogsWrapper.cs" />
+    <Compile Include="Search\BookmarksWrapper.cs" />
+    <Compile Include="Search\NewsWrapper.cs" />
+    <Compile Include="Search\PostWrapper.cs" />
+    <Compile Include="Search\TopicWrapper.cs" />
+    <Compile Include="Search\WikiWrapper.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Modules\Birthdays\Resources\BirthdayPatternResource.resx">
@@ -978,30 +964,34 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="App_Themes\Default\Images\icon-blogs.png" />
-    <Content Include="App_Themes\Default\Images\icon-bookmarks.png" />
-    <Content Include="App_Themes\Default\Images\icon-employees.png" />
-    <Content Include="App_Themes\Default\Images\icon-helpcenter.png" />
-    <Content Include="App_Themes\Default\Images\product_disabled_logo.png" />
-    <Content Include="App_Themes\Default\Images\product_logo.png" />
-    <Content Include="App_Themes\Default\Images\product_logolarge.png" />
+    <Content Include="App_Themes\default\images\icon-blogs.png" />
+    <Content Include="App_Themes\default\images\icon-bookmarks.png" />
+    <Content Include="App_Themes\default\images\icon-employees.png" />
+    <Content Include="App_Themes\default\images\icon-helpcenter.png" />
+    <Content Include="App_Themes\default\images\product_disabled_logo.png" />
+    <Content Include="App_Themes\default\images\product_logo.png" />
+    <Content Include="App_Themes\default\images\product_logolarge.png" />
+    <Content Include="Controls\ButtonSidePanel.ascx" />
     <Content Include="Controls\NavigationSidePanel.ascx" />
     <Content Include="Default.aspx" />
     <Content Include="Help.aspx" />
     <Content Include="js\common.js" />
-    <Content Include="Modules\Birthdays\App_Themes\Default\birthdays.css" />
-    <Content Include="Modules\Birthdays\App_Themes\Default\images\white_cross.png" />
+    <Content Include="js\tagsautocompletebox.js" />
+    <Content Include="Master\Styles.ascx" />
+    <Content Include="Modules\Birthdays\App_Themes\default\birthdays.css" />
+    <Content Include="Modules\Birthdays\App_Themes\default\images\birthday.png" />
+    <Content Include="Modules\Birthdays\App_Themes\default\images\white_cross.png" />
     <Content Include="Modules\Birthdays\Default.aspx" />
     <Content Include="Modules\Birthdays\js\birthdays.js" />
     <Content Include="Modules\Birthdays\Resources\patterns.xml" />
     <Content Include="Modules\Blogs\AddBlog.aspx" />
-    <Content Include="Modules\Blogs\App_Themes\Default\BlogStyle.css" />
-    <Content Include="Modules\Blogs\App_Themes\Default\images\BlogIconWG.png" />
-    <Content Include="Modules\Blogs\App_Themes\Default\images\blogs.png" />
-    <Content Include="Modules\Blogs\App_Themes\Default\images\blog_add.png" />
-    <Content Include="Modules\Blogs\App_Themes\Default\images\blog_icon.png" />
-    <Content Include="Modules\Blogs\App_Themes\Default\images\comboarrow_bottom.png" />
-    <Content Include="Modules\Blogs\App_Themes\Default\images\tags.png" />
+    <Content Include="Modules\Blogs\App_Themes\default\blogstyle.css" />
+    <Content Include="Modules\Blogs\App_Themes\default\images\BlogIconWG.png" />
+    <Content Include="Modules\Blogs\App_Themes\default\images\blogs.png" />
+    <Content Include="Modules\Blogs\App_Themes\default\images\blog_add.png" />
+    <Content Include="Modules\Blogs\App_Themes\default\images\blog_icon.png" />
+    <Content Include="Modules\Blogs\App_Themes\default\images\comboarrow_bottom.png" />
+    <Content Include="Modules\Blogs\App_Themes\default\images\tags.png" />
     <Content Include="Modules\Blogs\Core\Service\blog_patterns.xml" />
     <Content Include="Modules\Blogs\Default.aspx" />
     <Content Include="Modules\Blogs\EditBlog.aspx" />
@@ -1009,39 +999,39 @@
     <Content Include="Modules\Blogs\ViewBlog.aspx" />
     <Content Include="Modules\Blogs\Views\ViewBlogView.ascx" />
     <Content Include="Modules\Bookmarking\App_Data\IECapt.exe" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\bookmarkingstyle.css" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\16_edit.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\add_book.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\bookmarking_details.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\comboarrow_bottom.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\comment.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\goldStar.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\or01_bg.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\or02.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\plus_add.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\remove.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\star01.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\tag_16.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\wh-or_star.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\wh01.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\wh01_star.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\wh02_bg.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\wh02_bg.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\wh03_end.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\yel-or_star.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\yel01.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\yel02_bg.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\yell01_star.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\yell02_bg.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\css\ImagesCSS\yell03_end.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\Images\ajax_progress_loader.gif" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\Images\bookmarking_icon.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\Images\bookmarking_mini_icon.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\Images\bookmarks_icon.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\Images\goldstar.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\Images\greystar.png" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\Images\noimageavailable.jpg" />
-    <Content Include="Modules\Bookmarking\App_Themes\Default\Images\tags.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\bookmarkingstyle.css" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\16_edit.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\add_book.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\bookmarking_details.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\comboarrow_bottom.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\comment.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\goldStar.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\or01_bg.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\or02.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\plus_add.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\remove.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\star01.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\tag_16.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\wh-or_star.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\wh01.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\wh01_star.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\wh02_bg.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\wh02_bg.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\wh03_end.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\yel-or_star.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\yel01.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\yel02_bg.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\yell01_star.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\yell02_bg.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\css\imagescss\yell03_end.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\images\ajax_progress_loader.gif" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\images\bookmarking_icon.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\images\bookmarking_mini_icon.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\images\bookmarks_icon.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\images\goldstar.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\images\greystar.png" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\images\noimageavailable.jpg" />
+    <Content Include="Modules\Bookmarking\App_Themes\default\images\tags.png" />
     <Content Include="Modules\Bookmarking\BookmarkInfo.aspx" />
     <Content Include="Modules\Bookmarking\Core\Patterns\bookmarking_patterns.xml" />
     <Content Include="Modules\Bookmarking\CreateBookmark.aspx" />
@@ -1058,42 +1048,43 @@
     <Content Include="Modules\Bookmarking\UserControls\BookmarkRaitingUserControl.ascx" />
     <Content Include="Modules\Bookmarking\UserControls\CommentsUserControl.ascx" />
     <Content Include="Modules\Bookmarking\UserControls\Common\ActionButton\js\actionbutton.js" />
+    <Content Include="Modules\Bookmarking\UserControls\BookmarkingPagingUserControl.ascx" />
     <Content Include="Modules\Bookmarking\UserControls\CreateBookmarkUserControl.ascx" />
     <Content Include="Modules\Bookmarking\UserControls\SingleBookmarkUserControl.ascx" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\attach.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\back-progress.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\comboarrow_bottom.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\complete.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\down.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\forums_icon.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\forum_icon.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\forum_mini_icon.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\forum_read.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\forum_unread.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\goto.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\loader_small.gif" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\mail_edit.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\poll.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\poll_closed.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\poll_closed_sticky.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\poll_new.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\poll_new_closed.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\poll_new_closed_sticky.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\poll_new_sticky.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\poll_sticky.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\remove.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\tags.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\top.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\top_closed.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\top_closed_sticky.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\top_new.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\top_new_closed.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\top_new_closed_sticky.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\top_new_sticky.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\top_sticky.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\trash.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\images\upload.png" />
-    <Content Include="Modules\Forum\App_Themes\Default\style.css" />
+    <Content Include="Modules\Forum\App_Themes\default\images\attach.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\back-progress.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\comboarrow_bottom.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\complete.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\down.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\forums_icon.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\forum_icon.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\forum_mini_icon.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\forum_read.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\forum_unread.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\goto.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\loader_small.gif" />
+    <Content Include="Modules\Forum\App_Themes\default\images\mail_edit.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\poll.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\poll_closed.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\poll_closed_sticky.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\poll_new.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\poll_new_closed.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\poll_new_closed_sticky.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\poll_new_sticky.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\poll_sticky.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\remove.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\tags.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\top.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\top_closed.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\top_closed_sticky.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\top_new.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\top_new_closed.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\top_new_closed_sticky.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\top_new_sticky.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\top_sticky.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\trash.png" />
+    <Content Include="Modules\Forum\App_Themes\default\images\upload.png" />
+    <Content Include="Modules\Forum\App_Themes\default\style.css" />
     <Content Include="Modules\Forum\Core\Module\forum_patterns.xml" />
     <Content Include="Modules\Forum\Default.aspx" />
     <Content Include="Modules\Forum\EditTopic.aspx" />
@@ -1106,6 +1097,7 @@
     <Content Include="Modules\Forum\Posts.aspx" />
     <Content Include="Modules\Forum\Search.aspx" />
     <Content Include="Modules\Forum\Topics.aspx" />
+    <Content Include="Modules\Forum\UserControls\PagingControl.ascx" />
     <Content Include="Modules\Forum\UserControls\ForumEditor.ascx" />
     <Content Include="Modules\Forum\UserControls\ForumMaker.ascx" />
     <Content Include="Modules\Forum\UserControls\NewPostControl.ascx" />
@@ -1116,81 +1108,81 @@
     <Content Include="Modules\Forum\UserControls\TopicEditorControl.ascx" />
     <Content Include="Modules\Forum\UserControls\TopicListControl.ascx" />
     <Content Include="Modules\Forum\UserTopics.aspx" />
-    <Content Include="Modules\News\App_Themes\Default\images\150x_advert.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\150x_news.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\150x_newslogo.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\150x_order.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\150x_poll.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\32x_advert.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\32x_news.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\32x_order.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\32x_poll.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\comboarrow_bottom.png" />
-    <Content Include="Modules\News\App_Themes\Default\images\newslogo.png" />
-    <Content Include="Modules\News\App_Themes\Default\NewsStylesheet.css" />
+    <Content Include="Modules\News\App_Themes\default\images\150x_advert.png" />
+    <Content Include="Modules\News\App_Themes\default\images\150x_news.png" />
+    <Content Include="Modules\News\App_Themes\default\images\150x_newslogo.png" />
+    <Content Include="Modules\News\App_Themes\default\images\150x_order.png" />
+    <Content Include="Modules\News\App_Themes\default\images\150x_poll.png" />
+    <Content Include="Modules\News\App_Themes\default\images\32x_advert.png" />
+    <Content Include="Modules\News\App_Themes\default\images\32x_news.png" />
+    <Content Include="Modules\News\App_Themes\default\images\32x_order.png" />
+    <Content Include="Modules\News\App_Themes\default\images\32x_poll.png" />
+    <Content Include="Modules\News\App_Themes\default\images\comboarrow_bottom.png" />
+    <Content Include="Modules\News\App_Themes\default\images\newslogo.png" />
+    <Content Include="Modules\News\App_Themes\default\newsstylesheet.css" />
     <Content Include="Modules\News\Controls\FeedItem.ascx" />
     <Content Include="Modules\News\Controls\FeedView.ascx" />
-    <Content Include="Modules\News\default.aspx" />
-    <Content Include="Modules\News\editnews.aspx" />
-    <Content Include="Modules\News\editpoll.aspx" />
-    <Content Include="Modules\News\js\News.js" />
-    <Content Include="Modules\News\news.aspx" />
+    <Content Include="Modules\News\Default.aspx" />
+    <Content Include="Modules\News\EditNews.aspx" />
+    <Content Include="Modules\News\EditPoll.aspx" />
+    <Content Include="Modules\News\js\news.js" />
+    <Content Include="Modules\News\News.aspx" />
     <Content Include="Modules\News\Resources\news_patterns.xml" />
-    <Content Include="Modules\Wiki\App_Themes\Default\Css\filetype_style.css" />
-    <Content Include="Modules\Wiki\App_Themes\Default\Css\wikicss.css" />
-    <Content Include="Modules\Wiki\App_Themes\Default\Css\wikicssprint.css" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\filetype\file_image.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\filetype\file_mpg.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\filetype\file_na.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\filetype\file_ppt.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\filetype\file_sound.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\filetype\file_txt.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\filetype\file_xls.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\filetype\file_zip.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\Page.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\WikiLogo150.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\WikiLogo16.png" />
-    <Content Include="Modules\Wiki\App_Themes\Default\images\WikiLogo32.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\css\filetype_style.css" />
+    <Content Include="Modules\Wiki\App_Themes\default\css\wikicss.css" />
+    <Content Include="Modules\Wiki\App_Themes\default\css\wikicssprint.css" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\filetype\file_image.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\filetype\file_mpg.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\filetype\file_na.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\filetype\file_ppt.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\filetype\file_sound.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\filetype\file_txt.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\filetype\file_xls.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\filetype\file_zip.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\page.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\wikilogo150.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\wikilogo16.png" />
+    <Content Include="Modules\Wiki\App_Themes\default\images\wikilogo32.png" />
     <Content Include="Modules\Wiki\Code\Patterns\wiki_patterns.xml" />
-    <Content Include="Modules\Wiki\Content\Anchor.png" />
-    <Content Include="Modules\Wiki\Content\Bold.png" />
-    <Content Include="Modules\Wiki\Content\Box.png" />
-    <Content Include="Modules\Wiki\Content\BR.png" />
-    <Content Include="Modules\Wiki\Content\Code.png" />
-    <Content Include="Modules\Wiki\Content\Comment.png" />
-    <Content Include="Modules\Wiki\Content\enlarge.png" />
-    <Content Include="Modules\Wiki\Content\Escape.png" />
-    <Content Include="Modules\Wiki\Content\external.png" />
-    <Content Include="Modules\Wiki\Content\File.png" />
-    <Content Include="Modules\Wiki\Content\file_icon.gif" />
-    <Content Include="Modules\Wiki\Content\H1.png" />
-    <Content Include="Modules\Wiki\Content\H2.png" />
-    <Content Include="Modules\Wiki\Content\H3.png" />
-    <Content Include="Modules\Wiki\Content\H4.png" />
-    <Content Include="Modules\Wiki\Content\HR.png" />
-    <Content Include="Modules\Wiki\Content\Image.png" />
-    <Content Include="Modules\Wiki\Content\Italic.png" />
-    <Content Include="Modules\Wiki\Content\Link.png" />
-    <Content Include="Modules\Wiki\Content\lock_icon.gif" />
-    <Content Include="Modules\Wiki\Content\mail_icon.gif" />
-    <Content Include="Modules\Wiki\Content\main.css" />
-    <Content Include="Modules\Wiki\Content\NoBr.png" />
-    <Content Include="Modules\Wiki\Content\NoWiki.png" />
-    <Content Include="Modules\Wiki\Content\PageLink.png" />
-    <Content Include="Modules\Wiki\Content\Pre.png" />
-    <Content Include="Modules\Wiki\Content\SpecialTags.png" />
-    <Content Include="Modules\Wiki\Content\Striked.png" />
-    <Content Include="Modules\Wiki\Content\Subscript.png" />
-    <Content Include="Modules\Wiki\Content\Superscript.png" />
-    <Content Include="Modules\Wiki\Content\Symbol.png" />
-    <Content Include="Modules\Wiki\Content\Underlined.png" />
+    <Content Include="Modules\Wiki\content\anchor.png" />
+    <Content Include="Modules\Wiki\content\bold.png" />
+    <Content Include="Modules\Wiki\content\box.png" />
+    <Content Include="Modules\Wiki\content\br.png" />
+    <Content Include="Modules\Wiki\content\code.png" />
+    <Content Include="Modules\Wiki\content\comment.png" />
+    <Content Include="Modules\Wiki\content\enlarge.png" />
+    <Content Include="Modules\Wiki\content\escape.png" />
+    <Content Include="Modules\Wiki\content\external.png" />
+    <Content Include="Modules\Wiki\content\file.png" />
+    <Content Include="Modules\Wiki\content\file_icon.gif" />
+    <Content Include="Modules\Wiki\content\h1.png" />
+    <Content Include="Modules\Wiki\content\h2.png" />
+    <Content Include="Modules\Wiki\content\h3.png" />
+    <Content Include="Modules\Wiki\content\h4.png" />
+    <Content Include="Modules\Wiki\content\hr.png" />
+    <Content Include="Modules\Wiki\content\image.png" />
+    <Content Include="Modules\Wiki\content\italic.png" />
+    <Content Include="Modules\Wiki\content\link.png" />
+    <Content Include="Modules\Wiki\content\lock_icon.gif" />
+    <Content Include="Modules\Wiki\content\mail_icon.gif" />
+    <Content Include="Modules\Wiki\content\main.css" />
+    <Content Include="Modules\Wiki\content\nobr.png" />
+    <Content Include="Modules\Wiki\content\nowiki.png" />
+    <Content Include="Modules\Wiki\content\pagelink.png" />
+    <Content Include="Modules\Wiki\content\pre.png" />
+    <Content Include="Modules\Wiki\content\specialtags.png" />
+    <Content Include="Modules\Wiki\content\striked.png" />
+    <Content Include="Modules\Wiki\content\subscript.png" />
+    <Content Include="Modules\Wiki\content\superscript.png" />
+    <Content Include="Modules\Wiki\content\symbol.png" />
+    <Content Include="Modules\Wiki\content\underlined.png" />
     <Content Include="Modules\Wiki\Default.aspx" />
     <Content Include="Modules\Wiki\Diff.aspx" />
     <Content Include="Modules\Wiki\ListCategories.aspx" />
     <Content Include="Modules\Wiki\ListFiles.aspx" />
     <Content Include="Modules\Wiki\ListPages.aspx" />
     <Content Include="Modules\Wiki\PageHistoryList.aspx" />
-    <Content Include="Modules\Wiki\Scripts\EditPage.js" />
+    <Content Include="Modules\Wiki\scripts\editpage.js" />
     <Content Include="Modules\Wiki\WikiUC\EditFile.ascx" />
     <Content Include="Modules\Wiki\WikiUC\EditPage.ascx" />
     <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\css\behaviors\disablehandles.htc" />
@@ -1517,7 +1509,7 @@
     <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\fck_wysiwyg\dialogs\button_bg.png" />
     <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\fck_wysiwyg\dialogs\button_over_bg.png" />
     <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\fck_wysiwyg\dialogs\file.html" />
-    <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\fck_wysiwyg\dialogs\File.png" />
+    <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\fck_wysiwyg\dialogs\file.png" />
     <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\fck_wysiwyg\dialogs\image.html" />
     <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\fck_wysiwyg\dialogs\link.html" />
     <Content Include="Modules\Wiki\WikiUC\fckeditor\editor\plugins\fck_wysiwyg\fckplugin.js" />
@@ -1593,6 +1585,7 @@
     <Content Include="Modules\Wiki\WikiUC\ViewFile.ascx" />
     <Content Include="Modules\Wiki\WikiUC\ViewPage.ascx" />
     <Content Include="Photos.aspx" />
+    <Content Include="Templates\CommonTemplates.html" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\common\ASC.Common\ASC.Common.csproj">
@@ -1611,9 +1604,9 @@
       <Project>{49f07fff-98a5-47d2-a9e9-a46b98c41245}</Project>
       <Name>ASC.Api.Core</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\..\..\module\ASC.FullTextIndex\ASC.FullTextIndex.csproj">
-      <Project>{aa3b6b75-0eaa-499b-be85-304df28e6d31}</Project>
-      <Name>ASC.FullTextIndex</Name>
+    <ProjectReference Include="..\..\..\..\..\module\ASC.ElasticSearch\ASC.ElasticSearch.csproj">
+      <Project>{ae1a0e06-6cd4-4e1d-8209-22bbbd6d5652}</Project>
+      <Name>ASC.ElasticSearch</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\..\..\core\ASC.Web.Core\ASC.Web.Core.csproj">
       <Project>{02c40a64-fe22-41d0-9037-69f0d6f787a9}</Project>
@@ -1628,8 +1621,6 @@
     <Folder Include="Modules\Blogs\Data\HtmlEditorFiles\" />
     <Folder Include="Modules\Bookmarking\App_Data\screens\" />
     <Folder Include="Modules\Bookmarking\Core\Dao\Comments\" />
-    <Folder Include="Modules\Forum\App_Themes\Default\ForumImages\" />
-    <Folder Include="Modules\News\App_Themes\Default\NewsImages\" />
     <Folder Include="Modules\News\Data\HtmlEditorFiles\" />
     <Folder Include="Modules\Wiki\Data\Files\" />
     <Folder Include="Modules\Wiki\WikiUC\fckeditor\editor\dialog\fck_spellerpages\spellerpages\server-scripts\" />
@@ -1642,7 +1633,7 @@
     <Content Include="Modules\Forum\Forum.Master" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Modules\News\news.Master" />
+    <Content Include="Modules\News\News.Master" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Modules\Wiki\Wiki.Master" />
@@ -1652,16 +1643,35 @@
   <ItemGroup>
     <Content Include="Master\Community.Master" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="web.config" />
+    <None Include="web.Debug.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+    <None Include="web.Release.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AjaxPro.2">
+      <Version>2.9.17.2</Version>
+    </PackageReference>
+    <PackageReference Include="FredCK.FCKeditorV2">
+      <Version>2.6.3.19702</Version>
+    </PackageReference>
+    <PackageReference Include="HtmlAgilityPack">
+      <Version>1.6.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>12.0.3</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <ProjectExtensions>
-    <VisualStudio>
-      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
-        <WebProjectProperties>
-          <SaveServerSettingsInUserFile>True</SaveServerSettingsInUserFile>
-        </WebProjectProperties>
-      </FlavorProperties>
-    </VisualStudio>
-  </ProjectExtensions>
   <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="Exists('$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets')" />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" Condition="false" />
 </Project>

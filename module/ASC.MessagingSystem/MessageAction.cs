@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -36,9 +27,12 @@ namespace ASC.MessagingSystem
         LoginSuccessViaSocialAccount = 1001,
         LoginSuccessViaSms = 1007,
         LoginSuccessViaApi = 1010,
+        LoginSuccessViaSocialApp = 1011,
         LoginSuccessViaApiSms = 1012,
+        LoginSuccessViaApiTfa = 1024,
         LoginSuccessViaApiSocialAccount = 1019,
         LoginSuccessViaSSO = 1015,
+        LoginSuccesViaTfaApp = 1021,
         LoginFailViaSSO = 1018,
         LoginFailInvalidCombination = 1002,
         LoginFailSocialAccountNotFound = 1003,
@@ -47,8 +41,12 @@ namespace ASC.MessagingSystem
         LoginFailViaSms = 1008,
         LoginFailViaApi = 1013,
         LoginFailViaApiSms = 1014,
+        LoginFailViaApiTfa = 1025,
         LoginFailViaApiSocialAccount = 1020,
+        LoginFailViaTfaApp = 1022,
         LoginFailIpSecurity = 1009,
+        LoginFailBruteForce = 1023,
+        LoginFailRecaptcha = 1026,  // last login
         Logout = 1006,
 
         SessionStarted = 1016,
@@ -344,11 +342,15 @@ namespace ASC.MessagingSystem
         UserLinkedSocialAccount = 4011,
         UserUnlinkedSocialAccount = 4012,
 
+        UserConnectedTfaApp = 4032,
+        UserDisconnectedTfaApp = 4033,
+
         UserSentActivationInstructions = 4013,
         UserSentEmailChangeInstructions = 4014,
         UserSentPasswordChangeInstructions = 4015,
         UserSentDeleteInstructions = 4016,
 
+        UserUpdatedEmail = 5047,
         UserUpdatedPassword = 4017,
         UserDeleted = 4018,
 
@@ -365,6 +367,9 @@ namespace ASC.MessagingSystem
         GroupUpdated = 4027,
         GroupDeleted = 4028,
 
+        UserDataReassigns = 4030,
+        UserDataRemoving = 4031,
+
         #endregion
 
         #region Documents
@@ -375,11 +380,12 @@ namespace ASC.MessagingSystem
         UserFileUpdated = 5034,
         FileCreatedVersion = 5003,
         FileDeletedVersion = 5004,
+        FileRestoreVersion = 5044,
         FileUpdatedRevisionComment = 5005,
         FileLocked = 5006,
         FileUnlocked = 5007,
         FileUpdatedAccess = 5008,
-        FileSendAccessLink = 5036,
+        FileSendAccessLink = 5036, // not used
 
         FileDownloaded = 5009,
         FileDownloadedAs = 5010,
@@ -411,9 +417,16 @@ namespace ASC.MessagingSystem
 
         DocumentsThirdPartySettingsUpdated = 5031,
         DocumentsOverwritingSettingsUpdated = 5032,
+        DocumentsForcesave = 5049,
+        DocumentsStoreForcesave = 5048,
         DocumentsUploadingFormatsSettingsUpdated = 5033,
 
         FileConverted = 5035,
+
+        FileChangeOwner = 5043,
+
+        DocumentSignComplete = 5046,
+        DocumentSendToSign = 5045,
 
         #endregion
 
@@ -424,7 +437,7 @@ namespace ASC.MessagingSystem
         DnsSettingsUpdated = 6002,
         TrustedMailDomainSettingsUpdated = 6003,
         PasswordStrengthSettingsUpdated = 6004,
-        TwoFactorAuthenticationSettingsUpdated = 6005,
+        TwoFactorAuthenticationSettingsUpdated = 6005, // deprecated - use 6036-6038 instead
         AdministratorMessageSettingsUpdated = 6006,
         DefaultStartPageSettingsUpdated = 6007,
 
@@ -464,6 +477,17 @@ namespace ASC.MessagingSystem
 
         PortalAccessSettingsUpdated = 6031,
 
+        CookieSettingsUpdated = 6032,
+        MailServiceSettingsUpdated = 6033,
+
+        CustomNavigationSettingsUpdated = 6034,
+
+        AuditSettingsUpdated = 6035,
+
+        TwoFactorAuthenticationDisabled = 6036,
+        TwoFactorAuthenticationEnabledBySms = 6037,
+        TwoFactorAuthenticationEnabledByTfaApp = 6038,
+
         DocumentServiceLocationSetting = 5037,
         AuthorizationKeysSetting = 5038,
         FullTextSearchSetting = 5039,
@@ -471,7 +495,14 @@ namespace ASC.MessagingSystem
         StartTransferSetting = 5040,
         StartBackupSetting = 5041,
 
-        LicenseKeyUploaded = 5042, // last
+        LicenseKeyUploaded = 5042,
+
+        StartStorageEncryption = 5050,
+
+        PrivacyRoomEnable = 5051,
+        PrivacyRoomDisable = 5052,
+
+        StartStorageDecryption = 5053, // last
 
         #endregion
 

@@ -1,4 +1,21 @@
-﻿window.CustomEvent = function (newEvents) {
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+window.CustomEvent = function (newEvents) {
   if (typeof this.supportedEvents === 'undefined') {
     this.supportedEvents = [];
   }
@@ -111,7 +128,7 @@ window.CustomEvent.prototype.call = function (eventName, thisArg, argsArray) {
   var handlers = this.eventHandlers;
   for (var i = 0, n = handlers.length; i < n; i++) {
     if (handlers[i].name === eventName) {
-      handlers[i].handler.apply(thisArg, argsArray);
+        handlers[i].handler.apply(thisArg, argsArray);
       n = handlers.length;
       if (handlers[i] && handlers[i].type & 1) {
         handlers.splice(i, 1);

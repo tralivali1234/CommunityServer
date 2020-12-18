@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,16 +18,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security;
 using ASC.Api.Attributes;
 using ASC.Api.Collections;
+using ASC.CRM.Core.Entities;
+using ASC.Common.Threading.Progress;
 using ASC.CRM.Core;
 using ASC.MessagingSystem;
-using ASC.Web.CRM.Classes;
-using ASC.Web.Core.Utility.Settings;
-using ASC.Web.Studio.Utility;
-using System.Security;
-using ASC.Common.Threading.Progress;
+using ASC.Web.CRM.Resources;
 using ASC.Web.Core.Utility;
+using ASC.Web.CRM.Classes;
 
 namespace ASC.Api.CRM
 {
@@ -116,8 +107,8 @@ namespace ASC.Api.CRM
         {
             var tenantSettings = Global.TenantSettings;
             tenantSettings.ChangeContactStatusGroupAuto = changeContactStatusGroupAuto;
+            tenantSettings.Save();
 
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
             MessageService.Send(Request, MessageAction.ContactTemperatureLevelSettingsUpdated);
 
             return changeContactStatusGroupAuto;
@@ -138,8 +129,7 @@ namespace ASC.Api.CRM
         {
             var tenantSettings = Global.TenantSettings;
             tenantSettings.WriteMailToHistoryAuto = writeMailToHistoryAuto;
-
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
+            tenantSettings.Save();
             //MessageService.Send(Request, MessageAction.ContactTemperatureLevelSettingsUpdated);
 
             return writeMailToHistoryAuto;
@@ -160,8 +150,8 @@ namespace ASC.Api.CRM
         {
             var tenantSettings = Global.TenantSettings;
             tenantSettings.AddTagToContactGroupAuto = addTagToContactGroupAuto;
+            tenantSettings.Save();
 
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
             MessageService.Send(Request, MessageAction.ContactsTagSettingsUpdated);
 
             return addTagToContactGroupAuto;
@@ -183,7 +173,7 @@ namespace ASC.Api.CRM
             var tenantSettings = Global.TenantSettings;
             tenantSettings.IsConfiguredPortal = configured ?? true;
             tenantSettings.WebFormKey = webFormKey ?? Guid.NewGuid();
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
+            tenantSettings.Save();
             return tenantSettings.IsConfiguredPortal;
         }
 
@@ -206,7 +196,8 @@ namespace ASC.Api.CRM
             }
             tenantSettings.InvoiceSetting.CompanyName = companyName;
 
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
+            tenantSettings.Save();
+
             MessageService.Send(Request, MessageAction.OrganizationProfileUpdatedCompanyName, companyName);
 
             return companyName;
@@ -215,23 +206,41 @@ namespace ASC.Api.CRM
         /// <summary>
         ///  Save organisation company address
         /// </summary>
-        /// <param name="companyAddress">Organisation company address</param>
+        /// <param name="street">Organisation company street/building/apartment address</param>
+        /// <param name="city">City</param>
+        /// <param name="state">State</param>
+        /// <param name="zip">Zip</param>
+        /// <param name="country">Country</param>
         /// <short>Save organisation company address</short>
         /// <category>Organisation</category>
-        /// <returns>Organisation company address</returns>
+        /// <returns>Returns a JSON object with the organization company address details</returns>
         /// <exception cref="SecurityException"></exception>
         [Update(@"settings/organisation/address")]
-        public String UpdateOrganisationSettingsCompanyAddress(String companyAddress)
+        public String UpdateOrganisationSettingsCompanyAddress(String street, String city, String state, String zip, String country)
         {
             if (!CRMSecurity.IsAdmin) throw CRMSecurity.CreateSecurityException();
+
             var tenantSettings = Global.TenantSettings;
+
             if (tenantSettings.InvoiceSetting == null)
             {
                 tenantSettings.InvoiceSetting = InvoiceSetting.DefaultSettings;
             }
+
+            var companyAddress = Newtonsoft.Json.JsonConvert.SerializeObject(new
+                {
+                    type = AddressCategory.Billing.ToString(),
+                    street,
+                    city,
+                    state,
+                    zip,
+                    country
+                });
+
             tenantSettings.InvoiceSetting.CompanyAddress = companyAddress;
 
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
+            tenantSettings.Save();
+
             MessageService.Send(Request, MessageAction.OrganizationProfileUpdatedAddress);
 
             return companyAddress;
@@ -253,7 +262,7 @@ namespace ASC.Api.CRM
             int companyLogoID;
             if (!reset)
             {
-                companyLogoID = OrganisationLogoManager.TryUploadOrganisationLogoFromTmp();
+                companyLogoID = OrganisationLogoManager.TryUploadOrganisationLogoFromTmp(DaoFactory);
                 if (companyLogoID == 0)
                 {
                     throw new Exception("Downloaded image not found");
@@ -271,7 +280,7 @@ namespace ASC.Api.CRM
             }
             tenantSettings.InvoiceSetting.CompanyLogoID = companyLogoID;
 
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
+            tenantSettings.Save();
             MessageService.Send(Request, MessageAction.OrganizationProfileUpdatedInvoiceLogo);
 
             return companyLogoID;
@@ -319,7 +328,7 @@ namespace ASC.Api.CRM
             var tenantSettings = Global.TenantSettings;
             tenantSettings.WebFormKey = Guid.NewGuid();
 
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
+            tenantSettings.Save();
             MessageService.Send(Request, MessageAction.WebsiteContactFormUpdatedKey);
 
             return tenantSettings.WebFormKey.ToString();
@@ -351,47 +360,6 @@ namespace ASC.Api.CRM
             MessageService.Send(Request, MessageAction.CrmDefaultCurrencyUpdated);
 
             return ToCurrencyInfoWrapper(cur);
-        }
-
-        /// <summary>
-        ///  Save SMTP Server Settings
-        /// </summary>
-        /// <short>Save SMTP Settings</short>
-        /// <param name="host">Host name</param>
-        /// <param name="port">Port</param>
-        /// <param name="authentication">Need authentication</param>
-        /// <param name="hostLogin">Host Login</param>
-        /// <param name="hostPassword">Host Password</param>
-        /// <param name="senderDisplayName">Sender Name</param>
-        /// <param name="senderEmailAddress">Sender Email Address</param>
-        /// <param name="enableSSL">Enable SSL</param>
-        /// <category>Common</category>
-        /// <returns>SMTP Server Settings</returns>
-        /// <exception cref="SecurityException"></exception>
-        [Update(@"settings/smtp")]
-        public SMTPServerSetting SaveSMTPSettings(string host, int port, bool authentication, string hostLogin, string hostPassword, string senderDisplayName, string senderEmailAddress, bool enableSSL)
-        {
-            if (!CRMSecurity.IsAdmin) throw CRMSecurity.CreateSecurityException();
-
-            Global.SaveSMTPSettings(host, port, authentication, hostLogin, hostPassword, senderDisplayName, senderEmailAddress, enableSSL);
-            MessageService.Send(Request, MessageAction.CrmSmtpSettingsUpdated);
-
-            var crmSettings = Global.TenantSettings;
-
-            return crmSettings.SMTPServerSetting;
-        }
-
-        /// <visible>false</visible>
-        [Create(@"settings/testmail")]
-        public string SendTestMailSMTP(string toEmail, string mailSubj, string mailBody)
-        {
-            if (!CRMSecurity.IsAdmin) throw CRMSecurity.CreateSecurityException();
-
-            if (string.IsNullOrEmpty(toEmail) || string.IsNullOrEmpty(mailBody)) throw new ArgumentException();
-
-            MailSender.StartSendTestMail(toEmail, mailSubj, mailBody);
-            MessageService.Send(Request, MessageAction.CrmTestMailSent);
-            return "";
         }
 
         /// <visible>false</visible>
@@ -473,33 +441,88 @@ namespace ASC.Api.CRM
 
         /// <visible>false</visible>
         [Read(@"export/status")]
-        public IProgressItem GetExportToCSVStatus()
+        public IProgressItem GetExportStatus()
         {
             if (!CRMSecurity.IsAdmin) throw CRMSecurity.CreateSecurityException();
-            return ExportToCSV.GetStatus();
+            return ExportToCsv.GetStatus(false);
         }
 
         /// <visible>false</visible>
         [Update(@"export/cancel")]
-        public IProgressItem Cancel()
+        public IProgressItem CancelExport()
         {
             if (!CRMSecurity.IsAdmin) throw CRMSecurity.CreateSecurityException();
-            ExportToCSV.Cancel();
-            return ExportToCSV.GetStatus();
+            ExportToCsv.Cancel(false);
+            return ExportToCsv.GetStatus(false);
         }
 
         /// <visible>false</visible>
         [Create(@"export/start")]
-        public IProgressItem StartExportData()
+        public IProgressItem StartExport()
         {
             if (!CRMSecurity.IsAdmin) throw CRMSecurity.CreateSecurityException();
 
             MessageService.Send(Request, MessageAction.CrmAllDataExported);
 
-            return ExportToCSV.Start();
+            return ExportToCsv.Start(null, string.Format("{0}_{1}.zip", CRMSettingResource.Export, DateTime.UtcNow.Ticks));
         }
 
+        /// <visible>false</visible>
+        [Read(@"export/partial/status")]
+        public IProgressItem GetPartialExportStatus()
+        {
+            return ExportToCsv.GetStatus(true);
+        }
 
+        /// <visible>false</visible>
+        [Update(@"export/partial/cancel")]
+        public IProgressItem CancelPartialExport()
+        {
+            ExportToCsv.Cancel(true);
+            return ExportToCsv.GetStatus(true);
+        }
+
+        /// <visible>false</visible>
+        [Create(@"export/partial/{entityType:(contact|opportunity|case|task|invoiceitem)}/start")]
+        public IProgressItem StartPartialExport(string entityType, string base64FilterString)
+        {
+            if (string.IsNullOrEmpty(base64FilterString)) throw new ArgumentException();
+            
+            FilterObject filterObject;
+            String fileName;
+
+            switch (entityType.ToLower())
+            {
+                case "contact":
+                    filterObject = new ContactFilterObject(base64FilterString);
+                    fileName = CRMContactResource.Contacts + ".csv";
+                    MessageService.Send(Request, MessageAction.ContactsExportedToCsv);
+                    break;
+                case "opportunity":
+                    filterObject = new DealFilterObject(base64FilterString);
+                    fileName = CRMCommonResource.DealModuleName + ".csv";
+                    MessageService.Send(Request, MessageAction.OpportunitiesExportedToCsv);
+                    break;
+                case "case":
+                    filterObject = new CasesFilterObject(base64FilterString);
+                    fileName = CRMCommonResource.CasesModuleName + ".csv";
+                    MessageService.Send(Request, MessageAction.CasesExportedToCsv);
+                    break;
+                case "task":
+                    filterObject = new TaskFilterObject(base64FilterString);
+                    fileName = CRMCommonResource.TaskModuleName + ".csv";
+                    MessageService.Send(Request, MessageAction.CrmTasksExportedToCsv);
+                    break;
+                case "invoiceitem":
+                    fileName = CRMCommonResource.ProductsAndServices + ".csv";
+                    filterObject = new InvoiceItemFilterObject(base64FilterString);
+                    break;
+                default:
+                    throw new ArgumentException();
+            }
+
+            return ExportToCsv.Start(filterObject, fileName);
+        }
 
 
         protected CurrencyInfoWrapper ToCurrencyInfoWrapper(CurrencyInfo currencyInfo)

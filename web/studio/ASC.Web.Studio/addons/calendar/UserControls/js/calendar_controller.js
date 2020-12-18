@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -52,7 +43,7 @@ ASC.Api.TypeConverter = new function() {
         var min = date.getMinutes();
 
         var str = date.getFullYear() + '-' + (m > 9 ? m : ('0' + m)) + '-' + (d > 9 ? d : ('0' + d))
-                    + 'T' + (h > 9 ? h : ('0' + h)) + '-' + (min > 9 ? min : ('0' + min)) + "-00.000Z";
+            + 'T' + (h > 9 ? h : ('0' + h)) + '-' + (min > 9 ? min : ('0' + min)) + "-00.000Z";
 
         return str;
     }
@@ -62,9 +53,119 @@ ASC.Api.TypeConverter = new function() {
         var str = serverTime.replace(/\..*/gi, '');
         var date = str.split('T')[0].split('-');
         var time = str.split('T')[1].split(':');
-        return new Date(date[0], date[1] - 1, date[2], time[0], time[1]);
+        return new Date(date[0], date[1] - 1, date[2], time[0], time[1], time[2]);
     }
 }
+
+ASC.CalendarSizeManager = new function() {
+
+    var cache = {
+        topPanelHeight: 48,
+        fcHeaderHeight: 36,
+        fcMonthContentTheadHeight: 18,
+
+        fcMonthContentCellVPaddings: 0,
+        fcMonthContentCellVBorders: 2,
+        fcMonthContentCellVMargins: 0,
+        fcMonthContentCellVSides: 2,
+
+        fcMonthContentCellNumberHeight: 22,
+        fcMonthContentCellNumberVPaddings: 3,
+        fcMonthContentCellNumberVBorders: 0,
+        fcMonthContentCellNumberVMargins: 0,
+        fcMonthContentCellNumberVSides: 3,
+
+        fcMonthContentCellContentMaxHeight: 150,
+        fcMonthContentCellContentVPaddings: 3,
+        fcMonthContentCellContentVBorders: 0,
+        fcMonthContentCellContentVMargins: 0,
+        fcMonthContentCellContentVSides: 3,
+
+        fcMonthContentCellContentSegmentHeight: 18,
+        fcMonthContentCellContentSegmentVPaddings: 0,
+        fcMonthContentCellContentSegmentVBorders: 2,
+        fcMonthContentCellContentSegmentVMargins: 3,
+        fcMonthContentCellContentSegmentVSides: 5,
+        fcMonthContentCellContentSegmentHPaddings: 0,
+        fcMonthContentCellContentSegmentHBorders: 0,
+        fcMonthContentCellContentSegmentHMargins: 2,
+        fcMonthContentCellContentSegmentHSides: 2,
+
+        fcMainPadding: 26
+    };
+
+    function vpadding(styles) {
+        return (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+    }
+
+    function vborders(styles) {
+        return (parseFloat(styles.borderTopWidth) || 0) + (parseFloat(styles.borderBottomWidth) || 0);
+    }
+
+    function vmargins(styles) {
+        return (parseFloat(styles.marginTop) || 0) + (parseFloat(styles.marginBottom) || 0);
+    }
+
+    function hpadding(styles) {
+        return (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
+    }
+
+    function hborders(styles) {
+        return (parseFloat(styles.borderLeftWidth) || 0) + (parseFloat(styles.borderRightWidth) || 0);
+    }
+
+    function hmargins(styles) {
+        return (parseFloat(styles.marginLeft) || 0) + (parseFloat(styles.marginRight) || 0);
+    }
+
+    function refresh() {
+        cache = {};
+
+        cache.topPanelHeight = document.querySelector("#studioPageContent .studio-top-panel").clientHeight;
+        cache.fcHeaderHeight = document.querySelector(".fc-header-outer").clientHeight;
+        cache.fcMonthContentTheadHeight = document.querySelector(".fc-border-separate thead").clientHeight;
+
+        var cell = document.querySelector(".fc-border-separate tbody td.fc-widget-content.fc-day0");
+        var cellStyles = window.getComputedStyle(cell);
+        cache.fcMonthContentCellVPaddings = vpadding(cellStyles);
+        cache.fcMonthContentCellVBorders = vborders(cellStyles);
+        cache.fcMonthContentCellVMargins = vmargins(cellStyles);
+        cache.fcMonthContentCellVSides = cache.fcMonthContentCellVPaddings + cache.fcMonthContentCellVBorders + cache.fcMonthContentCellVMargins;
+
+        var cellNumber = cell.querySelector(".fc-day-number");
+        cache.fcMonthContentCellNumberHeight = cell.clientHeight;
+        var cellNumberStyles = window.getComputedStyle(cellNumber);
+        cache.fcMonthContentCellNumberVPaddings = vpadding(cellNumberStyles);
+        cache.fcMonthContentCellNumberVBorders = vborders(cellNumberStyles);
+        cache.fcMonthContentCellNumberVMargins = vmargins(cellNumberStyles);
+        cache.fcMonthContentCellNumberVSides = cache.fcMonthContentCellNumberVPaddings + cache.fcMonthContentCellNumberVBorders + cache.fcMonthContentCellNumberVMargins;
+
+        var cellContent = cell.querySelector(".fc-day-number");
+        cache.fcMonthContentCellContentMaxHeight = 150;
+        var cellContentStyles = window.getComputedStyle(cellContent);
+        cache.fcMonthContentCellContentVPaddings = vpadding(cellContentStyles);
+        cache.fcMonthContentCellContentVBorders = vborders(cellContentStyles);
+        cache.fcMonthContentCellContentVMargins = vmargins(cellContentStyles);
+        cache.fcMonthContentCellContentVSides = cache.fcMonthContentCellContentVPaddings + cache.fcMonthContentCellContentVBorders + cache.fcMonthContentCellContentVMargins;
+
+        var segment = document.querySelector(".fc-event-skin-day");
+        cache.fcMonthContentCellContentSegmentHeight = segment.clientHeight;
+        var segmentStyles = window.getComputedStyle(segment);
+        cache.fcMonthContentCellContentSegmentVPaddings = vpadding(segmentStyles);
+        cache.fcMonthContentCellContentSegmentVBorders = vborders(segmentStyles);
+        cache.fcMonthContentCellContentSegmentVMargins = vmargins(segmentStyles);
+        cache.fcMonthContentCellContentSegmentVSides = cache.fcMonthContentCellContentSegmentVPaddings + cache.fcMonthContentCellContentSegmentVBorders + cache.fcMonthContentCellContentSegmentVMargins;
+        cache.fcMonthContentCellContentSegmentHPaddings = hpadding(segmentStyles);
+        cache.fcMonthContentCellContentSegmentHBorders = hborders(segmentStyles);
+        cache.fcMonthContentCellContentSegmentHMargins = hmargins(segmentStyles);
+        cache.fcMonthContentCellContentSegmentHSides = cache.fcMonthContentCellContentSegmentHPaddings + cache.fcMonthContentCellContentSegmentHBorders + cache.fcMonthContentCellContentSegmentHMargins;
+    }
+
+    return {
+        refresh: refresh,
+        cache: cache
+    };
+};
 
 ASC.CalendarController = new function() {
 
@@ -98,6 +199,9 @@ ASC.CalendarController = new function() {
 
     var sharingManager;
 
+    this.characterString = "@&<>";
+    this.characterRegExp = new RegExp("[<>@&]", "gim");
+
     var AlertError = function(message) {
             alert(message);
     };
@@ -128,6 +232,23 @@ ASC.CalendarController = new function() {
         var comp = new ICAL.Component(['vcalendar', [], []]);
         var vevent = new ICAL.Component('vevent');
 
+        var alarm = new ICAL.Component('valarm');
+        if (alertType > 0) {
+            var valarmObj = {};
+            switch (alertType) {
+                case 1: valarmObj.minutes = 5; valarmObj.isNegative = true; break;
+                case 2: valarmObj.minutes = 15; valarmObj.isNegative = true; break;
+                case 3: valarmObj.minutes = 30; valarmObj.isNegative = true; break;
+                case 4: valarmObj.hours = 1; valarmObj.isNegative = true; break;
+                case 5: valarmObj.hours = 2; valarmObj.isNegative = true; break;
+                case 6: valarmObj.days = 1; valarmObj.isNegative = true; break;
+            }
+            
+            alarm.addPropertyWithValue("TRIGGER", new ICAL.Duration(valarmObj).toICALString());
+            alarm.addPropertyWithValue("ACTION", "DISPLAY");
+            alarm.addPropertyWithValue("DESCRIPTION", "Reminder");
+        }
+        
         vevent.addPropertyWithValue("DTSTAMP", ICAL.Time.fromJSDate(new Date(), true).toICALString());
         if (repeatType)
             vevent.addPropertyWithValue("RRULE", repeatType);
@@ -177,6 +298,7 @@ ASC.CalendarController = new function() {
         event.startDate = dtstart;
         event.endDate = dtend;
 
+        vevent.addSubcomponent(alarm);
         comp.addSubcomponent(vevent);
 
         var ics = comp.toString();
@@ -189,23 +311,67 @@ ASC.CalendarController = new function() {
         };
     };
 
+    //==================================================
+    
+    var getTodoData = function (calendarId, name, description, sDate, priority, completed) {
+
+        var startDate = sDate ? sDate.getTime() != new Date(1, 0, 1, 23, 59, 59).getTime() ? new Date(sDate.getTime()) : null : null;
+        
+        var comp = new ICAL.Component(['vcalendar', [], []]);
+        var vtodo = new ICAL.Component('vtodo');
+        
+        var todo = new ICAL.Event(vtodo);
+        
+        todo.summary = name;
+        todo.description = description ? description : "";
+       
+        var dtstart = ICAL.Time.fromJSDate(new Date());
+        dtstart.zone = ICAL.Timezone.utcTimezone;
+
+        var now = new Date();
+        var dtcompleted = ICAL.Time.fromJSDate(new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000)));
+        dtcompleted.zone = ICAL.Timezone.utcTimezone;
+        
+        if (startDate != null) {
+            startDate = new Date(startDate.getTime() + (startDate.getTimezoneOffset() * 60 * 1000));
+            dtstart = ICAL.Time.fromJSDate(startDate, false);
+            dtstart.zone = ICAL.Timezone.utcTimezone;
+            todo.startDate = dtstart;
+        }
+        
+        if (completed) todo._setProp('completed', dtcompleted);
+       
+        comp.addSubcomponent(vtodo);
+
+        var ics = comp.toString();
+        
+        
+        return {
+            calendarId: calendarId,
+            ics: ics
+        };
+        
+    }
+
     this.init = function (timeZones, editorUrl) {
+
+        jq('.mainPageTable.with-mainPageTableSidePanel .mainPageContent').addClass('calendar');
         var $icon = jq("link[rel*=icon][type^='image']:last");
         if ($icon.attr('href').indexOf('logo_favicon_general.ico') !== -1) {//not default
             $icon.attr('href', $icon.attr('href'));
         }
+        if (window.moment) {
+            window.moment.locale(ASC.Resources.Master.TwoLetterISOLanguageName);
+        }
 
-        sharingManager = new SharingSettingsManager(undefined, null);
-
-        LoadingBanner.animateDelay = 500;
         jq(document).ajaxStart(function() {
             if (!ASC.CalendarController.Search)
-                LoadingBanner.displayLoading(true);
+                LoadingBanner.displayLoading();
         });
 
         jq(document).ajaxStop(function() {
             if (!ASC.CalendarController.Busy)
-                LoadingBanner.hideLoading(true);
+                LoadingBanner.hideLoading();
         });
 
 
@@ -236,12 +402,12 @@ ASC.CalendarController = new function() {
         ASC.CalendarController.ApiUrl = ASC.Resources.Master.ApiPath + 'calendar';
 
         var calHeight = jq(window).height() -
-            jq("#studioPageContent .mainContainer").outerHeight(true);
+            (jq("#studioPageContent .mainContainer").length ? jq("#studioPageContent .mainContainer").outerHeight(true) : 0);
 
         var defTimeZone = null;
 
         jq(timeZones).each(function (i, el) {
-            if (el.id == ASC.Resources.Master.CurrentTenantUtcOffset.Id || el.name == ASC.Resources.Master.CurrentTenantUtcOffset.DisplayName) {
+            if (el.id == ASC.Resources.Master.CurrentTenantTimeZone.Id || el.name == ASC.Resources.Master.CurrentTenantTimeZone.DisplayName) {
                 defTimeZone = el;
                 return;
             }
@@ -293,13 +459,16 @@ ASC.CalendarController = new function() {
             height: calHeight,
 
             onHeightChange: function() {
-                var h = jq(window).height();
-                this.height = h - jq("#studioPageContent .studio-top-panel").outerHeight(true) - jq(".fc-header-outer").outerHeight(true);
+                var sizeManager = ASC.CalendarSizeManager.cache;
+                this.height = window.innerHeight - sizeManager.topPanelHeight - sizeManager.fcHeaderHeight - sizeManager.fcMainPadding;
             },
+
+            characterRegExp: ASC.CalendarController.characterRegExp,
 
             loadEventSources: ASC.CalendarController.LoadCalendars,
             editCalendar: ASC.CalendarController.DoRequestToCalendar,
             editEvent: ASC.CalendarController.DoRequestToEvent,
+            editTodo: ASC.CalendarController.DoRequestToTodo,
             editPermissions: ASC.CalendarController.EditPermissions,
             getPermissions: ASC.CalendarController.GetPermissions,
             removePermissions: ASC.CalendarController.RemovePermissions,
@@ -307,15 +476,24 @@ ASC.CalendarController = new function() {
             manageSubscriptions: ASC.CalendarController.ManageSubscriptions,
             viewChanged: ASC.CalendarController.ViewChangedHandler,
             getiCalUrl: ASC.CalendarController.GetiCalUrl,
+            getCaldavUrl: ASC.CalendarController.getCaldavUrl,
             defaultTimeZone: defTimeZone,
             timeZones : timeZones,
-            getMonthEvents: ASC.CalendarController.GetEventDays
+            getMonthEvents: ASC.CalendarController.GetEventDays,
+            replaceSpecCharacter: ASC.CalendarController.ReplaceSpecCharacter,
+            displayInfoPanel: ASC.CalendarController.displayInfoPanel,
+            characterString: ASC.CalendarController.characterString
         });
         
         ASC.Mail.Enabled = true;
         ASC.Mail.Accounts = [];
         ASC.Mail.DefaultAccount = null;
         ASC.Mail.Initialized = false;
+
+        if (Teamlab.profile.isVisitor) {
+            ASC.Mail.Enabled = false;
+            return;
+        }
 
         window.Teamlab.getAccounts({}, {
             success: function(params, res) {
@@ -381,6 +559,21 @@ ASC.CalendarController = new function() {
                             data.response[i].events[j].end = ASC.Api.TypeConverter.ServerTimeToClient(data.response[i].events[j].end);
                             data.response[i].events[j].repeatRule = ASC.Api.iCal.ParseRRuleFromString(data.response[i].events[j].repeatRule);
                         }
+                        if (data.response[i].todos && data.response[i].todos.length > 0) {
+                           
+                            for (var k = 0; k < data.response[i].todos.length; k++) {
+
+                                var completed;
+                                try {
+                                    completed = ASC.Api.TypeConverter.ServerTimeToClient(data.response[i].todos[k].completed);
+                                } catch(e) {
+                                    completed = false;
+                                }
+                                data.response[i].todos[k].completed = completed.getTime() == (new Date(1, 0, 1)).getTime() ? false : true;
+                                data.response[i].todos[k].start = ASC.Api.TypeConverter.ServerTimeToClient(data.response[i].todos[k].start);
+                            }
+                        }
+                       
                     }
 
                     data.response.sort(function (a, b) {
@@ -401,7 +594,23 @@ ASC.CalendarController = new function() {
             }
         })
     }
-
+    this.getCaldavUrl = function (calendarId, callback) {
+        callbackFunc = callback;
+        jq.ajax({
+            type: "get",
+            url: _controller.ApiUrl + "/" + calendarId + "/caldavurl.json",
+            complete: function (d) {
+                var data = jq.evalJSON(d.responseText);
+                if (data.status === 0) {
+                    callbackFunc({ result: true, url: data.response });
+                }
+                else {
+                    callbackFunc({ result: false, url: '' });
+                    AlertError(data.error.message);
+                }
+            }
+        });
+    }
     this.GetiCalUrl = function(calendarId, callback) {
         callbackFunc = callback;
         jq.ajax({ type: "get",
@@ -441,8 +650,7 @@ ASC.CalendarController = new function() {
             }
         });
     }
-
-    this.CreateCalendar = function(name, description, textColor, backgroundColor, timeZone, eventAlertType, sharingOptions) {
+    this.CreateCalendar = function (name, description, textColor, backgroundColor, timeZone, eventAlertType, sharingOptions, iCalUrl) {
 
         jq.ajax({ type: "post",
             url: _controller.ApiUrl + ".json",
@@ -452,7 +660,8 @@ ASC.CalendarController = new function() {
                 backgroundColor: backgroundColor,
                 timeZone: timeZone,
                 alertType: eventAlertType,
-                sharingOptions: sharingOptions
+                sharingOptions: sharingOptions,
+                iCalUrl: iCalUrl ? iCalUrl:null
             },
             complete: function(d) {
                 var data = jq.evalJSON(d.responseText);
@@ -469,7 +678,7 @@ ASC.CalendarController = new function() {
         });
     }
 
-    this.UpdateCalendar = function(calendarId, name, description, textColor, backgroundColor, timeZone, eventAlertType, hideEvents, sharingOptions) {
+    this.UpdateCalendar = function(calendarId, name, description, textColor, backgroundColor, timeZone, eventAlertType, hideEvents, sharingOptions, iCalUrl) {
 
         jq.ajax({ type: "put",
             url: _controller.ApiUrl + "/" + calendarId + ".json",
@@ -481,7 +690,8 @@ ASC.CalendarController = new function() {
                 timeZone: timeZone,
                 alertType: eventAlertType,
                 hideEvents: hideEvents,
-                sharingOptions: sharingOptions
+                sharingOptions: sharingOptions,
+                iCalUrl: iCalUrl ? iCalUrl:null
             },
             complete: function(d) {
                 var data = jq.evalJSON(d.responseText);
@@ -560,11 +770,16 @@ ASC.CalendarController = new function() {
         //create
         if (params.action === 1 && (params.iCalUrl == undefined || params.iCalUrl == null || params.iCalUrl == ''))
             _controller.CreateCalendar(params.title, params.description, params.textColor, params.backgroundColor, timeZone, params.defaultAlert.type, sharingOptions);
-
+        //create url without sync
+        else if (params.action === 1 && params.iCalUrl != undefined && params.iCalUrl != null && params.iCalUrl != '' && params.withoutSync == true)
+            _controller.CreateCalendar(params.title, params.description, params.textColor, params.backgroundColor, timeZone, params.defaultAlert.type, sharingOptions, params.iCalUrl);
         //create stream
         else if (params.action === 1 && params.iCalUrl != undefined && params.iCalUrl != null && params.iCalUrl != '')
             _controller.CreateiCalStream(params.iCalUrl, params.title, params.textColor, params.backgroundColor);
 
+        //update url
+        else if (params.action === 2 && params.iCalUrl != undefined && params.iCalUrl != null && params.iCalUrl != '')
+            _controller.UpdateCalendar(params.objectId, params.title, params.description, params.textColor, params.backgroundColor, timeZone, params.defaultAlert.type, params.isHidden, sharingOptions, params.iCalUrl);
         //update
         else if (params.action === 2)
             _controller.UpdateCalendar(params.objectId, params.title, params.description, params.textColor, params.backgroundColor, timeZone, params.defaultAlert.type, params.isHidden, sharingOptions);
@@ -609,7 +824,45 @@ ASC.CalendarController = new function() {
 
     }
 
-
+    this.DoRequestToTodo = function (params, callback) {
+        callbackFunc = callback;
+        
+        switch (params.action) {
+            case 1:
+                _controller.CreateTodo(
+                    params.sourceId,
+                    params.title,
+                    params.description,
+                    params.start,
+                    params.priority,
+                    params.completed
+                );
+                break;
+            case 2:
+                _controller.UpdateTodo(
+                    params.sourceId,
+                    params.title,
+                    params.description,
+                    params.start,
+                    params.priority,
+                    params.completed,
+                    params.objectId
+                );
+                break;
+            case 3:
+                _controller.DeleteTodo(
+                    params.sourceId,
+                    params.title,
+                    params.description,
+                    params.start,
+                    params.priority,
+                    params.completed,
+                    params.objectId
+                );
+                break;
+        default:
+        }
+    }
     this.DoRequestToEvent = function(params, callback) {
         callbackFunc = callback;
         //permissions
@@ -822,6 +1075,69 @@ ASC.CalendarController = new function() {
         });
     }
 
+
+    this.CreateTodo = function (calendarId, name, description, startDate, endDate, priority) {
+        
+        var url = _controller.ApiUrl + "/icstodo.json";
+
+        startDate = startDate ? new Date(startDate) : startDate;
+    
+        var postData = getTodoData(calendarId, name, description, startDate, priority, false);
+        
+        jq.ajax({ type: 'post',
+            url: url,
+            data: postData,
+            complete: function(d) {
+                var data = jq.evalJSON(d.responseText);
+               
+                if (data.status === 0) {
+                    callbackFunc({ result: true, todo: data.response });
+                }
+                else {
+                    callbackFunc({ result: false });
+                }
+            }
+        });
+    }
+    
+    this.UpdateTodo = function (calendarId, name, description, startDate, priority, completed, todoId) {
+
+        var url = _controller.ApiUrl + "/icstodo.json";
+
+        var putData = getTodoData(calendarId, name, description, startDate, priority, completed);
+        putData.todoId = todoId;
+
+        jq.ajax({
+            type: 'put',
+            url: url,
+            data: putData,
+            complete: function (d) {
+                var data = jq.evalJSON(d.responseText);
+
+                if (data.status === 0) {
+                    callbackFunc({ result: true, todo: data.response });
+                }
+                else {
+                    callbackFunc({ result: false });
+                }
+            }
+        });
+    }
+
+    this.DeleteTodo = function(calendarId, name, description, startDate, priority, completed, todoId) {
+        jq.ajax({
+            type: 'delete',
+            url: _controller.ApiUrl + "/todos/" + todoId + ".json",
+            complete: function(d) {
+                var data = jq.evalJSON(d.responseText);
+                if (data.status === 0) {
+                    callbackFunc({ result: true, event: undefined });
+                } else {
+                    callbackFunc({ result: false });
+                }
+            }
+        });
+    };
     //permissions
     var SetAccessForCalendar = function(sharingData) {
         var permissions = new Array();
@@ -868,16 +1184,12 @@ ASC.CalendarController = new function() {
         callback({ result: false });
     }
 
-
-    this.EditPermissions = function(param, callback) {
-        callbackFunc = callback;
-        oldPermissions = param.permissions;
-        //oldPermissions = clone(param.permissions);
+    var wrapperShowDialog = function (param) {
         if (param.permissions.data == undefined) {
-
-            jq.ajax({ type: 'get',
+            jq.ajax({
+                type: 'get',
                 url: _controller.ApiUrl + "/sharing.json",
-                complete: function(d) {
+                complete: function (d) {
                     var data = jq.evalJSON(d.responseText);
                     if (data.status === 0) {
                         sharingManager.OnSave = SetAccessForCalendar;
@@ -901,6 +1213,19 @@ ASC.CalendarController = new function() {
             return;
         }
     }
+
+    this.EditPermissions = function (param, callback) {
+        if (!sharingManager)
+            sharingManager = new SharingSettingsManager(undefined, null);
+
+        callbackFunc = callback;
+        oldPermissions = param.permissions;
+        //oldPermissions = clone(param.permissions);
+
+        setTimeout(function () {
+            wrapperShowDialog(param);
+        }, 0);
+    }
     
     this.GetPermissions = function (param, callback) {
 
@@ -911,17 +1236,23 @@ ASC.CalendarController = new function() {
                 url: _controller.ApiUrl + "/sharing.json",
                 complete: function (d) {
                     var data = jq.evalJSON(d.responseText);
-                    var users = new Array();
-                    
-                    for (var i = 0; i < data.response.items.length; i++) {
-                        var item = data.response.items[i];
-                        if (item.selectedAction.id == 'owner')
-                            continue;
-                        users.push({ objectId: item.id, name: item.name });
-                    }
+                    if (data.status === 0) {
+                        var users = new Array();
 
-                    callback({ result: data.status === 0, permissions: { users: users, data: data.response } });
-                    return;
+                        for (var i = 0; i < data.response.items.length; i++) {
+                            var item = data.response.items[i];
+                            if (item.selectedAction.id == 'owner')
+                                continue;
+                            users.push({ objectId: item.id, name: item.name });
+                        }
+
+                        callback({ result: data.status === 0, permissions: { users: users, data: data.response } });
+                        return;
+                    } else {
+                        callbackFunc({ result: false });
+                        if (data.statusCode == 403) window.location = window.location.origin;
+                        else AlertError(data.error.message);
+                    }
                 }
             });
             
@@ -983,4 +1314,19 @@ ASC.CalendarController = new function() {
             }
         });
     }
+
+    this.ReplaceSpecCharacter = function (str) {
+        return (str || "").trim().replace(ASC.CalendarController.characterRegExp, "_");
+    };
+
+    this.displayInfoPanel = function (str, warn) {
+        if (str === "" || typeof str === "undefined") {
+            return;
+        }
+        if (warn === true) {
+            toastr.error(str);
+        } else {
+            toastr.success(str);
+        }
+    };
 }

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,7 +20,11 @@ using System.Linq;
 using System.Threading;
 using System.Web;
 using System.Web.UI;
+using ASC.Common.Data;
+using ASC.Common.Data.Sql;
+using ASC.Common.Logging;
 using ASC.Core;
+using ASC.Core.Tenants;
 using ASC.Core.Users;
 using ASC.FederatedLogin;
 using ASC.FederatedLogin.Profile;
@@ -56,7 +51,7 @@ namespace ASC.Web.Studio.UserControls.Common
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            var accountLink = (AccountLinkControl) LoadControl(AccountLinkControl.Location);
+            var accountLink = (AccountLinkControl)LoadControl(AccountLinkControl.Location);
             accountLink.ClientCallback = "loginJoinCallback";
             accountLink.SettingsView = false;
             ThirdPartyList.Controls.Add(accountLink);
@@ -65,6 +60,7 @@ namespace ASC.Web.Studio.UserControls.Common
 
             if (loginProfile == null && !IsPostBack || SecurityContext.IsAuthenticated) return;
 
+            string cookiesKey;
             try
             {
                 if (loginProfile == null)
@@ -80,7 +76,7 @@ namespace ASC.Web.Studio.UserControls.Common
                 var userInfo = GetUserByThirdParty(loginProfile);
                 if (!CoreContext.UserManager.UserExists(userInfo.ID)) return;
 
-                var cookiesKey = SecurityContext.AuthenticateMe(userInfo.ID);
+                cookiesKey = SecurityContext.AuthenticateMe(userInfo.ID);
                 CookiesManager.SetCookies(CookiesType.AuthKey, cookiesKey);
                 MessageService.Send(HttpContext.Current.Request, MessageAction.LoginSuccessViaSocialAccount);
             }
@@ -97,15 +93,19 @@ namespace ASC.Web.Studio.UserControls.Common
                 return;
             }
 
-            var refererURL = (string) Session["refererURL"];
+            var refererURL = (string)Session["refererURL"];
 
             if (String.IsNullOrEmpty(refererURL))
-                Response.Redirect(CommonLinkUtility.GetDefault());
-            else
             {
-                Session["refererURL"] = null;
-                Response.Redirect(refererURL);
+                refererURL = CommonLinkUtility.GetDefault();
             }
+            if (Request.DesktopApp())
+            {
+                refererURL += (refererURL.Contains("?") ? "&" : "?") + "token=" + HttpUtility.HtmlEncode(cookiesKey);
+            }
+
+            Session["refererURL"] = null;
+            Response.Redirect(refererURL);
         }
 
         public static UserInfo GetUserByThirdParty(LoginProfile loginProfile)
@@ -119,24 +119,15 @@ namespace ASC.Web.Studio.UserControls.Common
                     {
                         throw new Exception(loginProfile.AuthorizationError);
                     }
-                    return ASC.Core.Users.Constants.LostUser;
+                    return Constants.LostUser;
                 }
 
-                if (string.IsNullOrEmpty(loginProfile.EMail))
-                {
-                    throw new Exception(Resource.ErrorNotCorrectEmail);
-                }
-
-                var userInfo = new UserInfo();
+                var userInfo = Constants.LostUser;
 
                 Guid userId;
                 if (TryGetUserByHash(loginProfile.HashId, out userId))
                 {
                     userInfo = CoreContext.UserManager.GetUsers(userId);
-                }
-                if (!CoreContext.UserManager.UserExists(userInfo.ID))
-                {
-                    userInfo = CoreContext.UserManager.GetUserByEmail(loginProfile.EMail);
                 }
 
                 var isNew = false;
@@ -148,7 +139,7 @@ namespace ASC.Web.Studio.UserControls.Common
                         {
                             SecurityContext.AuthenticateMe(ASC.Core.Configuration.Constants.CoreSystem);
                             CoreContext.UserManager.DeleteUser(userInfo.ID);
-                            userInfo = ASC.Core.Users.Constants.LostUser;
+                            userInfo = Constants.LostUser;
                         }
                         finally
                         {
@@ -166,6 +157,32 @@ namespace ASC.Web.Studio.UserControls.Common
 
                 if (isNew)
                 {
+                    var spam = HttpContext.Current.Request["spam"];
+                    if (spam != "on")
+                    {
+                        try
+                        {
+                            const string _databaseID = "com";
+                            using (var db = DbManager.FromHttpContext(_databaseID))
+                            {
+                                db.ExecuteNonQuery(new SqlInsert("template_unsubscribe", false)
+                                                       .InColumnValue("email", userInfo.Email.ToLowerInvariant())
+                                                       .InColumnValue("reason", "personal")
+                                    );
+                                LogManager.GetLogger("ASC.Web").Debug(String.Format("Write to template_unsubscribe {0}", userInfo.Email.ToLowerInvariant()));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.GetLogger("ASC.Web").Debug(String.Format("ERROR write to template_unsubscribe {0}, email:{1}", ex.Message, userInfo.Email.ToLowerInvariant()));
+                        }
+                    }
+
+                    var analytics = HttpContext.Current.Request["analytics"] == "on";
+                    var settings = TenantAnalyticsSettings.LoadForCurrentUser();
+                    settings.Analytics = analytics;
+                    settings.SaveForCurrentUser();
+
                     StudioNotifyService.Instance.UserHasJoin();
                     UserHelpTourHelper.IsNewUser = true;
                     PersonalSettings.IsNewUser = true;
@@ -206,7 +223,7 @@ namespace ASC.Web.Studio.UserControls.Common
                     Email = loginProfile.EMail,
                     Title = string.Empty,
                     Location = string.Empty,
-                    CultureName = Thread.CurrentThread.CurrentUICulture.Name,
+                    CultureName = CoreContext.Configuration.CustomMode ? "ru-RU" : Thread.CurrentThread.CurrentUICulture.Name,
                     ActivationStatus = EmployeeActivationStatus.Activated,
                 };
 
@@ -221,25 +238,31 @@ namespace ASC.Web.Studio.UserControls.Common
 
         private static UserInfo JoinByThirdPartyAccount(LoginProfile loginProfile)
         {
-            var userInfo = ProfileToUserInfo(loginProfile);
-
-            var pwd = UserManagerWrapper.GeneratePassword();
-
-            UserInfo newUserInfo;
-            try
+            if (string.IsNullOrEmpty(loginProfile.EMail))
             {
-                SecurityContext.AuthenticateMe(ASC.Core.Configuration.Constants.CoreSystem);
-                newUserInfo = UserManagerWrapper.AddUser(userInfo, pwd);
+                throw new Exception(Resource.ErrorNotCorrectEmail);
             }
-            finally
+
+            var userInfo = CoreContext.UserManager.GetUserByEmail(loginProfile.EMail);
+            if (!CoreContext.UserManager.UserExists(userInfo.ID))
             {
-                SecurityContext.Logout();
+                var newUserInfo = ProfileToUserInfo(loginProfile);
+
+                try
+                {
+                    SecurityContext.AuthenticateMe(ASC.Core.Configuration.Constants.CoreSystem);
+                    userInfo = UserManagerWrapper.AddUser(newUserInfo, UserManagerWrapper.GeneratePassword());
+                }
+                finally
+                {
+                    SecurityContext.Logout();
+                }
             }
 
             var linker = new AccountLinker("webstudio");
-            linker.AddLink(newUserInfo.ID.ToString(), loginProfile);
+            linker.AddLink(userInfo.ID.ToString(), loginProfile);
 
-            return newUserInfo;
+            return userInfo;
         }
     }
 }

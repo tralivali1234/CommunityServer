@@ -10,7 +10,7 @@
         <div class="requiredField headerPanelSmall-splitter" style="padding: 0 2px 0 0;">
             <span class="requiredErrorText"></span>
             <div class="bold headerPanelSmall"><%= CRMCasesResource.CaseTitle %>:</div>
-            <input type="text" class="textEdit" maxlength="100" style="width:100%" id="caseTitle" name="caseTitle" value="<%= GetCaseTitle() %>"/>
+            <input type="text" class="textEdit" maxlength="255" style="width:100%" id="caseTitle" name="caseTitle" value="<%= GetCaseTitle() %>"/>
         </div>
 
         <dl class="clearFix assignedCasesContacts">
@@ -18,7 +18,7 @@
             <dd id="membersCasesSelectorsContainer"></dd>
             <dt style="margin:20px 0;" class="hiddenFields">
                 <div id="casesContactListBox">
-                    <table id="contactTable" class="table-list" cellpadding="4" cellspacing="0">
+                    <table id="contactTable" class="table-list padding4" cellpadding="0" cellspacing="0">
                         <tbody>
                         </tbody>
                     </table>

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,16 +20,25 @@ using System.Collections.Generic;
 using System.Linq;
 
 using ASC.Common.Data.Sql.Expressions;
-using ASC.FullTextIndex;
+using ASC.ElasticSearch;
 using ASC.Projects.Core.DataInterfaces;
 using ASC.Projects.Core.Domain;
+using ASC.Web.Projects.Core.Search;
 
 namespace ASC.Projects.Data.DAO
 {
     class SearchDao : BaseDao, ISearchDao
     {
-        public SearchDao(string dbId, int tenant)
-            : base(dbId, tenant)
+        public IDaoFactory DaoFactory { get; set; }
+
+        public IProjectDao ProjectDao { get { return DaoFactory.ProjectDao; } }
+        public IMilestoneDao MilestoneDao { get { return DaoFactory.MilestoneDao; } }
+        public ITaskDao TaskDao { get { return DaoFactory.TaskDao; } }
+        public IMessageDao MessageDao { get { return DaoFactory.MessageDao; } }
+        public ICommentDao CommentDao { get { return DaoFactory.CommentDao; } }
+        public ISubtaskDao SubtaskDao { get { return DaoFactory.SubtaskDao; } }
+
+        public SearchDao(int tenant) : base(tenant)
         {
         }
 
@@ -58,9 +58,9 @@ namespace ASC.Projects.Data.DAO
         {
             Exp projWhere;
 
-            if (FullTextSearch.SupportModule(FullTextSearch.ProjectsModule))
+            List<int> projIds;
+            if (FactoryIndexer<ProjectsWrapper>.TrySelectIds(s => s.MatchAll(text), out projIds))
             {
-                var projIds = FullTextSearch.Search(FullTextSearch.ProjectsModule.Match(text));
                 projWhere = Exp.In("id", projIds);
             }
             else
@@ -68,16 +68,16 @@ namespace ASC.Projects.Data.DAO
                 projWhere = BuildLike(new[] { "title", "description" }, text, projectId);
             }
 
-            return new ProjectDao(DatabaseId, Tenant).GetProjects(projWhere);
+            return ProjectDao.GetProjects(projWhere);
         }
 
         private IEnumerable<DomainObject<int>> GetMilestones(String text, int projectId)
         {
             Exp mileWhere;
 
-            if (FullTextSearch.SupportModule(FullTextSearch.ProjectsMilestonesModule))
+            List<int> mileIds;
+            if (FactoryIndexer<MilestonesWrapper>.TrySelectIds(s => s.MatchAll(text), out mileIds))
             {
-                var mileIds = FullTextSearch.Search(FullTextSearch.ProjectsMilestonesModule.Match(text));
                 mileWhere = Exp.In("t.id", mileIds);
             }
             else
@@ -85,17 +85,16 @@ namespace ASC.Projects.Data.DAO
                 mileWhere = BuildLike(new[] { "t.title" }, text, projectId);
             }
 
-            return new MilestoneDao(DatabaseId, Tenant).GetMilestones(mileWhere);
+            return MilestoneDao.GetMilestones(mileWhere);
         }
 
         private IEnumerable<DomainObject<int>> GetTasks(String text, int projectId)
         {
             Exp taskWhere;
 
-            if (FullTextSearch.SupportModule(FullTextSearch.ProjectsTasksModule))
+            List<int> taskIds;
+            if (FactoryIndexer<TasksWrapper>.TrySelectIds(s => s.MatchAll(text), out taskIds))
             {
-                var taskIds = FullTextSearch.Search(FullTextSearch.ProjectsTasksModule.Match(text));
-
                 taskWhere = Exp.In("t.id", taskIds);
             }
             else
@@ -103,17 +102,16 @@ namespace ASC.Projects.Data.DAO
                 taskWhere = BuildLike(new[] { "t.title", "t.description" }, text, projectId);
             }
 
-            return new TaskDao(DatabaseId, Tenant).GetTasks(taskWhere);
+            return TaskDao.GetTasks(taskWhere);
         }
 
         private IEnumerable<DomainObject<int>> GetMessages(String text, int projectId)
         {
             Exp messWhere;
 
-            if (FullTextSearch.SupportModule(FullTextSearch.ProjectsMessagesModule))
+            List<int> messIds;
+            if (FactoryIndexer<DiscussionsWrapper>.TrySelectIds(s => s.MatchAll(text), out messIds))
             {
-                var messIds = FullTextSearch.Search(FullTextSearch.ProjectsMessagesModule.Match(text));
-
                 messWhere = Exp.In("t.id", messIds);
             }
             else
@@ -121,17 +119,16 @@ namespace ASC.Projects.Data.DAO
                 messWhere = BuildLike(new[] { "t.title", "t.content" }, text, projectId);
             }
 
-            return new MessageDao(DatabaseId, Tenant).GetMessages(messWhere);
+            return MessageDao.GetMessages(messWhere);
         }
 
         private IEnumerable<DomainObject<int>> GetComments(String text)
         {
             Exp commentsWhere;
 
-            if (FullTextSearch.SupportModule(FullTextSearch.ProjectsCommentsModule))
+            List<int> commentIds;
+            if (FactoryIndexer<CommentsWrapper>.TrySelectIds(s => s.MatchAll(text).Where(r=> r.InActive, false), out commentIds))
             {
-                var commentIds = FullTextSearch.Search(FullTextSearch.ProjectsCommentsModule.Match(text));
-
                 commentsWhere = Exp.In("comment_id", commentIds);
             }
             else
@@ -139,17 +136,16 @@ namespace ASC.Projects.Data.DAO
                 commentsWhere = BuildLike(new[] { "content" }, text);
             }
 
-            return new CommentDao(DatabaseId, Tenant).GetComments(commentsWhere);
+            return CommentDao.GetComments(commentsWhere);
         }
 
         private IEnumerable<DomainObject<int>> GetSubtasks(String text)
         {
             Exp subtasksWhere;
 
-            if (FullTextSearch.SupportModule(FullTextSearch.ProjectsSubtasksModule))
+            List<int> subtaskIds;
+            if (FactoryIndexer<SubtasksWrapper>.TrySelectIds(s => s.MatchAll(text), out subtaskIds))
             {
-                var subtaskIds = FullTextSearch.Search(FullTextSearch.ProjectsSubtasksModule.Match(text));
-
                 subtasksWhere = Exp.In("id", subtaskIds);
             }
             else
@@ -157,7 +153,7 @@ namespace ASC.Projects.Data.DAO
                 subtasksWhere = BuildLike(new[] { "title" }, text);
             }
 
-            return new SubtaskDao(DatabaseId, Tenant).GetSubtasks(subtasksWhere);
+            return SubtaskDao.GetSubtasks(subtasksWhere);
         }
 
         private static Exp BuildLike(string[] columns, string text, int projectId = 0)

@@ -1,30 +1,21 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-window.Attachments = (function() {
+window.Attachments = (function () {
     var moduleName,
         isInit = false,
         isLoaded = false,
@@ -58,26 +49,35 @@ window.Attachments = (function() {
         createNewEntityFlag = flag;
     };
 
-    var getEntityFiles = function() {
+    var getEntityFiles = function (files) {
+        if (Array.isArray(files)) {
+            onGetFiles([, files]);
+            return;
+        }
         switch (moduleName) {
             case "projects":
                 {
-                    Teamlab.getPrjEntityFiles(null, entityId, entityType, function() { onGetFiles(arguments); });
+                    Teamlab.getPrjEntityFiles(null, entityId(), entityType, function() { onGetFiles(arguments); });
                     break;
                 }
             case "crm":
                 {
-                    Teamlab.getCrmEntityFiles(null, entityId, entityType, function() { onGetFiles(arguments); });
-                    break;
+                    if (entityType == "report") {
+                        Teamlab.getCrmReportFiles(null, function () { onGetFiles(arguments); });
+                        break;
+                    } else {
+                        Teamlab.getCrmEntityFiles(null, entityId, entityType, function () { onGetFiles(arguments); });
+                        break;
+                    }
                 }
             default:
                 LoadingBanner.hideLoading();
         }
     };
-    var loadFiles = function() {
+    var loadFiles = function(files) {
         if (!isLoaded) {
             LoadingBanner.displayLoading();
-            getEntityFiles();
+            getEntityFiles(files);
         }
     };
     var checkEditingSupport = function() {
@@ -91,23 +91,21 @@ window.Attachments = (function() {
             jq("#createFirstDocument, #showDocumentPanel, #emptyDocumentPanel .newDocComb").hide();
         }
     };
-    var init = function() {
+    var init = function (entityTypeParam, entityIdParam) {
         if (!isInit) {
             isInit = true;
 
             checkEditingSupport();
 
-            entityId = jq.getURLParam("id");
+            entityId = entityIdParam || jq.getURLParam("id");
 
             emptyScreenVisible = jq("#emptyDocumentPanel").length == 0 ? false : true;
 
-            var projId = jq(".wrapperFilesContainer").attr("projectId");
             var module = jq(".wrapperFilesContainer").attr("moduleName");
 
-            if (projId != "0") projectId = projId;
             if (module != "") moduleName = module;
 
-            entityType = jq(".wrapperFilesContainer").attr("entityType");
+            entityType = entityTypeParam || jq(".wrapperFilesContainer").attr("entityType");
             var warnText = jq(".infoPanelAttachFile #wrongSign").text() + " " + characterString;
             jq(".infoPanelAttachFile #wrongSign").text(warnText);
 
@@ -129,7 +127,7 @@ window.Attachments = (function() {
                                     "</a>",
                                 "</p>"]
                             .join('')
-            }).insertAfter("#popupDocumentUploader");
+            }).insertAfter(".wrapperFilesContainer");
         }
 
         ASC.Controls.AnchorController.bind(/files/, initUploader);
@@ -179,10 +177,6 @@ window.Attachments = (function() {
             });
         }
 
-        jq('#attachProjDocuments').on('click', function(event) {
-            ProjectDocumentsPopup.showPortalDocUploader();
-            return false;
-        });
         jq('#questionWindowAttachments #noButton').bind('click', function() {
             jq.unblockUI();
             return false;
@@ -210,13 +204,9 @@ window.Attachments = (function() {
     };
 
     var initUploader = function() {
-        if (moduleName != 'crm') {
-            createAjaxUploader("linkNewDocumentUpload");
-        } else {
-            if (jq("#attachmentsContainer tr").length) {
-                createAjaxUploader("linkNewDocumentUpload");
-                return;
-            }
+        createAjaxUploader("linkNewDocumentUpload");
+
+        if (moduleName == "crm") {
             createAjaxUploader("uploadFirstFile");
         }
     };
@@ -248,7 +238,7 @@ window.Attachments = (function() {
             if (!uploadWithAttach) {
                 Teamlab.uploadFilesToPrjEntity(
                     null,
-                    entityId,
+                    entityId(),
                     {
                         buttonId: buttonId,
                         autoSubmit: true,
@@ -294,7 +284,7 @@ window.Attachments = (function() {
 
     var showQuestionWindow = function(fileId) {
         jq('#questionWindowAttachments #okButton').unbind('click');
-        StudioBlockUIManager.blockUI("#questionWindowAttachments", 400, 300, 0);
+        StudioBlockUIManager.blockUI("#questionWindowAttachments", 400);
         PopupKeyUpActionProvider.EnterAction = "jq(\"#okButton\").click();";
         jq('#questionWindowAttachments #okButton').bind('click', function() {
             jq.unblockUI();
@@ -327,8 +317,10 @@ window.Attachments = (function() {
         }
     };
     var createFile = function() {
-        var hWindow = null;
-        hWindow = window.open('');
+        var hWindow = window.open("");
+        hWindow.document.write(ASC.Resources.Master.Resource.LoadingPleaseWait);
+        hWindow.document.close();
+
         var title = jq("#newDocTitle").val();
         if (jq.trim(title) == "") {
             title = jq("#newDocTitle").attr("data");
@@ -336,12 +328,12 @@ window.Attachments = (function() {
         var ext = jq(".createFile").attr("id");
         title = replaceSpecCharacter(title) + ext;
         Teamlab.addDocFile(
-            { handler: hWindow },
+            {},
             rootFolderId,
             "file",
             { title: title, content: '', createNewIfExist: true },
-            function() { onCreateFile(arguments); },
-            { error: function(params) { params.handler.close(); } }
+            function() { onCreateFile(arguments, hWindow); },
+            { error: function() { hWindow.close(); } }
         );
         removeNewDocument();
     };
@@ -349,7 +341,7 @@ window.Attachments = (function() {
     var createFileTmpl = function (fileData) {
         var fileTmpl = {};
 
-        fileTmpl.title = decodeURIComponent(fileData.title);
+        fileTmpl.title = fileData.title;
 
         fileTmpl.exttype = ASC.Files.Utility.getCssClassByFileTitle(fileTmpl.title, true);
 
@@ -358,6 +350,8 @@ window.Attachments = (function() {
         var type;
         if (ASC.Files.Utility.CanImageView(fileTmpl.title)) {
             type = "image";
+        } else if (ASC.Files.MediaPlayer && ASC.Files.MediaPlayer.canPlay(fileTmpl.title)) {
+            type = "media"
         } else {
             if (ASC.Files.Utility.CanWebEdit(fileTmpl.title) && !ASC.Files.Utility.MustConvert(fileTmpl.title)) {
                 type = "editedFile";
@@ -376,19 +370,15 @@ window.Attachments = (function() {
         var versionGroup = parseInt(fileData.versionGroup);
         if (!version) {
             version = 1;
-            fileTmpl.viewUrl = ASC.Files.Utility.GetFileViewUrl(fileTmpl.id, version);
+            fileTmpl.viewUrl = ASC.Files.Utility.GetFileDownloadUrl(fileTmpl.id, version);
         }
         fileTmpl.version = version;
         if (!versionGroup) {
             versionGroup = 1;
         }
         fileTmpl.versionGroup = versionGroup;
-        fileTmpl.downloadUrl = ASC.Files.Utility.GetFileDownloadUrl(fileTmpl.id);
-        fileTmpl.docViewUrl = ASC.Files.Utility.GetFileWebViewerUrl(fileTmpl.id);
+        fileTmpl.docEditUrl = ASC.Files.Utility.GetFileWebEditorUrl(fileTmpl.id);
         fileTmpl.editUrl = ASC.Files.Utility.GetFileWebEditorUrl(fileTmpl.id);
-        if (fileData.isNewFile) {
-            fileTmpl.editUrl = fileTmpl.editUrl + "&new=true";
-        }
         fileTmpl.fileStatus = fileData.fileStatus;
         fileTmpl.trashAction = fileData.trashAction ? fileData.trashAction : "delete";
         if (createNewEntityFlag && !fileData.fromProjectDocs) {
@@ -502,8 +492,18 @@ window.Attachments = (function() {
         initUploader();
     };
 
+    var events = [];
     var bind = function(eventName, handler) {
         jq(document).bind(eventName, handler);
+        events.push(eventName);
+    };
+
+    var unbind = function () {
+        var $doc = jq(document);
+        while (events.length) {
+            var item = events.shift();
+            $doc.unbind(item);
+        }
     };
 
     var banOnEditing = function() {
@@ -535,9 +535,9 @@ window.Attachments = (function() {
         }
         LoadingBanner.hideLoading();
         if (banOnEditingFlag) {
-            jq(".containerAction, .information-upload-panel, .infoPanelAttachFile").remove();
-            jq("#emptyDocumentPanel .emptyScrBttnPnl").remove();
-            jq("#attachmentsContainer").find(".unlinkDoc").remove();
+            jq(".containerAction, .information-upload-panel, .infoPanelAttachFile").hide();
+            jq("#emptyDocumentPanel .emptyScrBttnPnl").hide();
+            jq("#attachmentsContainer").find(".unlinkDoc").hide();
         }
     };
 
@@ -550,7 +550,7 @@ window.Attachments = (function() {
         }
     };
 
-    var onCreateFile = function(response) {
+    var onCreateFile = function(response, hWindow) {
         var file = response[1];
 
         file.fileStatus = 1;
@@ -566,16 +566,18 @@ window.Attachments = (function() {
         }
         jq(".containerAction").show();
 
-        if (response[0].handler.location) {
-            response[0].handler.location.href = ASC.Files.Utility.GetFileWebEditorUrl(file.id) + "&new=true";
+        if (hWindow.location) {
+            hWindow.location.href = ASC.Files.Utility.GetFileWebEditorUrl(file.id);
         }
     };
 
     return {
         init: init,
         bind: bind,
+        unbind: unbind,
         loadFiles: loadFiles,
-        isLoaded: isLoaded,
+        get isLoaded() { return isLoaded; },
+        set isLoaded(value) { isLoaded = value; },
         appendToListAttachFiles: appendToListAttachFiles,
         isAddedFile: isAddedFile,
         appendFilesToLayout: publicAppendToListAttachFiles,
@@ -589,3 +591,7 @@ window.Attachments = (function() {
         setCreateNewEntityFlag: setCreateNewEntityFlag
     };
 })(jQuery);
+
+(jq(document).ready(function () {
+    jq("#mediaPlayer").appendTo("body");
+}));

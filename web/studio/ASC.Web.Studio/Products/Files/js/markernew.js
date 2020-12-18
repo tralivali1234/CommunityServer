@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -167,6 +158,10 @@ window.ASC.Files.Marker = (function () {
             folderId = itemData.entryId;
         }
 
+        //track event
+
+        trackingGoogleAnalytics("documents", "shownews", "folder");
+
         var targetSize = {
             top: target.offset().top,
             left: target.offset().left,
@@ -235,36 +230,28 @@ window.ASC.Files.Marker = (function () {
 
                 var rowLink = entryObj.find(".entry-title .name a");
 
-                if (entryType == "file") {
-                    if (rowLink.is(":not(:has(.file-extension))")) {
-                        ASC.Files.UI.highlightExtension(rowLink, entryTitle);
-                    }
-
-                    var entryUrl = ASC.Files.Utility.GetFileDownloadUrl(entryId);
-
-                    if (ASC.Files.Utility.CanWebEdit(entryTitle)
-                        && !ASC.Files.Utility.MustConvert(entryTitle)) {
-                        entryUrl = ASC.Files.Utility.GetFileWebEditorUrl(entryId);
-                        rowLink.attr("href", entryUrl).attr("target", "_blank");
-                    } else if (ASC.Files.Utility.CanWebView(entryTitle)) {
-                        entryUrl = ASC.Files.Utility.GetFileWebViewerUrl(entryId);
-                        rowLink.attr("href", entryUrl).attr("target", "_blank");
-                    } else if (typeof ASC.Files.ImageViewer != "undefined" && ASC.Files.Utility.CanImageView(entryTitle)) {
-                        entryUrl = "#" + ASC.Files.Common.getCorrectHash(ASC.Files.ImageViewer.getPreviewHash(entryId));
-                        rowLink.attr("href", entryUrl);
-                    } else {
-                        rowLink.attr("href", entryUrl);
-                    }
-                } else {
-                    entryUrl = ASC.Files.Constants.URL_BASE + "#" + ASC.Files.Common.getCorrectHash(entryId);
-                    rowLink.attr("href", entryUrl);
+                if (entryType == "file" && rowLink.is(":not(:has(.file-extension))")) {
+                    ASC.Files.UI.highlightExtension(rowLink, entryTitle);
                 }
+
+                var entryUrl = ASC.Files.UI.getEntryLink(entryType, entryId, entryTitle);
+                rowLink.attr("href", entryUrl).attr("target", "_blank");
             });
 
             var targetSize = params.targetSize;
-            jq("#filesNewsPanel").css(
-                {
-                    "top": targetSize.top + targetSize.height,
+            var filesNewsPanel = jq("#filesNewsPanel");
+            var margin = 8;
+            var startY = targetSize.top + targetSize.height + margin;
+            var correctionY = 0;
+            var panelHeight = filesNewsPanel.outerHeight();
+            if (document.body.clientHeight - (startY - pageYOffset + panelHeight) < 0) {
+                startY = targetSize.top - margin;
+                correctionY = panelHeight;
+            }
+
+            filesNewsPanel
+                .css({
+                    "top": startY - correctionY,
                     "left": targetSize.left
                 })
                 .toggle()
@@ -304,7 +291,7 @@ window.ASC.Files.Marker = (function () {
             return false;
         });
 
-        jq("#mainMarkRead").click(function () {
+        jq("#studioPageContent").on("click", "#buttonMarkRead, #mainMarkRead.unlockAction", function () {
             ASC.Files.Actions.hideAllActionPanels();
             ASC.Files.Marker.markAsRead();
         });
@@ -323,13 +310,65 @@ window.ASC.Files.Marker = (function () {
         });
 
         jq("#filesNewsList").on("click", ".file-row:not(.folder-row):not(.error-entry) .entry-title .name a, .file-row:not(.folder-row):not(.error-entry) .thumb-file", function () {
-            //ASC.Files.Actions.hideAllActionPanels();
             var fileData = ASC.Files.UI.getObjectData(this);
-            var updated = ASC.Files.Folders.clickOnFile(fileData);
+            var updated = true;
 
-            if (!updated) {
+            if (ASC.Files.MediaPlayer && (ASC.Files.MediaPlayer.canPlay(fileData.title) || ASC.Files.Utility.CanImageView(fileData.title))) {
+                ASC.Files.Actions.hideAllActionPanels();
+
+                var newFiles = jq("#filesNewsList .file-row:not(.folder-row):not(.error-entry) .ft_Image, #filesNewsList .file-row:not(.folder-row):not(.error-entry) .ft_Video");
+
+                var mediaFiles = [];
+                var pos = 0;
+                for (var i = 0; i < newFiles.length; i++) {
+                    var fData = ASC.Files.UI.getObjectData(newFiles[i]);
+
+                    if (ASC.Files.MediaPlayer.canPlay(fData.title) || ASC.Files.Utility.CanImageView(fData.title)) {
+                        mediaFiles.push(fData);
+                        if (fileData.id === fData.id) {
+                            pos = mediaFiles.length - 1;
+                        }
+                    }
+                }
+
                 var newFolderId = jq("#filesNewsPanel").attr("data-id");
                 var newObj = jq(".is-new" + ASC.Files.UI.getSelectorId(newFolderId));
+
+                ASC.Files.MediaPlayer.init(-1, {
+                    playlist: mediaFiles,
+                    playlistPos: pos,
+                    onCloseAction: function (folderId) {
+                        if (!ASC.Files.Common.isCorrectId(ASC.Files.Folders.currentFolder.id)) {
+                            ASC.Files.Anchor.navigationSet(folderId, false);
+                            return;
+                        }
+
+                        ASC.Files.Anchor.navigationSet(ASC.Files.Folders.currentFolder.id, true);
+                    },
+                    onMediaChangedAction: function (fileId) {
+                        var newsObj = ASC.Files.UI.getEntryObject("file", fileId).find(".is-new");
+                        if (!newsObj.is(":visible")) {
+                            if (!newObj.is(":visible")) {
+                                newObj = ASC.Files.UI.getEntryObject("folder", newFolderId).find(".is-new");
+                            }
+                            prevCount = newObj.html() | 0;
+                            ASC.Files.Marker.setNewCount("folder", newFolderId, prevCount - 1);
+                        }
+
+                        ASC.Files.Marker.removeNewIcon("file", fileId);
+
+                        var hash = ASC.Files.MediaPlayer.getPlayHash(fileId);
+                        ASC.Files.Anchor.move(hash, true);
+                    },
+                    downloadAction: ASC.Files.Utility.GetFileDownloadUrl
+                });
+            } else {
+                updated = ASC.Files.Folders.clickOnFile(fileData);
+            }
+
+            if (!updated) {
+                newFolderId = jq("#filesNewsPanel").attr("data-id");
+                newObj = jq(".is-new" + ASC.Files.UI.getSelectorId(newFolderId));
                 if (!newObj.is(":visible")) {
                     newObj = ASC.Files.UI.getEntryObject("folder", newFolderId).find(".is-new");
                 }

@@ -1,43 +1,36 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
 using System.Web;
-
+using ASC.Common.Utils;
 using ASC.Core;
 using ASC.Core.Users;
 using ASC.MessagingSystem;
 using ASC.Web.Core;
 using ASC.Web.Core.WhiteLabel;
 using ASC.Web.Core.Utility.Skins;
-using ASC.Web.Studio.Core.Import;
+using ASC.Web.Studio.Core;
 using ASC.Web.Studio.UserControls;
 using ASC.Web.Studio.UserControls.Common;
 using ASC.Web.Studio.UserControls.Common.AuthorizeDocs;
 using ASC.Web.Studio.Utility;
+using ASC.Web.Studio.UserControls.Management.SingleSignOnSettings;
+using Resources;
 
 namespace ASC.Web.Studio
 {
@@ -55,12 +48,6 @@ namespace ASC.Web.Studio
 
         protected override bool MayPhoneNotActivate { get { return true; } }
 
-        protected override bool RedirectToStartup { get { return false; } }
-
-        protected bool? IsAutorizePartner { get; set; }
-
-        protected Partner Partner { get; set; }
-
         protected string TenantName;
 
         protected override void OnPreInit(EventArgs e)
@@ -71,21 +58,9 @@ namespace ASC.Web.Studio
             {
                 if (CoreContext.Configuration.Personal)
                 {
-                    if (CoreContext.Configuration.Standalone)
-                    {
-                        var admin = CoreContext.UserManager.GetUserByUserName("administrator");
-                        var cookie = SecurityContext.AuthenticateMe(admin.ID);
-                        CookiesManager.SetCookies(CookiesType.AuthKey, cookie);
-                        Response.Redirect(CommonLinkUtility.GetDefault(), true);
-                    }
-
-                    if (Request["campaign"] == "personal")
-                    {
-                        Session["campaign"] = "personal";
-                    }
                     CheckSocialMedia();
 
-                    SetLanguage(abTesting: true);
+                    SetLanguage();
                 }
 
                 var token = Request["asc_auth_key"];
@@ -94,7 +69,7 @@ namespace ASC.Web.Studio
                     CookiesManager.SetCookies(CookiesType.AuthKey, token);
 
                     var refererURL = Request["refererURL"];
-                    if (string.IsNullOrEmpty(refererURL)) refererURL = "~/auth.aspx";
+                    if (string.IsNullOrEmpty(refererURL)) refererURL = "~/Auth.aspx";
 
                     Response.Redirect(refererURL, true);
                 }
@@ -104,16 +79,29 @@ namespace ASC.Web.Studio
 
             if (IsLogout)
             {
-                var loginName = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).DisplayUserName(false);
+                var user = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
+
+                var loginName = user.DisplayUserName(false);
                 ProcessLogout();
                 MessageService.Send(HttpContext.Current.Request, loginName, MessageAction.Logout);
 
-                // slo redirect
-                if (SsoImporter.SloIsEnable && HttpContext.Current != null)
+                if (!string.IsNullOrEmpty(user.SsoNameId))
                 {
-                    HttpContext.Current.Response.Redirect(SsoImporter.SloEndPoint, true);
+                    var settings = SsoSettingsV2.Load();
+
+                    if (settings.EnableSso && !string.IsNullOrEmpty(settings.IdpSettings.SloUrl))
+                    {
+                        var logoutSsoUserData = Signature.Create(new LogoutSsoUserData
+                        {
+                            NameId = user.SsoNameId,
+                            SessionId = user.SsoSessionId
+                        });
+
+                        HttpContext.Current.Response.Redirect(SetupInfo.SsoSamlLogoutUrl + "?data=" + HttpUtility.UrlEncode(logoutSsoUserData), true);
+                    }
                 }
-                Response.Redirect("~/auth.aspx", true);
+
+                Response.Redirect("~/Auth.aspx", true);
             }
             else
             {
@@ -127,11 +115,21 @@ namespace ASC.Web.Studio
             Page.Title = TenantName;
 
             Master.DisabledSidePanel = true;
+            if (Request.DesktopApp())
+            {
+                Master.DisabledTopStudioPanel = true;
+            }
+
             withHelpBlock = false;
             if (CoreContext.Configuration.Personal)
             {
-                Master.TopStudioPanel.TopLogo = WebImageSupplier.GetAbsoluteWebPath("personal_logo/logo_personal_auth.png");
-                AutorizeDocuments.Controls.Add(LoadControl(AuthorizeDocs.Location));
+                Master.DisabledLayoutMedia = true;
+                Master.TopStudioPanel.TopLogo = TenantLogoManager.IsRetina(Request)
+                                                        ? WebImageSupplier.GetAbsoluteWebPath("personal_logo/logo_personal_auth-@2x.png") 
+                                                        : WebImageSupplier.GetAbsoluteWebPath("personal_logo/logo_personal_auth.png");
+                AutorizeDocuments.Controls.Add(CoreContext.Configuration.CustomMode
+                                                   ? LoadControl(AuthorizeDocs.LocationCustomMode)
+                                                   : LoadControl(AuthorizeDocs.Location));
             }
             else
             {
@@ -142,23 +140,13 @@ namespace ASC.Web.Studio
                 CommunitationsHolder.Controls.Add(LoadControl(AuthCommunications.Location));
                 withHelpBlock = true;
             }
-
-            if (CoreContext.Configuration.PartnerHosted)
-            {
-                IsAutorizePartner = false;
-                var partner = CoreContext.PaymentManager.GetApprovedPartner();
-                if (partner != null)
-                {
-                    IsAutorizePartner = !string.IsNullOrEmpty(partner.AuthorizedKey);
-                    Partner = partner;
-                }
-            }
         }
 
         public static void ProcessLogout()
         {
             //logout
             CookiesManager.ClearCookies(CookiesType.AuthKey);
+            CookiesManager.ClearCookies(CookiesType.SocketIO);
             SecurityContext.Logout();
         }
 
@@ -190,7 +178,7 @@ namespace ASC.Web.Studio
             if (string.Equals(social, "facebook", StringComparison.InvariantCultureIgnoreCase)
                 || string.Equals(social, "google", StringComparison.InvariantCultureIgnoreCase))
             {
-                var returnUrl = new Uri(Request.GetUrlRewriter(), "auth.aspx");
+                var returnUrl = new Uri(Request.GetUrlRewriter(), "Auth.aspx");
                 loginUrl = "~/login.ashx?auth=" + social
                            + "&mode=Redirect&returnurl=" + HttpUtility.UrlEncode(returnUrl.ToString());
             }
@@ -199,6 +187,84 @@ namespace ASC.Web.Studio
             {
                 Response.Redirect(loginUrl, true);
             }
+        }
+
+
+        public static string GetAuthMessage(string messageKey)
+        {
+            MessageKey authMessage;
+            if (!Enum.TryParse(messageKey, out authMessage)) return null;
+            return GetAuthMessage(authMessage);
+        }
+        
+        public static string GetAuthMessage(MessageKey messageKey)
+        {
+            switch (messageKey)
+            {
+                case MessageKey.Error:
+                    return Resource.ErrorBadRequest;
+                case MessageKey.ErrorUserNotFound:
+                    return Resource.ErrorUserNotFound;
+                case MessageKey.ErrorExpiredActivationLink:
+                    return Resource.ErrorExpiredActivationLink;
+                case MessageKey.ErrorInvalidActivationLink:
+                    return Resource.ErrorInvalidActivationLink;
+                case MessageKey.ErrorConfirmURLError:
+                    return Resource.ErrorConfirmURLError;
+                case MessageKey.ErrorNotCorrectEmail:
+                    return Resource.ErrorNotCorrectEmail;
+                case MessageKey.LoginWithBruteForce:
+                    return Resource.LoginWithBruteForce;
+                case MessageKey.RecaptchaInvalid:
+                    return Resource.RecaptchaInvalid;
+                case MessageKey.LoginWithAccountNotFound:
+                    return Resource.LoginWithAccountNotFound;
+                case MessageKey.InvalidUsernameOrPassword:
+                    return Resource.InvalidUsernameOrPassword;
+                case MessageKey.SsoSettingsDisabled:
+                    return Resource.SsoSettingsDisabled;
+                case MessageKey.ErrorNotAllowedOption:
+                    return Resource.ErrorNotAllowedOption;
+                case MessageKey.SsoSettingsEmptyToken:
+                    return Resource.SsoSettingsEmptyToken;
+                case MessageKey.SsoSettingsNotValidToken:
+                    return Resource.SsoSettingsNotValidToken;
+                case MessageKey.SsoSettingsCantCreateUser:
+                    return Resource.SsoSettingsCantCreateUser;
+                case MessageKey.SsoSettingsUserTerminated:
+                    return Resource.SsoSettingsUserTerminated;
+                case MessageKey.SsoError:
+                    return Resource.SsoError;
+                case MessageKey.SsoAuthFailed:
+                    return Resource.SsoAuthFailed;
+                case MessageKey.SsoAttributesNotFound:
+                    return Resource.SsoAttributesNotFound;
+                default: return null;
+            }
+        }
+
+        public enum MessageKey
+        {
+            None,
+            Error,
+            ErrorUserNotFound,
+            ErrorExpiredActivationLink,
+            ErrorInvalidActivationLink,
+            ErrorConfirmURLError,
+            ErrorNotCorrectEmail,
+            LoginWithBruteForce,
+            RecaptchaInvalid,
+            LoginWithAccountNotFound,
+            InvalidUsernameOrPassword,
+            SsoSettingsDisabled,
+            ErrorNotAllowedOption,
+            SsoSettingsEmptyToken,
+            SsoSettingsNotValidToken,
+            SsoSettingsCantCreateUser,
+            SsoSettingsUserTerminated,
+            SsoError,
+            SsoAuthFailed,
+            SsoAttributesNotFound,
         }
     }
 }

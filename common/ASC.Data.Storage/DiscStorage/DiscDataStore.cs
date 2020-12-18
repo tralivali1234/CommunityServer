@@ -1,61 +1,61 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Core;
-using ASC.Core.Tenants;
-using ASC.Data.Storage.Configuration;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Web.Hosting;
-using System.Web.Routing;
+using ASC.Common.Logging;
+using ASC.Core;
+using ASC.Data.Storage.Configuration;
+using ASC.Data.Storage.Encryption;
 
 namespace ASC.Data.Storage.DiscStorage
 {
     public class DiscDataStore : BaseStorage
     {
-        private const int BufferSize = 4096;
-
-        private readonly string _modulename;
-        private readonly DataList _dataList;
+        private const int BufferSize = 8192;
         private readonly Dictionary<string, MappedPath> _mappedPaths = new Dictionary<string, MappedPath>();
 
+        private readonly ICrypt crypt;
 
         public DiscDataStore(string tenant, HandlerConfigurationElement handlerConfig, ModuleConfigurationElement moduleConfig)
         {
+            _tenant = tenant;
             //Fill map path
             _modulename = moduleConfig.Name;
             _dataList = new DataList(moduleConfig);
             foreach (DomainConfigurationElement domain in moduleConfig.Domains)
             {
-                _mappedPaths.Add(domain.Name, new MappedPath(tenant, moduleConfig.AppendTenant, domain.Path, domain.VirtualPath, handlerConfig.GetProperties()));
+                _mappedPaths.Add(domain.Name, new MappedPath(tenant, moduleConfig.AppendTenant, domain.Path, handlerConfig.GetProperties()));
             }
             //Add default
-            _mappedPaths.Add(string.Empty, new MappedPath(tenant, moduleConfig.AppendTenant, PathUtils.Normalize(moduleConfig.Path), moduleConfig.VirtualPath, handlerConfig.GetProperties()));
+            _mappedPaths.Add(string.Empty, new MappedPath(tenant, moduleConfig.AppendTenant, PathUtils.Normalize(moduleConfig.Path), handlerConfig.GetProperties()));
+
+            //Make expires
+            _domainsExpires =
+                moduleConfig.Domains.Cast<DomainConfigurationElement>().Where(x => x.Expires != TimeSpan.Zero).
+                    ToDictionary(x => x.Name,
+                                 y => y.Expires);
+            _domainsExpires.Add(string.Empty, moduleConfig.Expires);
+
+            var settings = moduleConfig.DisabledEncryption ? new EncryptionSettings() : EncryptionSettings.Load();
+
+            crypt = EncryptionFactory.GetCrypt(moduleConfig.Name, settings);
         }
 
         public String GetPhysicalPath(string domain, string path)
@@ -70,34 +70,24 @@ namespace ASC.Data.Storage.DiscStorage
             return (pathMap.PhysicalPath + EnsureLeadingSlash(path)).Replace('\\', '/');
         }
 
-        public override Uri GetPreSignedUri(string domain, string path, TimeSpan expire, IEnumerable<string> headers)
+        public override bool IsSupportInternalUri
         {
-            if (path == null)
-            {
-                throw new ArgumentNullException("path");
-            }
-
-            var pathMap = GetPath(domain);
-            var uri = pathMap.VirtualPath.IsAbsoluteUri ?
-                new MonoUri(pathMap.VirtualPath, pathMap.VirtualPath.LocalPath.TrimEnd('/') + EnsureLeadingSlash(path.Replace('\\', '/'))) :
-                new MonoUri(pathMap.VirtualPath.ToString().TrimEnd('/') + EnsureLeadingSlash(path.Replace('\\', '/')), UriKind.Relative);
-
-            return uri;
-        }
-
-        private static string EnsureLeadingSlash(string str)
-        {
-            return "/" + str.TrimStart('/');
+            get { return false; }
         }
 
         public override Stream GetReadStream(string domain, string path)
+        {
+            return GetReadStream(domain, path, true);
+        }
+
+        public Stream GetReadStream(string domain, string path, bool withDecription)
         {
             if (path == null) throw new ArgumentNullException("path");
             var target = GetTarget(domain, path);
 
             if (File.Exists(target))
             {
-                return File.OpenRead(target);
+                return withDecription ? crypt.GetReadStream(target) : File.OpenRead(target);
             }
             throw new FileNotFoundException("File not found", Path.GetFullPath(target));
         }
@@ -110,8 +100,8 @@ namespace ASC.Data.Storage.DiscStorage
 
             if (File.Exists(target))
             {
-                FileStream stream = File.OpenRead(target);
-                if (0 < offset) stream.Seek(offset, SeekOrigin.Begin);
+                var stream = crypt.GetReadStream(target);
+                if (0 < offset && stream.CanSeek) stream.Seek(offset, SeekOrigin.Begin);
                 return stream;
             }
             throw new FileNotFoundException("File not found", Path.GetFullPath(target));
@@ -130,65 +120,24 @@ namespace ASC.Data.Storage.DiscStorage
         public override Uri Save(string domain, string path, Stream stream, string contentEncoding, int cacheDays)
         {
             return Save(domain, path, stream);
-
-        }
-
-        public override Uri UploadWithoutQuota(string domain, string path, Stream stream, string contentType, string contentDisposition)
-        {
-            if (path == null) throw new ArgumentNullException("path");
-            if (stream == null) throw new ArgumentNullException("stream");
-
-            //Try seek to start
-            if (stream.CanSeek)
-            {
-                stream.Seek(0, SeekOrigin.Begin);
-            }
-
-            //Lookup domain
-            var target = GetTarget(domain, path);
-            CreateDirectory(target);
-            //Copy stream
-            using (var fs = File.Open(target, FileMode.Create))
-            {
-                var buffer = new byte[BufferSize];
-                int readed;
-                while ((readed = stream.Read(buffer, 0, BufferSize)) != 0)
-                {
-                    fs.Write(buffer, 0, readed);
-                }
-            }
-            return GetUri(domain, path);
         }
 
         public override Uri Save(string domain, string path, Stream stream)
         {
-            var postWriteCheck = false;
+            LogManager.GetLogger("ASC").Debug("Save " + path);
+            var buffered = stream.GetBuffered();
             if (QuotaController != null)
             {
-                try
-                {
-                    QuotaController.QuotaUsedAdd(_modulename, domain, _dataList.GetData(domain), stream.Length);
-                }
-                catch (TenantQuotaException)
-                {
-                    //this exception occurs only if tenant has no free space
-                    //or if file size larger than allowed by quota
-                    //so we can exit this function without stream buffering etc
-                    throw;
-                }
-                catch (Exception)
-                {
-                    postWriteCheck = true;
-                }
+                QuotaController.QuotaUsedCheck(buffered.Length);
             }
 
             if (path == null) throw new ArgumentNullException("path");
-            if (stream == null) throw new ArgumentNullException("stream");
+            if (buffered == null) throw new ArgumentNullException("stream");
 
             //Try seek to start
-            if (stream.CanSeek)
+            if (buffered.CanSeek)
             {
-                stream.Seek(0, SeekOrigin.Begin);
+                buffered.Seek(0, SeekOrigin.Begin);
             }
             //Lookup domain
             var target = GetTarget(domain, path);
@@ -196,9 +145,11 @@ namespace ASC.Data.Storage.DiscStorage
             //Copy stream
 
             //optimaze disk file copy
-            var fileStream = stream as FileStream;
-            var fslen = 0L;
-            if (fileStream != null)
+            var fileStream = buffered as FileStream;
+
+            long fslen;
+
+            if (fileStream != null && WorkContext.IsMono)
             {
                 File.Copy(fileStream.Name, target, true);
                 fslen = fileStream.Length;
@@ -209,23 +160,32 @@ namespace ASC.Data.Storage.DiscStorage
                 {
                     var buffer = new byte[BufferSize];
                     int readed;
-                    while ((readed = stream.Read(buffer, 0, BufferSize)) != 0)
+                    while ((readed = buffered.Read(buffer, 0, BufferSize)) != 0)
                     {
                         fs.Write(buffer, 0, readed);
                     }
                     fslen = fs.Length;
                 }
             }
-            if (postWriteCheck)
-            {
-                QuotaController.QuotaUsedAdd(_modulename, domain, _dataList.GetData(domain), fslen);
-            }
+
+            QuotaUsedAdd(domain, fslen);
+
+            crypt.EncryptFile(target);
+
             return GetUri(domain, path);
         }
 
         public override Uri Save(string domain, string path, Stream stream, ACL acl)
         {
             return Save(domain, path, stream);
+        }
+
+        public override bool IsSupportedPreSignedUri
+        {
+            get
+            {
+                return false;
+            }
         }
 
         #region chunking
@@ -237,7 +197,7 @@ namespace ASC.Data.Storage.DiscStorage
             return target;
         }
 
-        public override string UploadChunk(string domain, string path, string uploadId, Stream stream, int chunkNumber, long chunkLength)
+        public override string UploadChunk(string domain, string path, string uploadId, Stream stream, long defaultChunkSize, int chunkNumber, long chunkLength)
         {
             var target = GetTarget(domain, path);
             var mode = chunkNumber == 0 ? FileMode.Create : FileMode.Append;
@@ -255,11 +215,21 @@ namespace ASC.Data.Storage.DiscStorage
 
         public override Uri FinalizeChunkedUpload(string domain, string path, string uploadId, Dictionary<int, string> eTags)
         {
+            var target = GetTarget(domain, path);
+
             if (QuotaController != null)
             {
-                var size = GetFileSize(domain, path);
-                QuotaController.QuotaUsedAdd(_modulename, domain, _dataList.GetData(domain), size);
+                if (!File.Exists(target))
+                {
+                    throw new FileNotFoundException("file not found " + target);
+                }
+
+                var size = new FileInfo(target).Length;
+                QuotaUsedAdd(domain, size);
             }
+
+            crypt.EncryptFile(target);
+
             return GetUri(domain, path);
         }
 
@@ -286,11 +256,10 @@ namespace ASC.Data.Storage.DiscStorage
 
             if (File.Exists(target))
             {
-                if (QuotaController != null)
-                {
-                    QuotaController.QuotaUsedDelete(_modulename, domain, _dataList.GetData(domain), new FileInfo(target).Length);
-                }
+                var size = crypt.GetFileSize(target);
                 File.Delete(target);
+
+                QuotaUsedDelete(domain, size);
             }
             else
             {
@@ -309,14 +278,10 @@ namespace ASC.Data.Storage.DiscStorage
                 if (!File.Exists(target))
                     continue;
 
-                var obj = new FileInfo(target);
-
-                if (QuotaController != null)
-                {
-                    QuotaController.QuotaUsedDelete(_modulename, domain, _dataList.GetData(domain), obj.Length);
-                }
-
+                var size = crypt.GetFileSize(target);
                 File.Delete(target);
+
+                QuotaUsedDelete(domain, size);
             }
         }
 
@@ -331,11 +296,35 @@ namespace ASC.Data.Storage.DiscStorage
                 var entries = Directory.GetFiles(targetDir, pattern, recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
                 foreach (var entry in entries)
                 {
-                    if (QuotaController != null)
-                    {
-                        QuotaController.QuotaUsedDelete(_modulename, domain, _dataList.GetData(domain), new FileInfo(entry).Length);
-                    }
+                    var size = crypt.GetFileSize(entry);
                     File.Delete(entry);
+                    QuotaUsedDelete(domain, size);
+                }
+            }
+            else
+            {
+                throw new DirectoryNotFoundException(string.Format("Directory '{0}' not found", targetDir));
+            }
+        }
+
+        public override void DeleteFiles(string domain, string folderPath, DateTime fromDate, DateTime toDate)
+        {
+            if (folderPath == null) throw new ArgumentNullException("folderPath");
+
+            //Return dirs
+            var targetDir = GetTarget(domain, folderPath);
+            if (Directory.Exists(targetDir))
+            {
+                var entries = Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories);
+                foreach (var entry in entries)
+                {
+                    var fileInfo = new FileInfo(entry);
+                    if (fileInfo.LastWriteTime >= fromDate && fileInfo.LastWriteTime <= toDate)
+                    {
+                        var size = crypt.GetFileSize(entry);
+                        File.Delete(entry);
+                        QuotaUsedDelete(domain, size);
+                    }
                 }
             }
             else
@@ -370,18 +359,18 @@ namespace ASC.Data.Storage.DiscStorage
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(newtarget));
                 }
-                if (QuotaController != null)
-                {
-                    var flength = new FileInfo(target).Length;
-                    QuotaController.QuotaUsedDelete(_modulename, srcdomain, _dataList.GetData(srcdomain), flength);
-                    QuotaController.QuotaUsedAdd(_modulename, newdomain, _dataList.GetData(newdomain), flength);
-                }
+
+                var flength = crypt.GetFileSize(target);
+
                 //Delete file if exists
                 if (File.Exists(newtarget))
                 {
                     File.Delete(newtarget);
                 }
                 File.Move(target, newtarget);
+               
+                QuotaUsedDelete(srcdomain, flength);
+                QuotaUsedAdd(newdomain, flength);
             }
             else
             {
@@ -420,7 +409,7 @@ namespace ASC.Data.Storage.DiscStorage
             if (!Directory.Exists(targetDir)) return;
 
             var entries = Directory.GetFiles(targetDir, "*.*", SearchOption.AllDirectories);
-            var size = entries.Select(entry => new FileInfo(entry)).Select(info => info.Length).Sum();
+            var size = entries.Select(entry => crypt.GetFileSize(entry)).Sum();
 
             var subDirs = Directory.GetDirectories(targetDir, "*", SearchOption.AllDirectories).ToList();
             subDirs.Reverse();
@@ -428,10 +417,7 @@ namespace ASC.Data.Storage.DiscStorage
 
             Directory.Delete(targetDir, true);
 
-            if (QuotaController != null)
-            {
-                QuotaController.QuotaUsedDelete(_modulename, domain, _dataList.GetData(domain), size);
-            }
+            QuotaUsedDelete(domain, size);
         }
 
         public override long GetFileSize(string domain, string path)
@@ -440,11 +426,24 @@ namespace ASC.Data.Storage.DiscStorage
 
             if (File.Exists(target))
             {
-                return new FileInfo(target).Length;
+                return crypt.GetFileSize(target);
             }
             throw new FileNotFoundException("file not found " + target);
         }
 
+        public override long GetDirectorySize(string domain, string path)
+        {
+            var target = GetTarget(domain, path);
+
+            if (Directory.Exists(target))
+            {
+                return Directory.GetFiles(target, "*.*", SearchOption.AllDirectories)
+                    .Select(entry => crypt.GetFileSize(entry))
+                    .Sum();
+            }
+
+            throw new FileNotFoundException("directory not found " + target);
+        }
 
         public override Uri SaveTemp(string domain, out string assignedPath, Stream stream)
         {
@@ -475,11 +474,10 @@ namespace ASC.Data.Storage.DiscStorage
                 var finfo = new FileInfo(entry);
                 if ((DateTime.UtcNow - finfo.CreationTimeUtc) > oldThreshold)
                 {
-                    if (QuotaController != null)
-                    {
-                        QuotaController.QuotaUsedDelete(_modulename, domain, _dataList.GetData(domain), new FileInfo(entry).Length);
-                    }
+                    var size = crypt.GetFileSize(entry);
                     File.Delete(entry);
+
+                    QuotaUsedDelete(domain, size);
                 }
             }
         }
@@ -505,7 +503,7 @@ namespace ASC.Data.Storage.DiscStorage
         }
 
 
-        public override Uri[] List(string domain, string path, bool recursive)
+        public override string[] ListDirectoriesRelative(string domain, string path, bool recursive)
         {
             if (path == null) throw new ArgumentNullException("path");
 
@@ -517,12 +515,12 @@ namespace ASC.Data.Storage.DiscStorage
                 var entries = Directory.GetDirectories(targetDir, "*", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
                 return Array.ConvertAll(
                     entries,
-                    x => GetUri(domain, Path.Combine(path != null ? PathUtils.Normalize(path) : string.Empty, x.Substring(targetDir.Length))));
+                    x => x.Substring(targetDir.Length));
             }
-            return new Uri[0];
+            return new string[0];
         }
 
-        public override Uri[] ListFiles(string domain, string path, string pattern, bool recursive)
+        public override string[] ListFilesRelative(string domain, string path, string pattern, bool recursive)
         {
             if (path == null) throw new ArgumentNullException("path");
 
@@ -534,15 +532,9 @@ namespace ASC.Data.Storage.DiscStorage
                 var entries = Directory.GetFiles(targetDir, pattern, recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
                 return Array.ConvertAll(
                     entries,
-                    x => GetUri(domain, Path.Combine(PathUtils.Normalize(path), x.Substring(targetDir.Length))));
+                    x => x.Substring(targetDir.Length));
             }
-            return new Uri[0];
-        }
-
-        public override string[] ListFilesRelative(string domain, string path, string pattern, bool recursive)
-        {
-            var dirPath = GetUri(domain, path).ToString();
-            return ListFiles(domain, path, pattern, /*true*/recursive).Select(x => x.ToString().Substring(dirPath.Length).TrimStart('/')).ToArray();
+            return new string[0];
         }
 
         public override bool IsFile(string domain, string path)
@@ -572,7 +564,7 @@ namespace ASC.Data.Storage.DiscStorage
             if (Directory.Exists(target))
             {
                 var entries = Directory.GetFiles(target, "*.*", SearchOption.AllDirectories);
-                size = entries.Select(entry => new FileInfo(entry)).Select(info => info.Length).Sum();
+                size = entries.Select(entry => crypt.GetFileSize(entry)).Sum();
             }
             return size;
         }
@@ -590,12 +582,11 @@ namespace ASC.Data.Storage.DiscStorage
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(newtarget));
                 }
-                if (QuotaController != null)
-                {
-                    var flength = new FileInfo(target).Length;
-                    QuotaController.QuotaUsedAdd(_modulename, newdomain, _dataList.GetData(newdomain), flength);
-                }
+
                 File.Copy(target, newtarget, true);
+
+                var flength = crypt.GetFileSize(target);
+                QuotaUsedAdd(newdomain, flength);
             }
             else
             {
@@ -624,27 +615,20 @@ namespace ASC.Data.Storage.DiscStorage
             }
 
             // Copy each file into it's new directory.
-            foreach (FileInfo fi in source.GetFiles())
+            foreach (var fi in source.GetFiles())
             {
-                if (QuotaController != null)
-                {
-                    QuotaController.QuotaUsedAdd(_modulename, newdomain, _dataList.GetData(newdomain), fi.Length);
-                }
-                fi.CopyTo(Path.Combine(target.ToString(), fi.Name), true);
+                var fp = Path.Combine(target.ToString(), fi.Name);
+                fi.CopyTo(fp, true);
+                var size = crypt.GetFileSize(fp);
+                QuotaUsedAdd(newdomain, size);
             }
 
             // Copy each subdirectory using recursion.
             foreach (var diSourceSubDir in source.GetDirectories())
             {
-                var nextTargetSubDir =
-                    target.CreateSubdirectory(diSourceSubDir.Name);
+                var nextTargetSubDir = target.CreateSubdirectory(diSourceSubDir.Name);
                 CopyAll(diSourceSubDir, nextTargetSubDir, newdomain);
             }
-        }
-
-        public override Uri GetUriInternal(string path)
-        {
-            return GetUri(string.Empty, path);
         }
 
 
@@ -660,10 +644,15 @@ namespace ASC.Data.Storage.DiscStorage
 
         public Stream GetWriteStream(string domain, string path)
         {
+            return GetWriteStream(domain, path, FileMode.Create);
+        }
+
+        public Stream GetWriteStream(string domain, string path, FileMode fileMode)
+        {
             if (path == null) throw new ArgumentNullException("path");
             var target = GetTarget(domain, path);
             CreateDirectory(target);
-            return File.Open(target, FileMode.Create);
+            return File.Open(target, fileMode);
         }
 
         private static void CreateDirectory(string target)
@@ -695,26 +684,35 @@ namespace ASC.Data.Storage.DiscStorage
         }
 
 
-        private class MonoUri : Uri
+        public void Encrypt(string domain, string path)
         {
-            public MonoUri(Uri baseUri, string relativeUri)
-                : base(baseUri, relativeUri)
-            {
-            }
+            if (path == null) throw new ArgumentNullException("path");
 
-            public MonoUri(string uriString, UriKind uriKind)
-                : base(uriString, uriKind)
-            {
-            }
+            var target = GetTarget(domain, path);
 
-            public override string ToString()
+            if (File.Exists(target))
             {
-                var s = base.ToString();
-                if (WorkContext.IsMono && s.StartsWith(UriSchemeFile + SchemeDelimiter))
-                {
-                    return s.Substring(7);
-                }
-                return s;
+                crypt.EncryptFile(target);
+            }
+            else
+            {
+                throw new FileNotFoundException("file not found", target);
+            }
+        }
+
+        public void Decrypt(string domain, string path)
+        {
+            if (path == null) throw new ArgumentNullException("path");
+
+            var target = GetTarget(domain, path);
+
+            if (File.Exists(target))
+            {
+                crypt.DecryptFile(target);
+            }
+            else
+            {
+                throw new FileNotFoundException("file not found", target);
             }
         }
     }

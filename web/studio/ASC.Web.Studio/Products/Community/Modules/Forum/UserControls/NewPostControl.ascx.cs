@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -41,10 +32,12 @@ using ASC.Web.UserControls.Forum.Resources;
 using AjaxPro;
 using ASC.Core;
 using ASC.Core.Users;
+using ASC.ElasticSearch;
 using ASC.Forum;
 using ASC.Notify;
 using ASC.Notify.Model;
 using ASC.Notify.Recipients;
+using ASC.Web.Community.Search;
 using ASC.Web.Studio.Utility;
 using ASC.Web.UserControls.Forum.Common;
 
@@ -181,6 +174,7 @@ namespace ASC.Web.UserControls.Forum
         private string _tagString = "";
         private ForumManager _forumManager;
         private bool _isSelectForum;
+        private List<ThreadCategory> _categories = null;
         private List<Thread> _threads = null;
 
         private List<FileObj> Attachments { get; set; }
@@ -195,10 +189,10 @@ namespace ASC.Web.UserControls.Forum
 
         private void InitScripts()
         {
-            Page.RegisterBodyScripts("~/usercontrols/common/ckeditor/ckeditor-connector.js");
+            Page.RegisterBodyScripts("~/UserControls/Common/ckeditor/ckeditor-connector.js");
 
-            //Page.RegisterInlineScript("ckeditorConnector.onReady(function () {ForumManager.forumEditor = jq('#ckEditor').ckeditor({ toolbar : 'ComForum', filebrowserUploadUrl: '" + RenderRedirectUpload() + @"'}).editor;});");
-            Page.RegisterInlineScript("ckeditorConnector.onReady(function () {" +
+            //Page.RegisterInlineScript("ckeditorConnector.load(function () {ForumManager.forumEditor = jq('#ckEditor').ckeditor({ toolbar : 'ComForum', filebrowserUploadUrl: '" + RenderRedirectUpload() + @"'}).editor;});");
+            Page.RegisterInlineScript("ckeditorConnector.load(function () {" +
               "ForumManager.forumEditor = CKEDITOR.replace('ckEditor', { toolbar : 'ComBlog', filebrowserUploadUrl: '" + RenderRedirectUpload() + "'});" +
               "ForumManager.forumEditor.on('change',  function() {if (this.getData() == '') {jq('#btnPreview').addClass('disable');} else {jq('#btnPreview').removeClass('disable');}});" +
                "});");
@@ -249,7 +243,7 @@ namespace ASC.Web.UserControls.Forum
             Utility.RegisterTypeForAjax(this.GetType());
             Utility.RegisterTypeForAjax(typeof(PostControl));
 
-            Page.RegisterBodyScripts("~/js/uploader/jquery.fileupload.js", "~/js/uploader/jquery.fileuploadManager.js");
+            Page.RegisterBodyScripts("~/js/uploader/jquery.fileupload.js", "~/js/uploader/jquery.fileuploadmanager.js");
 
             PostType = NewPostType.Topic;
             PostAction = PostAction.Normal;
@@ -341,8 +335,7 @@ namespace ASC.Web.UserControls.Forum
                 }
                 else
                 {
-                    List<ThreadCategory> categories;
-                    ForumDataProvider.GetThreadCategories(TenantProvider.CurrentTenantID, out categories, out _threads);
+                    ForumDataProvider.GetThreadCategories(TenantProvider.CurrentTenantID, out _categories, out _threads);
 
 
                     foreach (var thread in _threads)
@@ -527,7 +520,7 @@ namespace ASC.Web.UserControls.Forum
 
                     if (!_forumManager.ValidateAccessSecurityAction(ForumAction.PostEdit, EditedPost))
                     {
-                        Response.Redirect("default.aspx");
+                        Response.Redirect("Default.aspx");
                         return;
                     }
 
@@ -614,6 +607,8 @@ namespace ASC.Web.UserControls.Forum
                         try
                         {
                             ForumDataProvider.UpdatePost(TenantProvider.CurrentTenantID, EditedPost.ID, EditedPost.Subject, EditedPost.Text, EditedPost.Formatter);
+                            FactoryIndexer<PostWrapper>.UpdateAsync(EditedPost);
+
                             if (IsAllowCreateAttachment)
                                 CreateAttachments(EditedPost);
                             int postsOnPageCount = -1;
@@ -654,7 +649,7 @@ namespace ASC.Web.UserControls.Forum
                         {
                             post.ID = ForumDataProvider.CreatePost(TenantProvider.CurrentTenantID, post.TopicID, post.ParentPostID,
                                                                    post.Subject, post.Text, post.IsApproved, post.Formatter);
-
+                            FactoryIndexer<PostWrapper>.IndexAsync(post);
                             Topic.PostCount++;
 
                             CommonControlsConfigurer.FCKEditingComplete(_settings.FileStoreModuleID, post.ID.ToString(), post.Text, false);
@@ -714,7 +709,14 @@ namespace ASC.Web.UserControls.Forum
                         topic.Type = (PostType == NewPostType.Poll ? TopicType.Poll : TopicType.Informational);
 
                         topic.ID = ForumDataProvider.CreateTopic(TenantProvider.CurrentTenantID, topic.ThreadID, topic.Title, topic.Type);
+
+                        foreach (var ace in ASC.Forum.Module.Constants.Aces)
+                        {
+                            CoreContext.AuthorizationManager.AddAce(new AzRecord(SecurityContext.CurrentAccount.ID, ace, ASC.Common.Security.Authorizing.AceType.Allow, topic));
+                        }
+
                         Topic = topic;
+                        FactoryIndexer<TopicWrapper>.IndexAsync(topic);
 
                         foreach (var tag in topic.Tags)
                         {
@@ -733,6 +735,7 @@ namespace ASC.Web.UserControls.Forum
                         post.ID = ForumDataProvider.CreatePost(TenantProvider.CurrentTenantID, post.TopicID, post.ParentPostID,
                                                                post.Subject, post.Text, post.IsApproved, post.Formatter);
 
+                        FactoryIndexer<PostWrapper>.IndexAsync(post);
                         CommonControlsConfigurer.FCKEditingComplete(_settings.FileStoreModuleID, post.ID.ToString(), post.Text, false);
 
                         if (IsAllowCreateAttachment)
@@ -747,6 +750,10 @@ namespace ASC.Web.UserControls.Forum
                             topic.QuestionID = ForumDataProvider.CreatePoll(TenantProvider.CurrentTenantID, topic.ID,
                                                                             _pollMaster.Singleton ? QuestionType.OneAnswer : QuestionType.SeveralAnswer,
                                                                             topic.Title, answerVariants);
+
+                            var topicWrapper = (TopicWrapper) topic;
+
+                            FactoryIndexer<TopicWrapper>.IndexAsync(topicWrapper);
                         }
 
                         NotifyAboutNewPost(post);
@@ -875,8 +882,7 @@ namespace ASC.Web.UserControls.Forum
 
             if (_threads == null)
             {
-                List<ThreadCategory> categories;
-                ForumDataProvider.GetThreadCategories(TenantProvider.CurrentTenantID, out categories, out _threads);
+                ForumDataProvider.GetThreadCategories(TenantProvider.CurrentTenantID, out _categories, out _threads);
 
                 _threads.RemoveAll(t => !t.Visible);
             }
@@ -890,16 +896,29 @@ namespace ASC.Web.UserControls.Forum
             sb.Append("<div>");
             sb.Append("<select name=\"forum_thread_id\" class=\"comboBox\" style='width:400px;'>");
 
-            foreach (var forum in _threads)
-            {
-                bool isAllow = false;
-                if (PostType == NewPostType.Topic)
-                    isAllow = _forumManager.ValidateAccessSecurityAction(ForumAction.TopicCreate, forum);
-                else if (PostType == NewPostType.Poll)
-                    isAllow = _forumManager.ValidateAccessSecurityAction(ForumAction.PollCreate, forum);
+            var grouppedThread = _threads.GroupBy(t => t.CategoryID);
 
-                if (isAllow)
-                    sb.Append("<option value=\"" + forum.ID + "\">" + forum.Title.HtmlEncode() + "</option>");
+            foreach (var forumGroup in grouppedThread)
+            {
+                var category = _categories.FirstOrDefault(c => c.ID == forumGroup.Key);
+
+                if(category != null)
+                    sb.Append("<optgroup label=\"" + category.Title  + "\">");
+
+                foreach (var forum in forumGroup)
+                {
+                    bool isAllow = false;
+                    if (PostType == NewPostType.Topic)
+                        isAllow = _forumManager.ValidateAccessSecurityAction(ForumAction.TopicCreate, forum);
+                    else if (PostType == NewPostType.Poll)
+                        isAllow = _forumManager.ValidateAccessSecurityAction(ForumAction.PollCreate, forum);
+
+                    if (isAllow)
+                        sb.Append("<option value=\"" + forum.ID + "\">" + forum.Title.HtmlEncode() + "</option>");
+                }
+
+                if (category != null)
+                    sb.Append("</optgroup>");
             }
 
             sb.Append("</select>");

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,17 +18,14 @@
 using System;
 using System.Globalization;
 using System.Linq;
-using System.Net;
-using System.Runtime.Remoting.Messaging;
 using System.Text.RegularExpressions;
 using System.Web;
-using System.Web.Configuration;
 using ASC.Core;
+using ASC.Core.Common;
 using ASC.Core.Users;
 using ASC.Security.Cryptography;
 using ASC.Web.Core;
 using ASC.Web.Core.WhiteLabel;
-using log4net;
 
 namespace ASC.Web.Studio.Utility
 {
@@ -62,7 +50,10 @@ namespace ASC.Web.Studio.Utility
         HelpCenter = 16,
         DocService = 17,
         FullTextSearch = 18,
-        WhiteLabel = 19
+        WhiteLabel = 19,
+        MailService = 20,
+        Storage = 21,
+        PrivacyRoom = 22
     }
 
     //  emp-invite - confirm ivite by email
@@ -86,139 +77,47 @@ namespace ASC.Web.Studio.Utility
         ProfileRemove,
         PhoneActivation,
         PhoneAuth,
-        Auth
+        Auth,
+        TfaActivation,
+        TfaAuth
     }
 
     public static class CommonLinkUtility
     {
-        private const string LOCALHOST = "localhost";
         private static readonly Regex RegFilePathTrim = new Regex("/[^/]*\\.aspx", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-        private static UriBuilder _serverRoot;
-        private static string _vpath;
 
         public const string ParamName_ProductSysName = "product";
         public const string ParamName_UserUserName = "user";
         public const string ParamName_UserUserID = "uid";
 
-        static CommonLinkUtility()
-        {
-            try
-            {
-                var uriBuilder = new UriBuilder(Uri.UriSchemeHttp, LOCALHOST);
-                if (HttpContext.Current != null && HttpContext.Current.Request != null)
-                {
-                    var u = HttpContext.Current.Request.GetUrlRewriter();
-                    uriBuilder = new UriBuilder(u.Scheme, LOCALHOST, u.Port);
-                }
-                _serverRoot = uriBuilder;
-            }
-            catch (Exception error)
-            {
-                LogManager.GetLogger("ASC.Web").Error(error);
-            }
-        }
-
         public static void Initialize(string serverUri)
         {
-            if (string.IsNullOrEmpty(serverUri))
-            {
-                throw new ArgumentNullException("serverUri");
-            }
-
-            var uri = new Uri(serverUri.Replace('*', 'x').Replace('+', 'x'));
-            _serverRoot = new UriBuilder(uri.Scheme, LOCALHOST, uri.Port);
-            _vpath = "/" + uri.AbsolutePath.Trim('/');
+            BaseCommonLinkUtility.Initialize(serverUri);
         }
 
         public static string VirtualRoot
         {
-            get { return ToAbsolute("~"); }
+            get { return BaseCommonLinkUtility.VirtualRoot; }
         }
 
         public static string ServerRootPath
         {
-            get
-            {
-                var result = new UriBuilder(_serverRoot.Uri);
-
-                // first, take from current request
-                if (HttpContext.Current != null && HttpContext.Current.Request != null)
-                {
-                    var u = HttpContext.Current.Request.GetUrlRewriter();
-                    result = new UriBuilder(u.Scheme, u.Host, u.Port);
-
-                    if (CoreContext.Configuration.Standalone && !result.Uri.IsLoopback)
-                    {
-                        // save for stanalone
-                        _serverRoot.Host = result.Host;
-                    }
-                }
-
-                if (result.Uri.IsLoopback)
-                {
-                    // take values from db if localhost or no http context thread
-                    var tenant = CoreContext.TenantManager.GetCurrentTenant();
-                    result.Host = tenant.TenantDomain;
-
-#if DEBUG
-                    // for Visual Studio debug
-                    if (tenant.TenantAlias == LOCALHOST)
-                    {
-                        result.Host = LOCALHOST;
-                    }
-#endif
-
-                    if (!string.IsNullOrEmpty(tenant.MappedDomain))
-                    {
-                        var mapped = tenant.MappedDomain.ToLowerInvariant();
-                        if (!mapped.Contains(Uri.SchemeDelimiter))
-                        {
-                            mapped = Uri.UriSchemeHttp + Uri.SchemeDelimiter + mapped;
-                        }
-                        result = new UriBuilder(mapped);
-                    }
-                }
-
-                return result.Uri.ToString().TrimEnd('/');
-            }
+            get { return BaseCommonLinkUtility.ServerRootPath; }
         }
 
         public static string GetFullAbsolutePath(string virtualPath)
         {
-            if (String.IsNullOrEmpty(virtualPath))
-                return ServerRootPath;
-
-            if (virtualPath.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) ||
-                virtualPath.StartsWith("mailto:", StringComparison.InvariantCultureIgnoreCase) ||
-                virtualPath.StartsWith("javascript:", StringComparison.InvariantCultureIgnoreCase) ||
-                virtualPath.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
-                return virtualPath;
-
-            if (string.IsNullOrEmpty(virtualPath) || virtualPath.StartsWith("/"))
-            {
-                return ServerRootPath + virtualPath;
-            }
-            return ServerRootPath + VirtualRoot.TrimEnd('/') + "/" + virtualPath.TrimStart('~', '/');
+            return BaseCommonLinkUtility.GetFullAbsolutePath(virtualPath);
         }
 
         public static string ToAbsolute(string virtualPath)
         {
-            if (_vpath == null)
-            {
-                return VirtualPathUtility.ToAbsolute(virtualPath);
-            }
-
-            if (string.IsNullOrEmpty(virtualPath) || virtualPath.StartsWith("/"))
-            {
-                return virtualPath;
-            }
-            return (_vpath != "/" ? _vpath : string.Empty) + "/" + virtualPath.TrimStart('~', '/');
+            return BaseCommonLinkUtility.ToAbsolute(virtualPath);
         }
 
         public static string Logout
         {
-            get { return ToAbsolute("~/auth.aspx") + "?t=logout"; }
+            get { return ToAbsolute("~/Auth.aspx") + "?t=logout"; }
         }
 
         public static string GetDefault()
@@ -228,7 +127,7 @@ namespace ASC.Web.Studio.Utility
 
         public static string GetMyStaff()
         {
-            return CoreContext.Configuration.Personal ? ToAbsolute("~/my.aspx") : ToAbsolute("~/products/people/profile.aspx");
+            return CoreContext.Configuration.Personal ? ToAbsolute("~/My.aspx") : ToAbsolute("~/Products/People/Profile.aspx");
         }
 
         public static string GetEmployees()
@@ -238,13 +137,13 @@ namespace ASC.Web.Studio.Utility
 
         public static string GetEmployees(EmployeeStatus empStatus)
         {
-            return ToAbsolute("~/products/people/") +
+            return ToAbsolute("~/Products/People/") +
                    (empStatus == EmployeeStatus.Terminated ? "#type=disabled" : string.Empty);
         }
 
         public static string GetDepartment(Guid depId)
         {
-            return depId != Guid.Empty ? ToAbsolute("~/products/people/#group=") + depId.ToString() : GetEmployees();
+            return depId != Guid.Empty ? ToAbsolute("~/Products/People/#group=") + depId.ToString() : GetEmployees();
         }
 
         #region user profile link
@@ -288,8 +187,8 @@ namespace ASC.Web.Studio.Utility
                 queryParams = guid != Guid.Empty ? GetUserParamsPair(guid) : ParamName_UserUserName + "=" + HttpUtility.UrlEncode(user);
             }
 
-            var url = absolute ? ToAbsolute("~/products/people/") : "/products/people/";
-            url += "profile.aspx?";
+            var url = absolute ? ToAbsolute("~/Products/People/") : "/Products/People/";
+            url += "Profile.aspx?";
             url += queryParams;
 
             return url;
@@ -307,9 +206,35 @@ namespace ASC.Web.Studio.Utility
                 IModule module;
                 GetLocationByRequest(out product, out module);
                 if (product != null) productID = product.ID;
-            }
+                }
 
             return productID;
+        }
+
+        public static Guid GetAddonID() {
+            var addonID = Guid.Empty;
+
+            if (HttpContext.Current != null)
+            {
+                var addonName = GetAddonNameFromUrl(HttpContext.Current.Request.Url.AbsoluteUri);
+
+                switch (addonName)
+                {
+                    case "mail":
+                        addonID = WebItemManager.MailProductID;
+                        break;
+                    case "talk":
+                        addonID = WebItemManager.TalkProductID;
+                        break;
+                    case "calendar":
+                        addonID = WebItemManager.CalendarProductID;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            return addonID;
         }
 
         public static void GetLocationByRequest(out IProduct currentProduct, out IModule currentModule)
@@ -457,22 +382,8 @@ namespace ASC.Web.Studio.Utility
                 name = GetProductNameFromUrl(url);
                 if (String.IsNullOrEmpty(name))
                 {
-                    try
-                    {
-                        var pos = url.IndexOf("/addons/", StringComparison.InvariantCultureIgnoreCase);
-                        if (0 <= pos)
-                        {
-                            url = url.Substring(pos + 8).ToLower();
-                            pos = url.IndexOf('/');
-                            return 0 < pos ? url.Substring(0, pos) : url;
-                        }
-                    }
-                    catch
-                    {
-                    }
-                    return null;
+                    return GetAddonNameFromUrl(url);
                 }
-
             }
 
             return name;
@@ -482,10 +393,28 @@ namespace ASC.Web.Studio.Utility
         {
             try
             {
-                var pos = url.IndexOf("/products/", StringComparison.InvariantCultureIgnoreCase);
+                var pos = url.IndexOf("/Products/", StringComparison.InvariantCultureIgnoreCase);
                 if (0 <= pos)
                 {
                     url = url.Substring(pos + 10).ToLower();
+                    pos = url.IndexOf('/');
+                    return 0 < pos ? url.Substring(0, pos) : url;
+                }
+            }
+            catch
+            {
+            }
+            return null;
+        }
+
+        private static string GetAddonNameFromUrl(string url)
+        {
+            try
+            {
+                var pos = url.IndexOf("/addons/", StringComparison.InvariantCultureIgnoreCase);
+                if (0 <= pos)
+                {
+                    url = url.Substring(pos + 8).ToLower();
                     pos = url.IndexOf('/');
                     return 0 < pos ? url.Substring(0, pos) : url;
                 }
@@ -500,7 +429,7 @@ namespace ASC.Web.Studio.Utility
         {
             try
             {
-                var pos = url.IndexOf("/modules/", StringComparison.InvariantCultureIgnoreCase);
+                var pos = url.IndexOf("/Modules/", StringComparison.InvariantCultureIgnoreCase);
                 if (0 <= pos)
                 {
                     url = url.Substring(pos + 9).ToLower();
@@ -587,11 +516,17 @@ namespace ASC.Web.Studio.Utility
 
             //--remove redundant slashes
             var uri = new Uri(url);
+
+            if (uri.Scheme == "mailto")
+                return uri.OriginalString;
+
             var baseUri = new UriBuilder(uri.Scheme, uri.Host, uri.Port).Uri;
             baseUri = uri.Segments.Aggregate(baseUri, (current, segment) => new Uri(current, segment));
             //--
+            //todo: lost query string!!!
 
-            return baseUri.ToString();
+
+            return baseUri.ToString().TrimEnd('/');
         }
 
         #endregion
@@ -601,9 +536,9 @@ namespace ASC.Web.Studio.Utility
         public static string GetAdministration(ManagementType managementType)
         {
             if (managementType == ManagementType.General)
-                return ToAbsolute("~/management.aspx") + string.Empty;
+                return ToAbsolute("~/Management.aspx") + string.Empty;
 
-            return ToAbsolute("~/management.aspx") + "?" + "type=" + ((int)managementType).ToString();
+            return ToAbsolute("~/Management.aspx") + "?" + "type=" + ((int)managementType).ToString();
         }
 
         #endregion
@@ -629,11 +564,6 @@ namespace ASC.Web.Studio.Utility
             if (userId != default(Guid))
             {
                 link += "&uid=" + userId;
-            }
-
-            if (postfix != null)
-            {
-                link += "&p=1";
             }
 
             return link;

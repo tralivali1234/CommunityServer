@@ -38,13 +38,13 @@
                         <div class="requiredField">
                             <span class="requiredErrorText"><%= CRMContactResource.ErrorEmptyContactFirstName%></span>
                             <div class="headerPanelSmall"><%= CRMContactResource.FirstName%></div>
-                            <input type="text" class="textEdit generalField" name="baseInfo_firstName" maxlength="100"
+                            <input type="text" class="textEdit generalField" name="baseInfo_firstName" maxlength="255"
                                value="<%= GetFirstName() %>"/>
                         </div>
                     </td>
                     <td style="padding-left:10px;">
                         <div class="bold"><%= CRMContactResource.LastName%></div>
-                        <input type="text" class="textEdit generalField" name="baseInfo_lastName" maxlength="100"
+                        <input type="text" class="textEdit generalField" name="baseInfo_lastName" maxlength="255"
                             value="<%= GetLastName() %>"/>
                     </td>
                 </tr>
@@ -64,7 +64,7 @@
                         <div>
                             <div class="bold"><%= CRMContactResource.PersonPosition%></div>
                             <input type="text" class="textEdit generalField" name="baseInfo_personPosition"
-                                maxlength="100" value="<%= GetTitle()%>" />
+                                maxlength="255" value="<%= GetTitle()%>" />
                         </div>
                     </td>
                 </tr>
@@ -76,7 +76,7 @@
                     <div class="requiredField">
                         <span class="requiredErrorText"><%= CRMContactResource.ErrorEmptyCompanyName%></span>
                         <div class="headerPanelSmall"><%= CRMContactResource.CompanyName%></div>
-                        <input type="text" class="textEdit generalField" name="baseInfo_companyName" maxlength="100"
+                        <input type="text" class="textEdit generalField" name="baseInfo_companyName" maxlength="255"
                             value="<%= GetCompanyName()%>" />
                     </div>
                 </div>
@@ -207,9 +207,10 @@
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="select-cell" colspan="2">
-                                            <select id="contactCountry" name="contactCountry" class="contact_country comboBox">
-                                            </select>
+                                        <td class="input-cell" colspan="2">
+                                            <input type="text" class="contact_country textEdit" maxlength="255"
+                                                name="contactInfo_Address_0_<%=(int)AddressCategory.Billing + "_" + AddressPart.Country %>_0"
+                                                placeholder="<%= CRMJSResource.CountryWatermark %>"/>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -292,7 +293,7 @@
 
                     <dt style="margin-top:20px;">
                         <div id="contactListBox">
-                            <table id="contactTable" class="table-list" cellpadding="4" cellspacing="0">
+                            <table id="contactTable" class="table-list padding4" cellpadding="0" cellspacing="0">
                                 <tbody>
                                 </tbody>
                             </table>
@@ -324,7 +325,7 @@
                     <div id="contactPhoto" class="contact-photo">
                         <div class="contact-photo-img">
                             <img class="contact_photo" alt="" src="<%= String.Format("{0}?{1}",ContactPhotoManager.GetBigSizePhoto(0, UrlParameters.Type != "people"), new DateTime().Ticks) %>"
-                                data-avatarurl="<%= TargetContact != null ? String.Format("{0}HttpHandlers/filehandler.ashx?action=contactphotoulr&cid={1}&isc={2}&ps=3", PathProvider.BaseAbsolutePath, TargetContact.ID, TargetContact is Company).ToLower() : "" %>" />
+                                data-avatarurl="<%= TargetContact != null ? String.Format("{0}HttpHandlers/filehandler.ashx?action=contactphotoulr&cid={1}&isc={2}&ps=3", PathProvider.BaseAbsolutePath, TargetContact.ID, TargetContact is Company) : "" %>" />
                         </div>
 
                         <div class="under_logo">

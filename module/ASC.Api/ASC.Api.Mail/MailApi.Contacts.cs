@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,12 +20,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 using ASC.Api.Attributes;
-using ASC.Api.Mail.DataContracts;
-using ASC.Api.Mail.Extensions;
-using ASC.Mail.Aggregator;
-using ASC.Mail.Aggregator.Common;
-using ASC.Mail.Aggregator.DbSchema;
-using ASC.Mail.Aggregator.Filter;
+using ASC.Mail;
+using ASC.Mail.Core.Dao.Expressions.Contact;
+using ASC.Mail.Core.Entities;
+using ASC.Mail.Data.Contracts;
+using ASC.Mail.Enums;
+using ASC.Mail.Extensions;
+
+// ReSharper disable InconsistentNaming
 
 namespace ASC.Api.Mail
 {
@@ -54,8 +47,12 @@ namespace ASC.Api.Mail
             if (string.IsNullOrEmpty(term))
                 throw new ArgumentException(@"term parameter empty.", "term");
 
-            var scheme = HttpContext.Current == null ? Uri.UriSchemeHttp : HttpContext.Current.Request.GetUrlRewriter().Scheme;
-            return MailBoxManager.SearchEmails(TenantId, Username, term, MailAutocompleteMaxCountPerSystem, scheme, MailAutocompleteTimeout);
+            var scheme = HttpContext.Current == null
+                ? Uri.UriSchemeHttp
+                : HttpContext.Current.Request.GetUrlRewriter().Scheme;
+
+            return MailEngineFactory.ContactEngine.SearchEmails(TenantId, Username, term, MailAutocompleteMaxCountPerSystem,
+                scheme, MailAutocompleteTimeout);
         }
 
         /// <summary>
@@ -70,37 +67,31 @@ namespace ASC.Api.Mail
         /// <short>Gets filtered contacts</short> 
         /// <category>Contacts</category>
         [Read(@"contacts")]
-        public IEnumerable<MailContactData> GetContacts(string search, int? contactType, int? pageSize, int fromIndex, string sortorder)
+        public IEnumerable<MailContactData> GetContacts(string search, int? contactType, int? pageSize, int fromIndex,
+            string sortorder)
         {
-            var filter = new MailContactsFilter
-            {
-                SearchFilter = search,
-                Type = contactType,
-                StartIndex = fromIndex,
-                Count = pageSize.GetValueOrDefault(25),
-                SortOrder = sortorder
-            };
+            var exp = string.IsNullOrEmpty(search) && !contactType.HasValue
+                ? new SimpleFilterContactsExp(TenantId, Username, sortorder == Defines.ASCENDING, fromIndex, pageSize)
+                : new FullFilterContactsExp(TenantId, Username, search, contactType,
+                    orderAsc: sortorder == Defines.ASCENDING,
+                    startIndex: fromIndex, limit: pageSize);
 
-            var contacts = MailBoxManager.GetMailContacts(
-                TenantId,
-                Username,
-                filter);
+            var contacts = MailEngineFactory.ContactEngine.GetContactCards(exp);
 
             int totalCount;
 
             if (contacts.Any() && contacts.Count() < pageSize)
             {
-                totalCount = fromIndex + contacts.Count();
+                totalCount = fromIndex + contacts.Count;
             }
             else
             {
-                totalCount = MailBoxManager.GetMailContactsCount(TenantId,
-                Username,
-                filter);
+                totalCount = MailEngineFactory.ContactEngine.GetContactCardsCount(exp);
             }
+
             _context.SetTotalCount(totalCount);
 
-            return contacts.ToContactData();
+            return contacts.ToMailContactDataList();
         }
 
         /// <summary>
@@ -115,9 +106,11 @@ namespace ASC.Api.Mail
         [Read(@"contacts/bycontactinfo")]
         public IEnumerable<MailContactData> GetContactsByContactInfo(ContactInfoType infoType, String data, bool? isPrimary)
         {
-            var contacts = MailBoxManager.GetContactsByContactInfo(TenantId, Username, infoType, data, isPrimary);
+            var exp = new FullFilterContactsExp(TenantId, Username, data, infoType: infoType, isPrimary: isPrimary);
 
-            return contacts.ToContactData();
+            var contacts = MailEngineFactory.ContactEngine.GetContactCards(exp);
+
+            return contacts.ToMailContactDataList();
         }
 
         /// <summary>
@@ -136,9 +129,12 @@ namespace ASC.Api.Mail
             if (!emails.Any())
                 throw new ArgumentException(@"Invalid list of emails.", "emails");
 
-            var contact = MailBoxManager.SaveMailContact(TenantId, Username, name, description, emails, phoneNumbers, ContactType.Personal);
+            var contactCard = new ContactCard(0, TenantId, Username, name, description, ContactType.Personal, emails,
+                phoneNumbers);
 
-            return contact.ToContactData();
+            var newContact = MailEngineFactory.ContactEngine.SaveContactCard(contactCard);
+
+            return newContact.ToMailContactData();
         }
 
         /// <summary>
@@ -149,12 +145,12 @@ namespace ASC.Api.Mail
         /// <short>Remove mail contact </short> 
         /// <category>Contacts</category>
         [Update(@"contacts/remove")]
-        public IEnumerable<int> RemoveContact(List<int> ids)
+        public IEnumerable<int> RemoveContacts(List<int> ids)
         {
             if (!ids.Any())
                 throw new ArgumentException(@"Empty ids collection", "ids");
 
-            MailBoxManager.DeleteMailContacts(TenantId, Username, ids);
+            MailEngineFactory.ContactEngine.RemoveContacts(ids);
 
             return ids;
         }
@@ -179,9 +175,11 @@ namespace ASC.Api.Mail
             if (!emails.Any())
                 throw new ArgumentException(@"Invalid list of emails.", "emails");
 
-            var contact = MailBoxManager.UpdateMailContact(TenantId, Username, id, name, description, emails, phoneNumbers, ContactType.Personal);
+            var contactCard = new ContactCard(id, TenantId, Username, name, description, ContactType.Personal, emails, phoneNumbers);
 
-            return contact.ToContactData();
+            var contact = MailEngineFactory.ContactEngine.UpdateContactCard(contactCard);
+
+            return contact.ToMailContactData();
         }
 
         /// <summary>
@@ -193,12 +191,12 @@ namespace ASC.Api.Mail
         /// <category>Contacts</category>
         ///<exception cref="ArgumentException">Exception happens when in parameters is invalid. Text description contains parameter name and text description.</exception>
         [Read(@"crm/linked/entities")]
-        public IEnumerable<CrmContactEntity> GetLinkedCrmEntitiesInfo(int message_id)
+        public IEnumerable<CrmContactData> GetLinkedCrmEntitiesInfo(int message_id)
         {
             if(message_id < 0)
                 throw new ArgumentException(@"meesage_id must be positive integer", "message_id");
 
-            return MailBoxManager.GetLinkedCrmEntitiesId(message_id, TenantId, Username);
+            return MailEngineFactory.CrmLinkEngine.GetLinkedCrmEntitiesId(message_id);
         }
     }
 }

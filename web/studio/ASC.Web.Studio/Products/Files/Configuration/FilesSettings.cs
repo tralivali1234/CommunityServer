@@ -1,48 +1,37 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
-using System.Collections.Generic;
 using System.Runtime.Serialization;
-using System.Web.Configuration;
 using ASC.Core;
-using ASC.Web.Core.Utility.Settings;
-using ASC.Web.Studio.Utility;
-using System.Globalization;
+using ASC.Core.Common.Settings;
+using ASC.Files.Core;
 
 namespace ASC.Web.Files.Classes
 {
     [Serializable]
     [DataContract]
-    public class FilesSettings : ISettings
+    public class FilesSettings : BaseSettings<FilesSettings>
     {
-        private static readonly CultureInfo CultureInfo = CultureInfo.CreateSpecificCulture("en-US");
-
         [DataMember(Name = "EnableThirdpartySettings")]
         public bool EnableThirdpartySetting { get; set; }
+
+        [DataMember(Name = "FastDelete")]
+        public bool FastDeleteSetting { get; set; }
 
         [DataMember(Name = "StoreOriginalFiles")]
         public bool StoreOriginalFilesSetting { get; set; }
@@ -50,93 +39,209 @@ namespace ASC.Web.Files.Classes
         [DataMember(Name = "UpdateIfExist")]
         public bool UpdateIfExistSetting { get; set; }
 
-        [DataMember(Name = "ExternalIP")]
-        public KeyValuePair<bool, string> CheckExternalIPSetting { get; set; }
-
         [DataMember(Name = "ConvertNotify")]
         public bool ConvertNotifySetting { get; set; }
 
-        public ISettings GetDefault()
+        [DataMember(Name = "SortedBy")]
+        public SortedByType DefaultSortedBySetting { get; set; }
+
+        [DataMember(Name = "SortedAsc")]
+        public bool DefaultSortedAscSetting { get; set; }
+
+        [DataMember(Name = "HideConfirmConvertSave")]
+        public bool HideConfirmConvertSaveSetting { get; set; }
+
+        [DataMember(Name = "HideConfirmConvertOpen")]
+        public bool HideConfirmConvertOpenSetting { get; set; }
+
+        [DataMember(Name = "Forcesave")]
+        public bool ForcesaveSetting { get; set; }
+
+        [DataMember(Name = "StoreForcesave")]
+        public bool StoreForcesaveSetting { get; set; }
+
+        [DataMember(Name = "HideRecent")]
+        public bool HideRecentSetting { get; set; }
+
+        [DataMember(Name = "HideFavorites")]
+        public bool HideFavoritesSetting { get; set; }
+
+        [DataMember(Name = "HideTemplates")]
+        public bool HideTemplatesSetting { get; set; }
+
+        public override ISettings GetDefault()
         {
             return new FilesSettings
                 {
+                    FastDeleteSetting = false,
                     EnableThirdpartySetting = true,
                     StoreOriginalFilesSetting = true,
                     UpdateIfExistSetting = false,
-                    CheckExternalIPSetting = new KeyValuePair<bool, string>(true, DateTime.MinValue.ToString(CultureInfo)),
                     ConvertNotifySetting = true,
+                    DefaultSortedBySetting = SortedByType.DateAndTime,
+                    DefaultSortedAscSetting = false,
+                    HideConfirmConvertSaveSetting = false,
+                    HideConfirmConvertOpenSetting = false,
+                    ForcesaveSetting = false,
+                    StoreForcesaveSetting = false,
+                    HideFavoritesSetting = false,
+                    HideRecentSetting = false,
+                    HideTemplatesSetting = false,
                 };
         }
 
-        public Guid ID
+        public override Guid ID
         {
             get { return new Guid("{03B382BD-3C20-4f03-8AB9-5A33F016316E}"); }
+        }
+
+        public static bool ConfirmDelete
+        {
+            set
+            {
+                var setting = LoadForCurrentUser();
+                setting.FastDeleteSetting = !value;
+                setting.SaveForCurrentUser();
+            }
+            get { return !LoadForCurrentUser().FastDeleteSetting; }
         }
 
         public static bool EnableThirdParty
         {
             set
             {
-                var setting = new FilesSettings
-                    {
-                        EnableThirdpartySetting = value
-                    };
-                SettingsManager.Instance.SaveSettings(setting, TenantProvider.CurrentTenantID);
+                var setting = Load();
+                setting.EnableThirdpartySetting = value;
+                setting.Save();
             }
-            get { return SettingsManager.Instance.LoadSettings<FilesSettings>(TenantProvider.CurrentTenantID).EnableThirdpartySetting; }
+            get { return Load().EnableThirdpartySetting; }
         }
 
         public static bool StoreOriginalFiles
         {
             set
             {
-                var setting = SettingsManager.Instance.LoadSettingsFor<FilesSettings>(SecurityContext.CurrentAccount.ID);
+                var setting = LoadForCurrentUser();
                 setting.StoreOriginalFilesSetting = value;
-
-                SettingsManager.Instance.SaveSettingsFor(setting, SecurityContext.CurrentAccount.ID);
+                setting.SaveForCurrentUser();
             }
-            get { return SettingsManager.Instance.LoadSettingsFor<FilesSettings>(SecurityContext.CurrentAccount.ID).StoreOriginalFilesSetting; }
+            get { return LoadForCurrentUser().StoreOriginalFilesSetting; }
         }
 
         public static bool UpdateIfExist
         {
             set
             {
-                var setting = SettingsManager.Instance.LoadSettingsFor<FilesSettings>(SecurityContext.CurrentAccount.ID);
+                var setting = LoadForCurrentUser();
                 setting.UpdateIfExistSetting = value;
-
-                SettingsManager.Instance.SaveSettingsFor(setting, SecurityContext.CurrentAccount.ID);
+                setting.SaveForCurrentUser();
             }
-            get { return SettingsManager.Instance.LoadSettingsFor<FilesSettings>(SecurityContext.CurrentAccount.ID).UpdateIfExistSetting; }
-        }
-
-        public static KeyValuePair<bool, DateTime> CheckHaveExternalIP
-        {
-            set
-            {
-                var setting = new FilesSettings
-                    {
-                        CheckExternalIPSetting = new KeyValuePair<bool, string>(value.Key, DateTime.UtcNow.ToString(CultureInfo))
-                    };
-                SettingsManager.Instance.SaveSettings(setting, -1);
-            }
-            get
-            {
-                var pair = SettingsManager.Instance.LoadSettings<FilesSettings>(-1).CheckExternalIPSetting;
-                return new KeyValuePair<bool, DateTime>(pair.Key, Convert.ToDateTime(pair.Value, CultureInfo));
-            }
+            get { return LoadForCurrentUser().UpdateIfExistSetting; }
         }
 
         public static bool ConvertNotify
         {
             set
             {
-                var setting = SettingsManager.Instance.LoadSettingsFor<FilesSettings>(SecurityContext.CurrentAccount.ID);
+                var setting = LoadForCurrentUser();
                 setting.ConvertNotifySetting = value;
-
-                SettingsManager.Instance.SaveSettingsFor(setting, SecurityContext.CurrentAccount.ID);
+                setting.SaveForCurrentUser();
             }
-            get { return SettingsManager.Instance.LoadSettingsFor<FilesSettings>(SecurityContext.CurrentAccount.ID).ConvertNotifySetting; }
+            get { return LoadForCurrentUser().ConvertNotifySetting; }
+        }
+
+        public static bool HideConfirmConvertSave
+        {
+            set
+            {
+                var setting = LoadForCurrentUser();
+                setting.HideConfirmConvertSaveSetting = value;
+                setting.SaveForCurrentUser();
+            }
+            get { return LoadForCurrentUser().HideConfirmConvertSaveSetting; }
+        }
+
+        public static bool HideConfirmConvertOpen
+        {
+            set
+            {
+                var setting = LoadForCurrentUser();
+                setting.HideConfirmConvertOpenSetting = value;
+                setting.SaveForCurrentUser();
+            }
+            get { return LoadForCurrentUser().HideConfirmConvertOpenSetting; }
+        }
+
+        public static OrderBy DefaultOrder
+        {
+            set
+            {
+                var setting = LoadForCurrentUser();
+                setting.DefaultSortedBySetting = value.SortedBy;
+                setting.DefaultSortedAscSetting = value.IsAsc;
+                setting.SaveForCurrentUser();
+            }
+            get
+            {
+                var setting = LoadForCurrentUser();
+                return new OrderBy(setting.DefaultSortedBySetting, setting.DefaultSortedAscSetting);
+            }
+        }
+
+        public static bool Forcesave
+        {
+            set
+            {
+                var setting = LoadForCurrentUser();
+                setting.ForcesaveSetting = value;
+                setting.SaveForCurrentUser();
+            }
+            get { return LoadForCurrentUser().ForcesaveSetting; }
+        }
+
+        public static bool StoreForcesave
+        {
+            set
+            {
+                if (CoreContext.Configuration.Personal) throw new NotSupportedException();
+                var setting = Load();
+                setting.StoreForcesaveSetting = value;
+                setting.Save();
+            }
+            get { return !CoreContext.Configuration.Personal && Load().StoreForcesaveSetting; }
+        }
+
+        public static bool RecentSection
+        {
+            set
+            {
+                var setting = LoadForCurrentUser();
+                setting.HideRecentSetting = !value;
+                setting.SaveForCurrentUser();
+            }
+            get { return !LoadForCurrentUser().HideRecentSetting; }
+        }
+
+        public static bool FavoritesSection
+        {
+            set
+            {
+                var setting = LoadForCurrentUser();
+                setting.HideFavoritesSetting = !value;
+                setting.SaveForCurrentUser();
+            }
+            get { return !LoadForCurrentUser().HideFavoritesSetting; }
+        }
+
+        public static bool TemplatesSection
+        {
+            set
+            {
+                var setting = LoadForCurrentUser();
+                setting.HideTemplatesSetting = !value;
+                setting.SaveForCurrentUser();
+            }
+            get { return !LoadForCurrentUser().HideTemplatesSetting; }
         }
     }
 }

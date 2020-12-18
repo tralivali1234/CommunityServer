@@ -1,33 +1,26 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
 using System.IO;
 using SharpCompress.Common;
-using SharpCompress.Reader;
-using SharpCompress.Writer;
+using SharpCompress.Readers;
+using SharpCompress.Writers;
 
 namespace ASC.Data.Backup
 {
@@ -58,15 +51,16 @@ namespace ASC.Data.Backup
     public class ZipReadOperator : IDataReadOperator
     {
         private readonly string tmpdir;
-
+        public List<string> Entries { get; private set; }
 
         public ZipReadOperator(string targetFile)
         {
-            tmpdir = Path.Combine(Path.GetDirectoryName(targetFile), Path.GetFileNameWithoutExtension(targetFile));
+            tmpdir = Path.Combine(Path.GetDirectoryName(targetFile), Path.GetFileNameWithoutExtension(targetFile).Replace('>', '_').Replace(':', '_').Replace('?', '_'));
+            Entries = new List<string>();
 
             using (var stream = File.OpenRead(targetFile))
             {
-                var reader = ReaderFactory.Open(stream, Options.LookForHeader | Options.KeepStreamsOpen);
+                var reader = ReaderFactory.Open(stream, new ReaderOptions { LookForHeader = true, LeaveStreamOpen = true });
                 while (reader.MoveToNextEntry())
                 {
                     if (reader.Entry.IsDirectory) continue;
@@ -91,13 +85,20 @@ namespace ASC.Data.Backup
                         using (var fileStream = File.Create(fullPath))
                         using (var entryStream = reader.OpenEntryStream())
                         {
-                            entryStream.CopyTo(fileStream);
+                            entryStream.StreamCopyTo(fileStream);
                         }
                     }
                     else
                     {
-                        reader.WriteEntryToDirectory(tmpdir, ExtractOptions.ExtractFullPath | ExtractOptions.Overwrite);
+                        try
+                        {
+                            reader.WriteEntryToDirectory(tmpdir, new ExtractionOptions { ExtractFullPath = true, Overwrite = true });
+                        }
+                        catch (ArgumentException)
+                        {
+                        }
                     }
+                    Entries.Add(reader.Entry.Key);
                 }
             }
         }
@@ -105,7 +106,7 @@ namespace ASC.Data.Backup
         public Stream GetEntry(string key)
         {
             var filePath = Path.Combine(tmpdir, key);
-            return File.Exists(filePath) ? File.Open(filePath, FileMode.Open) : null;
+            return File.Exists(filePath) ? File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read) : null;
         }
 
         public void Dispose()

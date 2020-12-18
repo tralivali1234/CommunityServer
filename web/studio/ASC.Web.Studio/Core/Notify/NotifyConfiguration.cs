@@ -1,53 +1,47 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.Remoting.Messaging;
 using System.Text.RegularExpressions;
 using System.Threading;
+using ASC.Common.Logging;
 using ASC.Core;
 using ASC.Core.Tenants;
 using ASC.Core.Users;
 using ASC.Notify;
 using ASC.Notify.Engine;
+using ASC.Notify.Messages;
 using ASC.Notify.Patterns;
 using ASC.Web.Core;
 using ASC.Web.Studio.Utility;
-using log4net;
+using MimeKit.Utils;
 using ASC.Web.Core.WhiteLabel;
 
 namespace ASC.Web.Studio.Core.Notify
 {
     public static class NotifyConfiguration
     {
-        private static bool configured = false;
-        private static object locker = new object();
-        private static readonly Regex urlReplacer = new Regex(@"(<a [^>]*href=(('(?<url>[^>']*)')|(""(?<url>[^>""]*)""))[^>]*>)|(<img [^>]*src=(('(?<url>(?!data:)[^>']*)')|(""(?<url>(?!data:)[^>""]*)""))[^/>]*/?>)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static bool configured;
+        private static readonly object locker = new object();
+        private static readonly Regex urlReplacer = new Regex(@"(<a [^>]*href=(('(?<url>[^>']*)')|(""(?<url>[^>""]*)""))[^>]*>)|(<img [^>]*src=(('(?<url>(?![data:|cid:])[^>']*)')|(""(?<url>(?![data:|cid:])[^>""]*)""))[^/>]*/?>)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex textileLinkReplacer = new Regex(@"""(?<text>[\w\W]+?)"":""(?<link>[^""]+)""", RegexOptions.Singleline | RegexOptions.Compiled);
 
         public static void Configure()
@@ -121,7 +115,7 @@ namespace ASC.Web.Studio.Core.Notify
                      try
                      {
                          // culture
-                         var u = ASC.Core.Users.Constants.LostUser;
+                         var u = Constants.LostUser;
 
                          if (32 <= r.Recipient.ID.Length)
                          {
@@ -139,17 +133,17 @@ namespace ASC.Web.Studio.Core.Notify
                              }
                          }
 
-                         if (ASC.Core.Users.Constants.LostUser.Equals(u))
+                         if (Constants.LostUser.Equals(u))
                          {
                              u = CoreContext.UserManager.GetUserByEmail(r.Recipient.ID);
                          }
 
-                         if (ASC.Core.Users.Constants.LostUser.Equals(u))
+                         if (Constants.LostUser.Equals(u))
                          {
                              u = CoreContext.UserManager.GetUserByUserName(r.Recipient.ID);
                          }
 
-                         if (!ASC.Core.Users.Constants.LostUser.Equals(u))
+                         if (!Constants.LostUser.Equals(u))
                          {
                              var culture = !string.IsNullOrEmpty(u.CultureName) ? u.GetCulture() : CoreContext.TenantManager.GetCurrentTenant().GetCulture();
                              Thread.CurrentThread.CurrentCulture = culture;
@@ -169,7 +163,7 @@ namespace ASC.Web.Studio.Core.Notify
                              }
                              if (productId != Guid.Empty && productId != new Guid("f4d98afdd336433287783c6945c81ea0") /* ignore people product */)
                              {
-                                 return !WebItemSecurity.IsAvailableForUser(productId.ToString(), u.ID);
+                                 return !WebItemSecurity.IsAvailableForUser(productId, u.ID);
                              }
                          }
 
@@ -183,7 +177,7 @@ namespace ASC.Web.Studio.Core.Notify
                      }
                      catch (Exception error)
                      {
-                         LogManager.GetLogger(typeof(NotifyConfiguration)).Error(error);
+                         LogManager.GetLogger("ASC").Error(error);
                      }
                      return false;
                  });
@@ -203,141 +197,24 @@ namespace ASC.Web.Studio.Core.Notify
                      {
                          var tags = r.Arguments;
 
-                         var logoTextTag = tags.FirstOrDefault(a => a.Tag == Constants.LetterLogoText);
-                         var logoTextTagTM = tags.FirstOrDefault(a => a.Tag == Constants.LetterLogoTextTM);
-
+                         var logoTextTag = tags.FirstOrDefault(a => a.Tag == CommonTags.LetterLogoText);
                          var logoText = logoTextTag != null ? (String)logoTextTag.Value : string.Empty;
-                         var logoTextTM = logoTextTagTM != null ? (String)logoTextTagTM.Value : string.Empty;
 
-                         if (!string.IsNullOrEmpty(logoText) && !string.IsNullOrEmpty(logoTextTM))
+                         if (!string.IsNullOrEmpty(logoText))
                          {
-                             var body = r.CurrentMessage.Body
-                                     .Replace(string.Format("${{{0}}}", Constants.LetterLogoTextTM), logoTextTM)
-                                     .Replace(string.Format("${{{0}}}", Constants.LetterLogoText), logoText);
-                             r.CurrentMessage.Body = body;
-
+                             r.CurrentMessage.Body = r.CurrentMessage.Body
+                                 .Replace(string.Format("${{{0}}}", CommonTags.LetterLogoText), logoText);
                          }
                      }
                      catch (Exception error)
                      {
-                         LogManager.GetLogger(typeof(NotifyConfiguration)).Error(error);
+                         LogManager.GetLogger("ASC").Error(error);
                      }
                      return false;
                  });
             client.AddInterceptor(whiteLabel);
 
             #endregion
-        }
-
-        private static string GetPartnerInfo()
-        {
-            var partner = CoreContext.PaymentManager.GetApprovedPartner();
-            if (partner == null || !partner.CustomEmailSignature) return string.Empty;
-
-            var footerStart = "<table cellspacing=\"0\" cellpadding=\"0\" style=\"margin: 0; border-spacing: 0; empty-cells: show;\">";
-            footerStart += "<tbody>";
-            footerStart += "<tr style=\"height: 10px\">";
-            footerStart += "<td colspan=\"2\" style=\"width: 40px; background-color: #09669C;\"><div style=\"width: 40px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "<td style=\"width: 600px; background-color: #fff;\"><div style=\"width: 600px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "<td colspan=\"2\" style=\"width: 40px; background-color: #09669C;\"><div style=\"width: 40px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "</tr>";
-            footerStart += "<tr style=\"height: 10px\">";
-            footerStart += "<td colspan=\"5\" style=\"width: 680px; background-color: #09669C;\"><div style=\"width: 680px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "</tr>";
-            footerStart += "<tr style=\"height: 10px\">";
-            footerStart += "<td style=\"width: 33px; background-color: #09669C;\"><div style=\"width: 33px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "<td style=\"width: 7px; background-color: #09669C;\"><div style=\"width: 7px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "<td style=\"width: 600px; background-color: #fff;\"><div style=\"width: 600px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "<td style=\"width: 7px; background-color: #09669C;\"><div style=\"width: 7px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "<td style=\"width: 33px; background-color: #09669C;\"><div style=\"width: 33px; height: 10px;\">&nbsp;</div></td>";
-            footerStart += "</tr>";
-            footerStart += "</tbody>";
-            footerStart += "</table>";
-            footerStart += "<table cellspacing=\"0\" cellpadding=\"0\" style=\"margin: 0; border-spacing: 0; empty-cells: show;\">";
-            footerStart += "<tbody>";
-            footerStart += "<tr style=\"color: #333;\">";
-            footerStart += "<td style=\"width: 33px; background-color: #09669C;\"><div style=\"width: 33px;\"> </div></td>";
-            footerStart += "<td style=\"width: 7px; background-color: #f5942d\"><div style=\"width: 7px;\"> </div></td>";
-            footerStart += "<td style=\"width: 600px; background-color: #fff;\">";
-            footerStart += "<div style=\"width: 540px; padding: 5px 30px 10px; overflow: hidden;\">";
-            footerStart += "<table cellspacing=\"0\" cellpadding=\"0\">";
-            footerStart += "<tbody>";
-            footerStart += "<tr>";
-
-            var footerEnd = "</tr>";
-            footerEnd += "</tbody>";
-            footerEnd += "</table>";
-            footerEnd += "</div>";
-            footerEnd += "</td>";
-            footerEnd += "<td style=\"width: 7px; background-color: #f5942d\"><div style=\"width: 7px;\"> </div></td>";
-            footerEnd += "<td style=\"width: 33px; background-color: #09669C;\"><div style=\"width: 33px;\"> </div></td>";
-            footerEnd += "</tr>";
-            footerEnd += "</tbody>";
-            footerEnd += "</table>";
-
-            var partnerInfo = string.Empty;
-            if ((partner.DisplayType == PartnerDisplayType.All || partner.DisplayType == PartnerDisplayType.LogoOnly) && !string.IsNullOrEmpty(partner.LogoUrl))
-            {
-                partnerInfo += "<td rowspan=\"2\" align=\"center\" style=\"width:180px; max-width:180px;\"><img src=\"" + partner.LogoUrl + "\" style=\"max-width:180px;\" /></td>";
-            }
-
-            partnerInfo += "<td colspan=\"3\" style=\"padding-left: 10px;\">";
-
-            if ((partner.DisplayType == PartnerDisplayType.All || partner.DisplayType == PartnerDisplayType.DisplayNameOnly) && !string.IsNullOrEmpty(partner.DisplayName))
-            {
-                partnerInfo += "<div style=\"font-size: 22px;\">" + partner.DisplayName + "</div>";
-            }
-            partnerInfo += "<i style=\"color: #808080; font-size: 13px;\">" + WebstudioNotifyPatternResource.TextForPartnerFooter + "</i>";
-            partnerInfo += "</td></tr><tr>";
-
-            if (!string.IsNullOrEmpty(partner.Address) || !string.IsNullOrEmpty(partner.SupportPhone) ||
-                !string.IsNullOrEmpty(partner.Phone) || !string.IsNullOrEmpty(partner.Url))
-            {
-                partnerInfo += "<td style=\"width:180px; padding:8px 0 0 10px; vertical-align: top;\">";
-
-                if (!string.IsNullOrEmpty(partner.Address))
-                {
-                    partnerInfo += "<div style=\"max-width: 180px; overflow: hidden; text-overflow: ellipsis; font-size: 12px; padding-bottom: 5px;\">" + partner.Address + "</div>";
-                }
-                if (!string.IsNullOrEmpty(partner.SupportPhone))
-                {
-                    partnerInfo += "<div style=\"max-width: 180px; overflow: hidden; text-overflow: ellipsis; font-size: 12px;\">" + partner.SupportPhone + "</div>";
-                }
-                else if (!string.IsNullOrEmpty(partner.Phone))
-                {
-                    partnerInfo += "<div style=\"max-width: 180px; overflow: hidden; text-overflow: ellipsis; font-size: 12px;\">" + partner.Phone + "</div>";
-                }
-                if (!string.IsNullOrEmpty(partner.Url))
-                {
-                    var fullUrl = partner.Url.StartsWith("http:") || partner.Url.StartsWith("https:") ? partner.Url : string.Concat("http://", partner.Url);
-                    partnerInfo += "<a style=\"font-size:12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; display:inline-block;\" target=\"_blank\" href=\"" + fullUrl + "\">" + partner.Url + "</a>";
-                }
-                partnerInfo += "</td>";
-            }
-            if (!string.IsNullOrEmpty(partner.SupportEmail) || !string.IsNullOrEmpty(partner.SalesEmail) || !string.IsNullOrEmpty(partner.Email))
-            {
-                partnerInfo += "<td style=\"width:180px; padding:8px 0 0 10px; vertical-align: top;\">";
-                if (!string.IsNullOrEmpty(partner.SupportEmail) || !string.IsNullOrEmpty(partner.SalesEmail))
-                {
-                    if (!string.IsNullOrEmpty(partner.SalesEmail))
-                    {
-                        partnerInfo += "<p style=\"font-size:12px; color:#808080; margin:0; padding:0;\">" + WebstudioNotifyPatternResource.SalesDepartment + ":</p>";
-                        partnerInfo += "<a style=\"font-size:12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; display:inline-block; margin-bottom: 8px;\" href=\"mailto:" + partner.SalesEmail + "\">" + partner.SalesEmail + "</a>";
-                    }
-                    if (!string.IsNullOrEmpty(partner.SupportEmail))
-                    {
-                        partnerInfo += "<p style=\"font-size:12px; color:#808080; margin:0; padding:0;\">" + WebstudioNotifyPatternResource.TechnicalSupport + ":</p>";
-                        partnerInfo += "<a style=\"font-size:12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; display:inline-block;\" href=\"mailto:" + partner.SupportEmail + "\">" + partner.SupportEmail + "</a>";
-                    }
-                }
-                else if (!string.IsNullOrEmpty(partner.Email))
-                {
-                    partnerInfo += "<a style=\"font-size:12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; display:inline-block;\" href=\"mailto:" + partner.Email + "\">" + partner.Email + "</a><br />";
-                }
-                partnerInfo += "</td>";
-            }
-            partnerInfo = footerStart + partnerInfo + footerEnd;
-            return partnerInfo;
         }
 
 
@@ -364,10 +241,11 @@ namespace ASC.Web.Studio.Core.Notify
                 product = WebItemManager.Instance[(Guid)CallContext.GetData("asc.web.product_id")] as IProduct;
             }
 
-            var logoText = TenantLogoManager.GetLogoText();
-            var logoTextTM = String.Equals(logoText, TenantWhiteLabelSettings.DefaultLogo, StringComparison.Ordinal)
-                ? String.Format("{0}™", logoText.ToUpper())
-                : logoText;
+            var logoText = TenantWhiteLabelSettings.DefaultLogoText;
+            if ((TenantExtra.Enterprise || CoreContext.Configuration.CustomMode) && !MailWhiteLabelSettings.Instance.IsDefault)
+            {
+                logoText = TenantLogoManager.GetLogoText();
+            }
 
             request.Arguments.Add(new TagValue(CommonTags.AuthorID, aid));
             request.Arguments.Add(new TagValue(CommonTags.AuthorName, aname));
@@ -377,19 +255,79 @@ namespace ASC.Web.Studio.Core.Notify
             request.Arguments.Add(new TagValue(CommonTags.ModuleID, module != null ? module.ID : Guid.Empty));
             request.Arguments.Add(new TagValue(CommonTags.ProductUrl, CommonLinkUtility.GetFullAbsolutePath(product != null ? product.StartURL : "~")));
             request.Arguments.Add(new TagValue(CommonTags.DateTime, TenantUtil.DateTimeNow()));
-            request.Arguments.Add(new TagValue(CommonTags.Helper, new PatternHelper()));
             request.Arguments.Add(new TagValue(CommonTags.RecipientID, Context.SYS_RECIPIENT_ID));
+            request.Arguments.Add(new TagValue(CommonTags.ProfileUrl, CommonLinkUtility.GetFullAbsolutePath(CommonLinkUtility.GetMyStaff())));
             request.Arguments.Add(new TagValue(CommonTags.RecipientSubscriptionConfigURL, CommonLinkUtility.GetMyStaff()));
-            request.Arguments.Add(new TagValue("Partner", GetPartnerInfo()));
-            request.Arguments.Add(new TagValue(Constants.LetterLogo, CommonLinkUtility.GetFullAbsolutePath(TenantLogoManager.GetLogoDark(true))));
-            request.Arguments.Add(new TagValue(Constants.LetterLogoText, logoText));
-            request.Arguments.Add(new TagValue(Constants.LetterLogoTextTM, logoTextTM));
-            request.Arguments.Add(new TagValue(Constants.MailWhiteLabelSettings, MailWhiteLabelSettings.Instance));
+            request.Arguments.Add(new TagValue(CommonTags.HelpLink, CommonLinkUtility.GetHelpLink(false)));
+            request.Arguments.Add(new TagValue(CommonTags.LetterLogoText, logoText));
+            request.Arguments.Add(new TagValue(CommonTags.MailWhiteLabelSettings, MailWhiteLabelSettings.Instance));
+            request.Arguments.Add(new TagValue(CommonTags.SendFrom, CoreContext.TenantManager.GetCurrentTenant().Name));
+            request.Arguments.Add(new TagValue(CommonTags.ImagePath, StudioNotifyHelper.GetNotificationImageUrl("").TrimEnd('/')));
 
-            if (!request.Arguments.Any(x => CommonTags.SendFrom.Equals(x.Tag)))
+            AddLetterLogo(request);
+        }
+
+        private static void AddLetterLogo(NotifyRequest request)
+        {
+            if (TenantExtra.Enterprise || CoreContext.Configuration.CustomMode)
             {
-                request.Arguments.Add(new TagValue(CommonTags.SendFrom, CoreContext.TenantManager.GetCurrentTenant().Name));
+                try
+                {
+                    var logoData = TenantLogoManager.GetMailLogoDataFromCache();
+
+                    if (logoData == null)
+                    {
+                        var logoStream = TenantLogoManager.GetWhitelabelMailLogo();
+                        logoData = ReadStreamToByteArray(logoStream) ?? GetDefaultMailLogo();
+
+                        if (logoData != null)
+                            TenantLogoManager.InsertMailLogoDataToCache(logoData);
+                    }
+
+                    if (logoData != null)
+                    {
+                        var attachment = new NotifyMessageAttachment
+                        {
+                            FileName = "logo.png",
+                            Content = logoData,
+                            ContentId = MimeUtils.GenerateMessageId()
+                        };
+
+                        request.Arguments.Add(new TagValue(CommonTags.LetterLogo, "cid:" + attachment.ContentId));
+                        request.Arguments.Add(new TagValue(CommonTags.EmbeddedAttachments, new[] { attachment }));
+                        return;
+                    }
+                }
+                catch (Exception error)
+                {
+                    LogManager.GetLogger("ASC").Error(error);
+                }
             }
+
+            var logoUrl = CommonLinkUtility.GetFullAbsolutePath(TenantLogoManager.GetLogoDark(true));
+
+            request.Arguments.Add(new TagValue(CommonTags.LetterLogo, logoUrl));
+        }
+
+        private static byte[] ReadStreamToByteArray(Stream inputStream)
+        {
+            if (inputStream == null) return null;
+
+            using (inputStream)
+            {
+                using (var memoryStream = new MemoryStream())
+                {
+                    inputStream.CopyTo(memoryStream);
+                    return memoryStream.ToArray();
+                }
+            }
+        }
+
+        public static byte[] GetDefaultMailLogo()
+        {
+            var filePath = Path.Combine(Environment.CurrentDirectory, "skins", "default", "images", "onlyoffice_logo", "dark_general.png");
+
+            return File.Exists(filePath) ? File.ReadAllBytes(filePath) : null;
         }
     }
 }

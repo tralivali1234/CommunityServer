@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -409,16 +400,29 @@ window.ASC.Files.ServiceManager = (function () {
         GetFolderItems: "getfolderitems",
         GetItems: "getitems",
         GetFolderItemsTree: "getfolderitemstree",
+        GetMediaFile: "getmediafile",
 
+        SetAceLink: "setacelink",
         GetSharedInfo: "getsharedinfo",
         GetSharedInfoShort: "getsharedinfoshort",
+
+        GetFileSharedInfo: "getfilesharedinfo",
+        SetAceFileLink: "setacefilelink",
+        GetEncryptionAccess: "getencryptionaccess",
+
         SetAceObject: "setaceobject",
         UnSubscribeMe: "unsubscribeme",
         GetShortenLink: "getshortenlink",
-        SendLinkToEmail: "sendlinktoemail",
+        GetPresignedUri: "getpresigneduri",
+
+        GetUsers: "getusers",
+        SendEditorNotify: "sendeditornotify",
 
         MarkAsRead: "markasread",
         GetNews: "getnews",
+        GetTemplates: "gettemplates",
+
+        ChangeOwner: "changeowner",
 
         FolderRename: "folderrename",
         FileRename: "filerename",
@@ -445,11 +449,16 @@ window.ASC.Files.ServiceManager = (function () {
         SaveThirdParty: "savethirdparty",
         DeleteThirdParty: "deletethirdparty",
         ChangeAccessToThirdparty: "changeaccesstothirdparty",
+        SaveDocuSign: "savedocusign",
+        SendDocuSign: "senddocusign",
 
         UpdateIfExist: "updateifexist",
-        GetHelpCenter: "gethelpcenter",
+        Forcesave: "forcesave",
+        StoreForcesave: "storeforcesave",
 
-        StoreOriginalFiles: "storeoriginalfiles",
+        GetHelpCenter: "gethelpcenter",
+        ChangeDeleteConfrim: "changedeleteconfrim",
+
         ConvertCurrentFile: "convertcurrentfile",
         ChunkUploadCheckConversion: "chunkuploadcheckconversion",
         ChunkUploadGetFileFromServer: "chunkuploadgetfilefromserver",
@@ -461,6 +470,7 @@ window.ASC.Files.ServiceManager = (function () {
 
         GetEditHistory: "getedithistory",
         GetDiffUrl: "getdiffurl",
+        RestoreVersion: "restoreversion",
 
         GetMails: "getmails",
         StartMailMerge: "startmailmerge",
@@ -473,12 +483,12 @@ window.ASC.Files.ServiceManager = (function () {
 
     var createNewFile = function (eventType, params) {
         params.ajaxsync = true;
-        request("get", "xml", eventType, params, "folders-files-createfile?parentId=" + encodeURIComponent(params.folderID) + "&title=" + encodeURIComponent(params.fileTitle));
+        request("get", "xml", eventType, params, "folders-files-createfile?parentId=" + encodeURIComponent(params.folderID || "") + "&title=" + encodeURIComponent(params.fileTitle) + "&templateId=" + encodeURIComponent(params.templateId || ""));
     };
 
     var getFolderItems = function (eventType, params, data) {
         params.showLoading = params.append != true;
-        request("post", "xml", eventType, params, data, "folders?parentId=" + encodeURIComponent(params.folderId) + "&from=" + params.from + "&count=" + params.count + "&filter=" + params.filter + "&subjectID=" + params.subject + "&search=" + encodeURIComponent(params.text));
+        request("post", "xml", eventType, params, data, "folders?parentId=" + encodeURIComponent(params.folderId) + "&from=" + params.from + "&count=" + params.count + "&filter=" + params.filter + "&subjectGroup=" + !!params.subjectGroup + "&subjectID=" + params.subjectId + "&withSubfolders=" + !!params.withSubfolders + "&searchInContent=" + !!params.searchInContent + "&search=" + encodeURIComponent(params.search));
     };
 
     var getTreeSubFolders = function (eventType, params) {
@@ -494,12 +504,12 @@ window.ASC.Files.ServiceManager = (function () {
     };
 
     var getItems = function (eventType, params, data) {
-        request("post", "json", eventType, params, data, "folders-intries?filter=" + params.filter + "&subjectID=" + params.subject + "&search=" + encodeURIComponent(params.text));
+        request("post", "json", eventType, params, data, "folders-entries?filter=" + params.filter + "&subjectGroup=" + !!params.subjectGroup + "&subjectID=" + params.subjectId + "&search=" + encodeURIComponent(params.search));
     };
 
     var getFile = function (eventType, params) {
         params.ajaxsync = true;
-        request("get", "xml", eventType, params, "folders-files-getversion?fileId=" + encodeURIComponent(params.fileId) + "&version=" + (params.version || -1));
+        request("get", params.dataType || "xml", eventType, params, "folders-files-getversion?fileId=" + encodeURIComponent(params.fileId) + "&version=" + (params.version || -1));
     };
 
     var getFileHistory = function (eventType, params) {
@@ -519,7 +529,11 @@ window.ASC.Files.ServiceManager = (function () {
     };
 
     var getSiblingsImage = function (eventType, params, data) {
-        request("post", "json", eventType, params, data, "folders-files-siblings?fileId=" + encodeURIComponent(params.fileId) + "&filter=" + params.filter + "&subjectID=" + params.subjectId + "&search=" + encodeURIComponent(params.search));
+        request("post", "json", eventType, params, data, "folders-files-siblings?fileId=" + encodeURIComponent(params.fileId) + "&parentId=" + encodeURIComponent(params.folderId || "") + "&filter=" + params.filter + "&subjectGroup=" + !!params.subjectGroup + "&subjectID=" + params.subjectId + "&withSubfolders=" + !!params.withSubfolders + "&searchInContent=" + !!params.searchInContent + "&search=" + encodeURIComponent(params.search));
+    };
+
+    var getPresignedUri = function (eventType, params) {
+        request("get", "json", eventType, params, "presigned?fileId=" + encodeURIComponent(params.fileId));
     };
 
     var renameFolder = function (eventType, params) {
@@ -561,19 +575,19 @@ window.ASC.Files.ServiceManager = (function () {
     };
 
     var trackEditFile = function (eventType, params) {
-        request("get", "json", eventType, params, "trackeditfile?fileId=" + encodeURIComponent(params.fileID) + "&tabId=" + params.tabId + "&docKeyForTrack=" + params.docKeyForTrack + "&isFinish=" + (params.finish == true) + "&fixedVersion=" + (params.fixedVersion == true) + params.shareLinkParam);
+        request("get", "json", eventType, params, "trackeditfile?fileId=" + encodeURIComponent(params.fileID) + "&tabId=" + params.tabId + "&docKeyForTrack=" + params.docKeyForTrack + "&isFinish=" + (params.finish == true) + params.shareLinkParam);
     };
 
     var checkEditing = function (eventType, params, data) {
         request("post", "json", eventType, params, data, "checkediting");
     };
 
-    var saveEditing = function (eventType, params) {
-        request("get", "json", eventType, params, "saveediting?fileId=" + encodeURIComponent(params.fileID) + "&version=" + params.version + "&tabId=" + params.tabId + "&fileuri=" + encodeURIComponent(params.fileUri) + "&asNew=" + (params.asNew == true) + params.shareLinkKey);
+    var startEdit = function (eventType, params) {
+        request("get", "json", eventType, params, "startEdit?fileId=" + encodeURIComponent(params.fileID) + params.shareLinkParam);
     };
 
-    var startEdit = function (eventType, params) {
-        request("get", "json", eventType, params, "startEdit?fileId=" + encodeURIComponent(params.fileID) + "&docKeyForTrack=" + params.docKeyForTrack + "&asNew=" + (params.asNew == true) + params.shareLinkKey);
+    var setAceLink = function (eventType, params) {
+        request("get", "json", eventType, params, "setacelink?fileId=" + encodeURIComponent(params.fileId) + "&share=" + params.share);
     };
 
     var getSharedInfo = function (eventType, params, data) {
@@ -596,20 +610,36 @@ window.ASC.Files.ServiceManager = (function () {
         request("get", "json", eventType, params, "shorten?fileId=" + encodeURIComponent(params.fileId));
     };
 
-    var sendLinkToEmail = function (eventType, params, data) {
-        request("post", "json", eventType, params, data, "sendlinktoemail?fileId=" + encodeURIComponent(params.fileId));
+    var getEncryptionAccess = function (eventType, params) {
+        request("get", "json", eventType, params, "publickeys?fileId=" + encodeURIComponent(params.fileId));
+    };
+
+    var getUsers = function (eventType, params) {
+        request("get", "json", eventType, params, "sharedusers?fileId=" + encodeURIComponent(params.fileId));
+    };
+
+    var sendEditorNotify = function (eventType, params, data) {
+        request("post", "json", eventType, params, data, "sendeditornotify?fileId=" + encodeURIComponent(params.fileId));
     };
 
     var checkConversion = function (eventType, params, data) {
         request("post", "json", eventType, params, data, "checkconversion");
     };
 
-    var storeOriginalFiles = function (eventType, params) {
-        request("get", "json", eventType, params, "storeoriginal?set=" + params.value);
-    };
-
     var updateIfExist = function (eventType, params) {
         request("get", "json", eventType, params, "updateifexist?set=" + params.value);
+    };
+
+    var forcesave = function (eventType, params) {
+        request("get", "json", eventType, params, "forcesave?set=" + params.value);
+    };
+
+    var storeForcesave = function (eventType, params) {
+        request("get", "json", eventType, params, "storeforcesave?set=" + params.value);
+    };
+
+    var changeDeleteConfrim = function (eventType, params) {
+        request("get", "json", eventType, params, "changedeleteconfrim?set=" + params.value);
     };
 
     var getThirdParty = function (eventType, params) {
@@ -630,12 +660,30 @@ window.ASC.Files.ServiceManager = (function () {
         request("get", "json", eventType, params, "thirdparty?enable=" + (params.enable === true));
     };
 
+    var saveDocuSign = function (eventType, params, data) {
+        params.ajaxcontentType = "application/json";
+        request("post", "json", eventType, params, data, "docusign-save");
+    };
+
+    var deleteDocuSign = function (eventType, params) {
+        request("get", "json", eventType, params, "docusign-delete");
+    };
+
+    var sendDocuSign = function (eventType, params, data) {
+        request("post", "json", eventType, params, data, "docusign?fileId=" + encodeURIComponent(params.fileId));
+    };
+
     var markAsRead = function (eventType, params, data) {
         request("post", "json", eventType, params, data, "markasread");
     };
 
     var getNews = function (eventType, params) {
         request("get", "xml", eventType, params, "getnews?folderId=" + encodeURIComponent(params.folderId));
+    };
+
+    var getTemplates = function (eventType, params) {
+        request("get", "xml", eventType, params, "gettemplates?filter=" + params.filter + "&from=" + params.from + "&count=" + params.count + "&subjectGroup=" + !!params.subjectGroup + "&subjectID=" + params.subjectId + "&searchInContent=" + !!params.searchInContent + "&search=" + encodeURIComponent(params.search));
+    
     };
 
     var lockFile = function (eventType, params) {
@@ -650,12 +698,20 @@ window.ASC.Files.ServiceManager = (function () {
         request("get", "json", eventType, params, "edit-diff-url?fileId=" + encodeURIComponent(params.fileID) + "&version=" + params.version + params.shareLinkParam);
     };
 
+    var restoreVersion = function (eventType, params) {
+        request("get", "json", eventType, params, "restore-version?fileId=" + encodeURIComponent(params.fileID) + "&version=" + params.version + "&url=" + encodeURIComponent(params.url) + params.shareLinkParam);
+    };
+
     var getMailAccounts = function (eventType, params) {
         request("get", "json", eventType, params, "mailaccounts");
     };
 
     var getHelpCenter = function (eventType, params) {
         request("get", "json", eventType, params, "gethelpcenter");
+    };
+
+    var changeOwner = function (eventType, params, data) {
+        request("post", "json", eventType, params, data, "changeowner?userId=" + params.userId);
     };
 
     return {
@@ -679,10 +735,12 @@ window.ASC.Files.ServiceManager = (function () {
         updateComment: updateComment,
         completeVersion: completeVersion,
         getSiblingsImage: getSiblingsImage,
+        getPresignedUri: getPresignedUri,
 
         renameFolder: renameFolder,
         renameFile: renameFile,
-
+        
+        changeOwner: changeOwner,
         moveFilesCheck: moveFilesCheck,
         moveItems: moveItems,
         deleteItem: deleteItem,
@@ -694,32 +752,42 @@ window.ASC.Files.ServiceManager = (function () {
 
         trackEditFile: trackEditFile,
         checkEditing: checkEditing,
-        saveEditing: saveEditing,
         startEdit: startEdit,
 
+        setAceLink: setAceLink,
         getSharedInfo: getSharedInfo,
         getSharedInfoShort: getSharedInfoShort,
         setAceObject: setAceObject,
         unSubscribeMe: unSubscribeMe,
         getShortenLink: getShortenLink,
-        sendLinkToEmail: sendLinkToEmail,
+        getEncryptionAccess: getEncryptionAccess,
+
+        getUsers: getUsers,
+        sendEditorNotify: sendEditorNotify,
 
         checkConversion: checkConversion,
-        storeOriginalFiles: storeOriginalFiles,
         updateIfExist: updateIfExist,
+        forcesave: forcesave,
+        storeForcesave: storeForcesave,
+        changeDeleteConfrim: changeDeleteConfrim,
 
         getThirdParty: getThirdParty,
         saveThirdParty: saveThirdParty,
         deleteThirdParty: deleteThirdParty,
         changeAccessToThirdparty: changeAccessToThirdparty,
+        saveDocuSign: saveDocuSign,
+        deleteDocuSign: deleteDocuSign,
+        sendDocuSign: sendDocuSign,
 
         markAsRead: markAsRead,
         getNews: getNews,
+        getTemplates: getTemplates,
 
         lockFile: lockFile,
 
         getEditHistory: getEditHistory,
         getDiffUrl: getDiffUrl,
+        restoreVersion: restoreVersion,
 
         getMailAccounts: getMailAccounts,
 

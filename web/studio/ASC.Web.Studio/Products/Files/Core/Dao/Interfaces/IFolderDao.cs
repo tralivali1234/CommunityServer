@@ -1,37 +1,28 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace ASC.Files.Core
 {
     public interface IFolderDao : IDisposable
     {
-
         /// <summary>
         ///     Get folder by id.
         /// </summary>
@@ -73,20 +64,25 @@ namespace ASC.Files.Core
         /// <param name="parentId"></param>
         /// <param name="orderBy"></param>
         /// <param name="filterType"></param>
+        /// <param name="subjectGroup"></param>
         /// <param name="subjectID"></param>
         /// <param name="searchText"></param>
         /// <param name="withSubfolders"></param>
         /// <returns></returns>
-        List<Folder> GetFolders(object parentId, OrderBy orderBy, FilterType filterType, Guid subjectID, string searchText, bool withSubfolders = false);
+        List<Folder> GetFolders(object parentId, OrderBy orderBy, FilterType filterType, bool subjectGroup, Guid subjectID, string searchText, bool withSubfolders = false);
 
         /// <summary>
         /// Gets the folder (s) by ID (s)
         /// </summary>
         /// <param name="folderIds"></param>
+        /// <param name="filterType"></param>
+        /// <param name="subjectGroup"></param>
+        /// <param name="subjectID"></param>
         /// <param name="searchText"></param>
         /// <param name="searchSubfolders"></param>
+        /// <param name="checkShare"></param>
         /// <returns></returns>
-        List<Folder> GetFolders(object[] folderIds, string searchText = "", bool searchSubfolders = false);
+        List<Folder> GetFolders(object[] folderIds, FilterType filterType = FilterType.None, bool subjectGroup = false, Guid? subjectID = null, string searchText = "", bool searchSubfolders = false, bool checkShare = true);
 
         /// <summary>
         ///     Get folder, contains folder with id
@@ -113,16 +109,18 @@ namespace ASC.Files.Core
         /// </summary>
         /// <param name="folderId">folder id</param>
         /// <param name="toFolderId">destination folder id</param>
-        object MoveFolder(object folderId, object toFolderId);
+        /// <param name="cancellationToken"></param>
+        object MoveFolder(object folderId, object toFolderId, CancellationToken? cancellationToken);
 
         /// <summary>
         ///     copy folder
         /// </summary>
         /// <param name="folderId"></param>
         /// <param name="toFolderId"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns> 
         /// </returns>
-        Folder CopyFolder(object folderId, object toFolderId);
+        Folder CopyFolder(object folderId, object toFolderId, CancellationToken? cancellationToken);
 
         /// <summary>
         /// Validate the transfer operation directory to another directory.
@@ -149,7 +147,7 @@ namespace ASC.Files.Core
         int GetItemsCount(object folderId);
 
         /// <summary>
-        ///    Сheck folder on emptiness
+        ///    Check folder on emptiness
         /// </summary>
         /// <param name="folderId">folder id</param>
         /// <returns></returns>
@@ -171,7 +169,7 @@ namespace ASC.Files.Core
         bool UseRecursiveOperation(object folderId, object toRootFolderId);
 
         /// <summary>
-        /// Сheck the possibility to calculate the number of subitems
+        /// Check the possibility to calculate the number of subitems
         /// </summary>
         /// <param name="entryId"> </param>
         /// <returns></returns>
@@ -188,13 +186,20 @@ namespace ASC.Files.Core
         #region Only for TMFolderDao
 
         /// <summary>
+        /// Set created by
+        /// </summary>
+        /// <param name="folderIds"></param>
+        /// <param name="newOwnerId"></param>
+        void ReassignFolders(object[] folderIds, Guid newOwnerId);
+
+        /// <summary>
         /// Search the list of folders containing text in title
         /// Only in TMFolderDao
         /// </summary>
         /// <param name="text"></param>
-        /// <param name="folderTypes"></param>
+        /// <param name="bunch"></param>
         /// <returns></returns>
-        IEnumerable<Folder> Search(string text, params FolderType[] folderTypes);
+        IEnumerable<Folder> Search(string text, bool bunch = false);
 
         /// <summary>
         /// Only in TMFolderDao
@@ -219,8 +224,10 @@ namespace ASC.Files.Core
         ///  Returns id folder "My Documents"
         /// Only in TMFolderDao
         /// </summary>
+        /// <param name="createIfNotExists"></param>
+        /// <param name="userId"></param>
         /// <returns></returns>
-        object GetFolderIDUser(bool createIfNotExists);
+        object GetFolderIDUser(bool createIfNotExists, Guid? userId = null);
 
         /// <summary>
         /// Returns id folder "Shared with me"
@@ -231,12 +238,47 @@ namespace ASC.Files.Core
         object GetFolderIDShare(bool createIfNotExists);
 
         /// <summary>
-        /// Returns id folder "Trash"
+        /// Returns id folder "Recent"
         /// Only in TMFolderDao
         /// </summary>
         /// <param name="createIfNotExists"></param>
         /// <returns></returns>
-        object GetFolderIDTrash(bool createIfNotExists);
+        object GetFolderIDRecent(bool createIfNotExists);
+
+        /// <summary>
+
+        /// <summary>
+        /// Returns id folder "Favorites"
+        /// Only in TMFolderDao
+        /// </summary>
+        /// <param name="createIfNotExists"></param>
+        /// <returns></returns>
+        object GetFolderIDFavorites(bool createIfNotExists);
+
+        /// <summary>
+        /// Returns id folder "Templates"
+        /// Only in TMFolderDao
+        /// </summary>
+        /// <param name="createIfNotExists"></param>
+        /// <returns></returns>
+        object GetFolderIDTemplates(bool createIfNotExists);
+
+        /// <summary>
+        /// Returns id folder "Privacy"
+        /// Only in TMFolderDao
+        /// </summary>
+        /// <param name="createIfNotExists"></param>
+        /// <returns></returns>
+        object GetFolderIDPrivacy(bool createIfNotExists, Guid? userId = null);
+
+        /// <summary>
+        /// Returns id folder "Trash"
+        /// Only in TMFolderDao
+        /// </summary>
+        /// <param name="createIfNotExists"></param>
+        /// <param name="userId"></param>
+        /// <returns></returns>
+        object GetFolderIDTrash(bool createIfNotExists, Guid? userId = null);
 
         /// <summary>
         /// Returns id folder "Projects"
@@ -255,6 +297,13 @@ namespace ASC.Files.Core
         /// <returns></returns>
         String GetBunchObjectID(object folderID);
 
+        /// <summary>
+        /// Return ids of related objects
+        /// Only in TMFolderDao
+        /// </summary>
+        /// <param name="folderIDs"></param>
+        /// <returns></returns>
+        Dictionary<string, string> GetBunchObjectIDs(List<object> folderIDs);
 
         #endregion
     }

@@ -13,33 +13,6 @@ namespace ASC.Web.Studio.UserControls.Management {
     public partial class TariffUsage {
         
         /// <summary>
-        /// SmsBuyHolder control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder SmsBuyHolder;
-        
-        /// <summary>
-        /// VoipBuyHolder control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder VoipBuyHolder;
-        
-        /// <summary>
-        /// PaymentsCodeHolder control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder PaymentsCodeHolder;
-        
-        /// <summary>
         /// downgradeInfoContainer control.
         /// </summary>
         /// <remarks>
@@ -47,14 +20,5 @@ namespace ASC.Web.Studio.UserControls.Management {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::ASC.Web.Studio.Controls.Common.Container downgradeInfoContainer;
-        
-        /// <summary>
-        /// buyRecommendationContainer control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::ASC.Web.Studio.Controls.Common.Container buyRecommendationContainer;
     }
 }

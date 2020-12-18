@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -35,9 +26,8 @@ var TimeAndLanguage = new function () {
         };
         var timeManager = new TimeAndLanguageContentManager();
         timeManager.SaveTimeLangSettings(function (res) {
-            if (res.Status == "2") {
+            if (res.Status == "1") {
                 LoadingBanner.showMesInfoBtn("#studio_lngTimeSettings", res.Message, "success");
-            } else if (res.Status == "1") {
                 window.location.reload(true);
             } else {
                 LoadingBanner.showMesInfoBtn("#studio_lngTimeSettings", res.Message, "error");
@@ -48,10 +38,35 @@ var TimeAndLanguage = new function () {
 
 TimeAndLanguageContentManager = function () {
     this.SaveTimeLangSettings = function (parentCallback) {
-        TimeAndLanguageSettingsController.SaveLanguageTimeSettings(jq("#studio_lng").val(), jq("#studio_timezone").val(), function (result) {
-            if (parentCallback != null)
-                parentCallback(result.value);
-
+        Teamlab.setTimaAndLanguage(jq("#studio_lng").val() || jq('#studio_lng').data('default'), jq("#studio_timezone").val(), {
+            success: function (params, response) {
+                if (parentCallback != null)
+                    parentCallback({Status: 1, Message: response});
+            },
+            error: function (params, response) {
+                if (parentCallback != null)
+                    parentCallback({Status: 0, Message: response[0]});
+            }
         });
     };
 };
+
+jq(function () {
+    var previous;
+
+    if (jq("#NotFoundLanguage").length) {
+        jq("#studio_lng").on('focus', function () {
+            previous = this.value;
+        }).change(function () {
+            if (!this.value) {
+                setTimeout(function() {
+                    jq(".langTimeZoneBlock .HelpCenterSwitcher").helper({ BlockHelperID: 'NotFoundLanguage' });
+                }, 0);
+                this.value = previous;
+                return false;
+            } else {
+                previous = this.value;
+            }
+        });
+    }
+});

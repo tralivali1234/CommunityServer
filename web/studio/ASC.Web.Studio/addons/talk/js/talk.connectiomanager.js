@@ -1,4 +1,21 @@
-﻿window.ASC = window.ASC || {};
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+window.ASC = window.ASC || {};
 
 window.ASC.TMTalk = window.ASC.TMTalk || {};
 
@@ -9,7 +26,7 @@ window.ASC.TMTalk.connectionManager = (function () {
     isConnected = false,
     JID = '',
     servicePath = '',
-    clientInactivity = 90,
+    clientInactivity = 30,
     wait = 30,
     hold = 2,
     resourcePriority = '0',
@@ -23,6 +40,9 @@ window.ASC.TMTalk.connectionManager = (function () {
     onlineStatusId = 1,
     offlineStatusId = 0,
     newStatus = null,
+    reconnectionAttempts = 5,
+    reconnectTimeout = 2000,
+    reconnectCount = 0;
     statuses = [
       {id : 0, name : 'Offline', show : 'offline', title : 'Offline', isCurrent : true, className : 'offline'},
       {id : 1, name : 'Online', show : 'online', title : 'Online', isCurrent : false, className : 'online'},
@@ -64,7 +84,6 @@ window.ASC.TMTalk.connectionManager = (function () {
       retrievesDiscoItems : 'onretrievesdiscoitems'
     },
     eventManager = new CustomEvent(customEvents);
-
   var getMessageId = function () {
     messageId++;
     return idPrefix + messageId.toString(16);
@@ -97,14 +116,16 @@ window.ASC.TMTalk.connectionManager = (function () {
     };
   })();
 
+  var conflict;
   var init = function (servicepath, jid, priority, inactivity) {
     if (isInit === true) {
       return undefined;
     }
+    this.conflict = false;
     isInit = true;
     // TODO
     if (typeof jid === 'string') {
-      JID = jid;
+        JID = jid;
     }
     if (typeof priority === 'string') {
       resourcePriority = priority;
@@ -117,14 +138,14 @@ window.ASC.TMTalk.connectionManager = (function () {
       connectionManager = new Strophe.Connection(servicePath);
     }
 
-    if (ASC.TMTalk.Resources.hasOwnProperty('statusTitles') && typeof ASC.TMTalk.Resources.statusTitles === 'object') {
+    if (ASC.TMTalk.Resources.hasOwnProperty('statusTitles') && typeof ASC.TMTalk.Resources.StatusTitles === 'object') {
       var
         status = null,
         statusesInd = statuses.length;
       while (statusesInd--) {
         status = statuses[statusesInd];
-        if (ASC.TMTalk.Resources.statusTitles.hasOwnProperty(status.show)) {
-          statuses[statusesInd].title = ASC.TMTalk.Resources.statusTitles[status.show];
+        if (ASC.TMTalk.Resources.StatusTitles.hasOwnProperty(status.show)) {
+            statuses[statusesInd].title = ASC.TMTalk.Resources.StatusTitles[status.show];
         }
       }
     }
@@ -180,9 +201,14 @@ window.ASC.TMTalk.connectionManager = (function () {
       return undefined;
     }
     JabberClient.GetAuthToken(function (response) {
-      if (response && typeof response.value === 'string' && response.value) {
-        ASC.TMTalk.connectionManager.connect(null, response.value);
-      }
+        if (response && typeof response.value === 'string' && response.value) {
+            ASC.TMTalk.connectionManager.connect(null, response.value);
+        } else {
+            eventManager.call(customEvents.connecting);
+            setTimeout(function () {
+                ASC.TMTalk.connectionManager.status(Strophe.Status.CONNECTING);
+            }, reconnectTimeout);
+        }
     });
   };
 
@@ -225,7 +251,7 @@ window.ASC.TMTalk.connectionManager = (function () {
       var statusInd = 0;
       statusInd = statuses.length;
       while (statusInd--) {
-        if ((statuses[statusInd].id === status || statuses[statusInd].name === status) && !statuses[statusInd].isCurrent) {
+        if ((statuses[statusInd].id === status || statuses[statusInd].name === status)) {
           newStatus = statuses[statusInd];
           break;
         }
@@ -440,9 +466,9 @@ window.ASC.TMTalk.connectionManager = (function () {
       if (!messageIds.hasOwnProperty(from)) {
         messageIds[from] = {};
       }
-      if (messageIds[from].hasOwnProperty(id)) {
+      /*if (messageIds[from].hasOwnProperty(id)) {
         return true;
-      }
+      }*/
       messageIds[from][id] = true;
     }
 
@@ -778,6 +804,7 @@ window.ASC.TMTalk.connectionManager = (function () {
     } catch (e) {
         console.error(e.message);
     }
+
     return true;
   };
 
@@ -793,8 +820,10 @@ window.ASC.TMTalk.connectionManager = (function () {
       if (query === null) {
         return undefined;
       }
-      if (query.getAttribute('count')) {
-        ASC.TMTalk.messagesManager.loadHistory(iq);
+      if (query.getAttribute('count') || query.getAttribute('text')) {
+          var startIndex = query.getAttribute('startindex');
+
+          ASC.TMTalk.messagesManager.loadHistory(iq, ASC.TMTalk.Config.fullText && startIndex == null || parseInt(startIndex) === 0, query.getAttribute('text'));
       }
       if (query.getAttribute('from') && query.getAttribute('to')) {
         ASC.TMTalk.messagesManager.loadHistoryByFilter(iq, query.getAttribute('from'), query.getAttribute('to'));
@@ -865,7 +894,14 @@ window.ASC.TMTalk.connectionManager = (function () {
         .tree()
       );
   };
+  var savePushEndpoint = function (username, endpoint, browser) {
 
+      connectionManager.send(
+          $iq({ username: username, endpoint: endpoint, browser: browser, type: 'notification' })
+          .c('query', { xmlns: Strophe.NS.MUC_ADMIN })
+          .tree()
+      );
+  };
   var kickingOccupant = function (jid, nick, reason) {
     connectionManager.send(
       $iq({id : getMessageId(), from : connectionManager.jid, to : jid, type : 'set'})
@@ -942,7 +978,7 @@ window.ASC.TMTalk.connectionManager = (function () {
 
   var composingMessage = function (jid) {
     connectionManager.send(
-      $msg({id : getMessageId(), from : connectionManager.jid, to : jid, type : 'chat'})
+      $msg({ id: getMessageId(), from: connectionManager.jid, to: jid, type: 'chat' })
         .c('composing', {xmlns : Strophe.NS.CHATSTATES})
         .tree()
     );
@@ -970,8 +1006,9 @@ window.ASC.TMTalk.connectionManager = (function () {
   };
 
   var sendMessage = function (jid, body, type) {
+    var userName = escape(ASC.TMTalk.contactsManager.getContactName());
     connectionManager.send(
-      $msg({id : getMessageId(), from : connectionManager.jid, to : jid, type : type})
+      $msg({ id: getMessageId(), from: connectionManager.jid, to: jid, username: userName, type: type })
         .c('active', {xmlns : Strophe.NS.CHATSTATES}).up()
         .c('body').t(body).up()
         .tree()
@@ -1019,6 +1056,29 @@ window.ASC.TMTalk.connectionManager = (function () {
         .tree()
     );
   };
+  var getMessagesByRange = function(jid, startindex, count, text) {
+      connectionManager.send(
+          $iq({ id: getMessageId(), from: connectionManager.jid, to: jid, type: 'get' })
+          .c('query', { xmlns: Strophe.NS.HISTORY, count: count, startindex: startindex, text: Encoder.htmlEncode(text) })
+          .tree()
+      );
+  };
+    
+  var clearUnreadMessage = function (jid, to) {
+      connectionManager.send(
+          $iq({ id: getMessageId(), from: connectionManager.jid, to: to, type: 'get' })
+          .c('query', { xmlns: 'urn:xmpp:chat-markers:0'})
+          .tree()
+      );
+  };
+
+  var searchMessage = function (jid, text) {
+      connectionManager.send(
+        $iq({ id: getMessageId(), from: connectionManager.jid, to: jid, type: 'get' })
+          .c('query', { xmlns: Strophe.NS.HISTORY, text: Encoder.htmlEncode(text) })
+          .tree()
+      );
+  };
 
   var setSubject = function (jid, subject) {
     connectionManager.send(
@@ -1047,7 +1107,9 @@ window.ASC.TMTalk.connectionManager = (function () {
   var getJid = function () {
     return Strophe.getBareJidFromJid(connectionManager.jid);
   };
-
+  var getJID = function () {
+      return JID;
+  };
   var getDomain = function () {
     return connectionManager.domain;
   };
@@ -1058,6 +1120,8 @@ window.ASC.TMTalk.connectionManager = (function () {
 
   return {
     init    : init,
+
+    conflict: conflict,
 
     bind          : bind,
     unbind        : unbind,
@@ -1098,6 +1162,10 @@ window.ASC.TMTalk.connectionManager = (function () {
 
     getMessagesByDate   : getMessagesByDate,
     getMessagesByNumber : getMessagesByNumber,
+    getMessagesByRange: getMessagesByRange,
+    clearUnreadMessage: clearUnreadMessage,
+
+    searchMessage: searchMessage,
 
     setSubject  : setSubject,
 
@@ -1106,6 +1174,11 @@ window.ASC.TMTalk.connectionManager = (function () {
 
     getJid        : getJid,
     getDomain     : getDomain,
-    getUsername   : getUsername
+    getUsername: getUsername,
+
+    getJID: getJID,
+
+    savePushEndpoint: savePushEndpoint
+
   };
 })();

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -32,15 +23,14 @@ using ASC.Api.Bookmarks;
 using ASC.Api.Collections;
 using ASC.Api.Exceptions;
 using ASC.Bookmarking.Business;
+using ASC.Bookmarking.Business.Permissions;
 using ASC.Bookmarking.Pojo;
 using ASC.Core;
+using ASC.Core.Tenants;
 using ASC.Web.Studio.UserControls.Common.Comments;
+using ASC.Web.Studio.Utility.HtmlUtility;
 using ASC.Web.UserControls.Bookmarking.Common.Presentation;
 using ASC.Web.UserControls.Bookmarking.Common.Util;
-using ASC.Bookmarking.Business.Permissions;
-using ASC.Web.Studio.Utility;
-using ASC.Web.Studio.Utility.HtmlUtility;
-using ASC.Web.Studio.Controls.Common;
 
 namespace ASC.Api.Community
 {
@@ -142,7 +132,7 @@ namespace ASC.Api.Community
         ///<category>Bookmarks</category>
         ///<param name="tag">tag</param>
         ///<returns>List of bookmarks</returns>
-        [Read("bookmark/tag/{tag}")]
+        [Read("bookmark/bytag")]
         public IEnumerable<BookmarkWrapper> GetBookmarksByTag(string tag)
         {
             var bookmarks = BookmarkingDao.SearchBookmarksByTag(tag, (int)_context.StartIndex, (int)_context.Count);
@@ -337,7 +327,7 @@ namespace ASC.Api.Community
         [Create("bookmark")]
         public BookmarkWrapper AddBookmark(string url, string title, string description, string tags)
         {
-            var bookmark = new Bookmark(url, Core.Tenants.TenantUtil.DateTimeNow(), title, description) {UserCreatorID = SecurityContext.CurrentAccount.ID};
+            var bookmark = new Bookmark(url, TenantUtil.DateTimeNow(), title, description) {UserCreatorID = SecurityContext.CurrentAccount.ID};
             BookmarkingDao.AddBookmark(bookmark, !string.IsNullOrEmpty(tags) ? tags.Split(',').Select(x => new Tag {Name = x}).ToList() : new List<Tag>());
             return new BookmarkWrapper(bookmark);
         }
@@ -357,7 +347,7 @@ namespace ASC.Api.Community
         {
             var comment = new Comment
             {
-                Datetime = ASC.Core.Tenants.TenantUtil.DateTimeNow(),
+                Datetime = TenantUtil.DateTimeNow(),
                 UserID = SecurityContext.CurrentAccount.ID
             };
 
@@ -406,7 +396,7 @@ namespace ASC.Api.Community
             var comment = new Comment
             {
                 Content = content,
-                Datetime = ASC.Core.Tenants.TenantUtil.DateTimeNow(),
+                Datetime = TenantUtil.DateTimeNow(),
                 UserID = SecurityContext.CurrentAccount.ID
             };
 
@@ -442,7 +432,31 @@ namespace ASC.Api.Community
             return HtmlUtility.GetFull(content);
         }
 
+        /// <summary>
+        /// Removes bookmark from favourite. If after removing user bookmark raiting of this bookmark is 0, the bookmark will be removed completely.
+        /// </summary>
+        /// <short>Removes bookmark from favourite</short>
+        /// <param name="id">Bookmark ID</param>
+        /// <returns>bookmark</returns>
+        /// <category>Bookmarks</category>
+        [Delete("bookmark/@favs/{id}")]
+        public BookmarkWrapper RemoveBookmarkFromFavourite(long id)
+        {
+            var bookmark = BookmarkingServiceHelper.GetCurrentInstanse().RemoveBookmarkFromFavourite(id);
 
+            return bookmark == null ? null : new BookmarkWrapper(bookmark);
+        }
 
+        /// <summary>
+        /// Removes bookmark
+        /// </summary>
+        /// <short>Removes bookmark</short>
+        /// <param name="id">Bookmark ID</param>
+        /// <category>Bookmarks</category>
+        [Delete("bookmark/{id}")]
+        public void RemoveBookmark(long id)
+        {
+            BookmarkingServiceHelper.GetCurrentInstanse().RemoveBookmark(id);
+        }
     }
 }

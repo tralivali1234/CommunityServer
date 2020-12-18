@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -32,11 +23,13 @@ using System.Text;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
-using ASC.Web.Studio.UserControls.Common.ViewSwitcher;
-using AjaxPro;
+
+using ASC.Bookmarking;
 using ASC.Bookmarking.Business.Permissions;
 using ASC.Bookmarking.Common;
 using ASC.Bookmarking.Pojo;
+using ASC.Core;
+using ASC.Core.Users;
 using ASC.Web.Core.Utility.Skins;
 using ASC.Web.Studio.Controls.Common;
 using ASC.Web.Studio.Utility;
@@ -45,9 +38,11 @@ using ASC.Web.UserControls.Bookmarking.Common.Presentation;
 using ASC.Web.UserControls.Bookmarking.Common.Util;
 using ASC.Web.UserControls.Bookmarking.Resources;
 using ASC.Web.UserControls.Bookmarking.Util;
+using ASC.Web.Studio.UserControls.Common.ViewSwitcher;
+
 using HtmlAgilityPack;
-using log4net;
-using ASC.Bookmarking;
+using AjaxPro;
+using ASC.Common.Logging;
 
 namespace ASC.Web.UserControls.Bookmarking
 {
@@ -57,7 +52,7 @@ namespace ASC.Web.UserControls.Bookmarking
         #region Fields
 
         private readonly BookmarkingServiceHelper _serviceHelper = BookmarkingServiceHelper.GetCurrentInstanse();
-        public bool singleBookmark { get; set; }
+
         public IList<Bookmark> Bookmarks { get; set; }
 
         public int BookmarkPageCounter
@@ -65,8 +60,6 @@ namespace ASC.Web.UserControls.Bookmarking
             get { return ViewState["PageSize"] != null ? Convert.ToInt32(ViewState["PageSize"]) : 20; }
             set { ViewState["PageSize"] = value; }
         }
-
-        public int itemCounter { get; set; }
 
         #endregion
 
@@ -101,10 +94,13 @@ namespace ASC.Web.UserControls.Bookmarking
             if (Bookmarks == null || Bookmarks.Count == 0)
             {
                 var hidePanelsFlag = false;
+
+                var currentUser = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
+
                 var emptyScreenControl = new EmptyScreenControl
                     {
                         ImgSrc = WebImageSupplier.GetAbsoluteWebPath("bookmarks_icon.png", BookmarkingSettings.ModuleId),
-                        Describe = BookmarkingUCResource.EmptyScreenText
+                        Describe = currentUser.IsVisitor() ? BookmarkingUCResource.EmptyScreenTextVisitor : BookmarkingUCResource.EmptyScreenText
                     };
 
                 var displayMode = BookmarkingBusinessFactory.GetDisplayMode();
@@ -168,13 +164,7 @@ namespace ASC.Web.UserControls.Bookmarking
 
             if (!BookmarkDisplayMode.SelectedBookmark.Equals(displayMode))
             {
-                singleBookmark = false;
                 AddBookmarksListToPlaceHolder(bookmarks, BookmarksHolder);
-                SetBookmarkingPagination();
-            }
-            else
-            {
-                singleBookmark = true;
             }
         }
 
@@ -316,21 +306,6 @@ namespace ASC.Web.UserControls.Bookmarking
 
         #endregion
 
-        #region Pagination
-
-        private void SetBookmarkingPagination()
-        {
-            var pageNavigator = new PageNavigator();
-
-            _serviceHelper.InitPageNavigator(pageNavigator, BookmarkPageCounter);
-
-            itemCounter = pageNavigator.EntryCount;
-
-            BookmarkingPaginationContainer.Controls.Add(pageNavigator);
-        }
-
-        #endregion
-
         #region Tags Autocomplete Popup Box
 
         [AjaxMethod(HttpSessionStateRequirement.ReadWrite)]
@@ -444,15 +419,19 @@ namespace ASC.Web.UserControls.Bookmarking
                     if (!String.IsNullOrEmpty(encStr) && !e.ToLower().Equals(encStr.ToLower()))
                     {
                         encoding = Encoding.GetEncoding(encStr);
-                        sr = new StreamReader(stream, encoding);
-                        text = sr.ReadToEnd();
+                        using (sr = new StreamReader(stream, encoding))
+                        {
+                            text = sr.ReadToEnd();
+                        }
                     }
                     else
                     {
                         encoding = BookmarkingSettings.PageTitleEncoding;
 
-                        sr = new StreamReader(stream, encoding);
-                        text = sr.ReadToEnd();
+                        using (sr = new StreamReader(stream, encoding))
+                        {
+                            text = sr.ReadToEnd();
+                        }
 
                         var htmlEncoding = new HtmlDocument().DetectEncodingHtml(text);
                         if (htmlEncoding != null)
@@ -461,8 +440,9 @@ namespace ASC.Web.UserControls.Bookmarking
                             var req = WebRequest.Create(url);
                             using (var resp = req.GetResponse())
                             using (var respstream = resp.GetResponseStream())
+                            using (sr = new StreamReader(respstream, encoding))
                             {
-                                text = new StreamReader(respstream, encoding).ReadToEnd();
+                                text = sr.ReadToEnd();
                             }
                         }
                         else
@@ -479,7 +459,13 @@ namespace ASC.Web.UserControls.Bookmarking
                                     if (!string.IsNullOrEmpty(encodingVal))
                                     {
                                         encoding = Encoding.GetEncoding(encodingVal);
-                                        text = new StreamReader(WebRequest.Create(url).GetResponse().GetResponseStream(), encoding).ReadToEnd();
+
+                                        using (var resp = WebRequest.Create(url).GetResponse())
+                                        using (var respstream = resp.GetResponseStream())
+                                        using (sr = new StreamReader(respstream, encoding))
+                                        {
+                                            text = sr.ReadToEnd();
+                                        }
                                     }
                                 }
                             }

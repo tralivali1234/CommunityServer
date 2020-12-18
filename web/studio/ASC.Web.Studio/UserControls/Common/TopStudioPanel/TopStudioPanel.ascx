@@ -1,39 +1,58 @@
 ﻿<%@ Control Language="C#" AutoEventWireup="true" CodeBehind="TopStudioPanel.ascx.cs" Inherits="ASC.Web.Studio.UserControls.Common.TopStudioPanel" %>
 
+<%@ Import Namespace="System.Globalization" %>
 <%@ Import Namespace="ASC.Core" %>
 <%@ Import Namespace="ASC.Core.Users" %>
 <%@ Import Namespace="ASC.Web.Core" %>
 <%@ Import Namespace="ASC.Web.Core.WhiteLabel" %>
 <%@ Import Namespace="ASC.Web.Studio.Core" %>
+<%@ Import Namespace="ASC.Web.Studio.PublicResources" %>
 <%@ Import Namespace="ASC.Web.Studio.UserControls.Statistics" %>
 <%@ Import Namespace="ASC.Web.Studio.Utility" %>
 <%@ Import Namespace="Resources" %>
+<%@ Import Namespace="ASC.Data.Storage" %>
 
 <div class="studio-top-panel mainPageLayout  <% if (CoreContext.Configuration.Personal)
                                                 { %>try-welcome-top<% } %>">
     <ul>
-        <li class="studio-top-logo ">
-            <a class="top-logo" title="<%: Resource.TeamLabOfficeTitle %>" href="<%= CommonLinkUtility.GetDefault() %>">
+        <li class="studio-top-logo">
+            <a class="top-logo" title="<%: GetAbsoluteCompanyTopLogoTitle() %>" href="<%= CommonLinkUtility.GetDefault() %>">
                 <img alt="" src="<%= GetAbsoluteCompanyTopLogoPath() %>" />
-                <% if (IsAuthorizedPartner.HasValue)
-                   { %>
-                    <span class="top-logo-partner_name">
-                        <%= IsAuthorizedPartner.Value && Partner != null ? Resource.For + " " + (Partner.DisplayName ?? Partner.CompanyName).HtmlEncode() : Resource.HostedNonAuthorizedVersion %></span>
-                <% } %>
             </a>
         </li>
 
         <% if (CoreContext.Configuration.Personal && !SecurityContext.IsAuthenticated && !DisableLoginPersonal)
-           {%>
+           {
+                if (!CoreContext.Configuration.CustomMode)
+                { %>
+                    <div class="personal-languages">
+                        <div class="personal-languages_select <%= CultureInfo.CurrentUICulture.Name %>" data-lang="<%= CultureInfo.CurrentUICulture.TwoLetterISOLanguageName %>">
+                            <span><%= CultureInfo.CurrentUICulture.DisplayName %></span>
+                        </div>
+                        <div id="AuthFormLanguagesPanel" class="studio-action-panel">
+                            <ul class="personal-languages_list dropdown-content">
+                                <% foreach (var ci in SetupInfo.EnabledCulturesPersonal)
+                                    { %>
+                                <li class="dropdown-item <%= ci.Name %>">
+                                    <a href="<%= Request.Path %>?lang=<%= ci.TwoLetterISOLanguageName %>"><%= ci.DisplayName %></a>
+                                </li>
+                                <% } %>
+                            </ul>
+                        </div>
+                    </div>
+                <% } %>
             <li id="personalLogin" class="personal-login">
-                <a><%= Resource.Login %></a>
+                <% if (CoreContext.Configuration.CustomMode){ %><a><%= CustomModeResource.LoginCustomMode %></a><% } %>
+                <%else{%><a><%= Resource.Login %></a><% } %>
             </li>
           <% }%>
 
         <% if (DisplayModuleList)
            { %>
             <li class="product-menu with-subitem">
-                <span class="active-icon <%= CurrentProductClassName %>"></span>
+           <span class="active-icon-svg">
+               <svg class="active-icon"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenu<%= CurrentProductClassName + (CurrentProductClassNamePostfix ?? "") %>"></use></svg>
+           </span>
                 <a class="product-cur-link" title="<%= CurrentProductName %>">
                     <%: CurrentProductName %>
                 </a>
@@ -57,21 +76,25 @@
         <% if (CurrentUser != null && CurrentUser.IsOutsider())
            { %>
             <li class="top-item-box signin" >
-                <a href="<%= VirtualPathUtility.ToAbsolute("~/auth.aspx?t=logout") %>" title="<%= Resource.LoginButton %>"><%= Resource.LoginButton %></a>
+                <a href="<%= VirtualPathUtility.ToAbsolute("~/Auth.aspx?t=logout") %>" title="<%= Resource.LoginButton %>"><%= Resource.LoginButton %></a>
             </li>
         <% } %>
 
         <% if (!DisableSearch)
            { %>
             <li class="top-item-box search">
-                <span class="searchActiveBox inner-text" title="<%= Resource.Search %>"></span>
+                <span class="searchActiveBox inner-text" title="<%= Resource.Search %>">
+                    <svg><use base="<%= WebPath.GetPath("/") %>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenusearch"></use></svg>
+                </span>
             </li>
         <% } %>
 
         <% if (IsAdministrator && !DisableSettings)
            { %>
             <li class="top-item-box settings" >
-                <a class="inner-text" href="<%= CommonLinkUtility.GetAdministration(ManagementType.Customization) %>" title="<%= Resource.Administration %>"></a>
+                <a class="inner-text" href="<%= CommonLinkUtility.GetAdministration(ManagementType.Customization) %>" title="<%= Resource.Administration %>">
+                    <svg><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenusettings"></use></svg>
+                </a>
             </li>
         <% } %>
 
@@ -79,10 +102,21 @@
            { %>
             <li class="top-item-box tariffs <%= DisplayTrialCountDays ? "has-led" : "" %>">
                 <a class="inner-text" href="<%= TenantExtra.GetTariffPageLink() %>" title="<%= Resource.TariffSettings %>">
+                    <svg><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenupayments<%= CoreContext.Configuration.CustomMode ? "Rub" : "" %>"></use></svg>
                     <% if (DisplayTrialCountDays)
                        { %>
-                        <span class="inner-label">trial <%= TariffDays %></span>
+                        <span class="inner-label"><%= CoreContext.Configuration.CustomMode ? Resource.Trial.ToLower() : "trial" %> <%= TariffDays %></span>
                     <% } %>
+                </a>
+            </li>
+        <% } %>
+
+        <% if (!DisableGift)
+           { %>
+            <li class="top-item-box gift has-led">
+                <a class="inner-text giftBox" title="<%= Resource.Present %>">
+                    <svg><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenugift"></use></svg>
+                    <span class="inner-label">1</span>
                 </a>
             </li>
         <% } %>
@@ -94,43 +128,122 @@
         <% if (DisplayModuleList)
            { %>
             <div id="studio_productListPopupPanel" class="studio-action-panel modules">
-                <ul class="dropdown-content">
-                    <asp:Repeater runat="server" ID="_productRepeater">
-                        <ItemTemplate>
-                            <li class="<%# ((IWebItem)Container.DataItem).ProductClassName + (((IWebItem)Container.DataItem).IsDisabled() ? " display-none" : string.Empty) %>">
-                                <a href="<%# VirtualPathUtility.ToAbsolute(((IWebItem)Container.DataItem).StartURL) %>" class="dropdown-item menu-products-item 
-                                    <%# ((IWebItem)Container.DataItem).ProductClassName == CurrentProductClassName ? "active" : "" %>">
-                                    <%# (((IWebItem)Container.DataItem).Name).HtmlEncode() %>
-                                </a>
-                            </li>
-                        </ItemTemplate>
-                    </asp:Repeater>
+                <div class="wrapper">
+                    <div class="columns">
 
-                    <% if (CurrentUser != null && !CurrentUser.IsOutsider())
-                       { %>
-                    <li class="dropdown-item-seporator"></li>
-                    <asp:Repeater runat="server" ID="_addonRepeater">
-                        <ItemTemplate>
-                            <li class="<%# ((IWebItem)Container.DataItem).ProductClassName + (((IWebItem)Container.DataItem).IsDisabled() ? " display-none" : string.Empty) %>">
-                                <a href="<%# VirtualPathUtility.ToAbsolute(((IWebItem)Container.DataItem).StartURL) %>" class="dropdown-item menu-products-item">
-                                    <%# (((IWebItem)Container.DataItem).Name).HtmlEncode() %>
-                                </a>
-                            </li>
-                        </ItemTemplate>
-                    </asp:Repeater>
-                    <li class="feed"><a href="<%= VirtualPathUtility.ToAbsolute("~/feed.aspx") %>" class="dropdown-item menu-products-item"><%= UserControlsCommonResource.FeedTitle %></a></li>
-                    <% } %>
+                        <div class="tile main-nav-items">
+                            <ul class="dropdown-content">
+                                <% foreach (var item in Modules) { %>
+                                <li class="<%= item.ProductClassName + (item.IsDisabled() ? " display-none" : string.Empty) %>">
+                                    <a href="<%= VirtualPathUtility.ToAbsolute(item.StartURL) %>" class="dropdown-item menu-products-item <%= item.ProductClassName == CurrentProductClassName ? "active" : "" %>">
+                                        <span class="dropdown-item-icon">
+                                            <svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenu<%= item.ProductClassName %>"></use></svg>
+                                        </span>
+                                        <%= item.Name.HtmlEncode() %>
+                                    </a>
+                                </li>
+                                <% } %>
 
-                    <% if (IsAdministrator)
-                       { %>
-                        <li class="dropdown-item-seporator"></li>
-                        <li class="settings"><a href="<%= CommonLinkUtility.GetAdministration(ManagementType.Customization) %>" title="<%= Resource.Administration %>" class="dropdown-item menu-products-item"><%= Resource.Administration %></a></li>
-                    <% } %>
-                    <% if (!DisableTariff)
-                       { %>
-                        <li class="tarrifs"><a href="<%= TenantExtra.GetTariffPageLink() %>" title="<%= Resource.TariffSettings %>" class="dropdown-item menu-products-item"><%= Resource.TariffSettings %></a></li>
-                    <% } %>
-                </ul>
+                                <% if (TenantExtra.EnableControlPanel){ %>
+                                <li class="controlpanel">
+                                    <a href="<%= SetupInfo.ControlPanelUrl %>" target="_blank" class="dropdown-item menu-products-item controlpanel">
+                                        <span class="dropdown-item-icon">
+                                            <svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenucontrolpanel"></use></svg>
+                                        </span>
+                                        <%= Resource.ControlPanelLabel %>
+                                    </a>
+                                </li>
+                                <%} %>
+
+                                <% if (CurrentUser != null && !CurrentUser.IsOutsider()) { %>
+                                <% foreach (var item in Addons) { %>
+                                <li class="<%= item.ProductClassName + (item.IsDisabled() ? " display-none" : string.Empty) %>">
+                                    <a href="<%= VirtualPathUtility.ToAbsolute(item.StartURL) %>" class="dropdown-item menu-products-item <%= item.ProductClassName == CurrentProductClassName ? "active" : "" %>">
+                                        <span class="dropdown-item-icon">
+                                            <svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenu<%= item.ProductClassName %>"></use></svg>
+                                        </span>
+                                        <%= item.Name.HtmlEncode() %>
+                                    </a>
+                                </li>
+                                <% } %>
+                                <li class="feed">
+                                    <a href="<%= VirtualPathUtility.ToAbsolute("~/Feed.aspx") %>" class="dropdown-item menu-products-item <%= "feed" == CurrentProductClassName ? "active" : "" %>">
+                                        <span class="dropdown-item-icon"> <svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenufeed"></use></svg> </span>
+                                        <%= UserControlsCommonResource.FeedTitle %>
+                                    </a>
+                                </li>
+                                <% } %>
+                            </ul>           
+                        </div>
+
+                        <div class="tile custom-nav-items">
+                            <ul class="dropdown-content">
+                                <% foreach (var item in CustomModules) { %>
+                                <li class="<%= item.ProductClassName + (item.IsDisabled() ? " display-none" : string.Empty) %>">
+                                    <a href="<%= VirtualPathUtility.ToAbsolute(item.StartURL) %>" class="dropdown-item menu-products-item <%= item.ProductClassName == CurrentProductClassName ? "active" : "" %>">
+                                        <span class="dropdown-item-icon">
+                                            <svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenu<%= item.ProductClassName %>"></use></svg>
+                                        </span>
+                                        <%= item.Name.HtmlEncode() %>
+                                    </a>
+                                </li>
+                                <% } %>
+                                <% foreach (var item in CustomNavigationItems) { %>
+                                <li id="topNavCustomItem_<%= item.Id %>">
+                                    <a href="<%= item.Url.HtmlEncode() %>" target="_blank" class="dropdown-item menu-products-item">
+                                        <span class="dropdown-item-icon" style="background: url('<%= item.SmallImg %>')"></span>
+                                        <%= item.Label.HtmlEncode() %>
+                                    </a>
+                                </li>
+                                <% } %>
+                            </ul>
+                        </div>
+
+                        <% if (IsAdministrator || (ShowAppsNavItem && AuthServiceList.Any()) || ShowDesktopNavItem || !DisableTariff)
+                           { %>
+                        <div class="tile spec-nav-items">
+                            <ul class="dropdown-content">
+                                <% if (IsAdministrator) { %>
+                                <li class="settings"><a href="<%= CommonLinkUtility.GetAdministration(ManagementType.Customization) %>" title="<%= Resource.Administration %>" class="dropdown-item menu-products-item <%= "settings" == CurrentProductClassName ? "active" : "" %>">
+                                    <span class="dropdown-item-icon"><svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenusettings"></use></svg></span><%= Resource.Administration %></a></li>
+                                <% } %>
+                                
+                                <% if (ShowAppsNavItem) { %>
+                                <li class="apps">
+                                    <% if (IsAdministrator) { %>
+                                    <a href="<%= CommonLinkUtility.GetAdministration(ManagementType.ThirdPartyAuthorization) %>" title="<%= Resource.Apps %>" class="dropdown-item menu-products-item <%= "apps" == CurrentProductClassName ? "active" : "" %>"><span class="dropdown-item-icon"><svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenuproductsandinstruments"></use></svg></span><%= Resource.Apps %></a>
+                                    <% } else if (AuthServiceList.Any()) { %>
+                                    <a title="<%= Resource.Apps %>" class="dropdown-item menu-products-item"><span class="dropdown-item-icon"><svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenuproductsandinstruments"></use></svg></span><%= Resource.Apps %></a>
+                                    <div id="appsPopupBody" class="display-none">
+                                        <p>
+                                            <%= Resource.AppsDescription %><br>
+                                            <% if (!string.IsNullOrEmpty(CommonLinkUtility.GetHelpLink())) { %>
+                                            <%= string.Format(Resource.AppsDescriptionHelp, "<a href=\"" + CommonLinkUtility.GetHelpLink() + "/server/windows/community/authorization-keys.aspx\" class=\"link underline\" target=\"_blank\">", "</a>") %>
+                                            <% } %>
+                                        </p>
+                                        <div class="apps-list">
+                                        <% foreach (var service in AuthServiceList) { %>
+                                            <span>
+                                                <img src="<%= VirtualPathUtility.ToAbsolute("~/UserControls/Management/AuthorizationKeys/img/" + service.Name.ToLower() + ".svg") %>" alt="<%= service.Title %>" />
+                                            </span>
+                                        <% } %>
+                                        </div>
+                                        <div class="small-button-container">
+                                            <a class="button gray middle" onclick="jq.unblockUI();"><%= Resource.OKButton %></a>        
+                                        </div>
+                                    </div>
+                                    <% } %>
+                                </li>
+                                <% } %>
+                                <% if (!DisableTariff) { %>
+                                <li class="tarrifs"><a href="<%= TenantExtra.GetTariffPageLink() %>" title="<%= Resource.TariffSettings %>" class="dropdown-item menu-products-item <%= CurrentProductClassName == "payments" ? "active" : "" %>"><span class="dropdown-item-icon"> <svg class="dropdown-item-svg"><use base="<%= WebPath.GetPath("/")%>" href="/skins/default/images/svg/top-studio-menu.svg#svgTopStudioMenupayments<%= CoreContext.Configuration.CustomMode ? "Rub" : "" %>"></use></svg> </span><%= Resource.TariffSettings %></a></li>
+                                <% } %>
+                            </ul>
+                        </div>
+                        <% } %>
+
+                    </div>
+                </div>
             </div>
         <% } %>
     </asp:PlaceHolder>
@@ -140,7 +253,7 @@
         <div id="studio_searchPopupPanel" class="studio-action-panel">
             <div class="dropdown-content">
                 <div class="search-input-box">
-                    <input type="search" id="studio_search" class="search-input textEdit" placeholder="<%= UserControlsCommonResource.SearchHld %>" maxlength="255" data-url="<%= VirtualPathUtility.ToAbsolute("~/search.aspx") %>" />
+                    <input type="search" id="studio_search" class="search-input textEdit" placeholder="<%= UserControlsCommonResource.SearchHld %>" maxlength="255" data-url="<%= VirtualPathUtility.ToAbsolute("~/Search.aspx") %>" />
                     <button class="button blue search-btn" type="button"></button>
                 </div>
                 <div class="header-base small bold"><%= UserControlsCommonResource.SeeInModulesHdr %></div>
@@ -217,65 +330,23 @@
                             <% } %>
                         </ul>
 
-                        <% if (IsAuthorizedPartner.HasValue && IsAuthorizedPartner.Value && Partner != null)
-                            { %>
-                            <br />
-                            <div class="confirmation-popup_licensor"><%= Resource.AboutCompanySublicensee %></div>
-                            <div class="confirmation-popup_name"><%= (Partner.DisplayName ?? Partner.CompanyName).HtmlEncode() %></div>
-                            <ul class="confirmation-popup_info">
-                                <% if (!string.IsNullOrEmpty(Partner.Address))
-                                    { %>
-                                    <li><span class="gray-text"><%= Resource.AboutCompanyAddressTitle %>: 
-                                        </span><%= Partner.Address.HtmlEncode() %></li>
-                                <% } %>
-                                <% if (!string.IsNullOrEmpty(Partner.SupportEmail))
-                                    { %>
-                                    <li><span class="gray-text"><%= Resource.AboutCompanyEmailTitle %>: 
-                                        </span><a href="mailto:<%= Partner.SupportEmail %>" class="link"><%= Partner.SupportEmail %></a></li>
-                                <% }
-                                    else if (!string.IsNullOrEmpty(Partner.Email))
-                                    { %>
-                                    <li><span class="gray-text"><%= Resource.AboutCompanyEmailTitle %>: 
-                                        </span><a href="mailto:<%= Partner.Email %>" class="link"><%= Partner.Email %></a></li>
-                                <% } %>
-                                <% if (!string.IsNullOrEmpty(Partner.Phone))
-                                    { %>
-                                    <li><span class="gray-text"><%= Resource.AboutCompanyTelTitle %>: 
-                                        </span><%= Partner.Phone.HtmlEncode() %></li>
-                                <% } %>
-                                <% if (!string.IsNullOrEmpty(Partner.Url))
-                                    { %>
-                                    <li><a href="<%= Partner.Url.StartsWith("http:") || Partner.Url.StartsWith("https:") ? Partner.Url : string.Concat("http://", Partner.Url) %>" target="_blank" class="link"><%= Partner.Url %></a></li>
-                                <% } %>
-                            </ul>
+                        <% if (TenantExtra.Opensource)
+                           { %>
+                        <br />
+                        <div><%= string.Format(UserControlsCommonResource.LicensedUnderApache, "<a href=\"http://www.apache.org/licenses/LICENSE-2.0\" class=\"link underline\" target=\"_blank\">", "</a>") %></div>
+                        <div><%= string.Format(UserControlsCommonResource.SourceCode, "<a href=\"https://github.com/ONLYOFFICE/CommunityServer\" class=\"link underline\" target=\"_blank\">", "</a>") %></div>
                         <% } %>
 
                         <% if (!Settings.IsDefault && !Settings.IsLicensor)
                            {
                                var defaultSettings = Settings.GetDefault() as CompanyWhiteLabelSettings;
-                               %>
-                            <br />
-                            <div class="confirmation-popup_licensor"><%= Resource.AboutCompanyLicensor %></div>
-                            <div class="confirmation-popup_name"><%= defaultSettings.CompanyName %></div>
-                            <ul class="confirmation-popup_info">
-                                <li>
-                                    <span class="gray-text"><%= Resource.AboutCompanyAddressTitle %>: 
-                                    </span><%= defaultSettings.Address %>
-                                </li>
-                                <li>
-                                    <span class="gray-text"><%= Resource.AboutCompanyEmailTitle %>: 
-                                    </span><a href="mailto:<%= defaultSettings.Email %>" class="link"><%= defaultSettings.Email %></a>
-                                </li>
-                                <li>
-                                    <span class="gray-text"><%= Resource.AboutCompanyTelTitle %>: 
-                                    </span><%= defaultSettings.Phone %>
-                                </li>
-                                <li>
-                                    <a href="<%= defaultSettings.Site %>" target="_blank" class="link">
-                                        <%= defaultSettings.Site.Replace(Uri.UriSchemeHttp + Uri.SchemeDelimiter, String.Empty).Replace(Uri.UriSchemeHttps + Uri.SchemeDelimiter, String.Empty) %>
-                                    </a>
-                                </li>
-                            </ul>
+                        %>
+                            <div class="confirmation-copyright gray-text">
+                                <%= string.Format(Resource.AboutCopyright, DateTime.Now.Year, defaultSettings.CompanyName) %>
+                                <a href="<%= defaultSettings.Site %>" target="_blank" class="link gray-text">
+                                    <%= defaultSettings.Site.Replace(Uri.UriSchemeHttp + Uri.SchemeDelimiter, String.Empty).Replace(Uri.UriSchemeHttps + Uri.SchemeDelimiter, String.Empty) %>
+                                </a>
+                            </div>
                         <% } %>
                     </div>
                 </li>
@@ -288,10 +359,7 @@
                 <% } %>
 
                 <%--Logout--%>
-                <% if (!(CoreContext.Configuration.Personal && CoreContext.Configuration.Standalone)) { %>
-                <li><a class="dropdown-item" href="<%= CommonLinkUtility.Logout %>">
-                        <%= UserControlsCommonResource.LogoutButton %></a></li>
-                <% } %>
+                <li id="logout_ref"><a class="dropdown-item" href="<%= CommonLinkUtility.Logout %>"><%= UserControlsCommonResource.LogoutButton %></a></li>
             </ul>
         </div>
     <% } %>
@@ -304,7 +372,7 @@
             <div class="list display-none"></div>
             <div class="loader-text-block"><%= FeedResource.LoadingMsg %></div>
             <div class="feeds-readed-msg"><span><%= FeedResource.FeedsReadedMsg %></span></div>
-            <a class="see-all-btn" href="<%= VirtualPathUtility.ToAbsolute("~/feed.aspx") %>">
+            <a class="see-all-btn" href="<%= VirtualPathUtility.ToAbsolute("~/Feed.aspx") %>">
                 <%= FeedResource.SeeAllFeedsBtn %>
             </a>
         </div>
@@ -325,9 +393,36 @@
         </div>
     </div>
 
-    <div id="studio_dropVoipPopupPanel" class="studio-action-panel">
-        <asp:PlaceHolder runat="server" ID="_voipPhonePlaceholder"></asp:PlaceHolder>
+    <% if (!DisableGift)
+       { %>
+    <div id="studio_dropGiftPopupPanel" class="studio-action-panel">
+        <div id="drop-gift-box" class="drop-list-box">
+            <% if (IsAdministrator) { %>
+            <div class="hdr"><%= Resource.PresentAdminHdr %></div>
+            <% } else { %>
+            <div class="hdr"><%= Resource.PresentUserHdr %></div>
+            <% } %>
+            <div class="gift-list">
+                <div class="gift-item gift-item-pro"><%= Resource.PresentItemPro %></div>
+                <% if (false && !CoreContext.Configuration.CustomMode) { %>
+                <div class="gift-item gift-item-private"><%= Resource.PresentItemPrivate %></div>
+                <% } %>
+                <div class="gift-item gift-item-mobile"><%= Resource.PresentItemMobile %></div>
+            </div>
+            <% if (IsAdministrator) { %>
+            <div class="btn-box">
+                <span class="left-btn" data-url="<%= SetupInfo.ControlPanelUrl.TrimEnd('/') + "/gift" %>"><%= Resource.PresentAdminOkBtn %></span>
+                <span class="right-btn"><%= Resource.PresentAdminHideBtn %></span>
+            </div>
+            <% } else { %>
+            <div class="btn-box">
+                <span class="left-btn"><%= Resource.PresentUserOkBtn %></span>
+                <span class="right-btn"><%= Resource.PresentUserHideBtn %></span>
+            </div>
+             <% } %>
+        </div>
     </div>
+    <% } %>
 
     <asp:PlaceHolder runat="server" ID="_customNavControls"></asp:PlaceHolder>
 </div>

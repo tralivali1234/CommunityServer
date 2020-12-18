@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,6 +20,7 @@ using ASC.Data.Backup.Utils;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Text.RegularExpressions;
 
 namespace ASC.Data.Backup.Tasks.Modules
@@ -119,14 +111,18 @@ namespace ASC.Data.Backup.Tasks.Modules
             get { return _tableRelations; }
         }
 
-        public override bool TryAdjustFilePath(ColumnMapper columnMapper, ref string filePath)
+        public override bool TryAdjustFilePath(bool dump, ColumnMapper columnMapper, ref string filePath)
         {
             var match = Regex.Match(filePath, @"^thumbs/\d+/\d+/\d+/(?'fileId'\d+)\.jpg$");
             if (match.Success)
             {
                 var fileId = columnMapper.GetMapping("files_file", "id", match.Groups["fileId"].Value);
                 if (fileId == null)
-                    return false;
+                {
+                    if(!dump) return false;
+
+                    fileId = match.Groups["fileId"].Value;
+                }
 
                 var s = fileId.ToString().PadRight(6, '0');
                 filePath = string.Format("thumbs/{0}/{1}/{2}/{3}.jpg", s.Substring(0, 2), s.Substring(2, 2), s.Substring(4), fileId);
@@ -144,7 +140,7 @@ namespace ASC.Data.Backup.Tasks.Modules
             return base.GetSelectCommandConditionText(tenantId, table);
         }
 
-        protected override bool TryPrepareValue(IDbConnection connection, ColumnMapper columnMapper, TableInfo table, string columnName, ref object value)
+        protected override bool TryPrepareValue(DbConnection connection, ColumnMapper columnMapper, TableInfo table, string columnName, ref object value)
         {
 
             if (table.Name == "projects_comments" && columnName == "content" ||
@@ -156,7 +152,7 @@ namespace ASC.Data.Backup.Tasks.Modules
             return base.TryPrepareValue(connection, columnMapper, table, columnName, ref value);
         }
 
-        protected override bool TryPrepareValue(IDbConnection connection, ColumnMapper columnMapper, RelationInfo relation, ref object value)
+        protected override bool TryPrepareValue(DbConnection connection, ColumnMapper columnMapper, RelationInfo relation, ref object value)
         {
             if (relation.ChildTable == "projects_comments" && relation.ChildColumn == "target_uniq_id")
             {
@@ -173,7 +169,7 @@ namespace ASC.Data.Backup.Tasks.Modules
             return base.TryPrepareValue(connection, columnMapper, relation, ref value);
         }
 
-        protected override bool TryPrepareValue(IDbConnection connection, ColumnMapper columnMapper, TableInfo table, string columnName, IEnumerable<RelationInfo> relations, ref object value)
+        protected override bool TryPrepareValue(bool dump, DbConnection connection, ColumnMapper columnMapper, TableInfo table, string columnName, IEnumerable<RelationInfo> relations, ref object value)
         {
             if (table.Name == "projects_tasks_order" && columnName == "task_order")
             {
@@ -200,7 +196,7 @@ namespace ASC.Data.Backup.Tasks.Modules
                 return true;
             }
 
-            return base.TryPrepareValue(connection, columnMapper, table, columnName, relations, ref value);
+            return base.TryPrepareValue(dump, connection, columnMapper, table, columnName, relations, ref value);
         }
     }
 }

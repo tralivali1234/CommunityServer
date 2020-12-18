@@ -1,4 +1,21 @@
-﻿window.ASC = window.ASC || {};
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+window.ASC = window.ASC || {};
 
 window.ASC.TMTalk = window.ASC.TMTalk || {};
 
@@ -55,8 +72,25 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
     var
       nodes = null,
       nodesInd = 0,
-      newmessage = null;
+      newmessage = null,
+      time = "",
+      weekday ="",
+      day = "";
+      
+    if (date.split(' ')) {
+        time = date.split(' ')[2],
+        weekday = date.split(' ')[0],
+        day = date.split(' ')[1];
+        
+        var currentDate = new Date;
+        var today = [currentDate.getDate(), (currentDate.getMonth() + 1), currentDate.getFullYear()].join('.');
+        currentDate.setDate(currentDate.getDate() - 1);
+        var yesterday = currentDate;
+        yesterday = [yesterday.getDate(), (yesterday.getMonth() + 1), yesterday.getFullYear()].join('.');
 
+        day = day === today || day === yesterday ? weekday : weekday + " " + day;
+    }
+      
     if (!defaultMessage) {
       throw 'no templates defaultmessage';
     }
@@ -73,12 +107,24 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       nodes[0].innerHTML = name;
     }
 
-    nodes = ASC.TMTalk.dom.getElementsByClassName(newmessage, 'date', 'span');
+    nodes = ASC.TMTalk.dom.getElementsByClassName(newmessage, 'date', 'div');
     if (nodes.length > 0) {
-      nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'value', 'span');
-      if (nodes.length > 0) {
-        nodes[0].innerHTML = date;
-      }
+        for (var nodeNum = 0; nodeNum < nodes.length; nodeNum++) {
+            var dateValue = ASC.TMTalk.dom.getElementsByClassName(nodes[nodeNum], 'value', 'span');
+            if (dateValue.length > 0) {
+                dateValue[0].innerHTML = time;
+            }
+        }
+      
+    }
+      
+    nodes = ASC.TMTalk.dom.getElementsByClassName(newmessage, 'daysplit', 'span');
+    if (nodes.length > 0) {
+        nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'value', 'span');
+        if (nodes.length > 0) {
+            $(nodes[0]).attr('date', date.split(' ')[1])
+            nodes[0].innerHTML = day;
+        }
     }
 
     nodes = ASC.TMTalk.dom.getElementsByClassName(newmessage, 'body', 'div');
@@ -199,12 +245,14 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       smile = null,
       smilesInd = 0,
       aliasesInd = 0,
-      reUrl = /(http:\/\/|https:\/\/|ftp:\/\/|www\.){1}[\w\.\/\|\\:?#'~\[\]\{\}%&=+$,@\-_!~*;()]+/ig,
+      //reUrl = /(http:\/\/|https:\/\/|ftp:\/\/|www\.){1}[\w\.\/\|\\:?#'~\[\]\{\}%&=+$,@\-_!~*;()]+/ig,
       foundLinks = [],
       foundSmiles = [];
 
     body = translateSymbols(body, false);
     body = body.replace(/\n/g, '<br>');
+      
+    var reUrl = new XRegExp("(http:\/\/|https:\/\/|ftp:\/\/|www\.){1}[0-9\\p{L}\\p{M}\w\.\/\|\\:?#'~\[\\]\{\}%&=+$,@\\-_!~*;()]+", 'gi');
 
     while (link = reUrl.exec(body)) {
       lnkstr = link[0];
@@ -262,20 +310,49 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
     return body;
   }
 
+
   var addMessage = function (roomnode, name, date, body, isMine, needParagraph, isUnreadMessage, inTop) {
-    var
-      nodes = null,
-      newmessage = null,
-      firstmessage = null,
-      lastmessage = null,
-      messagescontainer = null;
+      var nodes = null,
+          newmessage = null,
+          firstmessage = null,
+          lastmessage = null,
+          messagescontainer = null,
+          firstmessageday = null,
+          firstmessagedatesplit = null,
+          lastmessageday = null,
+          lastmessagedatesplit = null,
+          day = "",
+          cid = $(roomnode).attr('data-roomcid');
+      newmessage = createMessage(name, date, body, isMine);
+      
+      if (date.split(' ')) {
+          
+          day = date.split(' ')[1];
+          var currentDate = new Date;
+          var today = [currentDate.getDate(), (currentDate.getMonth() + 1), currentDate.getFullYear()].join('.');
+          currentDate.setDate(currentDate.getDate() - 1);
+          var yesterday = currentDate;
+          yesterday = [yesterday.getDate(), (yesterday.getMonth() + 1), yesterday.getFullYear()].join('.');
 
-    newmessage = createMessage(name, date, body, isMine);
-
+          day = day === today || day === yesterday ? date.split(' ')[0] : [date.split(' ')[0],date.split(' ')[1]].join(" ");
+      }
+      if (!ASC.TMTalk.dom.hasClass(roomnode, 'conference')) {
+          $(ASC.TMTalk.dom.getElementsByClassName(newmessage, 'head', 'div')[0]).hide();
+      }
     nodes = ASC.TMTalk.dom.getElementsByClassName(roomnode, 'messages', 'ul');
     if (nodes.length > 0) {
       messagescontainer = nodes[0];
     }
+    $(messagescontainer).unbind('scroll');
+    $(messagescontainer).scroll(function () {
+        var currentMessagesCount = 0;
+        if (this.scrollTop === 0) {
+            currentMessagesCount = jQuery('div#talkRoomsContainer ul.rooms li.room.current ul.messages:first').find('li').not('.default').length;
+            var startindex = currentMessagesCount++;
+            var count = 5;
+            ASC.TMTalk.messagesManager.updateHistory(cid, startindex, count, jq(".room.current .search-value").val());
+        }
+    });
     if (messagescontainer !== null) {
       lastmessage = ASC.TMTalk.dom.lastElementChild(messagescontainer);
       if (ASC.TMTalk.dom.hasClass(lastmessage, 'default')) {
@@ -289,7 +366,13 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           ASC.TMTalk.dom.addClass(lastmessage, 'more');
         }
       }
-
+      if (lastmessage !== null) {
+          lastmessagedatesplit = ASC.TMTalk.dom.getElementsByClassName(lastmessage, 'daysplit', 'span');
+          lastmessageday = ASC.TMTalk.dom.getElementsByClassName(lastmessagedatesplit[0], 'value', 'span');
+          if (day === lastmessageday[0].innerText && !inTop) {
+              ASC.TMTalk.dom.addClass(ASC.TMTalk.dom.getElementsByClassName(newmessage, 'value', 'span')[0], 'hidden');
+          }
+      }
       if (isUnreadMessage === true) {
         ASC.TMTalk.dom.addClass(newmessage, 'unread');
         ASC.TMTalk.events.add(newmessage, 'mouseover', function () {
@@ -307,7 +390,13 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           }
         }
       }
-
+      if (firstmessage != null) {
+          firstmessagedatesplit = ASC.TMTalk.dom.getElementsByClassName(firstmessage, 'daysplit', 'span');
+          firstmessageday = ASC.TMTalk.dom.getElementsByClassName(firstmessagedatesplit[0], 'value', 'span');
+          if (day === firstmessageday[0].innerText) {
+              ASC.TMTalk.dom.addClass(firstmessageday[0], 'hidden');
+          }
+      }
       if (inTop === true && firstmessage !== null) {
         messagescontainer.insertBefore(newmessage, firstmessage);
       } else {
@@ -343,6 +432,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
   };
 
   var clarificationContacts = function (contactscontainer) {
+     
     var
       node = null,
       nodes = null,
@@ -605,7 +695,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       }
 
       contactsContainer.appendChild(contactnode);
-      clarificationContacts(contactsContainer);
+      //clarificationContacts(contactsContainer);
     }
   };
 
@@ -644,13 +734,13 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           }
         }
 
-        clarificationContacts(contactsContainer);
+        //clarificationContacts(contactsContainer);
         break;
       }
     }
   };
 
-  var onSentMessageToList = function (listId, name, displaydate, date, body) {
+  var onSentMessageToList = function (listId, name, displaydate, date, body) {   
     var room = null;
     if ((room = getRoomByCid(listId)) !== null) {
       var needParagraph = true;
@@ -689,7 +779,6 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
 
     if (contactnode === null) {
       contactname = ASC.TMTalk.contactsManager.getContactName(contactjid);
-
       contactnode = createContact(contactjid);
       contactnode.className += ' invited';
 
@@ -700,7 +789,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       }
 
       contactsContainer.appendChild(contactnode);
-      clarificationContacts(contactsContainer);
+      //clarificationContacts(contactsContainer);
     }
 
     var timeout = contactnode.getAttribute('data-inviteid');
@@ -733,7 +822,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
         if (nodes[nodesInd].getAttribute('data-cid') === contactjid) {
           if (ASC.TMTalk.dom.hasClass(nodes[nodesInd], 'invited')) {
             nodes[nodesInd].parentNode.removeChild(nodes[nodesInd]);
-            clarificationContacts(contactsContainer);
+            //clarificationContacts(contactsContainer);
           }
           break;
         }
@@ -806,7 +895,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       }
 
       contactsContainer.appendChild(contactnode);
-      clarificationContacts(contactsContainer);
+      //clarificationContacts(contactsContainer);
     }
   };
 
@@ -847,13 +936,17 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
         break;
       }
     }
-    clarificationContacts(contactsContainer);
+    //clarificationContacts(contactsContainer);
   };
 
   var onOpenHistory = function (jid) {
+    
+    //jq("#cha").tlCombobox();
+      
     var currentRoomData = ASC.TMTalk.roomsManager.getRoomData();
     if (currentRoomData.type === 'chat' && currentRoomData.id === jid) {
-      ASC.TMTalk.dom.addClass(roomlistContainer, 'history');
+        ASC.TMTalk.dom.addClass(roomlistContainer, 'history');
+                
 
       var room = getRoomByCid(jid);
       if (room !== null) {
@@ -866,7 +959,8 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           nodes[0].value = '';
         }
 
-        nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+        //nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+        nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
         if (nodes.length > 0) {
           nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
           if (nodes.length > 0) {
@@ -877,10 +971,18 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           ASC.TMTalk.roomsContainer.resetHistorySearch(room, ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li'));
         }
       }
+      
+      var cha = ASC.TMTalk.dom.getElementsByClassName(ASC.TMTalk.dom.getElementsByClassName(room, 'filtering-panel', 'div')[0], 'cha', 'div');
+      var filterId = cha[0].firstElementChild.getAttribute('data-value');
+      if (filterId) 
+        getFilteringHistory(jid, filterId)
+      else 
+        getFilteringHistory(jid, 0); // 0 - last day
 
-      getFilteringHistory(jid, 2); // 2 - last month
       $(window).resize();
+      
     }
+    
   };
 
   var onCloseHistory = function (jid) {
@@ -892,7 +994,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
     }
   };
 
-  var onGetContactHistory = function (jid, messages, newmessagescount) {
+  var onGetContactHistory = function (jid, messages, newmessagescount, removeOld, searchText) {
     var
       node = null,
       nodes = null,
@@ -910,17 +1012,47 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
 	    //  }
 	    //  node.parentNode.removeChild(node);
       //}
-
+        var messagescontainer;
       nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
       if (nodes.length > 0) {
-        ASC.TMTalk.dom.removeClass(nodes[0], 'loading');
+          ASC.TMTalk.dom.removeClass(nodes[0], 'loading');
+          nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
+          if (nodes.length > 0) {
+              messagescontainer = nodes[0];
+          }
       }
 
+        if (removeOld) {
+            var oldMessages = ASC.TMTalk.dom.getElementsByClassName(room, 'message paragraph', 'li');
+            for (var i = 0; i < oldMessages.length; i++) {
+                oldMessages[i].remove();
+            }
+        }
+
       messagesInd = messages.length;
+      var currentMessageCount = jQuery('div#talkRoomsContainer ul.rooms li.room.current ul.messages:first').find('li').not('.default').length;
       while (messagesInd--) {
         message = messages[messagesInd];
         addMessage(room, message.displayName, message.displayDate, textToHtml(message.body), message.isOwn, true, newmessagescount-- > 0, true);
       }
+      if (messages.length != 0 && currentMessageCount > 0) {
+          
+          var container = jQuery('div#talkRoomsContainer ul.rooms li.room[data-roomcid="' + jid + '"] ul.messages');
+          var element = jQuery('div#talkRoomsContainer li.room[data-roomcid="' + jid + '"] div.messages ul.messages li:eq(5)');
+          var correction = jQuery('div#talkRoomsContainer li.room.current').hasClass('conference') ? 25 : 50;
+
+          var top = 0;
+          if (container.length > 0 && element.length > 0 && element.position() != undefined) {
+              top = element.position().top + container.offset().top + container.scrollTop() - correction;
+          }
+          jQuery('div#talkRoomsContainer ul.rooms li.room[data-roomcid="' + jid + '"] ul.messages').scrollTo(top);
+      } else if (currentMessageCount != 0) {
+          jQuery('div#talkRoomsContainer ul.rooms li.room[data-roomcid="' + jid + '"] ul.messages').scrollTo(0);
+      }
+
+        if (searchText) {
+            historySearch(searchText, room, ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li'));
+        }
     }
   };
 
@@ -935,7 +1067,8 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       historyfragment = null,
       messagescontainer = null;
     if ((room = getRoomByCid(jid)) !== null) {
-      nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+        //nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+        nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
       if (nodes.length > 0) {
         ASC.TMTalk.dom.removeClass(nodes[0], 'loading');
         nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
@@ -943,11 +1076,28 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           messagescontainer = nodes[0];
         }
       }
+      if (messagescontainer !== null) {
+          if (jQuery(messagescontainer).find('li:not(.default):first').length > 0) {
+              var firstMessageTopPosition = jQuery(messagescontainer).find('li:not(.default):first').position().top;
+              var countMessages = jQuery(messagescontainer).find('li:not(.default)').length ?
+                  jQuery(messagescontainer).find('li:not(.default)').length : 0;
+          }
+      }
       historyfragment = document.createDocumentFragment();
-      for (var i = 0, n = messages.length; i < n; i++) {
+        var lastmessagedate = null,
+            currentmessagedate= null;
+      for (var i = 0, n = messages.length - countMessages; i < n; i++) {
         message = messages[i];
         newmessage = createMessage(message.displayName, message.displayDate, textToHtml(message.body), message.isOwn);
         newmessage.className += ' paragraph';
+        $(newmessage).find('div.head').hide();
+
+        currentmessagedate = [message.displayDate.split(' ')[0],message.displayDate.split(' ')[1]].join(" ");
+        if (lastmessagedate != null && lastmessagedate === currentmessagedate) {
+            $(newmessage).find('span.daysplit').hide();
+        }
+        lastmessagedate = [message.displayDate.split(' ')[0],message.displayDate.split(' ')[1]].join(" ");
+          
         historyfragment.appendChild(newmessage);
         //addMessageToHistory(room, message.displayName, message.displayDate, textToHtml(message.body), message.isOwn);
       }
@@ -955,16 +1105,43 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       if (messagescontainer !== null) {
         nodes = ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li');
         nodesInd = nodes.length;
-        while (nodesInd--) {
-          node = nodes[nodesInd];
-          if (ASC.TMTalk.dom.hasClass(node, 'default')) {
-	          continue;
-	        }
-	        node.parentNode.removeChild(node);
-	      }
-        messagescontainer.appendChild(historyfragment);
+        for (var i = 0; i < nodesInd; i++)
+        {
+            node = nodes[i];
+            if (ASC.TMTalk.dom.hasClass(node, 'default')) {
+                continue;
+            }
+            if (ASC.TMTalk.dom.getElementsByClassName(node, 'daysplit', 'span').length > 0) {
+                
+                var currentDate = new Date;
+                var today = [currentDate.getDate(),(currentDate.getMonth() + 1),currentDate.getFullYear()].join('.');
+                currentDate.setDate(currentDate.getDate() - 1);
+                var yesterday = currentDate;
+                yesterday = [yesterday.getDate(), (yesterday.getMonth() + 1), yesterday.getFullYear()].join('.');
+                if (lastmessagedate) {
+                    var day = lastmessagedate.split(' ').length > 1 ? lastmessagedate.split(' ')[1]:'';
+                    var lastMessageDate = ASC.TMTalk.dom.getElementsByClassName(node, 'daysplit', 'span')[0].textContent;
+
+                    if ((lastmessagedate.indexOf(lastMessageDate) + 1) && day === today || day === yesterday) {
+                        $(ASC.TMTalk.dom.getElementsByClassName(node, 'daysplit', 'span')[0]).hide();
+                    }
+                    break;
+                }
+                
+            }
+        }
+        messagescontainer.insertBefore(historyfragment, nodes[0]);
         if (newmessage !== null) {
-          messagescontainer.scrollTop = newmessage.offsetTop + newmessage.offsetHeight + 100;
+            messagescontainer.scrollTop = newmessage.offsetTop + newmessage.offsetHeight - firstMessageTopPosition;
+        }
+        nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'search-value', 'input');
+        if (nodes.length > 0) {
+            var searchstr = nodes[0].value;
+            if (searchstr) {
+                if (messagescontainer !== null) {
+                   ASC.TMTalk.roomsContainer.historySearch(searchstr, room, ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li'));
+                }
+            }
         }
       }
     }        
@@ -1008,11 +1185,17 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
         classname += ' mailing start-splash';
         newroom.className = classname;
         break;
-      case 'conference' :
+        case 'conference':
+        setTimeout(function () {
+            if (ASC.TMTalk.dom.hasClass(newroom, 'start-splash')) {
+                var $currentRoom = jQuery('div#talkRoomsContainer ul.rooms li.room.current');
+                $currentRoom.removeClass('minimized');
+            }
+        }, 500);
         newroom.setAttribute('data-roomcid', data.id);
 
         var classname = newroom.className;
-        classname += ' conference ' + data.classname + ' start-splash';
+        classname += ' conference ' + data.classname + ' minimized start-splash';
         newroom.className = classname;
         break;
     }
@@ -1070,6 +1253,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           break;
       }
       ASC.TMTalk.dom.removeClass(roomlistContainer, 'history');
+      ASC.TMTalk.dom.removeClass(roomlistContainer, 'searchmessage');
       //TMTalk.hideAllDialogs();
       showLastMessage(currentroom);
     }
@@ -1180,7 +1364,8 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       nodesInd = 0,
       selector = null,
       seloption = null;
-    nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+      //nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+    nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
     if (nodes.length > 0) {
       ASC.TMTalk.dom.addClass(nodes[0], 'loading');
     }
@@ -1189,7 +1374,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       ASC.TMTalk.dom.removeClass(nodes[0], 'found');
       nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'search-value', 'input');
       if (nodes.length > 0) {
-        nodes[0].value = '';
+       // nodes[0].value = '';
       }
     }
 
@@ -1288,10 +1473,12 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
     if (text.length > 0) {
       cltext = text.toLowerCase();
       strIndex = 0;
-      while ((strIndex = cltext.indexOf(lcstr)) !== -1) {
-        newhtml += text.substring(0, strIndex) + '<span class="hl-text">' + text.substring(strIndex, strIndex + lcstr.length) + '</span>';
-        text = text.substring(strIndex + strlen);
-        cltext = cltext.substring(strIndex + strlen);
+      
+      while ((strIndex = cltext.indexOf(Encoder.htmlEncode(lcstr))) !== -1) {
+          var endIndex = Encoder.htmlEncode(lcstr).length;
+          newhtml += text.substring(0, strIndex) + '<span class="hl-text">' + text.substring(strIndex, strIndex + endIndex) + '</span>';
+          text = text.substring(strIndex + Encoder.htmlEncode(str).length);
+          cltext = cltext.substring(strIndex + Encoder.htmlEncode(str).length);
       }
       newhtml += text;
       //newhtml += text.replace(restr, '<span class="hl-text">$&</span>');
@@ -1314,6 +1501,9 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
       nodes = null,
       message = null,
       messagesInd = 0,
+      foundmessagecount = 0,
+      foundmessages = null, 
+      currentfoundmessage = null, 
       lastfoundmessage = null;
 
     if (typeof str !== 'string' || str.length === 0 || messages.length === 0) {
@@ -1341,14 +1531,76 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           if (lastfoundmessage === null) {
             lastfoundmessage = message;
           }
+          foundmessagecount++;
           ASC.TMTalk.dom.addClass(message, 'found');
         }
       }
     }
+    nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
+    if (nodes.length > 0) {
+        ASC.TMTalk.dom.removeClass(nodes[0], 'loading');
+    }
+    nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'countfoundmessage', 'span');
+    if (nodes.length > 0) {
+        foundmessages = nodes[0];
+        $(foundmessages).html(foundmessagecount);
+        nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'currentfoundmessage', 'span');
+        if (nodes.length > 0) {
+            currentfoundmessage = nodes[0];
+            if (foundmessagecount !== 0) $(currentfoundmessage).html("1");
+            else $(currentfoundmessage).html("0");
+        }
+    }
     if (lastfoundmessage !== null) {
       var messagescontainer = lastfoundmessage.parentNode;
-      messagescontainer.scrollTop = lastfoundmessage.offsetTop - (messagescontainer.offsetHeight - lastfoundmessage.offsetHeight);
+      messagescontainer.scrollTop = lastfoundmessage.offsetTop - (messagescontainer.offsetHeight - lastfoundmessage.offsetHeight) + lastfoundmessage.scrollHeight;
     }
+  };
+    
+  function minimizingUserList() {
+
+      var room = jQuery('div#talkRoomsContainer ul.rooms li.room.current')[0];
+      if (ASC.TMTalk.dom.hasClass(room, 'room') && (ASC.TMTalk.dom.hasClass(room, 'conference') || ASC.TMTalk.dom.hasClass(room, 'mailing'))) {
+
+          ASC.TMTalk.dom.toggleClass(room, 'minimized');
+          var roomid = room.getAttribute('data-roomid'),
+              roomcid = room.getAttribute('data-roomcid'),
+              $messagesContainer = jQuery('div#talkRoomsContainer ul.rooms li.room.current div.messages ul.messages'),
+              messagesContainerScrollTop = $messagesContainer.scrollTop();
+          isMinimized = ASC.TMTalk.dom.hasClass(room, 'minimized');
+          if (roomid) {
+              ASC.TMTalk.roomsManager.updateRoomData(roomid, { minimized: isMinimized });
+          }
+          if (!isMinimized) {
+              ASC.TMTalk.dom.removeClass('talkRoomsContainer', 'minimized');
+              ASC.TMTalk.tabsContainer.setStatus('hint', { hint: ASC.TMTalk.Resources.HintSendInvite }, 2);
+              var roomSeparator = ASC.TMTalk.dom.getElementsByClassName(room, 'room-separator');
+              if (roomSeparator.length > 0) {
+                  ASC.TMTalk.dom.removeClass(roomSeparator[0], 'hidden');
+              }
+              var subPanel = ASC.TMTalk.dom.getElementsByClassName(room, 'sub-panel noBorder')[0];
+              ASC.TMTalk.dom.removeClass(subPanel, 'noBorder');
+              ASC.TMTalk.dom.addClass(subPanel, 'border');
+          } else {
+              ASC.TMTalk.dom.addClass('talkRoomsContainer', 'minimized');
+              if (ASC.TMTalk.dom.hasClass(room, 'conference') && roomcid) {
+                  ASC.TMTalk.tabsContainer.resetStatus('conference', { confsubject: ASC.TMTalk.mucManager.getConferenceSubject(roomcid) }, 1);
+              }
+              //ASC.TMTalk.dom.addClass(target.parentNode, 'hidden');
+              if ((ASC.TMTalk.dom.hasClass(room, 'conference') && ASC.TMTalk.dom.getElementsByClassName(room, 'contact').length <= 2)
+                  || (ASC.TMTalk.dom.hasClass(room, 'mailing') && ASC.TMTalk.dom.getElementsByClassName(room, 'contact').length <= 1)) {
+
+                  //ASC.TMTalk.dom.removeClass(room, 'start-splash');
+
+              }
+              var subPanel = ASC.TMTalk.dom.getElementsByClassName(room, 'sub-panel border')[0];
+              ASC.TMTalk.dom.removeClass(subPanel, 'border');
+              ASC.TMTalk.dom.addClass(subPanel, 'noBorder');
+          }
+          $(window).resize();
+          ASC.TMTalk.roomsContainer.showLastMessage(null);
+          $messagesContainer.scrollTop(messagesContainerScrollTop);
+      }
   };
 
   var resetHistorySearch = function (room, messages) {
@@ -1360,7 +1612,14 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
     if (messages.length === 0) {
       return undefined;
     }
-
+    nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'currentfoundmessage', 'span');
+    if (nodes.length > 0) {
+        $(nodes[0]).html(0);
+    }
+    nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'countfoundmessage', 'span');
+    if (nodes.length > 0) {
+        $(nodes[0]).html(0);
+    }
     nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'filtering-panel', 'div');
     if (nodes.length > 0) {
       ASC.TMTalk.dom.removeClass(nodes[0], 'found');
@@ -1390,8 +1649,13 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
 
     resetHistorySearch  : resetHistorySearch,
     historySearch       : historySearch,
+    
+    minimizingUserList  :minimizingUserList,
+    
+    showLastMessage : showLastMessage,
+    onRottenInvite: onRottenInvite,
 
-    showLastMessage : showLastMessage
+    getRoomByCid: getRoomByCid
   };
 })(jQuery);
 
@@ -1410,6 +1674,25 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
         }
       });
     }
+    
+    $('#closeHistory')
+      .on('click',function (evt) {
+          var room = $('.room.chat.current');
+          var roomcid = room.attr('data-roomcid');
+          if (roomcid) {
+              ASC.TMTalk.messagesManager.closeHistory(roomcid);
+          }
+          //var target = evt.target;
+          //var room = target.parentNode.parentNode.parentNode;
+          //var room = getElementByCl
+         // if (ASC.TMTalk.dom.hasClass(room, 'room') && ASC.TMTalk.dom.hasClass(room, 'chat')) {
+             // var roomcid = room.getAttribute('data-roomcid');
+              //if (roomcid) {
+                //  ASC.TMTalk.messagesManager.closeHistory(roomcid);
+             // }
+         // }
+      })
+
 
     $('#talkRoomsContainer')
       .keydown(function (evt) {
@@ -1417,26 +1700,55 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
           evt.originalEvent.stopPropagation ? evt.originalEvent.stopPropagation() : evt.originalEvent.cancelBubble = true;
         }
       })
+      .keyup(function(evt) {
+        switch (evt.keyCode) {
+            case 27:
+                if (evt.target.tagName.toLowerCase() === 'input' && ASC.TMTalk.dom.hasClass(evt.target, 'search-value')) {
+                    if (evt.target.value) {
+                        ASC.TMTalk.roomsManager.clearSearch(evt.target.parentNode.parentNode.parentNode.parentNode);
+                    } else {
+                        var filteringPanel = evt.target.parentNode.parentNode.parentNode;
+                        if ($(filteringPanel).hasClass('show')) {
+                            $(filteringPanel).removeClass('show');
+                        }
+                            
+                    }
+                }
+                break;
+        }
+      })
       .keypress(function (evt) {
         switch (evt.keyCode) {
-          case 13 :
+            case 13:
             if (evt.target.tagName.toLowerCase() === 'input' && ASC.TMTalk.dom.hasClass(evt.target, 'search-value')) {
-              var room = evt.target.parentNode.parentNode.parentNode;
+               
+              var room = evt.target.parentNode.parentNode.parentNode.parentNode;
+              var currentRoomData = ASC.TMTalk.roomsManager.getRoomData();
+              var jid = currentRoomData.id;
+              var messageCount = 0;
               if (ASC.TMTalk.dom.hasClass(room, 'room')) {
                 var searchstr = evt.target.value;
                 if (searchstr) {
                   var
                     nodes = null,
                     messagescontainer = null;
-                  nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+                  //nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+                  nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
                   if (nodes.length > 0) {
                     nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
                     if (nodes.length > 0) {
                       messagescontainer = nodes[0];
+                      nodes = ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li');
+                      messageCount = nodes.length;
                     }
                   }
                   if (messagescontainer !== null) {
-                    ASC.TMTalk.roomsContainer.historySearch(searchstr, room, ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li'));
+                      if (!currentRoomData.fullhistory && messageCount > 20) {
+                          ASC.TMTalk.roomsContainer.getFilteringHistory(jid, 3);
+                          currentRoomData.fullhistory = true;
+                      } else {
+                          ASC.TMTalk.roomsContainer.historySearch(searchstr, room, ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li'));
+                      }
                   }
                 }
               }
@@ -1445,18 +1757,19 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
         }
       })
       .click(function (evt) {
-        var target = evt.target;
-
+          var target = evt.target;
         if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'remove-member')) {
           var contact = target.parentNode.parentNode;
+          var invited = ASC.TMTalk.dom.hasClass(contact, 'invited') ? true : false;
           if (ASC.TMTalk.dom.hasClass(contact, 'contact')) {
             var room = contact.parentNode.parentNode.parentNode;
+            var roomCid = room.getAttribute('data-roomcid');
             if (ASC.TMTalk.dom.hasClass(room, 'room')) {
               var jid = contact.getAttribute('data-cid');
               if (ASC.TMTalk.dom.hasClass(room, 'conference')) {
                 var contactjid = contact.getAttribute('data-cid');
                 if (contactjid) {
-                  TMTalk.showDialog('kick-occupant', ASC.TMTalk.mucManager.getContactName(jid), {contactjid : contactjid});
+                  TMTalk.showDialog('kick-occupant', ASC.TMTalk.mucManager.getContactName(jid), { contactjid: contactjid }, { invited: invited, roomCid: roomCid});
                 }
               } else if (ASC.TMTalk.dom.hasClass(room, 'mailing')) {
                 var listId = room.getAttribute('data-roomcid');
@@ -1467,54 +1780,62 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
               }
             }
           }
-      } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'toggle-minimizing')) {
-          var room = target.parentNode.parentNode;
-          if (ASC.TMTalk.dom.hasClass(room, 'room') && (ASC.TMTalk.dom.hasClass(room, 'conference') || ASC.TMTalk.dom.hasClass(room, 'mailing'))) {
-            ASC.TMTalk.dom.toggleClass(room, 'minimized');
-            var
-              roomid = room.getAttribute('data-roomid'),
-              roomcid = room.getAttribute('data-roomcid'),
-              isMinimized = ASC.TMTalk.dom.hasClass(room, 'minimized');
-            if (roomid) {
-              ASC.TMTalk.roomsManager.updateRoomData(roomid, {minimized : isMinimized});
+        } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'toggle-minimizing')) {
+            
+        } else if (ASC.TMTalk.dom.hasClass(target, 'openUserList') && ASC.TMTalk.dom.hasClass(target, 'with-entity-menu')) {
+            ASC.TMTalk.roomsContainer.minimizingUserList();
+        } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'remove-mailing') || (ASC.TMTalk.dom.hasClass(target, 'removeMailing') && ASC.TMTalk.dom.hasClass(target, 'with-entity-menu'))) {
+            var currentRoomData = ASC.TMTalk.roomsManager.getRoomData();
+            if (currentRoomData !== null && currentRoomData.type === 'mailing') {
+                var listId = currentRoomData.id;
+                if (listId) {
+                    ASC.TMTalk.msManager.removeList(listId);
+                }
+            };
+        } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'remove-conference') || (ASC.TMTalk.dom.hasClass(target, 'removeRoom') && ASC.TMTalk.dom.hasClass(target, 'with-entity-menu'))) {
+            var currentRoomData = ASC.TMTalk.roomsManager.getRoomData();
+            if (currentRoomData !== null && currentRoomData.type === 'conference' && currentRoomData.affiliation === 'owner') {
+                var roomjid = currentRoomData.id;
+                if (roomjid) {
+                    TMTalk.showDialog('remove-room', ASC.TMTalk.mucManager.getConferenceName(roomjid), { roomjid: roomjid });
+                }
             }
-            if (isMinimized) {
-              ASC.TMTalk.dom.addClass('talkRoomsContainer', 'minimized');
-              if (ASC.TMTalk.dom.hasClass(room, 'conference') && roomcid) {
-                ASC.TMTalk.tabsContainer.resetStatus('conference', {confsubject : ASC.TMTalk.mucManager.getConferenceSubject(roomcid)}, 1);
-              }
-            } else {
-              ASC.TMTalk.dom.removeClass('talkRoomsContainer', 'minimized');
-              ASC.TMTalk.tabsContainer.setStatus('hint', {hint : ASC.TMTalk.Resources.hintSendInvite}, 2);
+        } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'close-history')) {
+            var room = target.parentNode.parentNode.parentNode;
+            if (ASC.TMTalk.dom.hasClass(room, 'room') && ASC.TMTalk.dom.hasClass(room, 'chat')) {
+                var roomcid = room.getAttribute('data-roomcid');
+                if (roomcid) {
+                    ASC.TMTalk.messagesManager.closeHistory(roomcid);
+                }
             }
-            $(window).resize();
-            ASC.TMTalk.roomsContainer.showLastMessage(null);
-          }
-      } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'close-history')) {
-          var room = target.parentNode.parentNode.parentNode;
-          if (ASC.TMTalk.dom.hasClass(room, 'room') && ASC.TMTalk.dom.hasClass(room, 'chat')) {
-            var roomcid = room.getAttribute('data-roomcid');
-            if (roomcid) {
-              ASC.TMTalk.messagesManager.closeHistory(roomcid);
-            }
-          }
         } else if (ASC.TMTalk.dom.hasClass(target, 'filter-value')) {
-          var selector = target.parentNode;
-          if (ASC.TMTalk.dom.hasClass(selector, 'custom-select')) {
-            var room = selector.parentNode.parentNode;
-            if (ASC.TMTalk.dom.hasClass(room, 'room')) {
-              ASC.TMTalk.dom.toggleClass(selector, 'open');
-              if (ASC.TMTalk.dom.hasClass(selector, 'open')) {
-                $(document).one('click', (function (roomId) {
-                  return function () {
-                    ASC.TMTalk.roomsContainer.hideHistoryFilter(roomId);
-                  };
-                })(room.getAttribute('data-roomid')));
-                return false;
-              }
+            var selector = target.parentNode;
+            if (ASC.TMTalk.dom.hasClass(selector, 'custom-select')) {
+                var room = selector.parentNode.parentNode;
+                if (ASC.TMTalk.dom.hasClass(room, 'room')) {
+                    ASC.TMTalk.dom.toggleClass(selector, 'open');
+                    if (ASC.TMTalk.dom.hasClass(selector, 'open')) {
+                        $(document).one('click', (function(roomId) {
+                            return function() {
+                                ASC.TMTalk.roomsContainer.hideHistoryFilter(roomId);
+                            };
+                        })(room.getAttribute('data-roomid')));
+                        return false;
+                    }
+                }
             }
-          }
+            //new history filter
         } else if (ASC.TMTalk.dom.hasClass(target, 'filter-option')) {
+            var selector = target.parentNode.parentNode.parentNode.parentNode;
+            var optionid = target.getAttribute('data-value');
+            var room = selector.parentNode.parentNode.parentNode.parentNode;
+            if (ASC.TMTalk.dom.hasClass(room, 'room')) {
+                var roomcid = room.getAttribute('data-roomcid');
+                if (roomcid && optionid) {
+                    ASC.TMTalk.roomsContainer.getFilteringHistory(roomcid, optionid);
+                }
+            }
+        } /*else if (ASC.TMTalk.dom.hasClass(target, 'filter-option')) {
           var selector = target.parentNode.parentNode.parentNode;
           if (ASC.TMTalk.dom.hasClass(selector, 'custom-select')) {
             var optionid = target.getAttribute('data-id');
@@ -1529,100 +1850,150 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
               }
             }
           }
-      } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'search-start')) {
-          var room = target.parentNode.parentNode.parentNode;
-          if (ASC.TMTalk.dom.hasClass(room, 'room')) {
-            var
-              nodes = null,
-              messagescontainer = null;
-            nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'search-value', 'input');
-            if (nodes.length > 0) {
-              var searchstr = nodes[0].value;
-              if (searchstr) {
-                nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+      }*/
+        else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'search-start')) {
+            var filteringPanel = target.parentNode.parentNode.parentNode;
+            if ($(filteringPanel).hasClass('close')) {
+                $(filteringPanel).removeClass('close');
+            }
+            $(filteringPanel).toggleClass('show');
+            
+        } else if ((ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'search-prev-message')) ||
+                    ASC.TMTalk.dom.hasClass(target, 'search_prevbutton_container') ||
+                    (ASC.TMTalk.dom.hasClass(target, 'button-container') && ASC.TMTalk.dom.hasClass(target, 'search-prev-message'))) {
+
+            var room = null;
+            if (ASC.TMTalk.dom.hasClass(target, 'search-prev-message')) {
+                if (ASC.TMTalk.dom.hasClass(target, 'button-talk')) 
+                    room = target.parentNode.parentNode.parentNode.parentNode.parentNode;
+                else
+                    room = target.parentNode.parentNode.parentNode.parentNode;
+            } else {
+                room = target.parentNode.parentNode.parentNode;
+            }
+                                                                                                                                        
+            if (ASC.TMTalk.dom.hasClass(room, 'room')) {
+                var node = null,
+                    nodes = null,
+                    nodesInd = 0,
+                    messagescontainer = null,
+                    currentfoundmessage = null;
+                //nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+                nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
                 if (nodes.length > 0) {
-                  nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
-                  if (nodes.length > 0) {
-                    messagescontainer = nodes[0];
-                  }
+                    nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
+                    if (nodes.length > 0) {
+                        messagescontainer = nodes[0];
+                    }
                 }
                 if (messagescontainer !== null) {
-                  ASC.TMTalk.roomsContainer.historySearch(searchstr, room, ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li'));
+                    var containerOffsetTop = messagescontainer.scrollTop;
+                    nodes = ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message found', 'li');
+                    nodesInd = nodes.length;
+                    var number = 0;
+                    while (nodesInd--) {
+                        node = nodes[nodesInd];
+                        number++;
+                        if (ASC.TMTalk.dom.getElementsByClassName(node, 'message', 'div')[0].offsetHeight > 0 && node.offsetTop < containerOffsetTop) {
+                            messagescontainer.scrollTop = node.offsetTop;
+                            break;
+                        }
+                        if (number == nodes.length) {
+                            messagescontainer.scrollTop = nodes[nodes.length - 1].offsetTop - (messagescontainer.offsetHeight - ASC.TMTalk.dom.getElementsByClassName(node, 'message', 'div')[0].offsetHeight);
+                            number = 1;
+                        }
+                    }
+                    nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'currentfoundmessage', 'span');
+                    if (nodes.length > 0) {
+                        currentfoundmessage = nodes[0];
+                        $(currentfoundmessage).html(number);
+                    }
                 }
-              }
+                $('div#talkRoomsContainer ul.rooms li.room.current div.filtering-panel.show div.textfield.filtering-field input').focus();
             }
-          }
-      } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'search-prev-message')) {
-          var room = target.parentNode.parentNode.parentNode;
-          if (ASC.TMTalk.dom.hasClass(room, 'room')) {
-            var
-              node = null,
-              nodes = null,
-              nodesInd = 0,
-              messagescontainer = null;
-            nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
-            if (nodes.length > 0) {
-              nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
-              if (nodes.length > 0) {
-                messagescontainer = nodes[0];
-              }
+        } else if ((ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'search-next-message')) ||
+                    ASC.TMTalk.dom.hasClass(target, 'search_nextbutton_container') ||
+                    (ASC.TMTalk.dom.hasClass(target, 'button-container') && ASC.TMTalk.dom.hasClass(target, 'search-next-message'))) {
+            var room = null;
+            if (ASC.TMTalk.dom.hasClass(target, 'search-next-message')) {
+                if (ASC.TMTalk.dom.hasClass(target, 'button-talk'))
+                    room = target.parentNode.parentNode.parentNode.parentNode.parentNode;
+                else
+                    room = target.parentNode.parentNode.parentNode.parentNode;
+            } else {
+                room = target.parentNode.parentNode.parentNode;
             }
-            if (messagescontainer !== null) {
-              var containerOffsetTop = messagescontainer.scrollTop;
-              nodes = ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message found', 'li');
-              nodesInd = nodes.length;
-              while (nodesInd--) {
-                node = nodes[nodesInd];
-                if (node.offsetHeight > 0 && node.offsetTop < containerOffsetTop) {
-                  messagescontainer.scrollTop = node.offsetTop;
-                  break;
+            if (ASC.TMTalk.dom.hasClass(room, 'room')) {
+                var node = null,
+                    nodes = null,
+                    nodesInd = 0,
+                    currentnumber = 0,
+                    messagescontainer = null;
+                //nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
+                nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
+                if (nodes.length > 0) {
+                    nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
+                    if (nodes.length > 0) {
+                        messagescontainer = nodes[0];
+                    }
                 }
-              }
-            }
-          }
-      } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'search-next-message')) {
-          var room = target.parentNode.parentNode.parentNode;
-          if (ASC.TMTalk.dom.hasClass(room, 'room')) {
-            var
-              node = null,
-              nodes = null,
-              nodesInd = 0,
-              messagescontainer = null;
-            nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'history', 'div');
-            if (nodes.length > 0) {
-              nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
-              if (nodes.length > 0) {
-                messagescontainer = nodes[0];
-              }
-            }
-            if (messagescontainer !== null) {
-              var containerOffsetTop = messagescontainer.scrollTop + messagescontainer.offsetHeight;
-              nodes = ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message found', 'li');
-              nodesInd = nodes.length;
-              for (var i = 0, n = nodes.length; i < n; i++) {
-                node = nodes[i];
-                if (node.offsetHeight > 0 && node.offsetTop + node.offsetHeight > containerOffsetTop) {
-                  messagescontainer.scrollTop = node.offsetTop - (messagescontainer.offsetHeight - node.offsetHeight);
-                  break;
+                if (messagescontainer !== null) {
+                    var containerOffsetTop = messagescontainer.scrollTop + messagescontainer.offsetHeight;
+                    nodes = ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message found', 'li');
+                    nodesInd = nodes.length;
+                    for (var i = 0, n = nodes.length; i < n; i++) {
+                        node = nodes[i];
+                        if (ASC.TMTalk.dom.getElementsByClassName(node, 'message', 'div')[0].offsetHeight > 0 && node.offsetTop + node.offsetHeight > containerOffsetTop) {
+                            messagescontainer.scrollTop = node.offsetTop - (messagescontainer.offsetHeight - ASC.TMTalk.dom.getElementsByClassName(node, 'message', 'div')[0].offsetHeight);
+                            break;
+                        }
+                    }
+                    if (i !== nodes.length) {
+                        currentnumber = nodes.length - i;
+                    } else {
+                        try {
+                            messagescontainer.scrollTop = nodes[0].offsetTop - (messagescontainer.offsetHeight - ASC.TMTalk.dom.getElementsByClassName(node, 'message', 'div')[0].offsetHeight);
+                            currentnumber = i ;
+                        }catch (err){}
+                        
+                    }
+                    nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'currentfoundmessage', 'span');
+                    if (nodes.length > 0) {
+                        currentfoundmessage = nodes[0];
+                        $(currentfoundmessage).html(currentnumber);
+                    }
                 }
-              }
+                $('div#talkRoomsContainer ul.rooms li.room.chat div.filtering-panel.show div.textfield.filtering-field input').focus();
             }
-          }
+        } else if (ASC.TMTalk.dom.hasClass(target, 'button-talk') && ASC.TMTalk.dom.hasClass(target, 'clear-search')) {
+            var room = target.parentNode.parentNode.parentNode;
+            ASC.TMTalk.roomsManager.clearSearch(room);
+            jQuery('div#talkRoomsContainer ul.rooms li.room div.filtering-panel').removeClass('show');
         }
       });
 
     $('#talkDialogsContainer').click(function (evt) {
+       
       var $target = $(evt.target);
-
+      
       if ($target.hasClass('button-talk') && $target.hasClass('kick-occupant')) {
         var
           jid = ASC.TMTalk.trim($('#hdnKickJId').val()),
+          invited = $('#hdnKickInvited').val(),
+          roomCid = ASC.TMTalk.trim($('#hdnKickRoomCid').val()),
           reason = $('#txtKickReason').val();
-        if (jid) {
-          reason = typeof reason === 'string' ? reason : '';
-          ASC.TMTalk.mucManager.kickContact(jid, reason);
-          TMTalk.hideDialog();
+        if ($.parseJSON(invited)) {
+            if (roomCid) {
+                window.ASC.TMTalk.roomsContainer.onRottenInvite(roomCid, jid);
+            }
+        } else {
+           if (jid) {
+              reason = typeof reason === 'string' ? reason : '';
+              ASC.TMTalk.mucManager.kickContact(jid, reason);
+           } 
         }
+        TMTalk.hideDialog();
+        
     } else if ($target.hasClass('button-talk') && $target.hasClass('remove-room')) {
         var
           roomjid = ASC.TMTalk.trim($('#hdnRemoveJid').val()),
@@ -1644,6 +2015,7 @@ window.ASC.TMTalk.roomsContainer = (function ($) {
         var
           roomjid = ASC.TMTalk.trim($('#hdnInvitationRoom').val()),
           inviterjid = ASC.TMTalk.trim($('#hdnInvitationContact').val());
+        
         if (roomjid) {
           ASC.TMTalk.mucManager.declineInvite(roomjid, inviterjid);
         }

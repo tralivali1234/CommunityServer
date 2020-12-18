@@ -1,4 +1,21 @@
-﻿window.ASC = window.ASC || {};
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+window.ASC = window.ASC || {};
 
 window.ASC.TMTalk = window.ASC.TMTalk || {};
 
@@ -111,8 +128,118 @@ window.ASC.TMTalk.roomsManager = (function () {
     }
     return null;
   };
+    var focusHistorySearch = function () {
+        
+    };
+    var blurHistorySearch = function () {
+    };
+    var clearSearch = function (room) {
+        var messages = null;
+        if (ASC.TMTalk.dom.hasClass(room, 'room')) {
+            var searchInput = ASC.TMTalk.dom.getElementsByClassName(room, 'search-value', 'input');
+            if (searchInput.length > 0) {
+                jQuery(searchInput[0]).val('');
+            }
 
-  return {
+            nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'ul');
+            if (nodes.length > 0) {
+                messages = nodes[0];
+            }
+            ASC.TMTalk.roomsContainer.resetHistorySearch(room, ASC.TMTalk.dom.getElementsByClassName(messages, 'message', 'li'));
+            ASC.TMTalk.dom.removeClass(room.parentNode.parentNode, 'searchmessage');
+
+            jQuery('div#talkRoomsContainer ul.rooms li.room.chat div.filtering-panel div.filtering-panel-tools').removeClass('show');
+            jQuery('div#talkRoomsContainer ul.rooms li.room.chat div.filtering-panel div.filtering-container').removeClass('show_tools');
+
+            if (ASC.TMTalk.Config.fullText) {
+                var jid = ASC.TMTalk.roomsManager.getRoomData().id;
+                ASC.TMTalk.messagesManager.clearCurrentHistory(jid);
+                ASC.TMTalk.messagesManager.getHistory(jid);
+            }
+        }
+    };
+    var find = null;
+    var keyupHistorySearch = function () {
+
+        var filteringPanel,
+            filteringPanelTools,
+            filteringContainer,
+            input,
+            clearSearchButton,
+
+            room;
+
+        room = jQuery('div#talkRoomsContainer ul.rooms li.room.current')[0];
+        
+        filteringPanel = jQuery('div#talkRoomsContainer ul.rooms li.room.current div.filtering-panel:first');
+        input = jQuery('div#talkRoomsContainer ul.rooms li.room.current div.filtering-panel div.filtering-container div.textfield input:first')[0];
+        clearSearchButton = jQuery('div#talkRoomsContainer ul.rooms li.room.current div.filtering-panel div.clear-search');
+
+        filteringContainer = filteringPanel.find('div.filtering-container');
+        filteringPanelTools = filteringPanel.find('div.filtering-panel-tools');
+        
+        var currentRoomData = ASC.TMTalk.roomsManager.getRoomData(),
+            jid = currentRoomData.id,
+            messageCount = 0;
+        
+        
+        
+        if (filteringPanel.hasClass('found')) {
+            filteringPanel.addClass('input-text');
+        }
+        clearTimeout(find);
+        find = setTimeout(function () {
+            if (input.value) {
+                filteringPanelTools.addClass('show');
+                filteringContainer.addClass('show_tools');
+
+                if (ASC.TMTalk.dom.hasClass(room, 'room')) {
+                    var searchstr = input.value;
+                    if (searchstr) {
+                        if (ASC.TMTalk.Config.fullText) {
+                            ASC.TMTalk.connectionManager.searchMessage(jid, input.value);
+                            return;
+                        }
+                        var nodes = null,
+                            messagescontainer = null;
+                        nodes = ASC.TMTalk.dom.getElementsByClassName(room, 'messages', 'div');
+                        if (nodes.length > 0) {
+                            nodes = ASC.TMTalk.dom.getElementsByClassName(nodes[0], 'messages', 'ul');
+                            if (nodes.length > 0) {
+                                messagescontainer = nodes[0];
+                                nodes = ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li');
+                                messageCount = nodes.length;
+                            }
+                        }
+                        if (messagescontainer !== null) {
+                            if (ASC.TMTalk.dom.hasClass(room, 'chat')) {
+                                if (!currentRoomData.fullhistory && messageCount > 20) {
+                                    ASC.TMTalk.roomsContainer.getFilteringHistory(jid, 3);
+                                    currentRoomData.fullhistory = true;
+                                } else {
+                                    ASC.TMTalk.roomsContainer.historySearch(searchstr, room, ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li'));
+                                }
+                            } else {
+                                ASC.TMTalk.roomsContainer.historySearch(searchstr, room, ASC.TMTalk.dom.getElementsByClassName(messagescontainer, 'message', 'li'));
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (ASC.TMTalk.Config.fullText) {
+                    ASC.TMTalk.messagesManager.updateHistory(jid, 0, 20, "");
+                } else {
+                    ASC.TMTalk.roomsManager.clearSearch(room);
+                }
+            }
+            filteringPanel.removeClass('input-text');
+            
+        }, 1000);
+    };
+    var keydownHistorySearch = function () {
+        
+    };
+    return {
     init  : init,
 
     bind    : bind,
@@ -123,8 +250,13 @@ window.ASC.TMTalk.roomsManager = (function () {
     createRoom  : createRoom,
     openRoom    : openRoom,
     closeRoom   : closeRoom,
-
-    getCurrentRoomId  : getCurrentRoomId,
+    focusHistorySearch      : focusHistorySearch,
+    blurHistorySearch       : blurHistorySearch,
+    keyupHistorySearch      : keyupHistorySearch,
+    keydownHistorySearch    : keydownHistorySearch,
+    getCurrentRoomId: getCurrentRoomId,
+    
+    clearSearch: clearSearch,
 
     getRoomData     : getRoomData,
     updateRoomData  : updateRoomData,

@@ -1,53 +1,85 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
+
 using System;
-using System.Globalization;
+using System.Configuration;
 using System.IO;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web;
 using System.Web.Optimization;
-using ASC.Core.Tenants;
+
+using ASC.Common.Logging;
+using ASC.Core;
 using ASC.Data.Storage;
-using log4net;
+using ASC.Data.Storage.Configuration;
+using ASC.Data.Storage.DiscStorage;
 
 namespace ASC.Web.Core.Client.Bundling
 {
     class DiscTransform : IBundleTransform
     {
-        private static readonly ILog log = LogManager.GetLogger("ASC.Web.Bundle.DiscTransform");
+        private static readonly ILog log;
 
-        private static readonly IDataStore storage = StorageFactory.GetStorage(Tenant.DEFAULT_TENANT.ToString(CultureInfo.InvariantCulture), "bundle");
+        public static readonly bool SuccessInitialized;
+
+        const string BaseVirtualPath = "/discbundle/";
+        static string BaseStoragePath;
+
+        static DiscTransform()
+        {
+            try
+            {
+                log = LogManager.GetLogger("ASC.Web.Bundle.DiscTransform");
+
+                var section = (StorageConfigurationSection)ConfigurationManagerExtension.GetSection("storage");
+                if (section == null)
+                {
+                    throw new Exception("Storage section not found.");
+                }
+
+                foreach (HandlerConfigurationElement h in section.Handlers)
+                {
+                    if (h.Name == "disc")
+                    {
+                        BaseStoragePath = Path.Combine(h.HandlerProperties["$STORAGE_ROOT"].Value, "bundle");
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(BaseStoragePath))
+                {
+                    DiscDataHandler.RegisterVirtualPath(BaseVirtualPath, GetFullPhysicalPath("/"), true);
+                    SuccessInitialized = CoreContext.Configuration.Standalone && !StaticUploader.CanUpload();
+                }
+            }
+            catch (Exception fatal)
+            {
+                log.Fatal(fatal);
+            }
+        }
 
         public void Process(BundleContext context, BundleResponse response)
         {
-            if (!BundleTable.Bundles.UseCdn) return;
-            
+            if (!SuccessInitialized || !BundleTable.Bundles.UseCdn) return;
+
             try
             {
                 var bundle = context.BundleCollection.GetBundleFor(context.BundleVirtualPath);
@@ -65,27 +97,54 @@ namespace ASC.Web.Core.Client.Bundling
 
         private static void UploadToDisc(CdnItem item)
         {
+            var filePath = GetFullFileName(item.Bundle.Path, item.Response.ContentType).TrimStart('/');
+            var fullFilePath = GetFullPhysicalPath(filePath);
+
             try
             {
-                var filePath = GetFullFileName(item.Bundle.Path, item.Response.ContentType).TrimStart('/');
-
                 using (var mutex = new Mutex(true, filePath))
                 {
-                    mutex.WaitOne();
+                    var wait = mutex.WaitOne(60000);
 
-                    if (!storage.IsFile("", filePath))
+                    try
                     {
-                        using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(item.Response.Content)))
+                        CreateDir(fullFilePath);
+
+                        if (!File.Exists(fullFilePath))
                         {
-                            item.Bundle.CdnPath = storage.Save(filePath, stream).ToString();
+                            var gzip = ClientSettings.GZipEnabled;
+
+                            using (var fs = File.OpenWrite(fullFilePath))
+                            using (var tw = new StreamWriter(fs))
+                            {
+                                tw.WriteLine(item.Response.Content);
+                            }
+
+                            item.Bundle.CdnPath = GetUri(filePath);
+
+                            if (gzip)
+                            {
+                                using (var fs = File.OpenWrite(fullFilePath + ".gz"))
+                                using (var zip = new GZipStream(fs, CompressionMode.Compress, true))
+                                using (var tw = new StreamWriter(zip))
+                                {
+                                    tw.WriteLine(item.Response.Content);
+                                }
+                            }
+
+                        }
+                        else
+                        {
+                            item.Bundle.CdnPath = GetUri(item.Bundle.Path, item.Response.ContentType);
                         }
                     }
-                    else
+                    finally
                     {
-                        item.Bundle.CdnPath = GetUri(item.Bundle.Path, item.Response.ContentType);
+                        if (wait)
+                        {
+                            mutex.ReleaseMutex();
+                        }
                     }
-
-                    mutex.ReleaseMutex();
                 }
             }
             catch (Exception err)
@@ -94,9 +153,14 @@ namespace ASC.Web.Core.Client.Bundling
             }
         }
 
+        internal static string GetUri(string path)
+        {
+            return BaseVirtualPath + path.TrimStart('/');
+        }
+
         internal static string GetUri(string path, string contentType)
         {
-            return storage.GetUri(GetFullFileName(path, contentType)).ToString();
+            return GetUri(GetFullFileName(path, contentType));
         }
 
         internal static string GetFullFileName(string path, string contentType)
@@ -117,6 +181,39 @@ namespace ASC.Web.Core.Client.Bundling
             return string.Format("/{0}/javascript/{1}.js", category, hrefToken);
         }
 
+        internal static bool IsFile(string path)
+        {
+            var filePath = GetFullPhysicalPath(path);
+            var staticPath = GetFullStaticPhysicalPath(path);
+            if (!File.Exists(filePath) && File.Exists(staticPath))
+            {
+                using (var mutex = new Mutex(true, path))
+                {
+                    mutex.WaitOne();
+
+                    try
+                    {
+                        CreateDir(filePath);
+
+                        if (File.Exists(staticPath))
+                        {
+                            File.Copy(staticPath, filePath, true);
+                        }
+
+                        if (File.Exists(staticPath + ".gz"))
+                        {
+                            File.Copy(staticPath + ".gz", filePath + ".gz", true);
+                        }
+                    }
+                    finally
+                    {
+                        mutex.ReleaseMutex();
+                    }
+                }
+            }
+
+            return File.Exists(filePath);
+        }
 
         private static string GetCategoryFromPath(string controlPath)
         {
@@ -129,6 +226,25 @@ namespace ASC.Web.Core.Client.Bundling
                 result = matches.Groups[2].Value;
 
             return result;
+        }
+
+        private static string GetFullPhysicalPath(string path)
+        {
+            return Path.GetFullPath(Path.Combine(HttpContext.Current.Server.MapPath("~/"), BaseStoragePath, path.TrimStart('/')));
+        }
+
+        private static string GetFullStaticPhysicalPath(string path)
+        {
+            return Path.GetFullPath(Path.Combine(HttpContext.Current.Server.MapPath("~/"), "App_Data/static/bundle/", path.TrimStart('/')));
+        }
+
+        private static void CreateDir(string path)
+        {
+            var dir = Path.GetDirectoryName(path);
+            if (dir != null && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
         }
     }
 }

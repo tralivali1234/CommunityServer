@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -44,8 +35,8 @@ namespace ASC.CRM.Core.Dao
         private readonly HttpRequestDictionary<DealMilestone> _dealMilestoneCache =
             new HttpRequestDictionary<DealMilestone>("crm_deal_milestone");
 
-        public CachedDealMilestoneDao(int tenantID, string storageKey)
-            : base(tenantID, storageKey)
+        public CachedDealMilestoneDao(int tenantID)
+            : base(tenantID)
         {
 
         }
@@ -102,8 +93,8 @@ namespace ASC.CRM.Core.Dao
 
         #region Constructor
 
-        public DealMilestoneDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public DealMilestoneDao(int tenantID)
+            : base(tenantID)
         {
 
 
@@ -113,11 +104,10 @@ namespace ASC.CRM.Core.Dao
 
         public virtual void Reorder(int[] ids)
         {
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction())
+            using (var tx = Db.BeginTransaction())
             {
                 for (int index = 0; index < ids.Length; index++)
-                    db.ExecuteNonQuery(Update("crm_deal_milestone")
+                    Db.ExecuteNonQuery(Update("crm_deal_milestone")
                                              .Set("sort_order", index)
                                              .Where(Exp.Eq("id", ids[index])));
 
@@ -127,10 +117,7 @@ namespace ASC.CRM.Core.Dao
 
         public int GetCount()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(Query("crm_deal_milestone").SelectCount());
-            }
+            return Db.ExecuteScalar<int>(Query("crm_deal_milestone").SelectCount());
         }
 
 
@@ -145,11 +132,8 @@ namespace ASC.CRM.Core.Dao
                                       Exp.EqColumns("tbl_deal_milestone.id", "tbl_crm_deal.deal_milestone_id"))
                 .Select("count(tbl_crm_deal.deal_milestone_id)");
 
-            using (var db = GetDb())
-            {
-                var queryResult = db.ExecuteList(sqlQuery);
-                return queryResult.ToDictionary(x => Convert.ToInt32(x[0]), y => Convert.ToInt32(y[1]));
-            }
+            var queryResult = Db.ExecuteList(sqlQuery);
+            return queryResult.ToDictionary(x => Convert.ToInt32(x[0]), y => Convert.ToInt32(y[1]));
         }
 
         public int GetRelativeItemsCount(int id)
@@ -159,10 +143,7 @@ namespace ASC.CRM.Core.Dao
                              .Select("count(*)")
                              .Where(Exp.Eq("deal_milestone_id", id));
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(sqlQuery);
-            }
+            return Db.ExecuteScalar<int>(sqlQuery);
         }
 
         public virtual int Create(DealMilestone item)
@@ -173,14 +154,13 @@ namespace ASC.CRM.Core.Dao
 
             int id;
 
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction())
+            using (var tx = Db.BeginTransaction())
             {
                 if (item.SortOrder == 0)
-                    item.SortOrder = db.ExecuteScalar<int>(Query("crm_deal_milestone")
+                    item.SortOrder = Db.ExecuteScalar<int>(Query("crm_deal_milestone")
                                                             .SelectMax("sort_order")) + 1;
 
-                id = db.ExecuteScalar<int>(
+                id = Db.ExecuteScalar<int>(
                                   Insert("crm_deal_milestone")
                                  .InColumnValue("id", 0)
                                  .InColumnValue("title", item.Title)
@@ -200,12 +180,9 @@ namespace ASC.CRM.Core.Dao
 
         public virtual void ChangeColor(int id, String newColor)
         {
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Update("crm_deal_milestone")
-                                         .Set("color", newColor)
-                                         .Where(Exp.Eq("id", id)));
-            }
+            Db.ExecuteNonQuery(Update("crm_deal_milestone")
+                                        .Set("color", newColor)
+                                        .Where(Exp.Eq("id", id)));
         }
 
         public virtual void Edit(DealMilestone item)
@@ -214,16 +191,13 @@ namespace ASC.CRM.Core.Dao
             if (HaveContactLink(item.ID))
                 throw new ArgumentException(String.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeEdited, CRMErrorsResource.DealMilestoneHasRelatedDeals));
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Update("crm_deal_milestone")
-                                        .Set("title", item.Title)
-                                        .Set("description", item.Description)
-                                        .Set("color", item.Color)
-                                        .Set("probability", item.Probability)
-                                        .Set("status", (int)item.Status)
-                                        .Where(Exp.Eq("id", item.ID)));
-            }
+            Db.ExecuteNonQuery(Update("crm_deal_milestone")
+                                    .Set("title", item.Title)
+                                    .Set("description", item.Description)
+                                    .Set("color", item.Color)
+                                    .Set("probability", item.Probability)
+                                    .Set("status", (int)item.Status)
+                                    .Where(Exp.Eq("id", item.ID)));
         }
 
         public bool HaveContactLink(int dealMilestoneID)
@@ -233,10 +207,7 @@ namespace ASC.CRM.Core.Dao
                                 .SelectCount()
                                 .SetMaxResults(1);
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(sqlQuery)  >= 1;
-            }
+            return Db.ExecuteScalar<int>(sqlQuery) >= 1;
         }
 
         public virtual void Delete(int id)
@@ -244,48 +215,33 @@ namespace ASC.CRM.Core.Dao
             if (HaveContactLink(id))
                 throw new ArgumentException(String.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeDeleted, CRMErrorsResource.DealMilestoneHasRelatedDeals));
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_deal_milestone").Where(Exp.Eq("id", id)));
-            }
+            Db.ExecuteNonQuery(Delete("crm_deal_milestone").Where(Exp.Eq("id", id)));
         }
 
         public virtual DealMilestone GetByID(int id)
         {
-            using (var db = GetDb())
-            {
-                var dealMilestones = db.ExecuteList(GetDealMilestoneQuery(Exp.Eq("id", id))).ConvertAll(row => ToDealMilestone(row));
+            var dealMilestones = Db.ExecuteList(GetDealMilestoneQuery(Exp.Eq("id", id))).ConvertAll(row => ToDealMilestone(row));
 
-                if (dealMilestones.Count == 0)
-                    return null;
+            if (dealMilestones.Count == 0)
+                return null;
 
-                return dealMilestones[0];
-            }
+            return dealMilestones[0];
         }
 
         public Boolean IsExist(int id)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<bool>("select exists(select 1 from crm_deal_milestone where tenant_id = @tid and id = @id)",
-                    new { tid = TenantID, id = id });
-            }
+            return Db.ExecuteScalar<bool>("select exists(select 1 from crm_deal_milestone where tenant_id = @tid and id = @id)",
+                new { tid = TenantID, id = id });
         }
 
         public List<DealMilestone> GetAll(int[] id)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetDealMilestoneQuery(Exp.In("id", id))).ConvertAll(row => ToDealMilestone(row));
-            }
+            return Db.ExecuteList(GetDealMilestoneQuery(Exp.In("id", id))).ConvertAll(row => ToDealMilestone(row));
         }
 
         public List<DealMilestone> GetAll()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetDealMilestoneQuery(null)).ConvertAll(row => ToDealMilestone(row));
-            }
+            return Db.ExecuteList(GetDealMilestoneQuery(null)).ConvertAll(row => ToDealMilestone(row));
         }
 
         private SqlQuery GetDealMilestoneQuery(Exp where)

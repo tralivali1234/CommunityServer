@@ -1,38 +1,20 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Common.Caching;
-using ASC.Common.Data;
-using ASC.Common.Data.Sql;
-using ASC.Common.Data.Sql.Expressions;
-using ASC.Core;
-using ASC.Core.Tenants;
-using ASC.FullTextIndex;
-using ASC.Web.Community.Product;
-using ASC.Web.Studio.Utility;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -41,6 +23,17 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Web;
+using ASC.Common.Caching;
+using ASC.Common.Data;
+using ASC.Common.Data.Sql;
+using ASC.Common.Data.Sql.Expressions;
+using ASC.Core;
+using ASC.Core.Tenants;
+using ASC.Web.Community.Forum;
+using ASC.Web.Community.Product;
+using ASC.Web.Studio.Utility;
+using ASC.ElasticSearch;
+using ASC.Web.Community.Search;
 
 namespace ASC.Forum
 {
@@ -142,11 +135,11 @@ namespace ASC.Forum
 
     public class ForumDataProvider
     {
-        internal static DbManager DbManager
+        internal static IDbManager DbManager
         {
             get
             {
-                return DbManager.FromHttpContext(ASC.Web.Community.Forum.ForumManager.DbId);
+                return Common.Data.DbManager.FromHttpContext(ASC.Web.Community.Forum.ForumManager.DbId);
             }
         }
 
@@ -646,11 +639,14 @@ namespace ASC.Forum
 
         public static List<Topic> SearchTopicsByText(int tenantID, string text, int curPageNumber, int topicOnPageCount, out int topicCount)
         {
-            List<int> topicIDs;
-            var modules = new[] { FullTextSearch.ForumModule.Match(text), FullTextSearch.PostModule.Match(text) };
-            if (FullTextSearch.SupportModule(modules))
+            List<int> topicIDs, tIDs, pIDs = null;
+            if (FactoryIndexer<TopicWrapper>.TrySelectIds(r => r.MatchAll(text), out tIDs) || FactoryIndexer<PostWrapper>.TrySelectIds(r => r.MatchAll(text), out pIDs))
             {
-                topicIDs = FullTextSearch.Search(modules);
+                topicIDs = tIDs;
+                if (pIDs != null)
+                {
+                    topicIDs.AddRange(pIDs);
+                }
             }
             else
             {
@@ -1700,5 +1696,76 @@ where ft.TenantID = @tid and fp.id = @postID")
         }
 
         #endregion
+    }
+
+    public class RemoveDataHelper
+    {
+        public static void RemoveThreadCategory(ThreadCategory category)
+        {
+            List<int> removedPostIDs;
+
+            ForumDataProvider.RemoveThreadCategory(TenantProvider.CurrentTenantID, category.ID, out removedPostIDs);
+
+            ForumManager.Instance.RemoveAttachments(category);
+
+            removedPostIDs.ForEach(
+                idPost =>
+                CommonControlsConfigurer.FCKUploadsRemoveForItem(ForumManager.Settings.FileStoreModuleID,
+                                                                 idPost.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        public static void RemoveThread(Thread thread)
+        {
+            List<int> removedPostIDs;
+
+            ForumDataProvider.RemoveThread(TenantProvider.CurrentTenantID, thread.ID, out removedPostIDs);
+
+            ForumManager.Instance.RemoveAttachments(thread);
+
+            removedPostIDs.ForEach(
+                idPost =>
+                CommonControlsConfigurer.FCKUploadsRemoveForItem(ForumManager.Settings.FileStoreModuleID,
+                                                                 idPost.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        public static void RemoveTopic(Topic topic)
+        {
+            List<int> removedPostIDs;
+
+            var attachmantOffsetPhysicalPaths = ForumDataProvider.RemoveTopic(TenantProvider.CurrentTenantID, topic.ID,
+                                                                              out removedPostIDs);
+
+            foreach (var ace in Module.Constants.Aces)
+            {
+                CoreContext.AuthorizationManager.RemoveAce(new AzRecord(SecurityContext.CurrentAccount.ID, ace,
+                                                                        Common.Security.Authorizing.AceType.Allow, topic));
+            }
+
+            FactoryIndexer<TopicWrapper>.DeleteAsync(topic);
+
+            ForumManager.Settings.ForumManager.RemoveAttachments(attachmantOffsetPhysicalPaths.ToArray());
+
+            removedPostIDs.ForEach(
+                idPost =>
+                CommonControlsConfigurer.FCKUploadsRemoveForItem(ForumManager.Settings.ForumManager.Settings.FileStoreModuleID,
+                                                                 idPost.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        public static DeletePostResult RemovePost(Post post)
+        {
+            var result = ForumDataProvider.RemovePost(TenantProvider.CurrentTenantID, post.ID);
+
+            if (result == DeletePostResult.Successfully)
+            {
+                ForumManager.Settings.ForumManager.RemoveAttachments(post);
+
+                FactoryIndexer<PostWrapper>.DeleteAsync(post);
+
+                CommonControlsConfigurer.FCKUploadsRemoveForItem(ForumManager.Settings.ForumManager.Settings.FileStoreModuleID,
+                                                                 post.ID.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return result;
+        }
     }
 }

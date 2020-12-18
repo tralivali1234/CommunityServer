@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -32,17 +23,20 @@ using ASC.Common.Security;
 using ASC.Common.Security.Authorizing;
 using ASC.Core;
 using ASC.Core.Users;
+using ASC.CRM.Core.Dao;
 using ASC.CRM.Core.Entities;
 using ASC.Files.Core;
 using ASC.Files.Core.Security;
 using ASC.Web.Core;
 using ASC.Web.CRM.Classes;
 using ASC.Web.CRM.Configuration;
+using ASC.Web.CRM.Core;
 using ASC.Web.CRM.Core.Enums;
 using Action = ASC.Common.Security.Authorizing.Action;
 using Constants = ASC.Core.Users.Constants;
 using SecurityContext = ASC.Core.SecurityContext;
 using ASC.Web.CRM.Resources;
+using Autofac;
 
 namespace ASC.CRM.Core
 {
@@ -58,20 +52,25 @@ namespace ASC.CRM.Core
 
         private static ISecurityObjectProvider GetCRMSecurityProvider()
         {
-            return new CRMSecurityObjectProvider(Global.DaoFactory);
+            return new CRMSecurityObjectProvider();
         }
 
-        private static bool IsPrivate(ISecurityObjectId entity)
+        public static bool IsPrivate(ISecurityObjectId entity)
         {
             return GetAccessSubjectTo(entity).Any();
         }
 
-        private static bool CanAccessTo(ISecurityObjectId entity)
+        public static bool CanAccessTo(ISecurityObjectId entity)
         {
-            return IsAdmin || SecurityContext.CheckPermissions(entity, GetCRMSecurityProvider(), _actionRead);
+            return CanAccessTo(entity, SecurityContext.CurrentAccount.ID);
         }
 
-        private static void MakePublic(ISecurityObjectId entity)
+        public static bool CanAccessTo(ISecurityObjectId entity, Guid userId)
+        {
+            return IsAdministrator(userId) || SecurityContext.CheckPermissions(entity, GetCRMSecurityProvider(), _actionRead);
+        }
+
+        public static void MakePublic(ISecurityObjectId entity)
         {
             SetAccessTo(entity, new List<Guid>());
         }
@@ -141,12 +140,12 @@ namespace ASC.CRM.Core
             return result;
         }
 
-        private static Dictionary<Guid, String> GetAccessSubjectTo(ISecurityObjectId entity)
+        public static Dictionary<Guid, String> GetAccessSubjectTo(ISecurityObjectId entity)
         {
             return GetAccessSubjectTo(entity, EmployeeStatus.All);
         }
 
-        private static List<Guid> GetAccessSubjectGuidsTo(ISecurityObjectId entity)
+        public static List<Guid> GetAccessSubjectGuidsTo(ISecurityObjectId entity)
         {
             var allAces = CoreContext.AuthorizationManager.GetAcesWithInherits(Guid.Empty, _actionRead.ID, entity,
                                                                                GetCRMSecurityProvider())
@@ -162,7 +161,7 @@ namespace ASC.CRM.Core
             return result;
         }
 
-        private static void SetAccessTo(ISecurityObjectId entity, List<Guid> subjectID)
+        public static void SetAccessTo(ISecurityObjectId entity, List<Guid> subjectID)
         {
             if (subjectID.Count == 0)
             {
@@ -212,21 +211,6 @@ namespace ASC.CRM.Core
             }
         }
 
-        public static void SetAccessTo(RelationshipEvent relationshipEvent, List<Guid> subjectID)
-        {
-            SetAccessTo((ISecurityObjectId)relationshipEvent, subjectID);
-        }
-
-        public static void SetAccessTo(Contact contact, List<Guid> subjectID)
-        {
-            SetAccessTo((ISecurityObjectId)contact, subjectID);
-        }
-
-        public static void SetAccessTo(Task task, List<Guid> subjectID)
-        {
-            SetAccessTo((ISecurityObjectId)task, subjectID);
-        }
-
         public static void SetAccessTo(Cases cases, List<Guid> subjectID)
         {
             if (IsAdmin || cases.CreateBy == SecurityContext.CurrentAccount.ID)
@@ -235,60 +219,58 @@ namespace ASC.CRM.Core
             }
         }
 
-        public static void SetAccessTo(Invoice invoice, List<Guid> subjectID)
-        {
-            SetAccessTo((ISecurityObjectId)invoice, subjectID);
-        }
-
-        public static void SetAccessTo(InvoiceItem invoiceItem, List<Guid> subjectID)
-        {
-            SetAccessTo((ISecurityObjectId)invoiceItem, subjectID);
-        }
-
-        public static void SetAccessTo(InvoiceTax invoiceTax, List<Guid> subjectID)
-        {
-            SetAccessTo((ISecurityObjectId)invoiceTax, subjectID);
-        }
-
         #endregion
 
         #region CanAccessTo
 
-        public static bool CanAccessTo(Deal deal)
-        {
-            return CanAccessTo((ISecurityObjectId)deal);
-        }
 
         public static bool CanAccessTo(RelationshipEvent relationshipEvent)
         {
-            if (IsAdmin)
+            return CanAccessTo(relationshipEvent, SecurityContext.CurrentAccount.ID);
+        }
+
+        public static bool CanAccessTo(RelationshipEvent relationshipEvent, Guid userId)
+        {
+            if (IsAdministrator(userId))
                 return true;
 
-            if (relationshipEvent.ContactID > 0)
+            using (var scope = DIHelper.Resolve())
             {
-                var contactObj = Global.DaoFactory.GetContactDao().GetByID(relationshipEvent.ContactID);
-                if (contactObj != null) return CanAccessTo(contactObj);
+                var daoFactory = scope.Resolve<DaoFactory>();
+
+                if (relationshipEvent.ContactID > 0)
+                {
+                    var contactObj = daoFactory.ContactDao.GetByID(relationshipEvent.ContactID);
+                    if (contactObj != null) return CanAccessTo(contactObj, userId);
+                }
+
+                if (relationshipEvent.EntityType == EntityType.Case)
+                {
+                    var caseObj = daoFactory.CasesDao.GetByID(relationshipEvent.EntityID);
+                    if (caseObj != null) return CanAccessTo(caseObj, userId);
+                }
+
+                if (relationshipEvent.EntityType == EntityType.Opportunity)
+                {
+                    var dealObj = daoFactory.DealDao.GetByID(relationshipEvent.EntityID);
+                    if (dealObj != null) return CanAccessTo(dealObj, userId);
+                }
+
+                return false;
             }
-
-            if (relationshipEvent.EntityType == EntityType.Case)
-            {
-                var caseObj = Global.DaoFactory.GetCasesDao().GetByID(relationshipEvent.EntityID);
-                if (caseObj != null) return CanAccessTo(caseObj);
-            }
-
-            if (relationshipEvent.EntityType == EntityType.Opportunity)
-            {
-                var dealObj = Global.DaoFactory.GetDealDao().GetByID(relationshipEvent.EntityID);
-                if (dealObj != null) return CanAccessTo(dealObj);
-            }
-
-            return false;
-
         }
 
         public static bool CanAccessTo(Contact contact)
         {
-            return contact.ShareType == ShareType.Read || contact.ShareType == ShareType.ReadWrite || IsAdmin || GetAccessSubjectTo(contact).ContainsKey(SecurityContext.CurrentAccount.ID);
+            return CanAccessTo(contact, SecurityContext.CurrentAccount.ID);
+        }
+
+        public static bool CanAccessTo(Contact contact, Guid userId)
+        {
+            return contact.ShareType == ShareType.Read ||
+                contact.ShareType == ShareType.ReadWrite ||
+                IsAdministrator(userId) ||
+                GetAccessSubjectTo(contact).ContainsKey(userId);
         }
 
         public static bool CanAccessTo(int contactID, EntityType entityType, ShareType? shareType, int companyID)
@@ -311,71 +293,70 @@ namespace ASC.CRM.Core
 
         public static bool CanAccessTo(Task task)
         {
-            if (IsAdmin || task.ResponsibleID == SecurityContext.CurrentAccount.ID ||
-                (task.ContactID == 0 && task.EntityID == 0) || task.CreateBy == SecurityContext.CurrentAccount.ID) return true;
-
-            if (task.ContactID > 0)
-            {
-                var contactObj = Global.DaoFactory.GetContactDao().GetByID(task.ContactID);
-
-                if (contactObj != null) return CanAccessTo(contactObj);
-
-                // task.ContactID = 0;
-
-                //  Global.DaoFactory.GetTaskDao().SaveOrUpdateTask(task);
-
-            }
-
-            if (task.EntityType == EntityType.Case)
-            {
-                var caseObj = Global.DaoFactory.GetCasesDao().GetByID(task.EntityID);
-
-                if (caseObj != null) return CanAccessTo(caseObj);
-
-                //   task.EntityType = EntityType.Any;
-                //   task.EntityID = 0;
-
-                //   Global.DaoFactory.GetTaskDao().SaveOrUpdateTask(task);
-
-            }
-
-            if (task.EntityType == EntityType.Opportunity)
-            {
-                var dealObj = Global.DaoFactory.GetDealDao().GetByID(task.EntityID);
-
-                if (dealObj != null) return CanAccessTo(dealObj);
-
-                //   task.EntityType = EntityType.Any;
-                //  task.EntityID = 0;
-
-                //  Global.DaoFactory.GetTaskDao().SaveOrUpdateTask(task);
-            }
-
-            return false;
-
+            return CanAccessTo(task, SecurityContext.CurrentAccount.ID);
         }
 
-        public static bool CanAccessTo(Cases cases)
+        public static bool CanAccessTo(Task task, Guid userId)
         {
-            return CanAccessTo((ISecurityObjectId)cases);
+            if (IsAdministrator(userId) || task.ResponsibleID == userId ||
+                (task.ContactID == 0 && task.EntityID == 0) || task.CreateBy == userId)
+                return true;
+
+            using (var scope = DIHelper.Resolve())
+            {
+                var daoFactory = scope.Resolve<DaoFactory>();
+                if (task.ContactID > 0)
+                {
+                    var contactObj = daoFactory.ContactDao.GetByID(task.ContactID);
+                    if (contactObj != null) return CanAccessTo(contactObj, userId);
+                }
+
+                if (task.EntityType == EntityType.Case)
+                {
+                    var caseObj = daoFactory.CasesDao.GetByID(task.EntityID);
+                    if (caseObj != null) return CanAccessTo(caseObj, userId);
+                }
+
+                if (task.EntityType == EntityType.Opportunity)
+                {
+                    var dealObj = daoFactory.DealDao.GetByID(task.EntityID);
+                    if (dealObj != null) return CanAccessTo(dealObj, userId);
+                }
+
+                return false;
+            }
         }
 
         public static bool CanAccessTo(Invoice invoice)
         {
-            if (IsAdmin || invoice.CreateBy == SecurityContext.CurrentAccount.ID) return true;
+            return CanAccessTo(invoice, SecurityContext.CurrentAccount.ID);
+        }
 
-            if (invoice.ContactID > 0)
-                return CanAccessTo(Global.DaoFactory.GetContactDao().GetByID(invoice.ContactID));
+        public static bool CanAccessTo(Invoice invoice, Guid userId)
+        {
+            if (IsAdministrator(userId) || invoice.CreateBy == userId) return true;
 
-            if (invoice.EntityType == EntityType.Opportunity)
-                return CanAccessTo(Global.DaoFactory.GetDealDao().GetByID(invoice.EntityID));
+            using (var scope = DIHelper.Resolve())
+            {
+                var daoFactory = scope.Resolve<DaoFactory>();
+                if (invoice.ContactID > 0)
+                    return CanAccessTo(daoFactory.ContactDao.GetByID(invoice.ContactID), userId);
 
-            return false;
+                if (invoice.EntityType == EntityType.Opportunity)
+                    return CanAccessTo(daoFactory.DealDao.GetByID(invoice.EntityID), userId);
+
+                return false;
+            }
         }
 
         public static bool CanAccessTo(InvoiceTax invoiceTax)
         {
-            if (IsAdmin || invoiceTax.CreateBy == SecurityContext.CurrentAccount.ID) return true;
+            return CanAccessTo(invoiceTax, SecurityContext.CurrentAccount.ID);
+        }
+
+        public static bool CanAccessTo(InvoiceTax invoiceTax, Guid userId)
+        {
+            if (IsAdministrator(userId) || invoiceTax.CreateBy == userId) return true;
 
             return false;
         }
@@ -403,7 +384,49 @@ namespace ASC.CRM.Core
 
         public static bool CanEdit(RelationshipEvent relationshipEvent)
         {
-            return CanAccessTo(relationshipEvent);
+            var userId = SecurityContext.CurrentAccount.ID;
+
+            if (IsAdmin) return true;
+
+            using (var scope = DIHelper.Resolve())
+            {
+                var daoFactory = scope.Resolve<DaoFactory>();
+
+                if (relationshipEvent.ContactID > 0)
+                {
+                    var contactObj = daoFactory.ContactDao.GetByID(relationshipEvent.ContactID);
+                    if (contactObj != null)
+                    {
+                        if(CanEdit(contactObj)) return true;
+
+                        return CanAccessTo(contactObj, userId) && relationshipEvent.CreateBy == userId;
+                    }
+                }
+
+                if (relationshipEvent.EntityType == EntityType.Case)
+                {
+                    var caseObj = daoFactory.CasesDao.GetByID(relationshipEvent.EntityID);
+                    if (caseObj != null)
+                    {
+                        if (CanEdit(caseObj)) return true;
+
+                        return CanAccessTo(caseObj, userId) && relationshipEvent.CreateBy == userId;
+                    }
+                }
+
+                if (relationshipEvent.EntityType == EntityType.Opportunity)
+                {
+                    var dealObj = daoFactory.DealDao.GetByID(relationshipEvent.EntityID);
+                    if (dealObj != null)
+                    {
+                        if (CanEdit(dealObj)) return true;
+
+                        return CanAccessTo(dealObj, userId) && relationshipEvent.CreateBy == userId;
+                    }
+                }
+
+                return false;
+            }
         }
 
         public static bool CanEdit(Contact contact)
@@ -443,7 +466,10 @@ namespace ASC.CRM.Core
 
         public static bool CanDelete(Contact contact)
         {
-            return CanEdit(contact) && Global.DaoFactory.GetContactDao().CanDelete(contact.ID);
+            using (var scope = DIHelper.Resolve())
+            {
+                return CanEdit(contact) && scope.Resolve<DaoFactory>().ContactDao.CanDelete(contact.ID);
+            }
         }
 
         public static bool CanDelete(Invoice invoice)
@@ -453,12 +479,18 @@ namespace ASC.CRM.Core
 
         public static bool CanDelete(InvoiceItem invoiceItem)
         {
-            return CanEdit(invoiceItem) && Global.DaoFactory.GetInvoiceItemDao().CanDelete(invoiceItem.ID);
+            using (var scope = DIHelper.Resolve())
+            {
+                return CanEdit(invoiceItem) && scope.Resolve<DaoFactory>().InvoiceItemDao.CanDelete(invoiceItem.ID);
+            }
         }
 
         public static bool CanDelete(InvoiceTax invoiceTax)
         {
-            return CanEdit(invoiceTax) && Global.DaoFactory.GetInvoiceTaxDao().CanDelete(invoiceTax.ID);
+            using (var scope = DIHelper.Resolve())
+            {
+                return CanEdit(invoiceTax) && scope.Resolve<DaoFactory>().InvoiceTaxDao.CanDelete(invoiceTax.ID);
+            }
         }
 
         public static bool CanDelete(Deal deal)
@@ -478,186 +510,15 @@ namespace ASC.CRM.Core
 
         #endregion
 
-        #region MakePublic
-
-        public static void MakePublic(Deal deal)
-        {
-            MakePublic((ISecurityObjectId)deal);
-        }
-
-        public static void MakePublic(RelationshipEvent relationshipEvent)
-        {
-            MakePublic((ISecurityObjectId)relationshipEvent);
-        }
-
-        public static void MakePublic(Contact contact)
-        {
-            MakePublic((ISecurityObjectId)contact);
-        }
-
-        public static void MakePublic(Task task)
-        {
-            MakePublic((ISecurityObjectId)task);
-        }
-
-        public static void MakePublic(Cases cases)
-        {
-            MakePublic((ISecurityObjectId)cases);
-        }
-
-        public static void MakePublic(Invoice invoice)
-        {
-            MakePublic((ISecurityObjectId)invoice);
-        }
-
-        public static void MakePublic(InvoiceItem invoiceItem)
-        {
-            MakePublic((ISecurityObjectId)invoiceItem);
-        }
-
-        public static void MakePublic(InvoiceTax invoiceTax)
-        {
-            MakePublic((ISecurityObjectId)invoiceTax);
-        }
-
-        #endregion
-
         #region IsPrivate
-
-        public static bool IsPrivate(Deal deal)
-        {
-            return IsPrivate((ISecurityObjectId)deal);
-        }
-
-        public static bool IsPrivate(RelationshipEvent relationshipEvent)
-        {
-            return IsPrivate((ISecurityObjectId)relationshipEvent);
-        }
 
         public static bool IsPrivate(Contact contact)
         {
-            return !CanAccessTo(contact);
-        }
-
-        public static bool IsPrivate(Task task)
-        {
-            return IsPrivate((ISecurityObjectId)task);
-        }
-
-        public static bool IsPrivate(Cases cases)
-        {
-            return IsPrivate((ISecurityObjectId)cases);
-        }
-
-        public static bool IsPrivate(Invoice invoice)
-        {
-            return IsPrivate((ISecurityObjectId)invoice);
-        }
-
-        public static bool IsPrivate(InvoiceItem invoiceItem)
-        {
-            return IsPrivate((ISecurityObjectId)invoiceItem);
-        }
-
-        public static bool IsPrivate(InvoiceTax invoiceTax)
-        {
-            return IsPrivate((ISecurityObjectId)invoiceTax);
+            return contact.ShareType == ShareType.None;
         }
 
         #endregion
 
-        #region GetAccessSubjectTo
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(Deal deal)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)deal);
-        }
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(RelationshipEvent relationshipEvent)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)relationshipEvent);
-        }
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(Contact contact)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)contact);
-        }
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(Contact contact, EmployeeStatus employeeStatus)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)contact, employeeStatus);
-        }
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(Task task)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)task);
-        }
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(Cases cases)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)cases);
-        }
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(Invoice invoice)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)invoice);
-        }
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(InvoiceItem invoiceItem)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)invoiceItem);
-        }
-
-        public static Dictionary<Guid, string> GetAccessSubjectTo(InvoiceTax invoiceTax)
-        {
-            return GetAccessSubjectTo((ISecurityObjectId)invoiceTax);
-        }
-
-        #endregion
-
-        #region GetAccessSubjectGuidsTo
-
-        public static List<Guid> GetAccessSubjectGuidsTo(Deal deal)
-        {
-            return GetAccessSubjectGuidsTo((ISecurityObjectId)deal);
-        }
-
-        public static List<Guid> GetAccessSubjectGuidsTo(RelationshipEvent relationshipEvent)
-        {
-            return GetAccessSubjectGuidsTo((ISecurityObjectId)relationshipEvent);
-        }
-
-        public static List<Guid> GetAccessSubjectGuidsTo(Contact contact)
-        {
-            return GetAccessSubjectGuidsTo((ISecurityObjectId)contact);
-        }
-
-        public static List<Guid> GetAccessSubjectGuidsTo(Task task)
-        {
-            return GetAccessSubjectGuidsTo((ISecurityObjectId)task);
-        }
-
-        public static List<Guid> GetAccessSubjectGuidsTo(Cases cases)
-        {
-            return GetAccessSubjectGuidsTo((ISecurityObjectId)cases);
-        }
-
-        public static List<Guid> GetAccessSubjectGuidsTo(Invoice invoice)
-        {
-            return GetAccessSubjectGuidsTo((ISecurityObjectId)invoice);
-        }
-
-        public static List<Guid> GetAccessSubjectGuidsTo(InvoiceItem invoiceItem)
-        {
-            return GetAccessSubjectGuidsTo((ISecurityObjectId)invoiceItem);
-        }
-
-        public static List<Guid> GetAccessSubjectGuidsTo(InvoiceTax invoiceTax)
-        {
-            return GetAccessSubjectGuidsTo((ISecurityObjectId)invoiceTax);
-        }
-
-        #endregion
 
         #region DemandAccessTo
 
@@ -820,17 +681,20 @@ namespace ASC.CRM.Core
                 throw new ArgumentException();
 
 
-            var listItem = Global.DaoFactory.GetDealMilestoneDao().GetByID(deal.DealMilestoneID);
-            if (listItem == null) throw new ArgumentException(CRMErrorsResource.DealMilestoneNotFound);
-
-            if (deal.ContactID != 0)
+            using (var scope = DIHelper.Resolve())
             {
-                var contact = Global.DaoFactory.GetContactDao().GetByID(deal.ContactID);
-                if (contact == null) throw new ArgumentException();
+                var daoFactory = scope.Resolve<DaoFactory>();
+                var listItem = daoFactory.DealMilestoneDao.GetByID(deal.DealMilestoneID);
+                if (listItem == null) throw new ArgumentException(CRMErrorsResource.DealMilestoneNotFound);
 
-                if (!CanAccessTo(contact)) throw new SecurityException(CRMErrorsResource.AccessDenied);
+                if (deal.ContactID != 0)
+                {
+                    var contact = daoFactory.ContactDao.GetByID(deal.ContactID);
+                    if (contact == null) throw new ArgumentException();
+
+                    if (!CanAccessTo(contact)) throw new SecurityException(CRMErrorsResource.AccessDenied);
+                }
             }
-
             if (string.IsNullOrEmpty(deal.BidCurrency))
             {
                 throw new ArgumentException();
@@ -854,14 +718,18 @@ namespace ASC.CRM.Core
             if (targetInvoice == null || targetInvoice.ID != line.InvoiceID) throw new ArgumentException();
             if (!CRMSecurity.CanEdit(targetInvoice)) throw CRMSecurity.CreateSecurityException();
 
-            if (!Global.DaoFactory.GetInvoiceItemDao().IsExist(line.InvoiceItemID))
-                throw new ArgumentException();
+            using (var scope = DIHelper.Resolve())
+            {
+                var daoFactory = scope.Resolve<DaoFactory>();
+                if (!daoFactory.InvoiceItemDao.IsExist(line.InvoiceItemID))
+                    throw new ArgumentException();
 
-            if (line.InvoiceTax1ID > 0 && !Global.DaoFactory.GetInvoiceTaxDao().IsExist(line.InvoiceTax1ID))
-                throw new ArgumentException();
+                if (line.InvoiceTax1ID > 0 && !daoFactory.InvoiceTaxDao.IsExist(line.InvoiceTax1ID))
+                    throw new ArgumentException();
 
-            if (line.InvoiceTax2ID > 0 && !Global.DaoFactory.GetInvoiceTaxDao().IsExist(line.InvoiceTax2ID))
-                throw new ArgumentException();
+                if (line.InvoiceTax2ID > 0 && !daoFactory.InvoiceTaxDao.IsExist(line.InvoiceTax2ID))
+                    throw new ArgumentException();
+            }
         }
 
         public static void DemandCreateOrUpdate(Invoice invoice)
@@ -874,26 +742,30 @@ namespace ASC.CRM.Core
                 String.IsNullOrEmpty(invoice.Terms))
                     throw new ArgumentException();
 
-            var contact = Global.DaoFactory.GetContactDao().GetByID(invoice.ContactID);
-            if (contact == null) throw new ArgumentException();
-            if (!CanAccessTo(contact)) throw new SecurityException(CRMErrorsResource.AccessDenied);
-
-            if (invoice.ConsigneeID != 0 && invoice.ConsigneeID != invoice.ContactID)
+            using (var scope = DIHelper.Resolve())
             {
-                var consignee = Global.DaoFactory.GetContactDao().GetByID(invoice.ConsigneeID);
-                if (consignee == null) throw new ArgumentException();
-                if (!CanAccessTo(consignee)) throw new SecurityException(CRMErrorsResource.AccessDenied);
-            }
+                var daoFactory = scope.Resolve<DaoFactory>();
+                var contact = daoFactory.ContactDao.GetByID(invoice.ContactID);
+                if (contact == null) throw new ArgumentException();
+                if (!CanAccessTo(contact)) throw new SecurityException(CRMErrorsResource.AccessDenied);
 
-            if (invoice.EntityID != 0)
-            {
-                var deal = Global.DaoFactory.GetDealDao().GetByID(invoice.EntityID);
-                if (deal == null) throw new ArgumentException();
-                if (!CanAccessTo(deal)) throw new SecurityException(CRMErrorsResource.AccessDenied);
+                if (invoice.ConsigneeID != 0 && invoice.ConsigneeID != invoice.ContactID)
+                {
+                    var consignee = daoFactory.ContactDao.GetByID(invoice.ConsigneeID);
+                    if (consignee == null) throw new ArgumentException();
+                    if (!CanAccessTo(consignee)) throw new SecurityException(CRMErrorsResource.AccessDenied);
+                }
 
-                var dealMembers = Global.DaoFactory.GetDealDao().GetMembers(invoice.EntityID);
-                if (!dealMembers.Contains(invoice.ContactID))
-                    throw new ArgumentException();
+                if (invoice.EntityID != 0)
+                {
+                    var deal = daoFactory.DealDao.GetByID(invoice.EntityID);
+                    if (deal == null) throw new ArgumentException();
+                    if (!CanAccessTo(deal)) throw new SecurityException(CRMErrorsResource.AccessDenied);
+
+                    var dealMembers = daoFactory.DealDao.GetMembers(invoice.EntityID);
+                    if (!dealMembers.Contains(invoice.ContactID))
+                        throw new ArgumentException();
+                }
             }
 
             if (CurrencyProvider.Get(invoice.Currency.ToUpper()) == null)
@@ -913,15 +785,18 @@ namespace ASC.CRM.Core
         {
             get
             {
-                return CoreContext.UserManager.IsUserInGroup(SecurityContext.CurrentAccount.ID, Constants.GroupAdmin.ID) ||
-                       WebItemSecurity.IsProductAdministrator(ProductEntryPoint.ID, SecurityContext.CurrentAccount.ID);
+                return IsAdministrator(SecurityContext.CurrentAccount.ID);
             }
         }
 
         public static bool IsAdministrator(Guid userId)
         {
-            return CoreContext.UserManager.IsUserInGroup(userId, Constants.GroupAdmin.ID) ||
-                   WebItemSecurity.IsProductAdministrator(ProductEntryPoint.ID, userId);
+            return WebItemSecurity.IsProductAdministrator(ProductEntryPoint.ID, userId);
+        }
+
+        public static bool IsAvailableForUser(Guid userId)
+        {
+            return WebItemSecurity.IsAvailableForUser(WebItemManager.CRMProductID, userId);
         }
 
         public static IEnumerable<Task> FilterRead(IEnumerable<Task> tasks)
@@ -930,50 +805,66 @@ namespace ASC.CRM.Core
 
             if (IsAdmin) return tasks;
 
-            var result = tasks;
-            var contactIDs = result.Where(x => x.ResponsibleID != SecurityContext.CurrentAccount.ID).Select(x => x.ContactID).Distinct();
+            var result = tasks.ToList();
+            var contactIDs = result
+                .Where(x => x.ResponsibleID != SecurityContext.CurrentAccount.ID)
+                .Select(x => x.ContactID)
+                .Distinct()
+                .ToList();
 
-            if (contactIDs.Any())
+            using (var scope = DIHelper.Resolve())
             {
-                contactIDs = Global.DaoFactory.GetContactDao()
-                                   .GetContacts(contactIDs.ToArray())
-                                   .FindAll(CanAccessTo)
-                                   .Select(x => x.ID);
+                var daoFactory = scope.Resolve<DaoFactory>();
+                if (contactIDs.Any())
+                {
+                    contactIDs = daoFactory.ContactDao
+                        .GetContacts(contactIDs.ToArray())
+                        .Select(x => x.ID)
+                        .ToList();
 
-                result = result.Where(x => x.ContactID == 0 || contactIDs.Contains(x.ContactID) || x.ResponsibleID == SecurityContext.CurrentAccount.ID);
+                    result = result.Where(x => x.ContactID == 0 || contactIDs.Contains(x.ContactID) || x.ResponsibleID == SecurityContext.CurrentAccount.ID).ToList();
 
-                if (!result.Any()) return Enumerable.Empty<Task>();
+                    if (!result.Any()) return Enumerable.Empty<Task>();
+                }
+
+                var casesIds = result.Where(x => x.EntityType == EntityType.Case && x.ResponsibleID != SecurityContext.CurrentAccount.ID)
+                        .Select(x => x.EntityID)
+                        .Distinct()
+                        .ToList();
+
+                if (casesIds.Any())
+                {
+                    casesIds = daoFactory.CasesDao
+                        .GetCases(casesIds.ToArray())
+                        .Select(x => x.ID)
+                        .ToList();
+
+                    result = result.Where(x => x.EntityID == 0 || casesIds.Contains(x.EntityID) || x.ResponsibleID == SecurityContext.CurrentAccount.ID).ToList();
+
+                    if (!result.Any()) return Enumerable.Empty<Task>();
+                }
+
+                var dealsIds = result.Where(x => x.EntityType == EntityType.Opportunity && x.ResponsibleID != SecurityContext.CurrentAccount.ID)
+                        .Select(x => x.EntityID)
+                        .Distinct()
+                        .ToList();
+
+                if (dealsIds.Any())
+                {
+                    dealsIds = daoFactory.DealDao
+                        .GetDeals(dealsIds.ToArray())
+                        .Select(x => x.ID)
+                        .ToList();
+
+                    result = result
+                        .Where(x => x.EntityID == 0 || dealsIds.Contains(x.EntityID) || x.ResponsibleID == SecurityContext.CurrentAccount.ID)
+                        .ToList();
+
+                    if (!result.Any()) return Enumerable.Empty<Task>();
+                }
+
+                return result;
             }
-
-            var casesIds = result.Where(x => x.EntityType == EntityType.Case && x.ResponsibleID != SecurityContext.CurrentAccount.ID).Select(x => x.EntityID).Distinct();
-
-            if (casesIds.Any())
-            {
-                casesIds = Global.DaoFactory.GetCasesDao()
-                                   .GetCases(casesIds.ToArray())
-                                   .FindAll(CanAccessTo)
-                                   .Select(x => x.ID);
-
-                result = result.Where(x => x.EntityID == 0 || casesIds.Contains(x.EntityID) || x.ResponsibleID == SecurityContext.CurrentAccount.ID);
-
-                if (!result.Any()) return Enumerable.Empty<Task>();
-            }
-
-            var dealsIds = result.Where(x => x.EntityType == EntityType.Opportunity && x.ResponsibleID != SecurityContext.CurrentAccount.ID).Select(x => x.EntityID).Distinct();
-
-            if (dealsIds.Any())
-            {
-                dealsIds = Global.DaoFactory.GetDealDao()
-                                   .GetDeals(dealsIds.ToArray())
-                                   .FindAll(CanAccessTo)
-                                   .Select(x => x.ID);
-
-                result = result.Where(x => x.EntityID == 0 || dealsIds.Contains(x.EntityID) || x.ResponsibleID == SecurityContext.CurrentAccount.ID);
-
-                if (!result.Any()) return Enumerable.Empty<Task>();
-            }
-
-            return result.ToList();
 
         }
 
@@ -983,22 +874,26 @@ namespace ASC.CRM.Core
 
             if (IsAdmin) return invoices;
 
-            var result = invoices;
-            var contactIDs = result.Select(x => x.ContactID).Distinct();
+            var result = invoices.ToList();
+            var contactIDs = result.Select(x => x.ContactID).Distinct().ToList();
 
-            if (contactIDs.Any())
+            using (var scope = DIHelper.Resolve())
             {
-                contactIDs = Global.DaoFactory.GetContactDao()
-                                   .GetContacts(contactIDs.ToArray())
-                                   .FindAll(CanAccessTo)
-                                   .Select(x => x.ID);
+                var daoFactory = scope.Resolve<DaoFactory>();
+                if (contactIDs.Any())
+                {
+                    contactIDs = daoFactory.ContactDao
+                        .GetContacts(contactIDs.ToArray())
+                        .Select(x => x.ID)
+                        .ToList();
 
-                result = result.Where(x => x.ContactID == 0 || contactIDs.Contains(x.ContactID));
+                    result = result.Where(x => x.ContactID == 0 || contactIDs.Contains(x.ContactID)).ToList();
 
-                if (!result.Any()) return Enumerable.Empty<Invoice>();
+                    if (!result.Any()) return Enumerable.Empty<Invoice>();
+                }
             }
 
-            return result.ToList();
+            return result;
         }
 
         public static bool CanGoToFeed(Task task)

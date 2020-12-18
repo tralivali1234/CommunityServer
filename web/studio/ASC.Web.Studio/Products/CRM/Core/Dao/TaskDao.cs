@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,17 +19,18 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Web.Caching;
+using System.Text.RegularExpressions;
+
 using ASC.Collections;
-using ASC.Common.Data;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
+using ASC.Common.Logging;
 using ASC.Core;
 using ASC.Core.Tenants;
 using ASC.CRM.Core.Entities;
-using ASC.FullTextIndex;
-using System.Text.RegularExpressions;
-using log4net;
+
+using ASC.ElasticSearch;
+using ASC.Web.CRM.Core.Search;
 
 namespace ASC.CRM.Core.Dao
 {
@@ -47,8 +39,8 @@ namespace ASC.CRM.Core.Dao
 
         private readonly HttpRequestDictionary<Task> _contactCache = new HttpRequestDictionary<Task>("crm_task");
 
-        public CachedTaskDao(int tenantID, string storageKey)
-            : base(tenantID, storageKey)
+        public CachedTaskDao(int tenantID)
+            : base(tenantID)
         {
 
         }
@@ -93,8 +85,8 @@ namespace ASC.CRM.Core.Dao
     {
         #region Constructor
 
-        public TaskDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public TaskDao(int tenantID)
+            : base(tenantID)
         {
 
 
@@ -113,14 +105,11 @@ namespace ASC.CRM.Core.Dao
 
             CRMSecurity.DemandEdit(task);
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(
-                    Update("crm_task")
-                    .Set("is_closed", false)
-                    .Where(Exp.Eq("id", taskID))
-                    );
-            }
+            Db.ExecuteNonQuery(
+                Update("crm_task")
+                .Set("is_closed", false)
+                .Where(Exp.Eq("id", taskID))
+                );
         }
 
         public void CloseTask(int taskID)
@@ -132,25 +121,19 @@ namespace ASC.CRM.Core.Dao
 
             CRMSecurity.DemandEdit(task);
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(
-                      Update("crm_task")
-                      .Set("is_closed", true)
-                      .Where(Exp.Eq("id", taskID))
-                   );
-            }
+            Db.ExecuteNonQuery(
+                    Update("crm_task")
+                    .Set("is_closed", true)
+                    .Where(Exp.Eq("id", taskID))
+                );
         }
 
         public virtual Task GetByID(int taskID)
         {
-            using (var db = GetDb())
-            {
-                var tasks = db.ExecuteList(GetTaskQuery(Exp.Eq("id", taskID)))
-                    .ConvertAll(row => ToTask(row));
+            var tasks = Db.ExecuteList(GetTaskQuery(Exp.Eq("id", taskID)))
+                .ConvertAll(row => ToTask(row));
 
-                return tasks.Count > 0 ? tasks[0] : null;
-            }
+            return tasks.Count > 0 ? tasks[0] : null;
         }
 
         public List<Task> GetTasks(EntityType entityType, int entityID, bool? onlyActiveTask)
@@ -160,33 +143,23 @@ namespace ASC.CRM.Core.Dao
         }
         public int GetAllTasksCount()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(Query("crm_task").SelectCount());
-            }
+            return Db.ExecuteScalar<int>(Query("crm_task").SelectCount());
         }
 
         public List<Task> GetAllTasks()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(
-                    GetTaskQuery(null)
-                    .OrderBy("deadline", true)
-                    .OrderBy("title", true))
-                    .ConvertAll(row => ToTask(row)).FindAll(CRMSecurity.CanAccessTo);
-            }
+            return Db.ExecuteList(
+                GetTaskQuery(null)
+                .OrderBy("deadline", true)
+                .OrderBy("title", true))
+                .ConvertAll(row => ToTask(row)).FindAll(CRMSecurity.CanAccessTo);
         }
 
         public void ExecAlert(IEnumerable<int> ids)
         {
             if (!ids.Any()) return;
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(new SqlUpdate("crm_task").Set("exec_alert", true).Where(Exp.In("id", ids.ToArray())));
-
-            }
+                Db.ExecuteNonQuery(new SqlUpdate("crm_task").Set("exec_alert", true).Where(Exp.In("id", ids.ToArray())));
         }
 
         public List<object[]> GetInfoForReminder(DateTime scheduleDate)
@@ -206,11 +179,7 @@ namespace ASC.CRM.Core.Dao
                     Exp.Between("DATE_ADD(deadline, interval -alert_value minute)", scheduleDate.AddHours(-1), scheduleDate.AddHours(1))
                 );
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery);
-
-            }
+            return Db.ExecuteList(sqlQuery);
         }
 
         public List<Task> GetTasks(
@@ -323,27 +292,24 @@ namespace ASC.CRM.Core.Dao
 
                 if (keywords.Length > 0)
                 {
-                    var modules = SearchDao.GetFullTextSearchModule(EntityType.Task, searchText);
-                    if (FullTextSearch.SupportModule(modules))
+                    List<int> tasksIds;
+                    if (!FactoryIndexer<TasksWrapper>.TrySelectIds(s => s.MatchAll(searchText), out tasksIds))
                     {
-                        var taskIDs = FullTextSearch.Search(modules);
-
-                        if (taskIDs.Any())
-                            sqlQuery.Where(Exp.In(taskTableAlias + ".id", taskIDs));
+                        sqlQuery.Where(BuildLike(new[] {taskTableAlias + ".title", taskTableAlias + ".description"}, keywords));
+                    }
+                    else
+                    {
+                        if (tasksIds.Any())
+                            sqlQuery.Where(Exp.In(taskTableAlias + ".id", tasksIds));
                         else
                             return new List<Task>();
                     }
-                    else
-                        sqlQuery.Where(BuildLike(new[] {taskTableAlias + ".title", taskTableAlias + ".description"},
-                                                 keywords));
+
                 }
             }
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery)
-                   .ConvertAll(row => ToTask(row));
-            }
+            return Db.ExecuteList(sqlQuery)
+                .ConvertAll(row => ToTask(row));
         }
 
         public int GetTasksCount(
@@ -418,145 +384,140 @@ namespace ASC.CRM.Core.Dao
                                               0,
                                               null);
 
-                    using (var db = GetDb())
-                    {
-                        result = db.ExecuteScalar<int>(sqlQuery);
-                    }
+                    result = Db.ExecuteScalar<int>(sqlQuery);
                 }
                 else
                 {
+                    var taskIds = new List<int>();
+
                     var sqlQuery = Query("crm_task tbl_tsk")
-                                  .SelectCount()
+                                  .Select("tbl_tsk.id")
                                   .LeftOuterJoin("crm_contact tbl_ctc", Exp.EqColumns("tbl_tsk.contact_id", "tbl_ctc.id"))
-                                  .Where(Exp.Or(Exp.Eq("tbl_ctc.is_shared", Exp.Empty), Exp.Gt("tbl_ctc.is_shared", 0)))
-                                  .Where(Exp.EqColumns("tbl_tsk.entity_id", "0"));
+                                  .Where(Exp.Or(Exp.Eq("tbl_ctc.is_shared", Exp.Empty), Exp.Gt("tbl_ctc.is_shared", 0)));
+
+                    sqlQuery = WhereConditional(sqlQuery, "tbl_tsk",
+                                                responsibleId,
+                                                categoryId,
+                                                isClosed,
+                                                fromDate,
+                                                toDate,
+                                                entityType,
+                                                entityId,
+                                                0,
+                                                0,
+                                                null);
 
                     // count tasks without entityId and only open contacts
-                    using (var db = GetDb())
-                    {
-                        result = db.ExecuteScalar<int>(WhereConditional(sqlQuery, "tbl_tsk",
-                                             responsibleId,
-                                             categoryId,
-                                             isClosed,
-                                             fromDate,
-                                             toDate,
-                                             entityType,
-                                             entityId,
-                                             0,
-                                             0,
-                                             null));
-                    }
+
+                    taskIds = Db.ExecuteList(sqlQuery).Select(item => Convert.ToInt32(item[0])).ToList();
 
                     LogManager.GetLogger("ASC.CRM").DebugFormat("End GetTasksCount: {0}. count tasks without entityId and only open contacts", DateTime.Now.ToString());
 
 
                     sqlQuery = Query("crm_task tbl_tsk")
-                                .SelectCount()
+                                .Select("tbl_tsk.id")
                                 .InnerJoin("crm_contact tbl_ctc", Exp.EqColumns("tbl_tsk.contact_id", "tbl_ctc.id"))
                                 .InnerJoin("core_acl tbl_cl", Exp.EqColumns("tbl_ctc.tenant_id", "tbl_cl.tenant") &
                                 Exp.Eq("tbl_cl.subject", ASC.Core.SecurityContext.CurrentAccount.ID.ToString()) &
                                 Exp.Eq("tbl_cl.action", CRMSecurity._actionRead.ID.ToString()) &
                                 Exp.EqColumns("tbl_cl.object", "CONCAT('ASC.CRM.Core.Entities.Company|', tbl_ctc.id)"))
                                 .Where(Exp.Eq("tbl_ctc.is_shared", 0))
-                                .Where(Exp.Eq("tbl_ctc.is_company", Exp.True));
+                                .Where(Exp.Eq("tbl_ctc.is_company", 1));
+
+                    sqlQuery = WhereConditional(sqlQuery, "tbl_tsk",
+                                                responsibleId,
+                                                categoryId,
+                                                isClosed,
+                                                fromDate,
+                                                toDate,
+                                                entityType,
+                                                entityId,
+                                                0,
+                                                0,
+                                                null);
 
                     // count tasks with entityId and only close contacts
-                    using (var db = GetDb())
-                    {
-                        result += db.ExecuteScalar<int>(WhereConditional(sqlQuery, "tbl_tsk",
-                                             responsibleId,
-                                             categoryId,
-                                             isClosed,
-                                             fromDate,
-                                             toDate,
-                                             entityType,
-                                             entityId,
-                                             0,
-                                             0,
-                                             null));
-                    }
+                    taskIds.AddRange(Db.ExecuteList(sqlQuery).Select(item => Convert.ToInt32(item[0])).ToList());
 
                     LogManager.GetLogger("ASC.CRM").DebugFormat("End GetTasksCount: {0}. count tasks with entityId and only close contacts", DateTime.Now.ToString());
 
                     sqlQuery = Query("crm_task tbl_tsk")
-                              .SelectCount()
+                              .Select("tbl_tsk.id")
                               .InnerJoin("crm_contact tbl_ctc", Exp.EqColumns("tbl_tsk.contact_id", "tbl_ctc.id"))
                               .InnerJoin("core_acl tbl_cl", Exp.EqColumns("tbl_ctc.tenant_id", "tbl_cl.tenant") &
                               Exp.Eq("tbl_cl.subject", ASC.Core.SecurityContext.CurrentAccount.ID.ToString()) &
                               Exp.Eq("tbl_cl.action", CRMSecurity._actionRead.ID.ToString()) &
                               Exp.EqColumns("tbl_cl.object", "CONCAT('ASC.CRM.Core.Entities.Person|', tbl_ctc.id)"))
                               .Where(Exp.Eq("tbl_ctc.is_shared", 0))
-                              .Where(Exp.Eq("tbl_ctc.is_company", Exp.False));
+                              .Where(Exp.Eq("tbl_ctc.is_company", 0));
+
+                    sqlQuery = WhereConditional(sqlQuery, "tbl_tsk",
+                                                responsibleId,
+                                                categoryId,
+                                                isClosed,
+                                                fromDate,
+                                                toDate,
+                                                entityType,
+                                                entityId,
+                                                0,
+                                                0,
+                                                null);
 
                     // count tasks with entityId and only close contacts
-                    using (var db = GetDb())
-                    {
-                        result += db.ExecuteScalar<int>(WhereConditional(sqlQuery, "tbl_tsk",
-                                             responsibleId,
-                                             categoryId,
-                                             isClosed,
-                                             fromDate,
-                                             toDate,
-                                             entityType,
-                                             entityId,
-                                             0,
-                                             0,
-                                             null));
-                    }
+                    taskIds.AddRange(Db.ExecuteList(sqlQuery).Select(item => Convert.ToInt32(item[0])).ToList());
 
                     LogManager.GetLogger("ASC.CRM").DebugFormat("End GetTasksCount: {0}. count tasks with entityId and only close contacts", DateTime.Now.ToString());
 
 
                     sqlQuery = Query("crm_task tbl_tsk")
-                                .SelectCount()
+                                .Select("tbl_tsk.id")
                                 .InnerJoin("core_acl tbl_cl", Exp.EqColumns("tbl_tsk.tenant_id", "tbl_cl.tenant") &
                                 Exp.Eq("tbl_cl.subject", ASC.Core.SecurityContext.CurrentAccount.ID.ToString()) &
                                 Exp.Eq("tbl_cl.action", CRMSecurity._actionRead.ID.ToString()) &
                                 Exp.EqColumns("tbl_cl.object", "CONCAT('ASC.CRM.Core.Entities.Deal|', tbl_tsk.entity_id)"))
                                 .Where(!Exp.Eq("tbl_tsk.entity_id", 0) & Exp.Eq("tbl_tsk.entity_type", (int)EntityType.Opportunity) & Exp.Eq("tbl_tsk.contact_id", 0));
 
+                    sqlQuery = WhereConditional(sqlQuery, "tbl_tsk",
+                                                responsibleId,
+                                                categoryId,
+                                                isClosed,
+                                                fromDate,
+                                                toDate,
+                                                entityType,
+                                                entityId,
+                                                0,
+                                                0,
+                                                null);
+
                     // count tasks with entityId and without contact
-                    using (var db = GetDb())
-                    {
-                        result += db.ExecuteScalar<int>(WhereConditional(sqlQuery, "tbl_tsk",
-                                             responsibleId,
-                                             categoryId,
-                                             isClosed,
-                                             fromDate,
-                                             toDate,
-                                             entityType,
-                                             entityId,
-                                             0,
-                                             0,
-                                             null));
-                    }
+                    taskIds.AddRange(Db.ExecuteList(sqlQuery).Select(item => Convert.ToInt32(item[0])).ToList());
 
                     LogManager.GetLogger("ASC.CRM").DebugFormat("End GetTasksCount: {0}. count tasks with entityId and without contact", DateTime.Now.ToString());
 
                     sqlQuery = Query("crm_task tbl_tsk")
-                                .SelectCount()
+                                .Select("tbl_tsk.id")
                                 .InnerJoin("core_acl tbl_cl", Exp.EqColumns("tbl_tsk.tenant_id", "tbl_cl.tenant") &
                                 Exp.Eq("tbl_cl.subject", ASC.Core.SecurityContext.CurrentAccount.ID.ToString()) &
                                 Exp.Eq("tbl_cl.action", CRMSecurity._actionRead.ID.ToString()) &
                                 Exp.EqColumns("tbl_cl.object", "CONCAT('ASC.CRM.Core.Entities.Cases|', tbl_tsk.entity_id)"))
                                 .Where(!Exp.Eq("tbl_tsk.entity_id", 0) & Exp.Eq("tbl_tsk.entity_type", (int)EntityType.Case) & Exp.Eq("tbl_tsk.contact_id", 0));
 
-                    // count tasks with entityId and without contact
-                    using (var db = GetDb())
-                    {
-                        result += db.ExecuteScalar<int>(WhereConditional(sqlQuery, "tbl_tsk",
-                                             responsibleId,
-                                             categoryId,
-                                             isClosed,
-                                             fromDate,
-                                             toDate,
-                                             entityType,
-                                             entityId,
-                                             0,
-                                             0,
-                                             null));
-                    }
+                    sqlQuery = WhereConditional(sqlQuery, "tbl_tsk",
+                                                responsibleId,
+                                                categoryId,
+                                                isClosed,
+                                                fromDate,
+                                                toDate,
+                                                entityType,
+                                                entityId,
+                                                0,
+                                                0,
+                                                null);
 
+                    // count tasks with entityId and without contact
+                    taskIds.AddRange(Db.ExecuteList(sqlQuery).Select(item => Convert.ToInt32(item[0])).ToList());
+
+                    result = taskIds.Distinct().Count();
 
                     LogManager.GetLogger("ASC.CRM").DebugFormat("End GetTasksCount: {0}. count tasks with entityId and without contact", DateTime.Now.ToString());
 
@@ -599,10 +560,8 @@ namespace ASC.CRM.Core.Dao
                 {
                     case EntityType.Contact:
                         var isCompany = true;
-                        using (var db = GetDb())
-                        {
-                            isCompany = db.ExecuteScalar<bool>(Query("crm_contact").Select("is_company").Where(Exp.Eq("id", entityID)));
-                        }
+                        isCompany = Db.ExecuteScalar<bool>(Query("crm_contact").Select("is_company").Where(Exp.Eq("id", entityID)));
+
                         if (isCompany)
                             return WhereConditional(sqlQuery, alias, responsibleID, categoryID, isClosed, fromDate, toDate, EntityType.Company, entityID, from, count, orderBy);
                         else
@@ -640,11 +599,11 @@ namespace ASC.CRM.Core.Dao
                 sqlQuery.Where(Exp.Eq(aliasPrefix + "category_id", categoryID));
 
             if (fromDate != DateTime.MinValue && toDate != DateTime.MinValue)
-                sqlQuery.Where(Exp.Between(aliasPrefix + "deadline", TenantUtil.DateTimeToUtc(fromDate), TenantUtil.DateTimeToUtc(toDate.AddDays(1).AddMinutes(-1))));
+                sqlQuery.Where(Exp.Between(aliasPrefix + "deadline", TenantUtil.DateTimeToUtc(fromDate), TenantUtil.DateTimeToUtc(toDate)));
             else if (fromDate != DateTime.MinValue)
                 sqlQuery.Where(Exp.Ge(aliasPrefix + "deadline", TenantUtil.DateTimeToUtc(fromDate)));
             else if (toDate != DateTime.MinValue)
-                sqlQuery.Where(Exp.Le(aliasPrefix + "deadline", TenantUtil.DateTimeToUtc(toDate.AddDays(1).AddMinutes(-1))));
+                sqlQuery.Where(Exp.Le(aliasPrefix + "deadline", TenantUtil.DateTimeToUtc(toDate)));
 
             if (0 < from && from < int.MaxValue)
                 sqlQuery.SetFirstResult(from);
@@ -700,31 +659,28 @@ namespace ASC.CRM.Core.Dao
 
         public Dictionary<int, Task> GetNearestTask(int[] contactID)
         {
-            using (var db = GetDb())
+            var sqlSubQuery =
+                        Query("crm_task")
+                        .SelectMin("id")
+                        .SelectMin("deadline")
+                        .Select("contact_id")
+                        .Where(Exp.In("contact_id", contactID) & Exp.Eq("is_closed", false))
+                        .GroupBy("contact_id");
+
+            var taskIDs = Db.ExecuteList(sqlSubQuery).ConvertAll(row => row[0]);
+
+            if (taskIDs.Count == 0) return new Dictionary<int, Task>();
+
+            var tasks = Db.ExecuteList(GetTaskQuery(Exp.In("id", taskIDs))).ConvertAll(row=>ToTask(row)).Where(CRMSecurity.CanAccessTo);
+
+            var result = new Dictionary<int, Task>();
+
+            foreach (var task in tasks.Where(task => !result.ContainsKey(task.ContactID)))
             {
-                var sqlSubQuery =
-                           Query("crm_task")
-                          .SelectMin("id")
-                          .SelectMin("deadline")
-                          .Select("contact_id")
-                          .Where(Exp.In("contact_id", contactID) & Exp.Eq("is_closed", false))
-                          .GroupBy("contact_id");
-
-                var taskIDs = db.ExecuteList(sqlSubQuery).ConvertAll(row => row[0]);
-
-                if (taskIDs.Count == 0) return new Dictionary<int, Task>();
-
-                var tasks = db.ExecuteList(GetTaskQuery(Exp.In("id", taskIDs))).ConvertAll(row=>ToTask(row)).Where(CRMSecurity.CanAccessTo);
-
-                var result = new Dictionary<int, Task>();
-
-                foreach (var task in tasks.Where(task => !result.ContainsKey(task.ContactID)))
-                {
-                    result.Add(task.ContactID, task);
-                }
-
-                return result;
+                result.Add(task.ContactID, task);
             }
+
+            return result;
         }
 
         public IEnumerable<Guid> GetResponsibles(int categoryID)
@@ -734,14 +690,12 @@ namespace ASC.CRM.Core.Dao
                 .GroupBy(1);
 
             if (0 < categoryID) q.Where("category_id", categoryID);
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(q)
-                   .ConvertAll(r => (string)r[0])
-                   .Select(r => new Guid(r))
-                   .Where(g => g != Guid.Empty)
-                   .ToList();
-            }
+
+            return Db.ExecuteList(q)
+                .ConvertAll(r => (string)r[0])
+                .Select(r => new Guid(r))
+                .Where(g => g != Guid.Empty)
+                .ToList();
         }
 
 
@@ -753,12 +707,9 @@ namespace ASC.CRM.Core.Dao
                           .Where(Exp.In("contact_id", contactID))
                           .GroupBy("contact_id");
 
-            using (var db = GetDb())
-            {
-                var sqlResult = db.ExecuteList(sqlQuery);
+            var sqlResult = Db.ExecuteList(sqlQuery);
 
-                return sqlResult.ToDictionary(item => Convert.ToInt32(item[0]), item => Convert.ToInt32(item[1]));
-            }
+            return sqlResult.ToDictionary(item => Convert.ToInt32(item[0]), item => Convert.ToInt32(item[1]));
         }
 
         public int GetTasksCount(int contactID)
@@ -780,12 +731,9 @@ namespace ASC.CRM.Core.Dao
                           .SelectCount()
                           .GroupBy("contact_id");
 
-            using (var db = GetDb())
-            {
-                var sqlResult = db.ExecuteList(sqlQuery);
+            var sqlResult = Db.ExecuteList(sqlQuery);
 
-                return sqlResult.ToDictionary(item => Convert.ToInt32(item[0]), item => Convert.ToInt32(item[1]) > 0);
-            }
+            return sqlResult.ToDictionary(item => Convert.ToInt32(item[0]), item => Convert.ToInt32(item[1]) > 0);
         }
 
 
@@ -801,33 +749,27 @@ namespace ASC.CRM.Core.Dao
         public virtual Task SaveOrUpdateTask(Task newTask)
         {
             _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "tasks.*"));
-            using (var db = GetDb())
-            {
-                return SaveOrUpdateTask(newTask, db);
-            }
+            return SaveOrUpdateTaskInDb(newTask);
         }
 
         public virtual Task[] SaveOrUpdateTaskList(List<Task> newTasks)
         {
             _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "tasks.*"));
             var result = new List<Task>();
-            using (var db = GetDb())
+            foreach (var newTask in newTasks)
             {
-                foreach (var newTask in newTasks)
-                {
-                    result.Add(SaveOrUpdateTask(newTask, db));
-                }
+                result.Add(SaveOrUpdateTaskInDb(newTask));
             }
             return result.ToArray();
         }
 
-        private Task SaveOrUpdateTask(Task newTask, DbManager db)
+        private Task SaveOrUpdateTaskInDb(Task newTask)
         {
             if (String.IsNullOrEmpty(newTask.Title) || newTask.DeadLine == DateTime.MinValue ||
                 newTask.CategoryID <= 0)
                 throw new ArgumentException();
 
-            if (newTask.ID == 0 || db.ExecuteScalar<int>(Query("crm_task").SelectCount().Where(Exp.Eq("id", newTask.ID))) == 0)
+            if (newTask.ID == 0 || Db.ExecuteScalar<int>(Query("crm_task").SelectCount().Where(Exp.Eq("id", newTask.ID))) == 0)
             {
                 newTask.CreateOn = DateTime.UtcNow;
                 newTask.CreateBy = ASC.Core.SecurityContext.CurrentAccount.ID;
@@ -835,7 +777,7 @@ namespace ASC.CRM.Core.Dao
                 newTask.LastModifedOn = DateTime.UtcNow;
                 newTask.LastModifedBy = ASC.Core.SecurityContext.CurrentAccount.ID;
 
-                newTask.ID = db.ExecuteScalar<int>(
+                newTask.ID = Db.ExecuteScalar<int>(
                                Insert("crm_task")
                               .InColumnValue("id", 0)
                               .InColumnValue("title", newTask.Title)
@@ -856,7 +798,7 @@ namespace ASC.CRM.Core.Dao
             }
             else
             {
-                var oldTask = db.ExecuteList(GetTaskQuery(Exp.Eq("id", newTask.ID)))
+                var oldTask = Db.ExecuteList(GetTaskQuery(Exp.Eq("id", newTask.ID)))
                     .ConvertAll(row => ToTask(row))
                     .FirstOrDefault();
 
@@ -870,7 +812,7 @@ namespace ASC.CRM.Core.Dao
 
                 newTask.IsClosed = oldTask.IsClosed;
 
-                db.ExecuteNonQuery(
+                Db.ExecuteNonQuery(
                                 Update("crm_task")
                                 .Set("title", newTask.Title)
                                 .Set("description", newTask.Description)
@@ -887,25 +829,23 @@ namespace ASC.CRM.Core.Dao
                                 .Where(Exp.Eq("id", newTask.ID)));
             }
 
+            FactoryIndexer<TasksWrapper>.IndexAsync(newTask);
             return newTask;
         }
 
         public virtual int SaveTask(Task newTask)
         {
             _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "tasks.*"));
-            using (var db = GetDb())
-            {
-                return SaveTask(newTask, db);
-            }
+            return SaveTaskInDb(newTask);
         }
 
-        private int SaveTask(Task newTask, DbManager db)
+        private int SaveTaskInDb(Task newTask)
         {
             if (String.IsNullOrEmpty(newTask.Title) || newTask.DeadLine == DateTime.MinValue ||
                 newTask.CategoryID == 0)
                 throw new ArgumentException();
 
-             return db.ExecuteScalar<int>(
+             var result = Db.ExecuteScalar<int>(
                                Insert("crm_task")
                               .InColumnValue("id", 0)
                               .InColumnValue("title", newTask.Title)
@@ -917,24 +857,28 @@ namespace ASC.CRM.Core.Dao
                               .InColumnValue("entity_id", newTask.EntityID)
                               .InColumnValue("is_closed", newTask.IsClosed)
                               .InColumnValue("category_id", newTask.CategoryID)
-                              .InColumnValue("create_on", DateTime.UtcNow)
+                              .InColumnValue("create_on", newTask.CreateOn == DateTime.MinValue ? DateTime.UtcNow : newTask.CreateOn)
                               .InColumnValue("create_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                              .InColumnValue("last_modifed_on", DateTime.UtcNow)
+                              .InColumnValue("last_modifed_on", newTask.CreateOn == DateTime.MinValue ? DateTime.UtcNow : newTask.CreateOn)
                               .InColumnValue("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
                               .InColumnValue("alert_value", (int)newTask.AlertValue)
                               .Identity(1, 0, true));
+
+            newTask.ID = result;
+            FactoryIndexer<TasksWrapper>.IndexAsync(newTask);
+
+            return result;
         }
 
         public virtual int[] SaveTaskList(List<Task> items)
         {
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction())
+            using (var tx = Db.BeginTransaction())
             {
                 var result = new List<int>();
 
                 foreach (var item in items)
                 {
-                    result.Add(SaveTask(item, db));
+                    result.Add(SaveTaskInDb(item));
                 }
 
                 tx.Commit();
@@ -952,23 +896,19 @@ namespace ASC.CRM.Core.Dao
 
             CRMSecurity.DemandEdit(task);
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_task").Where("id", taskID));
-            }
+            Db.ExecuteNonQuery(Delete("crm_task").Where("id", taskID));
 
             _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "tasks.*"));
+            FactoryIndexer<TasksWrapper>.DeleteAsync(task);
         }
 
         public List<Task> CreateByTemplate(List<TaskTemplate> templateItems, EntityType entityType, int entityID)
         {
-
             if (templateItems == null || templateItems.Count == 0) return new List<Task>();
 
             var result = new List<Task>();
 
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction())
+            using (var tx = Db.BeginTransaction())
             {
                 foreach (var templateItem in templateItems)
                 {
@@ -1002,11 +942,11 @@ namespace ASC.CRM.Core.Dao
                             throw new NotImplementedException();
                     }
 
-                    task = SaveOrUpdateTask(task, db);
+                    task = SaveOrUpdateTask(task);
 
                     result.Add(task);
 
-                    db.ExecuteNonQuery(Insert("crm_task_template_task")
+                    Db.ExecuteNonQuery(Insert("crm_task_template_task")
                                      .InColumnValue("task_id", task.ID)
                                      .InColumnValue("task_template_id", templateItem.ID));
 
@@ -1100,6 +1040,51 @@ namespace ASC.CRM.Core.Dao
 
         #endregion
 
+
+        public void ReassignTasksResponsible(Guid fromUserId, Guid toUserId)
+        {
+            var tasks = GetTasks(String.Empty, fromUserId, 0, false, DateTime.MinValue, DateTime.MinValue,
+                            EntityType.Any, 0, 0, 0, null);
+
+            foreach (var task in tasks)
+            {
+                task.ResponsibleID = toUserId;
+
+                SaveOrUpdateTask(task);
+            }
+        }
+
         #endregion
+
+
+        /// <summary>
+        /// Test method
+        /// </summary>
+        /// <param name="taskId"></param>
+        /// <param name="creationDate"></param>
+        public void SetTaskCreationDate(int taskId, DateTime creationDate)
+        {
+            Db.ExecuteNonQuery(
+                Update("crm_task")
+                    .Set("create_on", TenantUtil.DateTimeToUtc(creationDate))
+                    .Where(Exp.Eq("id", taskId)));
+            // Delete relative keys
+            _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "tasks.*"));
+        }
+
+        /// <summary>
+        /// Test method
+        /// </summary>
+        /// <param name="taskId"></param>
+        /// <param name="lastModifedDate"></param>
+        public void SetTaskLastModifedDate(int taskId, DateTime lastModifedDate)
+        {
+            Db.ExecuteNonQuery(
+                Update("crm_task")
+                    .Set("last_modifed_on", TenantUtil.DateTimeToUtc(lastModifedDate))
+                    .Where(Exp.Eq("id", taskId)));
+            // Delete relative keys
+            _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "tasks.*"));
+        }
     }
 }

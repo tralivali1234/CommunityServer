@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -123,7 +114,7 @@ namespace ASC.Api.Calendar.iCalParser
                 || _curPropToken.TokenVal == TokenValue.Texdate)
             {
 
-                if (iprop != null && iprop.TokenText.ToLower() == "date")
+                if (iprop != null && iprop.TokenText.ToLowerInvariant() == "date")
                     dateTime = Token.ParseDate(t.TokenText);
 
                 else
@@ -142,7 +133,7 @@ namespace ASC.Api.Calendar.iCalParser
                             _curEvent.OriginalStartDate = dateTime;
 
                             if (!isAllDay && !isUTC && _curCalendar.TimeZone != null)
-                                _curEvent.UtcStartDate = dateTime.AddMinutes((-1) * (int)_curCalendar.TimeZone.BaseUtcOffset.TotalMinutes);
+                                _curEvent.UtcStartDate = dateTime.Subtract(_curCalendar.TimeZone.GetOffset());
                             else
                                 _curEvent.UtcStartDate = dateTime;
 
@@ -152,7 +143,7 @@ namespace ASC.Api.Calendar.iCalParser
                         {
                             _curEvent.OriginalEndDate = dateTime;
                             if (!isAllDay && !isUTC && _curCalendar.TimeZone != null)
-                                _curEvent.UtcEndDate = dateTime.AddMinutes((-1) * (int)_curCalendar.TimeZone.BaseUtcOffset.TotalMinutes);
+                                _curEvent.UtcEndDate = dateTime.Subtract(_curCalendar.TimeZone.GetOffset());
                             else if (isAllDay)
                                 _curEvent.UtcEndDate = dateTime.AddDays(-1);
                             else
@@ -183,7 +174,7 @@ namespace ASC.Api.Calendar.iCalParser
             {
                 case TokenValue.Tvcalendar:
                 case TokenValue.Tvtimezone:
-                    switch (id.TokenText.ToLower())
+                    switch (id.TokenText.ToLowerInvariant())
                     {
                         case "tzid":
                             _curCalendar.TZID = t.TokenText;
@@ -204,7 +195,7 @@ namespace ASC.Api.Calendar.iCalParser
                     break;
 
                 case TokenValue.Tvevent:
-                    switch (id.TokenText.ToLower())
+                    switch (id.TokenText.ToLowerInvariant())
                     {
                         case "description":
                             _curEvent.Description = t.TokenText;
@@ -230,17 +221,18 @@ namespace ASC.Api.Calendar.iCalParser
             //event timezone
             if ((_curPropToken.TokenVal == TokenValue.Tdtstart || _curPropToken.TokenVal == TokenValue.Tdtend) && _component.Peek().TokenVal == TokenValue.Tvevent)
             {
-                switch (key.TokenText.ToLower())
+                switch (key.TokenText.ToLowerInvariant())
                 {
                     case "tzid":
+                        if (!_curEvent.AllDayLong)
+                        {
+                            var tz = TimeZoneConverter.GetTimeZone(val.TokenText);
+                            if (_curPropToken.TokenVal == TokenValue.Tdtstart)
+                                _curEvent.UtcStartDate = _curEvent.OriginalStartDate.Subtract(tz.GetOffset());
 
-                        var tz = TimeZoneConverter.GetTimeZone(val.TokenText);
-                        if (_curPropToken.TokenVal == TokenValue.Tdtstart)
-                            _curEvent.UtcStartDate = _curEvent.OriginalStartDate.AddMinutes((-1) * (int)tz.BaseUtcOffset.TotalMinutes);
-                        
-                        else if (_curPropToken.TokenVal == TokenValue.Tdtend)
-                            _curEvent.UtcEndDate = _curEvent.OriginalEndDate.AddMinutes((-1) * (int)tz.BaseUtcOffset.TotalMinutes);
-
+                            else if (_curPropToken.TokenVal == TokenValue.Tdtend)
+                                _curEvent.UtcEndDate = _curEvent.OriginalEndDate.Subtract(tz.GetOffset());
+                        }
                         break;
                 }
             }
@@ -248,7 +240,7 @@ namespace ASC.Api.Calendar.iCalParser
             //event rrule
             if (_curPropToken.TokenVal == TokenValue.Trrule && _component.Peek().TokenVal == TokenValue.Tvevent)
             {
-                switch(key.TokenText.ToLower())
+                switch(key.TokenText.ToLowerInvariant())
                 {
                     case "freq":
                         _curEvent.RecurrenceRule.Freq = RecurrenceRule.ParseFrequency(val.TokenText);

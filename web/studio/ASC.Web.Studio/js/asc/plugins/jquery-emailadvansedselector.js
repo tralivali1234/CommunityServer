@@ -1,27 +1,19 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
+
 
 //TODO: READ ME
 
@@ -42,6 +34,7 @@
 //    jq("#emailSelector").AdvancedEmailSelector("init", {
 //        isInPopup: false,
 //        items: itemsArray || itemsString,
+//        maxCount: 20,
 //        onChangeCallback: function () {
 //            console.log("changed");
 //        }
@@ -133,11 +126,13 @@
             self.closeSelector();
 
             if (changed) {
-                self.updateHistoryStep(true, self.getItems());
+                self.updateHistoryStep(true, true);
 
                 if (self.settings.onChangeCallback && fireCallback)
                     self.settings.onChangeCallback();
             }
+
+            self.input.focus();
         };
 
         this.drawItems = function(items, nextObj) {
@@ -156,6 +151,15 @@
                     jq.tmpl("template-emailselector-item", item).data("item-data", item).insertBefore(nextObj);
                     selectedEmails.push(item.email);
                     changed = true;
+
+                    if (self.settings.maxCount) {
+                        if (selectedEmails.length >= self.settings.maxCount) {
+                            self.obj.find(".emailselector-input").prop("disabled", true);
+                            return;
+                        } else {
+                            self.obj.find(".emailselector-input").prop("disabled", false);
+                        }
+                    }
                 }
             });
 
@@ -186,17 +190,20 @@
 
         this.clearItems = function() {
             self.obj.find(".emailselector-item").remove();
+            self.obj.find(".emailselector-input").prop("disabled", false);
         };
 
-        this.updateHistoryStep = function(stepForward, data) {
+        this.updateHistoryStep = function (stepForward, setData) {
+            var data = self.getItems();
+
             if (stepForward) {
-                if (data) {
+                if (setData) {
                     self.historyStep++;
                     self.history = jq.grep(self.history, function(item) {
                         return item.step < self.historyStep;
                     });
                     self.history.push({
-                        data: self.getItems(),
+                        data: data,
                         step: self.historyStep
                     });
                 } else {
@@ -206,6 +213,14 @@
             } else {
                 if (self.historyStep > 0)
                     self.historyStep--;
+            }
+
+            if (self.settings.maxCount) {
+                if (data.length >= self.settings.maxCount) {
+                    self.obj.find(".emailselector-input").prop("disabled", true);
+                } else {
+                    self.obj.find(".emailselector-input").prop("disabled", false);
+                }
             }
         };
 
@@ -249,7 +264,7 @@
             self.obj.on("click", ".emailselector-item-close", function (e) {
                 jq(e.target).parent().remove();
 
-                self.updateHistoryStep(true, self.getItems());
+                self.updateHistoryStep(true, true);
 
                 if (self.settings.onChangeCallback)
                     self.settings.onChangeCallback();
@@ -317,14 +332,20 @@
                         break;
                     case keyCode.Z:
                         if (e.ctrlKey) {
-                            self.updateHistoryStep(false);
+                            self.updateHistoryStep(false, false);
                             self.showHistoryStep();
+
+                            if (self.settings.onChangeCallback)
+                                self.settings.onChangeCallback();
                         }
                         break;
                     case keyCode.Y:
                         if (e.ctrlKey) {
-                            self.updateHistoryStep(true);
+                            self.updateHistoryStep(true, false);
                             self.showHistoryStep();
+
+                            if (self.settings.onChangeCallback)
+                                self.settings.onChangeCallback();
                         }
                         break;
                     case keyCode.backspace:
@@ -332,7 +353,7 @@
                         self.obj.find(".emailselector-item.selected").remove();
                         self.hiddenInput.val(self.getString(true));
 
-                        self.updateHistoryStep(true, self.getItems());
+                        self.updateHistoryStep(true, true);
 
                         if (self.settings.onChangeCallback)
                             self.settings.onChangeCallback();
@@ -403,8 +424,8 @@
 
             self.obj.on("cut", ".emailselector-hidden-input", function () {
                 self.obj.find(".emailselector-item.selected").remove();
-                
-                self.updateHistoryStep(true, self.getItems());
+
+                self.updateHistoryStep(true, true);
 
                 if (self.settings.onChangeCallback)
                     self.settings.onChangeCallback();
@@ -431,21 +452,29 @@
                     }
 
                     if (e.ctrlKey && e.keyCode === keyCode.Z) {
-                        self.updateHistoryStep(false);
+                        self.updateHistoryStep(false, false);
                         self.showHistoryStep();
+
+                        if (self.settings.onChangeCallback)
+                            self.settings.onChangeCallback();
+
                         return false;
                     }
 
                     if (e.ctrlKey && e.keyCode === keyCode.Y) {
-                        self.updateHistoryStep(true);
+                        self.updateHistoryStep(true, false);
                         self.showHistoryStep();
+
+                        if (self.settings.onChangeCallback)
+                            self.settings.onChangeCallback();
+
                         return false;
                     }
 
                     if (e.keyCode === keyCode.backspace) {
                         self.obj.find(".emailselector-item:last").remove();
 
-                        self.updateHistoryStep(true, self.getItems());
+                        self.updateHistoryStep(true, true);
 
                         if (self.settings.onChangeCallback)
                             self.settings.onChangeCallback();
@@ -460,7 +489,7 @@
                     }
                 }
             });
-            
+
             self.obj.on("keyup", ".emailselector-hidden-input", function (e) {
                 if (e.keyCode === keyCode.ctrl) {
                     self.ctrlKeyPressed = false;
@@ -487,7 +516,10 @@
                 minLength: 2,
                 delay: 300,
 
-                select: function(event, ui) {
+                select: function (event, ui) {
+                    if (ui.item.name)
+                        ui.item.name = Encoder.htmlDecode(ui.item.name);
+
                     self.addItem([ui.item], true);
                     return false;
                 },
@@ -554,6 +586,7 @@
                 open: function () {
                     var e = jq.Event("keydown", { keyCode: 40 });
                     jq(self.input).trigger(e);
+                    jq(this).autocomplete('widget').css('z-index', 100);
                     return false;
                 }
             });

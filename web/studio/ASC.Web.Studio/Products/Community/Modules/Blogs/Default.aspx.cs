@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,7 +19,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Web;
-using System.Web.UI.WebControls;
 using ASC.Blogs.Core;
 using ASC.Blogs.Core.Domain;
 using ASC.Blogs.Core.Resources;
@@ -40,7 +30,6 @@ using ASC.Web.Core.Utility.Skins;
 using ASC.Web.Studio.Controls.Common;
 using ASC.Web.Studio.Utility;
 using System.Globalization;
-using ASC.Web.Studio.Utility.HtmlUtility;
 
 namespace ASC.Web.Community.Blogs
 {
@@ -89,13 +78,15 @@ namespace ASC.Web.Community.Blogs
             get { return Request.QueryString["search"]; }
         }
 
+        public List<Tuple<Post, int>> PostsAndCommentsCount { get; set; }
+
         #endregion
 
         #region Methods
 
         protected override void PageLoad()
         {
-            
+            PostsAndCommentsCount = new List<Tuple<Post, int>>();
 
             BlogsPageSize = string.IsNullOrEmpty(Request["size"]) ? 20 : Convert.ToInt32(Request["size"]);
             Guid? userId = null;
@@ -132,7 +123,7 @@ namespace ASC.Web.Community.Blogs
                 FillPosts(postsQuery, engine);
             }
 
-            Title = HeaderStringHelper.GetPageTitle(mainContainer.CurrentPageCaption ?? BlogsResource.AddonName);
+            Title = HeaderStringHelper.GetPageTitle(BlogsResource.AddonName);
 
             var jsResource = new StringBuilder();
             jsResource.Append(String.Format("ASC.Community.BlogsJSResource = {{}};ASC.Community.BlogsJSResource.ReadMoreLink = \"{0}\";", BlogsResource.ReadMoreLink));
@@ -186,84 +177,21 @@ namespace ASC.Web.Community.Blogs
                     {
                         ImgSrc = WebImageSupplier.GetAbsoluteWebPath("blog_icon.png", ASC.Blogs.Core.Constants.ModuleId),
                         Header = BlogsResource.EmptyScreenBlogCaption,
-                        Describe = BlogsResource.EmptyScreenBlogText
+                        Describe = currentUser.IsVisitor() ? BlogsResource.EmptyScreenBlogTextVisitor : BlogsResource.EmptyScreenBlogText
                     };
 
                 if (CommunitySecurity.CheckPermissions(new PersonalBlogSecObject(currentUser), ASC.Blogs.Core.Constants.Action_AddPost)
                     && string.IsNullOrEmpty(UserID) && string.IsNullOrEmpty(Search))
                 {
-                    emptyScreenControl.ButtonHTML = String.Format("<a class='link underline blue plus' href='addblog.aspx'>{0}</a>", BlogsResource.EmptyScreenBlogLink);
+                    emptyScreenControl.ButtonHTML = String.Format("<a class='link underline blue plus' href='AddBlog.aspx'>{0}</a>", BlogsResource.EmptyScreenBlogLink);
                 }
 
                 placeContent.Controls.Add(emptyScreenControl);
                 return;
             }
 
-            placeContent.Controls.Add(new Literal {Text = "<div>"});
 
-            var post_with_comments = engine.GetPostsCommentsCount(posts);
-
-            if (!String.IsNullOrEmpty(UserID))
-            {
-                var post = post_with_comments[0].Item1;
-                var st = new StringBuilder();
-
-                st.Append("<div class=\"BlogsHeaderBlock header-with-menu\" style=\"margin-bottom:16px;\">");
-                st.Append("<span class=\"header\">" + CoreContext.UserManager.GetUsers(post.UserID).DisplayUserName() + "</span>");
-                st.Append("</div>");
-
-                placeContent.Controls.Add(new Literal {Text = st.ToString()});
-            }
-
-            for (var i = 0; i < post_with_comments.Count; i++)
-            {
-                var post = post_with_comments[i].Item1;
-                var commentCount = post_with_comments[i].Item2;
-                var sb = new StringBuilder();
-                var user = CoreContext.UserManager.GetUsers(post.UserID);
-
-                sb.Append("<div class=\"container-list\">");
-                sb.Append("<div class=\"header-list\">");
-
-                sb.Append("<div class=\"avatar-list\">");
-                sb.Append("<a href=\"viewblog.aspx?blogid=" + post.ID.ToString() + "\">" + ImageHTMLHelper.GetHTMLUserAvatar(user.ID) + "</a>");
-                sb.Append("</div><div class=\"describe-list\">");
-                sb.Append("<div class=\"title-list\">");
-                sb.Append("<a href=\"viewblog.aspx?blogid=" + post.ID.ToString() + "\">" + HttpUtility.HtmlEncode(post.Title) + "</a>");
-                sb.Append("</div>");
-
-                sb.Append("<div class=\"info-list\">");
-                sb.Append("<span class=\"caption-list\">" + BlogsResource.PostedTitle + ":</span>");
-                sb.Append(user.RenderCustomProfileLink("name-list", "link"));
-                sb.Append("</div>");
-
-                if (String.IsNullOrEmpty(UserID))
-                {
-                    sb.Append("<div class=\"info-list\">");
-                    sb.Append("<a class=\"link gray-text\" href=\"" + VirtualPathUtility.ToAbsolute(ASC.Blogs.Core.Constants.BaseVirtualPath) + "?userid=" + post.UserID + "\">" + BlogsResource.AllRecordsOfTheAutor + "</a>");
-                    sb.Append("</div>");
-                }
-
-                sb.Append("<div class=\"date-list\">");
-                sb.AppendFormat("{0}<span class=\"time-list\">{1}</span>", post.Datetime.ToString("d"), post.Datetime.ToString("t"));
-                sb.Append("</div></div></div>");
-
-                sb.Append("<div class=\"content-list\">");
-               
-                sb.Append(HtmlUtility.GetFull(post.Content, false));
-                sb.Append("<div id=\"postIndividualLink\" class=\"display-none\">viewblog.aspx?blogid=" + post.ID.ToString() + "</div>");               
-                sb.Append("<div class=\"comment-list\">");
-                sb.Append("<a href=\"viewblog.aspx?blogid=" + post.ID + "#comments\">" + BlogsResource.CommentsTitle + ": " + commentCount.ToString() + "</a>");
-                if (!currentUser.IsOutsider())
-                {
-                    sb.Append("<a href=\"viewblog.aspx?blogid=" + post.ID + "#addcomment\">" + BlogsResource.CommentsAddButtonTitle + "</a>");
-                }
-                sb.Append("</div></div></div>");
-
-                placeContent.Controls.Add(new Literal {Text = sb.ToString()});
-            }
-
-            placeContent.Controls.Add(new Literal {Text = "</div>"});
+            PostsAndCommentsCount = engine.GetPostsCommentsCount(posts);
         }
 
         #endregion
@@ -275,7 +203,7 @@ namespace ASC.Web.Community.Blogs
                     PageUrl = string.Format(
                         CultureInfo.CurrentCulture,
                         "{0}?{1}",
-                        VirtualPathUtility.ToAbsolute("~/products/community/modules/blogs/"),
+                        VirtualPathUtility.ToAbsolute("~/Products/Community/Modules/Blogs/"),
                         QueryString("page")
                         //BlogsPageSize
                         ),

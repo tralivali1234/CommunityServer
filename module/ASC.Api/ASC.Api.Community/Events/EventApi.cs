@@ -1,31 +1,23 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using ASC.Api.Attributes;
 using ASC.Api.Collections;
@@ -33,18 +25,16 @@ using ASC.Api.Events;
 using ASC.Api.Exceptions;
 using ASC.Api.Utils;
 using ASC.Core;
+using ASC.Core.Tenants;
+using ASC.Notify.Recipients;
 using ASC.Web.Community.News;
 using ASC.Web.Community.News.Code;
 using ASC.Web.Community.News.Code.DAO;
-using ASC.Web.Community.Product;
 using ASC.Web.Community.News.Code.Module;
-using ASC.Notify.Recipients;
-using ASC.Web.Studio.UserControls.Common.Comments;
-using ASC.Core.Tenants;
-using System.Globalization;
+using ASC.Web.Community.Product;
 using ASC.Web.Core.Users;
+using ASC.Web.Studio.UserControls.Common.Comments;
 using ASC.Web.Studio.Utility;
-using ASC.Web.Community.Blogs;
 using ASC.Web.Studio.Utility.HtmlUtility;
 
 namespace ASC.Api.Community
@@ -100,7 +90,10 @@ namespace ASC.Api.Community
             if (string.IsNullOrWhiteSpace(title))
                 throw new ArgumentException("Can't create feed with empty title", "title");
 
-            var feed = new Web.Community.News.Code.Feed
+            if (type != FeedType.News && type != FeedType.Order && type != FeedType.Advert && type != FeedType.Poll)
+                throw new ArgumentOutOfRangeException(string.Format("Unknown feed type: {0}.", type));
+
+            var feed = new Feed
                            {
                                Caption = title,
                                Text = content,
@@ -114,7 +107,6 @@ namespace ASC.Api.Community
             return new EventWrapperFull(feed);
         }
 
-
         ///<summary>
         ///Updates the selected event changing the event title, content or/and event type specified
         ///</summary>
@@ -124,7 +116,7 @@ namespace ASC.Api.Community
         /// <param name="feedid">Feed ID</param>
         /// <param name="title">Title</param>
         /// <param name="content">Content</param>
-        /// <param name="type">Type</param>
+        /// <param name="type">Type. One of  (News|Order|Advert|Poll)</param>
         ///<returns>List of events</returns>
         ///<category>Events</category>
         [Update("event/{feedid}")]
@@ -134,6 +126,12 @@ namespace ASC.Api.Community
 
             CommunitySecurity.DemandPermissions(feed, NewsConst.Action_Edit);
 
+            if (string.IsNullOrWhiteSpace(title))
+                throw new ArgumentException("Can't update feed with empty title", "title");
+
+            if (type != FeedType.News && type != FeedType.Order && type != FeedType.Advert && type != FeedType.Poll)
+                throw new ArgumentOutOfRangeException(string.Format("Unknown feed type: {0}.", type));
+
             feed.Caption = title;
             feed.Text = content;
             feed.Creator = SecurityContext.CurrentAccount.ID.ToString();
@@ -142,6 +140,34 @@ namespace ASC.Api.Community
             
             return new EventWrapperFull(feed);
         }
+
+        ///<summary>
+        ///Deletes the selected event
+        ///</summary>
+        ///<short>Delete event</short>
+        ///<param name="feedid">Feed ID</param>
+        ///<returns>Nothing</returns>
+        ///<exception cref="ItemNotFoundException"></exception>
+        ///<category>Events</category>
+        [Delete("event/{feedid}")]
+        public EventWrapperFull DeleteEvent(int feedid)
+        {
+            var feed = FeedStorage.GetFeed(feedid).NotFoundIfNull();
+
+            CommunitySecurity.DemandPermissions(feed, NewsConst.Action_Edit);
+
+            foreach (var comment in FeedStorage.GetFeedComments(feedid))
+            {
+                CommonControlsConfigurer.FCKUploadsRemoveForItem("news_comments", comment.Id.ToString(CultureInfo.InvariantCulture));
+            }
+
+            FeedStorage.RemoveFeed(feed);
+
+            CommonControlsConfigurer.FCKUploadsRemoveForItem("news", feedid.ToString(CultureInfo.InvariantCulture));
+
+            return null;
+        }
+
         ///<summary>
         ///Returns the list of all events for the current user with the event titles, date of creation and update, event text and author
         ///</summary>
@@ -400,8 +426,10 @@ namespace ASC.Api.Community
         {
             if (String.IsNullOrEmpty(content)) throw new ArgumentException();
 
-            var comment = new FeedComment(long.Parse(entityid));
-            comment.Comment = content;
+            var comment = new FeedComment(long.Parse(entityid))
+                {
+                    Comment = content
+                };
             var storage = FeedStorageFactory.Create();
             if (!string.IsNullOrEmpty(parentcommentid))
                 comment.ParentId = Convert.ToInt64(parentcommentid);
@@ -440,7 +468,7 @@ namespace ASC.Api.Community
                 TimeStampStr = comment.Date.Ago(),
                 IsRead = true,
                 Inactive = comment.Inactive,
-                CommentBody = comment.Comment,
+                CommentBody = HtmlUtility.GetFull(comment.Comment),
                 UserFullName = DisplayUserSettings.GetFullUserName(new Guid(comment.Creator)),
                 UserProfileLink = CommonLinkUtility.GetUserProfile(comment.Creator),
                 UserAvatarPath = UserPhotoManager.GetBigPhotoURL(new Guid(comment.Creator)),

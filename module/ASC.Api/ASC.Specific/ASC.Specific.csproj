@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ASC.Specific</RootNamespace>
     <AssemblyName>ASC.Specific</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
@@ -32,61 +32,36 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
+    <DebugType>none</DebugType>
     <Optimize>true</Optimize>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <NoWarn>1591</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="HtmlSanitizationLibrary">
-      <HintPath>..\..\..\packages\AntiXSS.4.2.1\lib\net40\HtmlSanitizationLibrary.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="log4net">
-      <HintPath>..\..\..\packages\log4net.2.0.3\lib\net40-client\log4net.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Microsoft.Practices.ServiceLocation">
-      <HintPath>..\..\..\packages\CommonServiceLocator.1.0\lib\NET35\Microsoft.Practices.ServiceLocation.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.Runtime.Serialization">
-      <RequiredTargetFramework>3.0</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.Web" />
-    <Reference Include="System.Web.Abstractions">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.Web.Routing">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-  </ItemGroup>
   <ItemGroup>
     <Compile Include="AntiXssParamInspector.cs" />
     <Compile Include="ApiDateTime.cs" />
     <Compile Include="AscApiConfiguration.cs" />
     <Compile Include="ASCCookieAuthorization.cs" />
     <Compile Include="ASCBasicAuthorization.cs" />
+    <Compile Include="ASCBearerAuthorization.cs" />
     <Compile Include="AuthorizationApi\AuthenticationEntryPoint.cs" />
     <Compile Include="AuthorizationApi\AuthenticationTokenData.cs" />
-    <Compile Include="WarmUpApi\WarnUpEntryPoint.cs" />
+    <Compile Include="CapabilitiesApi\CapabilitiesData.cs" />
+    <Compile Include="CapabilitiesApi\CapabilitiesEntryPoint.cs" />
     <Compile Include="GlobalFilters\ProductSecurityFilter.cs" />
     <Compile Include="IApiSortableDate.cs" />
-    <Compile Include="Log4netLog.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerializationFilters\CustomSerializer.cs" />
+    <Compile Include="WarmupApi\WarmUpEntryPoint.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\common\ASC.ActiveDirectory\ASC.ActiveDirectory.csproj">
+      <Project>{e588e818-f163-470c-802c-3a6e45b36080}</Project>
+      <Name>ASC.ActiveDirectory</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\..\common\ASC.Common\ASC.Common.csproj">
       <Project>{76de7717-3d4b-4a5b-b740-15b8913df0cb}</Project>
       <Name>ASC.Common</Name>
@@ -96,6 +71,10 @@
       <Project>{a51d0454-4afa-46de-89d4-b03d37e1816c}</Project>
       <Name>ASC.Core.Common</Name>
       <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\common\ASC.IPSecurity\ASC.IPSecurity.csproj">
+      <Project>{2FF2177F-2D1A-4396-84EB-51F14FD99385}</Project>
+      <Name>ASC.IPSecurity</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\..\web\core\ASC.Web.Core\ASC.Web.Core.csproj">
       <Project>{02c40a64-fe22-41d0-9037-69f0d6f787a9}</Project>
@@ -127,6 +106,23 @@
       <Name>ASC.Api.Core</Name>
       <Private>False</Private>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AntiXSS">
+      <Version>4.3.0</Version>
+    </PackageReference>
+    <PackageReference Include="GoogleAuthenticator">
+      <Version>1.2.1</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>12.0.3</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Web" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

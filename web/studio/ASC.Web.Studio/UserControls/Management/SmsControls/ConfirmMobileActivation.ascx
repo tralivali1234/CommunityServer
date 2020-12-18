@@ -1,4 +1,5 @@
 ﻿<%@ Control Language="C#" AutoEventWireup="true" CodeBehind="ConfirmMobileActivation.ascx.cs" Inherits="ASC.Web.Studio.UserControls.Management.ConfirmMobileActivation" %>
+<%@ Import Namespace="ASC.Web.Core.Sms" %>
 <%@ Import Namespace="ASC.Web.Studio.Core.SMS" %>
 <%@ Import Namespace="Resources" %>
 
@@ -13,8 +14,10 @@
         <div class="text-base">
             <%= string.IsNullOrEmpty(User.MobilePhone)
                     ? string.Empty
-                    : (string.Format(UserControlsCommonResource.MobileCurrentNumber, "<b>" + "+" + SmsManager.GetPhoneValueDigits(User.MobilePhone) + "</b>") + "<br/>") %>
-            <%= String.Format(UserControlsCommonResource.MobilePhoneDescription, "<br />") %>
+                    : (string.Format(UserControlsCommonResource.MobileCurrentNumber, "<b>" + "+" + SmsSender.GetPhoneValueDigits(User.MobilePhone) + "</b>") + "<br/>") %>
+            <%= StudioSmsNotificationSettings.Enable
+                    ? String.Format(UserControlsCommonResource.MobilePhoneDescription, "<br />")
+                    : string.Empty %>
         </div>
         <br />
         <input type="tel" id="primaryPhone" placeholder="<%= Resource.MobileNewNumber %>" pattern="\+?\d{4,63}" maxlength="64"
@@ -30,20 +33,20 @@
         <div class="text-base">
             <%= String.Format(UserControlsCommonResource.MobileCodeDescription,
                     "<span id=\"phoneNoise\">",
-                    SmsManager.BuildPhoneNoise(User.MobilePhone),
+                    SmsSender.BuildPhoneNoise(User.MobilePhone),
                     "</span>",
                     Resource.ActivateSendButton,
                     Resource.ActivateAgainGetCodeButton,
                     "<br />") %>
         </div>
         <br />
-        <input type="text" id="phoneAuthcode" placeholder="<%= Resource.ActivateCodeLabel %>" pattern="\d{0,<%= SmsKeyStorage.KeyLength %>}" 
+        <input type="text" id="phoneAuthcode" name="phoneAuthcode" placeholder="<%= Resource.ActivateCodeLabel %>" pattern="\d{0,<%= SmsKeyStorage.KeyLength %>}" 
             maxlength="<%= SmsKeyStorage.KeyLength %>" value="" class="pwdLoginTextbox" autofocus autocomplete="off" />
 
         <div class="middle-button-container">
             <a id="sendCodeButton" class="button blue big"><%= Resource.ActivateSendButton %></a>
             <span class="splitter-buttons"></span>
-            <a id="getCodeAgainButton" class="button gray big"><%= Resource.ActivateAgainGetCodeButton %></a>
+            <a id="getCodeAgainButton" class="disable button gray big"><%= Resource.ActivateAgainGetCodeButton %><span></span></a>
         </div>
     </div>
 </div>

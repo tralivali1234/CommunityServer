@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,45 +20,48 @@ window.accountsManager = (function($) {
         accountList = [],
         getAccountsHandler;
 
-    var init = function() {
+    function init() {
         if (isInit === false) {
-            var accounts;
             isInit = true;
 
-            getAccountsHandler = serviceManager.bind(window.Teamlab.events.getAccounts, onGetMailAccounts);
-            serviceManager.bind(window.Teamlab.events.updateMailMailbox, onUpdateMailMailbox);
-            serviceManager.bind(window.Teamlab.events.setMailMailboxState, onSetMailboxState);
-            serviceManager.bind(window.Teamlab.events.updateMailboxSignature, onUpdateMailboxSignature);
-            serviceManager.bind(window.Teamlab.events.updateMailboxAutoreply, onUpdateMailboxAutoreply);
-            serviceManager.bind(window.Teamlab.events.setEMailInFolder, onSetEMailInFolder);
+            var accounts = [];
+
+            getAccountsHandler = window.Teamlab.bind(window.Teamlab.events.getAccounts, onGetMailAccounts);
+            window.Teamlab.bind(window.Teamlab.events.updateMailMailbox, onUpdateMailMailbox);
+            window.Teamlab.bind(window.Teamlab.events.setMailMailboxState, onSetMailboxState);
+            window.Teamlab.bind(window.Teamlab.events.updateMailboxSignature, onUpdateMailboxSignature);
+            window.Teamlab.bind(window.Teamlab.events.updateMailboxAutoreply, onUpdateMailboxAutoreply);
+            window.Teamlab.bind(window.Teamlab.events.setEMailInFolder, onSetEMailInFolder);
 
             accountsModal.init();
             accountsPage.init();
 
             if (ASC.Mail.Presets.Accounts) {
                 var showDisabledAccountToast = false,
-                    showEnabledAutoreply = false,
-                    now = new Date();
-                accounts = $.map(ASC.Mail.Presets.Accounts, function(el) {
-                    el.signature.html = TMMail.htmlDecode(el.signature.html);
-                    el.autoreply.html = TMMail.htmlDecode(el.autoreply.html);
-                    if (!el.enabled && el.authError) {
+                    showEnabledAutoreply = false;
+
+                accounts = $.map(ASC.Mail.Presets.Accounts, function(account) {
+
+                    account.signature.html = TMMail.htmlDecode(account.signature.html);
+                    account.autoreply.html = TMMail.htmlDecode(account.autoreply.html);
+
+                    if (!account.enabled && account.authError) {
                         showDisabledAccountToast = true;
                     }
-                    var toDate = new Date(el.autoreply.toDate),
-                        fromDate = new Date(el.autoreply.fromDate);
-                    if (el.enabled && el.autoreply.turnOn &&
-                        (!el.autoreply.turnOnToDate || toDate > now) && fromDate <= now) {
-                        showEnabledAutoreply = true;
-                    }
-                    return el;
+
+                    if (!showEnabledAutoreply)
+                        showEnabledAutoreply = isAutoreplyEnabled(account);
+
+                    return account;
                 });
+
                 if (showEnabledAutoreply && !TMMail.pageIs('accounts') && !TMMail.pageIs('print')) {
                     window.toastr.info(MailScriptResource.GoToAccountsForChangeAutoreply.format(
                         "<a class=\"mail-autoreply-disable\">" + MailScriptResource.AutoreplyDisable + "</a>",
                         "<a href=\"#accounts\">" + MailResource.AccountsSettingsLabel + "</a>"),
                         MailScriptResource.EnabledAutoreplyNotification,
-                        { "closeButton": false, "timeOut": "0", "extendedTimeOut": "0" });
+                        { "closeButton": true, "timeOut": "0", "extendedTimeOut": "0" });
+
                     $(".mail-autoreply-disable").off("click").on("click", function () {
                         for (var i = 0; i < accounts.length; i++) {
                             var autoreply = accounts[i].autoreply;
@@ -81,11 +75,12 @@ window.accountsManager = (function($) {
                         }
                     });
                 }
+
                 if (showDisabledAccountToast && !TMMail.pageIs('accounts')) {
                     window.toastr.error(MailScriptResource.GoToAccountsOnDeactivationText.format(
                         "<a href=\"#accounts\">" + MailResource.AccountsSettingsLabel + "</a>"),
                         MailScriptResource.DeactivatedAccountsNotification,
-                        { "closeButton": false, "timeOut": "0", "extendedTimeOut": "0" });
+                        { "closeButton": true, "timeOut": "0", "extendedTimeOut": "0" });
                 }
             }
 
@@ -94,15 +89,36 @@ window.accountsManager = (function($) {
             accountsPanel.init();
             accountsPanel.update();
         }
-    };
+    }
 
-    var onGetMailAccounts = function(params, accounts) {
+    function isAutoreplyEnabled(account) {
+        var now = window.moment(new Date()),
+            enabledAutoreply = false;
+
+        var toDate = window.moment(new Date(account.autoreply.toDate)),
+                        fromDate = window.moment(new Date(account.autoreply.fromDate));
+
+        if (toDate.diff(fromDate) === 0) {
+            toDate = toDate.add(1, 'day');
+        }
+
+        if (account.enabled
+            && account.autoreply.turnOn
+            && fromDate.diff(now) <= 0
+            && (!account.autoreply.turnOnToDate || toDate.diff(now) >= 0)) {
+            enabledAutoreply = true;
+        }
+
+        return enabledAutoreply;
+    }
+
+    function onGetMailAccounts(params, accounts) {
         accountsPage.clear();
         initAccounts(accounts);
         accountsPage.loadAccounts(accounts);
-    };
+    }
 
-    var initAccounts = function(accounts) {
+    function initAccounts(accounts) {
         accountList = [];
         $.each(accounts, function(index, value) {
             var account = {
@@ -124,9 +140,9 @@ window.accountsManager = (function($) {
             };
             addAccount(account);
         });
-    };
+    }
 
-    var onUpdateMailMailbox = function(params, account) {
+    function onUpdateMailMailbox(params, account) {
         accountsModal.hide();
 
         var i = getAccountIndexByAddress(account.email);
@@ -156,9 +172,9 @@ window.accountsManager = (function($) {
         if (params.activateOnSuccess) {
             accountsModal.activateAccountWithoutQuestion(account.email);
         }
-    };
+    }
 
-    var removeAccount = function (email) {
+    function removeAccount(email) {
         accountsPage.deleteAccount(email);
         var index = getAccountIndexByAddress(email);
         if (index !== -1) {
@@ -168,11 +184,12 @@ window.accountsManager = (function($) {
         mailBox.markFolderAsChanged(TMMail.sysfolders.inbox.id);
         mailBox.markFolderAsChanged(TMMail.sysfolders.sent.id);
         mailBox.markFolderAsChanged(TMMail.sysfolders.drafts.id);
+        mailBox.markFolderAsChanged(TMMail.sysfolders.templates.id);
         mailBox.markFolderAsChanged(TMMail.sysfolders.trash.id);
         mailBox.markFolderAsChanged(TMMail.sysfolders.spam.id);
-    };
+    }
 
-    var onSetMailboxState = function (params, mailboxId) {
+    function onSetMailboxState(params, mailboxId) {
         var aliases = getAliasesByMailboxId(mailboxId);
         for (var i = 0; i < aliases.length; i++) {
             enableMailbox(aliases[i].email, params.enabled);
@@ -196,7 +213,7 @@ window.accountsManager = (function($) {
         if (params.onSuccessOperationCallback && $.isFunction(params.onSuccessOperationCallback)) {
             params.onSuccessOperationCallback.call();
         }
-    };
+    }
 
     function enableMailbox(email, enabled) {
         accountsPage.activateAccount(email, enabled);
@@ -208,7 +225,7 @@ window.accountsManager = (function($) {
         }
     }
 
-    var onUpdateMailboxSignature = function(params, signature) {
+    function onUpdateMailboxSignature(params, signature) {
         accountsModal.hide();
         var account = window.accountsManager.getAccountById(params.id);
         if (account) {
@@ -218,9 +235,9 @@ window.accountsManager = (function($) {
         for (var i = 0; i < aliases.length; i++) {
             aliases[i].signature = signature;
         }
-    };
+    }
 
-    var onUpdateMailboxAutoreply = function (params, autoreply) {
+    function onUpdateMailboxAutoreply(params, autoreply) {
         accountsModal.hide();
         var account = window.accountsManager.getAccountById(params.id);
         if (account) {
@@ -232,9 +249,9 @@ window.accountsManager = (function($) {
             aliases[i].autoreply = autoreply;
             accountsModal.refreshAccount(aliases[i].email, aliases[i].enabled);
         }
-    };
+    }
 
-    var onSetEMailInFolder = function(params) {
+    function onSetEMailInFolder(params) {
         accountsModal.hide();
         var account = getAccountById(params.id);
         account.emailInFolder = params.emailInFolder;
@@ -244,13 +261,13 @@ window.accountsManager = (function($) {
         } else {
             window.toastr.success(window.MailScriptResource.SetAccountEMailInFolderSuccess);
         }
-    };
+    }
 
-    var getAccountList = function() {
+    function getAccountList() {
         return accountList;
-    };
+    }
 
-    var setDefaultAccount = function(email, setDefault) {
+    function setDefaultAccount(email, setDefault) {
         var emailToLowerCase = email.toLowerCase(),
             currentAccount;
 
@@ -263,14 +280,14 @@ window.accountsManager = (function($) {
         }
 
         accountsPanel.update();
-    };
+    }
 
-    var getDefaultAccount = function () {
+    function getDefaultAccount() {
         var defaultAccounts = jq.grep(accountList, function (a) { return a.is_default === true });
         return defaultAccounts.length !== 0 ? defaultAccounts[0] : accountList[0];
-    };
+    }
 
-    var getAccountIndexByAddress = function (email) {
+    function getAccountIndexByAddress(email) {
         var index = -1;
         for (var i = 0; i < accountList.length; i++) {
             if (accountList[i].email == email.toLowerCase()) {
@@ -279,18 +296,18 @@ window.accountsManager = (function($) {
             }
         }
         return index;
-    };
+    }
 
-    var getAccountByAddress = function(email) {
+    function getAccountByAddress(email) {
         var mailBox = null;
         var i = getAccountIndexByAddress(email);
         if (i > -1) {
             mailBox = accountList[i];
         }
         return mailBox;
-    };
+    }
 
-    var getAccountById = function(id) {
+    function getAccountById(id) {
         var mailBox = null;
         for (var i = 0; i < accountList.length; i++) {
             if (accountList[i].mailbox_id == id && !accountList[i].is_group && !accountList[i].is_alias) {
@@ -299,9 +316,9 @@ window.accountsManager = (function($) {
             }
         }
         return mailBox;
-    };
+    }
 
-    var getAliasesByMailboxId = function(id) {
+    function getAliasesByMailboxId(id) {
         var aliases = [];
         for (var i = 0; i < accountList.length; i++) {
             if (accountList[i].mailbox_id == id && accountList[i].is_alias) {
@@ -309,9 +326,9 @@ window.accountsManager = (function($) {
             }
         }
         return aliases;
-    };
+    }
 
-    var addAccount = function(account) {
+    function addAccount(account) {
         account.email = account.email.toLowerCase();
         for (var i = 0; i < accountList.length; i++) {
             if (accountList[i].email == account.email) {
@@ -320,7 +337,7 @@ window.accountsManager = (function($) {
         }
         accountList.push(account);
         contactsManager.init();
-    };
+    }
 
     function any() {
         return accountList.length > 0;
@@ -336,7 +353,8 @@ window.accountsManager = (function($) {
         addAccount: addAccount,
         any: any,
         enableMailbox: enableMailbox,
-        removeAccount: removeAccount
+        removeAccount: removeAccount,
+        isAutoreplyEnabled: isAutoreplyEnabled
     };
 
 })(jQuery);

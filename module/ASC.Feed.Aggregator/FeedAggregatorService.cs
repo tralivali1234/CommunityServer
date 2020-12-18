@@ -1,31 +1,30 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Web;
+
 using ASC.Common.Caching;
 using ASC.Common.Data;
+using ASC.Common.Logging;
 using ASC.Common.Web;
 using ASC.Core;
 using ASC.Core.Notify.Signalr;
@@ -39,21 +38,14 @@ using ASC.Feed.Data;
 using ASC.Projects.Core.Services.NotifyService;
 using ASC.Web.Core;
 using ASC.Web.Studio.Utility;
-using log4net;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Web;
+
 
 namespace ASC.Feed.Aggregator
 {
     public class FeedAggregatorService
     {
         private static readonly ILog log = LogManager.GetLogger("ASC.Feed.Agregator");
-        private static readonly SignalrServiceClient signalrServiceClient = new SignalrServiceClient();
+        private static readonly SignalrServiceClient signalrServiceClient = new SignalrServiceClient("counters");
 
         public static readonly List<IFeedModule> Modules = new List<IFeedModule>
             {
@@ -124,7 +116,7 @@ namespace ASC.Feed.Aggregator
                 var start = DateTime.UtcNow;
                 log.DebugFormat("Start of collecting feeds...");
 
-                Dictionary<int, HashSet<Guid>> unreadUsers = new Dictionary<int, HashSet<Guid>>();
+                var unreadUsers = new Dictionary<int, Dictionary<Guid, int>>();
 
                 foreach (var module in Modules)
                 {
@@ -154,7 +146,7 @@ namespace ASC.Feed.Aggregator
                             }
 
                             CoreContext.TenantManager.SetCurrentTenant(tenant);
-                            
+                            var users = CoreContext.UserManager.GetUsers();
                             // fake httpcontext break configuration manager for mono
                             if (!WorkContext.IsMono)
                             {
@@ -163,45 +155,34 @@ namespace ASC.Feed.Aggregator
                                 new HttpResponse(new StringWriter()));
                             }
 
-                            var feeds = Attempt(10, () => module.GetFeeds(new FeedFilter(fromTime, toTime) {Tenant = tenant}));
-                            log.DebugFormat("{0} feeds in {1} tenant.", feeds.Count(), tenant);
-                            foreach (var tuple in feeds)
-                            {
-                                if (tuple.Item1 == null) continue;
+                            var feeds = Attempt(10, () => module.GetFeeds(new FeedFilter(fromTime, toTime) {Tenant = tenant}).Where(r=> r.Item1 != null).ToList());
+                            log.DebugFormat("{0} feeds in {1} tenant.", feeds.Count, tenant);
 
-                                var r = new FeedRow
-                                    {
-                                        Id = tuple.Item1.Id,
-                                        ClearRightsBeforeInsert = tuple.Item1.Variate,
-                                        Tenant = tenant,
-                                        ProductId = module.Product,
-                                        ModuleId = tuple.Item1.Module,
-                                        AuthorId = tuple.Item1.AuthorId,
-                                        ModifiedById = tuple.Item1.ModifiedBy,
-                                        CreatedDate = tuple.Item1.CreatedDate,
-                                        ModifiedDate = tuple.Item1.ModifiedDate,
-                                        GroupId = tuple.Item1.GroupId,
-                                        Json = JsonConvert.SerializeObject(tuple.Item1, new JsonSerializerSettings
-                                            {
-                                                DateTimeZoneHandling = DateTimeZoneHandling.Utc
-                                            }),
-                                        Keywords = tuple.Item1.Keywords
-                                    };
-
-                                foreach (var u in CoreContext.UserManager.GetUsers())
+                            var tenant1 = tenant;
+                            var module1 = module;
+                            var feedsRow = feeds
+                                .Select(tuple => new Tuple<FeedRow, object>(new FeedRow(tuple.Item1)
                                 {
-                                    if (isStopped)
-                                    {
-                                        return;
-                                    }
-                                    if (TryAuthenticate(u.ID) && module.VisibleFor(tuple.Item1, tuple.Item2, u.ID))
-                                    {
-                                        r.Users.Add(u.ID);
-                                    }
+                                    Tenant = tenant1,
+                                    ProductId = module1.Product
+                                }, tuple.Item2))
+                                .ToList();
+
+                            foreach (var u in users)
+                            {
+                                if (isStopped)
+                                {
+                                    return;
+                                }
+                                if (!TryAuthenticate(u.ID))
+                                {
+                                    continue;
                                 }
 
-                                result.Add(r);
+                                module.VisibleFor(feedsRow, u.ID);
                             }
+
+                            result.AddRange(feedsRow.Select(r=> r.Item1));
                         }
                         catch (Exception ex)
                         {
@@ -225,15 +206,23 @@ namespace ASC.Feed.Aggregator
 
                     foreach(var res in result)
                     {
-                        foreach (var userGuid in res.Users)
+                        foreach (var userGuid in res.Users.Where(userGuid => !userGuid.Equals(res.ModifiedById)))
                         {
-                            HashSet<Guid> hashSet;
-                            if (!unreadUsers.TryGetValue(res.Tenant, out hashSet))
+                            Dictionary<Guid, int> dictionary;
+                            if (!unreadUsers.TryGetValue(res.Tenant, out dictionary))
                             {
-                                hashSet = new HashSet<Guid>();
+                                dictionary = new Dictionary<Guid, int>();
                             }
-                            hashSet.Add(userGuid);
-                            unreadUsers[res.Tenant] = hashSet;
+                            if (dictionary.ContainsKey(userGuid))
+                            {
+                                ++dictionary[userGuid];
+                            }
+                            else
+                            {
+                                dictionary.Add(userGuid, 1);
+                            }
+
+                            unreadUsers[res.Tenant] = dictionary;
                         }
                     }
                 }

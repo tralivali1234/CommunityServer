@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -34,7 +25,6 @@ using ASC.Core.Data;
 using ASC.Core.Security.Authentication;
 using ASC.Core.Tenants;
 using ASC.Core.Users;
-using ASC.Security.Cryptography;
 
 namespace ASC.Core
 {
@@ -45,6 +35,7 @@ namespace ASC.Core
         private readonly IQuotaService quotaService;
         private readonly ITariffService tariffService;
         private readonly TenantManager clientTenantManager;
+        private readonly DbSettingsManager settingsManager;
 
         public string Region
         {
@@ -71,13 +62,14 @@ namespace ASC.Core
             quotaService = new DbQuotaService(connectionString);
             tariffService = new TariffService(connectionString, quotaService, tenantService);
             clientTenantManager = new TenantManager(tenantService, quotaService, tariffService);
+            settingsManager = new DbSettingsManager(connectionString);
             Region = region ?? string.Empty;
             DbId = connectionString.Name;
         }
 
         public List<Tenant> GetTenants(DateTime from)
         {
-            return tenantService.GetTenants(from).Select(t => AddRegion(t)).ToList();
+            return tenantService.GetTenants(from).Select(AddRegion).ToList();
         }
 
         public List<Tenant> FindTenants(string login)
@@ -85,14 +77,13 @@ namespace ASC.Core
             return FindTenants(login, null);
         }
 
-        public List<Tenant> FindTenants(string login, string password)
+        public List<Tenant> FindTenants(string login, string passwordHash)
         {
-            var hash = !string.IsNullOrEmpty(password) ? Hasher.Base64Hash(password, HashAlg.SHA256) : null;
-            if (hash != null && userService.GetUser(Tenant.DEFAULT_TENANT, login, hash) == null)
+            if (!string.IsNullOrEmpty(passwordHash) && userService.GetUserByPasswordHash(Tenant.DEFAULT_TENANT, login, passwordHash) == null)
             {
                 throw new SecurityException("Invalid login or password.");
             }
-            return tenantService.GetTenants(login, hash).Select(t => AddRegion(t)).ToList();
+            return tenantService.GetTenants(login, passwordHash).Select(AddRegion).ToList();
         }
 
         public Tenant GetTenant(String domain)
@@ -120,7 +111,9 @@ namespace ASC.Core
             if (string.IsNullOrEmpty(ri.Email)) throw new Exception("Account email can not be empty");
             if (ri.FirstName == null) throw new Exception("Account firstname can not be empty");
             if (ri.LastName == null) throw new Exception("Account lastname can not be empty");
-            if (string.IsNullOrEmpty(ri.Password)) ri.Password = Crypto.GeneratePassword(6);
+            if (!UserFormatter.IsValidUserName(ri.FirstName, ri.LastName)) throw new Exception("Incorrect firstname or lastname");
+
+            if (string.IsNullOrEmpty(ri.PasswordHash)) ri.PasswordHash = Guid.NewGuid().ToString();
 
             // create tenant
             tenant = new Tenant(ri.Address.ToLowerInvariant())
@@ -131,13 +124,16 @@ namespace ASC.Core
                 HostedRegion = ri.HostedRegion,
                 PartnerId = ri.PartnerId,
                 AffiliateId = ri.AffiliateId,
-                Industry = ri.Industry
+                Campaign = ri.Campaign,
+                Industry = ri.Industry,
+                Spam = ri.Spam,
+                Calls = ri.Calls
             };
 
             tenant = tenantService.SaveTenant(tenant);
 
             // create user
-            var user = new UserInfo()
+            var user = new UserInfo
             {
                 UserName = ri.Email.Substring(0, ri.Email.IndexOf('@')),
                 LastName = ri.LastName,
@@ -148,12 +144,15 @@ namespace ASC.Core
                 ActivationStatus = ri.ActivationStatus
             };
             user = userService.SaveUser(tenant.TenantId, user);
-            userService.SetUserPassword(tenant.TenantId, user.ID, ri.Password);
+            userService.SetUserPasswordHash(tenant.TenantId, user.ID, ri.PasswordHash);
             userService.SaveUserGroupRef(tenant.TenantId, new UserGroupRef(user.ID, Constants.GroupAdmin.ID, UserGroupRefType.Contains));
 
             // save tenant owner
             tenant.OwnerId = user.ID;
             tenant = tenantService.SaveTenant(tenant);
+
+            settingsManager.SaveSettings(new TenantAnalyticsSettings { Analytics = ri.Analytics }, tenant.TenantId);
+            settingsManager.SaveSettings(new TenantControlPanelSettings { LimitedAccess = ri.LimitedControlPanel }, tenant.TenantId);
         }
 
         public Tenant SaveTenant(Tenant tenant)
@@ -166,19 +165,20 @@ namespace ASC.Core
             tenantService.RemoveTenant(tenant.TenantId);
         }
 
-        public string CreateAuthenticationCookie(int tenantId, string login, string password)
-        {
-            var passwordhash = Hasher.Base64Hash(password, HashAlg.SHA256);
-            var u = userService.GetUser(tenantId, login, passwordhash);
-            return u != null ? CookieStorage.EncryptCookie(tenantId, u.ID, login, passwordhash) : null;
-        }
-
         public string CreateAuthenticationCookie(int tenantId, Guid userId)
         {
             var u = userService.GetUser(tenantId, userId);
-            var password = userService.GetUserPassword(tenantId, userId);
-            var passwordhash = Hasher.Base64Hash(password, HashAlg.SHA256);
-            return u != null ? CookieStorage.EncryptCookie(tenantId, userId, u.Email, passwordhash) : null;
+            return CreateAuthenticationCookie(tenantId, u);
+        }
+
+        private string CreateAuthenticationCookie(int tenantId, UserInfo user)
+        {
+            if (user == null) return null;
+
+            var tenantSettings = settingsManager.LoadSettingsFor<TenantCookieSettings>(tenantId, Guid.Empty);
+            var expires = tenantSettings.IsDefault() ? DateTime.UtcNow.AddYears(1) : DateTime.UtcNow.AddMinutes(tenantSettings.LifeTime);
+            var userSettings = settingsManager.LoadSettingsFor<TenantCookieSettings>(tenantId, user.ID);
+            return CookieStorage.EncryptCookie(tenantId, user.ID, tenantSettings.Index, expires, userSettings.Index);
         }
 
         public Tariff GetTariff(int tenant, bool withRequestToPaymentSystem = true)
@@ -189,6 +189,11 @@ namespace ASC.Core
         public TenantQuota GetTenantQuota(int tenant)
         {
             return clientTenantManager.GetTenantQuota(tenant);
+        }
+
+        public IEnumerable<TenantQuota> GetTenantQuotas()
+        {
+            return clientTenantManager.GetTenantQuotas();
         }
 
         public TenantQuota SaveTenantQuota(TenantQuota quota)

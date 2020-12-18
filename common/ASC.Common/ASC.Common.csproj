@@ -9,7 +9,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>ASC.Common</RootNamespace>
     <AssemblyName>ASC.Common</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <UpgradeBackupLocation>
@@ -34,59 +34,8 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="HtmlSanitizationLibrary">
-      <HintPath>..\..\packages\AntiXSS.4.3.0\lib\net40\HtmlSanitizationLibrary.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework">
-      <HintPath>..\..\packages\Microsoft.VisualStudio.QualityTools.UnitTestFramework.11.0.50727.1\Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="StackExchange.Redis">
-      <HintPath>..\..\packages\StackExchange.Redis.10.0.0.0\lib\net45\StackExchange.Redis.dll</HintPath>
-    </Reference>
-    <Reference Include="StackExchange.Redis.Extensions.Core">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\StackExchange.Redis.Extensions.Core.1.3.5.0\lib\net45\StackExchange.Redis.Extensions.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Core">
-      <HintPath>C:\Windows\Microsoft.NET\Framework\v4.0.30319\System.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Data" />
-    <Reference Include="System.Linq">
-      <HintPath>C:\Windows\Microsoft.NET\Framework\v4.0.30319\System.Linq.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Runtime.Caching" />
-    <Reference Include="System.Runtime.Serialization">
-      <HintPath>C:\Windows\Microsoft.NET\Framework\v4.0.30319\System.Runtime.Serialization.dll</HintPath>
-    </Reference>
-    <Reference Include="System.ServiceModel">
-      <HintPath>C:\Windows\Microsoft.NET\Framework\v4.0.30319\System.ServiceModel.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web" />
-    <Reference Include="System.Web.Extensions">
-      <HintPath>C:\Windows\Microsoft.NET\Framework\v4.0.30319\System.Web.Extensions.dll</HintPath>
-    </Reference>
-    <Reference Include="HtmlAgilityPack">
-      <HintPath>..\..\packages\HtmlAgilityPack.1.3.9.2\lib\net20\HtmlAgilityPack.dll</HintPath>
-    </Reference>
-    <Reference Include="log4net">
-      <HintPath>..\..\packages\log4net.2.0.3\lib\net40-client\log4net.dll</HintPath>
-    </Reference>
-    <Reference Include="NVelocity">
-      <HintPath>..\..\packages\NVelocity.1.0.3\lib\NVelocity.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Xml" />
-    <Reference Include="System.Xml.Linq" />
-  </ItemGroup>
   <ItemGroup>
     <Compile Include="Caching\AscCache.cs" />
     <Compile Include="Caching\CacheNotifyAction.cs" />
@@ -95,8 +44,12 @@
     <Compile Include="Caching\RedisCache.cs" />
     <Compile Include="Collections\CachedDictionaryBase.cs" />
     <Compile Include="Collections\HttpRequestDictionary.cs" />
-    <Compile Include="Data\AdoProxy\DbCommandProxy.cs" />
-    <Compile Include="Data\AdoProxy\DbConnectionProxy.cs" />
+    <Compile Include="Data\AdoProxy\DbCommandProxy.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Data\AdoProxy\DbConnectionProxy.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Data\AdoProxy\DbTransactionProxy.cs" />
     <Compile Include="Data\AdoProxy\ExecuteHelper.cs" />
     <Compile Include="Data\AdoProxy\ProxyContext.cs" />
@@ -108,6 +61,8 @@
     <Compile Include="Data\DbTransaction.cs" />
     <Compile Include="Data\IDbManager.cs" />
     <Compile Include="Data\MultiRegionalDbManager.cs" />
+    <Compile Include="Data\Sql\Expressions\SumExp.cs" />
+    <Compile Include="Data\Sql\Expressions\IfExp.cs" />
     <Compile Include="Data\Sql\SqlDebugView.cs" />
     <Compile Include="Data\Sql\Dialects\SQLiteDialect.cs" />
     <Compile Include="Data\Sql\Dialects\MySQLDialect.cs" />
@@ -132,8 +87,25 @@
     <Compile Include="Data\Sql\SqlInsert.cs" />
     <Compile Include="Data\Sql\SqlQuery.cs" />
     <Compile Include="Data\Sql\SqlUpdate.cs" />
+    <Compile Include="Data\StreamExtension.cs" />
+    <Compile Include="Data\TempStream.cs" />
+    <Compile Include="DependencyInjection\AutofacConfigLoader.cs" />
+    <Compile Include="DependencyInjection\AutofacConfigurationSection.cs" />
+    <Compile Include="DependencyInjection\ComponentElement.cs" />
+    <Compile Include="DependencyInjection\ContainerElementCollection.cs" />
+    <Compile Include="DependencyInjection\ConfigurationElementCollection.cs" />
+    <Compile Include="DependencyInjection\DictionaryElementCollection.cs" />
+    <Compile Include="DependencyInjection\ListElementCollection.cs" />
+    <Compile Include="DependencyInjection\ListItemElement.cs" />
+    <Compile Include="DependencyInjection\NamedConfigurationElementCollection.cs" />
+    <Compile Include="DependencyInjection\ParameterElement.cs" />
+    <Compile Include="DependencyInjection\ParameterElementCollection.cs" />
+    <Compile Include="DependencyInjection\TypeManipulation.cs" />
     <Compile Include="Geolocation\IPGeolocationInfo.cs" />
     <Compile Include="Geolocation\GeolocationHelper.cs" />
+    <Compile Include="Logging\SelfCleaningTarget.cs" />
+    <Compile Include="Logging\Log.cs" />
+    <Compile Include="Logging\SelfCleaningAppender.cs" />
     <Compile Include="Logging\SpecialFolderPathConverter.cs" />
     <Compile Include="Module\BaseWcfClient.cs" />
     <Compile Include="Module\IServiceController.cs" />
@@ -199,6 +171,7 @@
     <Compile Include="Security\Authorizing\AzObjectSecurityProviderHelper.cs" />
     <Compile Include="Security\Cryptography\InstanceCrypto.cs" />
     <Compile Include="Security\Cryptography\MachinePseudoKeys.cs" />
+    <Compile Include="Security\Cryptography\PasswordHasher.cs" />
     <Compile Include="Security\ISecurityObject.cs" />
     <Compile Include="Security\SecurityCallContext.cs" />
     <Compile Include="Security\SecurityObjectId.cs" />
@@ -224,20 +197,6 @@
     <Compile Include="Security\IRoleProvider.cs" />
     <Compile Include="Security\ISecurityObjectId.cs" />
     <Compile Include="Security\ISecurityObjectProvider.cs" />
-    <Compile Include="Tests\Data\MultiRegionalDbTest.cs" />
-    <Compile Include="Tests\Data\DataTest.cs" />
-    <Compile Include="Tests\Data\ExpTest.cs" />
-    <Compile Include="Tests\Geolocation\GeolocationTest.cs" />
-    <Compile Include="Tests\Logging\ConvertTest.cs" />
-    <Compile Include="Tests\Notify\XmlPatternProvider2Test.cs" />
-    <Compile Include="Tests\Security\Authorizing\AzManagerTest.cs" />
-    <Compile Include="Tests\Security\Authorizing\Class1.cs" />
-    <Compile Include="Tests\Security\Authorizing\Domain.cs" />
-    <Compile Include="Tests\Security\Authorizing\DomainStub.cs" />
-    <Compile Include="Tests\Security\Cryptography\Hasher_Test.cs" />
-    <Compile Include="Tests\Utils\HtmlUtil_Test.cs" />
-    <Compile Include="Tests\Utils\MimeHeaderUtilsTest.cs" />
-    <Compile Include="Tests\Web\MimeMappingTest.cs" />
     <Compile Include="Threading\DistributedTaskStatus.cs" />
     <Compile Include="Threading\DistributedTask.cs" />
     <Compile Include="Threading\LimitedConcurrencyLevelTaskScheduler.cs" />
@@ -245,9 +204,12 @@
     <Compile Include="Threading\Progress\ProgressBase.cs" />
     <Compile Include="Threading\Progress\ProgressQueue.cs" />
     <Compile Include="Threading\DistributedTaskQueue.cs" />
+    <Compile Include="Utils\ConfigurationManagerExtension.cs" />
+    <Compile Include="Utils\DnsLookup.cs" />
     <Compile Include="Utils\HttpRequestExtensions.cs" />
     <Compile Include="Utils\MailAddressUtils.cs" />
     <Compile Include="Utils\MimeHeaderUtils.cs" />
+    <Compile Include="Utils\RandomString.cs" />
     <Compile Include="Utils\TimeZoneConverter\TimeZoneConverter.cs" />
     <Compile Include="Utils\Signature.cs" />
     <Compile Include="Utils\VelocityFormatter.cs" />
@@ -262,10 +224,66 @@
     <Compile Include="Web\RouteCallInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Tests\App.config" />
+    <EmbeddedResource Include="Utils\TimeZoneConverter\windowsZones.xml" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Utils\TimeZoneConverter\windowsZones.xml" />
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Utils\TimeZoneConverter\timeZoneNames.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ARSoft.Tools.Net">
+      <Version>2.2.9</Version>
+    </PackageReference>
+    <PackageReference Include="Autofac">
+      <Version>5.1.2</Version>
+    </PackageReference>
+    <PackageReference Include="HtmlAgilityPack">
+      <Version>1.6.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="log4net">
+      <Version>2.0.8</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Cryptography.KeyDerivation">
+      <Version>3.1.4</Version>
+    </PackageReference>
+    <PackageReference Include="MySql.Data">
+      <Version>8.0.19</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>12.0.3</Version>
+    </PackageReference>
+    <PackageReference Include="NLog">
+      <Version>4.7.0</Version>
+    </PackageReference>
+    <PackageReference Include="NVelocity">
+      <Version>1.2.0</Version>
+    </PackageReference>
+    <PackageReference Include="StackExchange.Redis">
+      <Version>2.0.519</Version>
+    </PackageReference>
+    <PackageReference Include="StackExchange.Redis.Extensions.LegacyConfiguration">
+      <Version>4.0.5</Version>
+    </PackageReference>
+    <PackageReference Include="System.Buffers">
+      <Version>4.5.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Memory">
+      <Version>4.5.3</Version>
+    </PackageReference>
+    <PackageReference Include="Ubiety.Dns.Core">
+      <Version>2.4.1</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Runtime.Caching" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

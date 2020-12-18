@@ -1,4 +1,21 @@
-﻿String.prototype.format = function () {
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
+String.prototype.format = function () {
   if (arguments.length === 0) {
     return '';
   }
@@ -80,7 +97,25 @@ window.ASC.TMTalk.sounds = (function () {
     isEnabled = null,
     soundsContainer = null;
 
-  var init = function (o) {
+    var initHtml = function() {
+        var o = document.createElement('div'),
+            soundsContainerId = 'talkHtmlSoundsContainer';
+        o.setAttribute('id', soundsContainerId);
+        
+        for (var i = 0; i < ASC.TMTalk.Config.soundsHtml.length; i++) {
+            var audioFindName = ASC.TMTalk.Config.soundsHtml[i].match(/\/\w+\./g);
+            if (audioFindName.length > 0) {
+                var audio = document.createElement('audio');
+                var audioName = audioFindName[audioFindName.length - 1].substring(1, audioFindName[audioFindName.length - 1].length - 1);
+                
+                audio.setAttribute('id', audioName);
+                audio.setAttribute('src', ASC.TMTalk.Config.soundsHtml[i]);
+                o.appendChild(audio);
+            }
+        }
+        document.getElementById('talkWrapper').appendChild(o);
+    };
+    var init = function (o) {
     if (typeof o === 'string') {
       o = document.getElementById(o);
     }
@@ -88,21 +123,27 @@ window.ASC.TMTalk.sounds = (function () {
       return null;
     }
     soundsContainer = o;
-    if (isEnabled === null && ASC.TMTalk.flashPlayer.isCorrect) {
+    if (isEnabled === null) {
       isEnabled = true;
     }
   };
 
-  var play = function (soundname) {
+    var play = function (soundname) {
     if (isEnabled === true && typeof soundname === 'string') {
-      try { soundsContainer.playSound(soundname) } catch (err) { }
+        var sound = document.getElementById(soundname + 'sound');
+        if (sound != null) {
+            try {
+                sound.play().catch(function (e) {
+                    console.log(e.message);
+                });
+            } catch(e) {}
+        }
+        //try { soundsContainer.playSound(soundname) } catch (err) { }
     }
   };
 
   var enable = function () {
-    if (ASC.TMTalk.flashPlayer.isCorrect) {
       isEnabled = true;
-    }
   };
 
   var disable = function () {
@@ -110,7 +151,8 @@ window.ASC.TMTalk.sounds = (function () {
   };
 
   var supported = function () {
-    return ASC.TMTalk.flashPlayer.isCorrect;
+      return true;
+      //return ASC.TMTalk.flashPlayer.isCorrect;
   };
 
   return {
@@ -119,6 +161,8 @@ window.ASC.TMTalk.sounds = (function () {
     init  : init,
     play  : play,
 
+    initHtml: initHtml,
+    
     enable  : enable,
     disable : disable
   };
@@ -246,6 +290,13 @@ window.ASC.TMTalk.properties = (function () {
     var oldvalue = properties[name] || '';
     properties[name] = value;
     if (inStorage === true) {
+        if (jQuery.isEmptyObject(storage) && ASC.TMTalk.cookies.get(cookieName)) {
+            var cookieProperty = ASC.TMTalk.cookies.get(cookieName).split(propertySeparator);
+            for (var i = 0; i < cookieProperty.length; i++) {
+                var field = cookieProperty[i].split(fieldSeparator);
+                storage[field[0]] = field[1];
+            }
+        }
       storage[name] = value;
       save();
     }
@@ -487,7 +538,11 @@ window.ASC.TMTalk.dragMaster = (function () {
   var execEvent = function (eventType, thisArg, argsArray) {
     thisArg = thisArg || window;
     argsArray = argsArray || [];
-
+    if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+    } else {
+        document.selection.empty();
+    }
     switch (eventType.toLowerCase()) {
       case 'ondrag' :
         if (typeof onDrop === 'function') {
@@ -1308,22 +1363,27 @@ window.ASC.TMTalk.notifications  = (function () {
       if (isDisabled) {
           return;
       }
-      jQuery.notification({
-          title: title,
-          body: content,
-          tag: marker,
-          timeout: 10000,
-          iconUrl: window.ASC.TMTalk.Resources.iconTeamlabOffice32
-      }).then(function (notification) {
-          if (notification !== null) {
-              notifications.push({ marker: marker, handler: notification });
-              notification.onclick = function () {
-                  getNotificationsClickCallback(marker);
-                  notification.close();
-              };
+      Teamlab.getProfile({}, marker.split("@")[0], {
+          success: function (params, data) {
+              jQuery.notification({
+                  title: title,
+                  body: content,
+                  tag: marker,
+                  timeout: 10000,
+                  //iconUrl: window.ASC.TMTalk.Resources.iconTeamlabOffice32
+                  iconUrl: location.origin + data.avatar
+              }).then(function (notification) {
+                  if (notification !== null) {
+                      notifications.push({ marker: marker, handler: notification });
+                      notification.onclick = function () {
+                          getNotificationsClickCallback(marker);
+                          notification.close();
+                      };
+                  }
+              }, function () {
+                  console.error('Rejected!');
+              });
           }
-      }, function () {
-          console.error('Rejected!');
       });
   };
 
@@ -1341,23 +1401,138 @@ window.ASC.TMTalk.notifications  = (function () {
           }
       }
   };
-
   var enable = function () {
-      if (window.Notification) {
-          jq.notification.requestPermission(function () {
-              if (jq.notification.permissionLevel() != "denied") {
-                  isDisabled = false;
-                  ASC.TMTalk.properties.item(propertyName, "1", true);
-              }
-          });
+      //Defer subscription
+      if (jq('#talkStatusMenu').hasClass('processing')) {
+          setTimeout(enable, 100);
+          return;
       }
-  };
+      if (window.Notification) {
+          try {
+              var messaging = window.firebase.messaging();
+              messaging.requestPermission()
+                  .then(function() {
+                      if (Notification.permission != 'denied') {
+                          isDisabled = false;
+                          ASC.TMTalk.properties.item(propertyName, "1", true);
+                          jq('#button-browser-notification').addClass('on').removeClass('off');
+                      }
+                      return messaging.getToken();
+                  })
+                  .then(function(token) {
+                      var browser = getBrowser();
+                      var username = ASC.TMTalk.connectionManager.getJID();
+                      username = username.split('@')[0];
+                      var endpoint = token;
+                      ASC.TMTalk.connectionManager.savePushEndpoint(username, endpoint, browser);
+                  })
+                  .catch(function(err) {
+                      console.log("Permission error:", err);
+                  });
+          } catch(exp) {
+              Notification.requestPermission()
+                 .then(function () {
+                     if (Notification.permission === 'denied') {
+                         return;
+                     }
+                     isDisabled = false;
+                     ASC.TMTalk.properties.item(propertyName, "1", true);
+                     jq('#button-browser-notification').addClass('on').removeClass('off');
+                 });
+          }
+        }
+    };
 
-  var disable = function () {
-    isDisabled = true;
-    ASC.TMTalk.properties.item(propertyName, "0", true);
-  };
+    var getBrowser = function() { 
+       
+        var is_chrome = navigator.userAgent.indexOf('Chrome') > -1;
+        var is_explorer = navigator.userAgent.indexOf('MSIE') > -1;
+        var is_firefox = navigator.userAgent.indexOf('Firefox') > -1;
+        var is_safari = navigator.userAgent.indexOf("Safari") > -1;
+        var is_opera = navigator.userAgent.toLowerCase().indexOf("opr") > -1;
 
+        if ((is_chrome) && (is_safari) && (is_opera)) {
+            return 'Opera';
+        }
+        else if ((is_chrome) && (is_safari)) {
+            return 'Google Chrome';
+        } else if ((is_safari)) {
+            return 'Safari';
+        } else if (is_firefox) {
+            return 'Firefox';
+        } else if (is_explorer) {
+            return 'Internet Explorer';
+        }
+        
+        return "Unknown browser";
+    };
+    
+    var disable = function () {
+        isDisabled = true;
+        ASC.TMTalk.properties.item(propertyName, "0", true);
+        if ('serviceWorker' in navigator) {
+
+                navigator.serviceWorker.ready.then(function (serviceWorkerRegistration) {
+                    serviceWorkerRegistration.pushManager.getSubscription().then(
+                        function (subscription) {
+                            if (!subscription) {
+                                return;
+                            }
+                            subscription.unsubscribe().then(function (successful) {
+
+                            }).catch(function (e) {
+                                console.log('Unsubscription error: ', e);
+                            });
+                        });
+                });
+        }
+    };
+
+    var initialiseFirebase = function (config) {
+        if (typeof config === "object") {
+            if ('serviceWorker' in navigator && !jQuery.browser.msie && !jQuery.browser.safari) {
+                try {
+                    window.firebase.initializeApp(config);
+                } catch(e) {
+                    console.log("initialize firebase error: ", e);
+                }
+            } else {
+                return;
+            }
+            //Are service workers supported in this browser
+            if ('serviceWorker' in navigator && !jQuery.browser.msie && !jQuery.browser.safari) {
+                    navigator.serviceWorker.register('talk.notification.js')
+                    .then(initialiseState);
+            }
+        } else {
+            if ('serviceWorker' in navigator && !jQuery.browser.msie && !jQuery.browser.safari) {
+
+                    navigator.serviceWorker.ready.then(function (serviceWorkerRegistration) {
+                        serviceWorkerRegistration.pushManager.getSubscription().then(
+                            function (subscription) {
+                                if (!subscription) {
+                                    return;
+                                }
+                                subscription.unsubscribe().then(function (successful) {
+
+                                }).catch(function (e) {
+                                    console.log('Unsubscription error: ', e);
+                                });
+                            });
+                    });
+            }
+    }
+    };
+ 
+    function initialiseState(registration) {
+        var messaging = window.firebase.messaging();
+        messaging.useServiceWorker(registration);
+        if (!('showNotification' in ServiceWorkerRegistration.prototype)) {
+            return;
+        }
+        if (enabled()) setTimeout(enable, 500);
+    }
+ 
   var enabled = function () {
     return !isDisabled;
   };
@@ -1371,7 +1546,9 @@ window.ASC.TMTalk.notifications  = (function () {
     enable    : enable,
     disable   : disable,
     enabled   : enabled,
-    supported : supported
+    supported : supported,
+
+    initialiseFirebase: initialiseFirebase
   };
 })();
 

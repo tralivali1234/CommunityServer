@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -32,48 +23,51 @@ namespace ASC.Projects.Engine
 {
     public class TagEngine
     {
-        private readonly ITagDao _tagDao;
+        public IDaoFactory DaoFactory { get; set; }
 
-
-        public TagEngine(IDaoFactory daoFactory)
+        public KeyValuePair<int, string> Create(string data)
         {
-            _tagDao = daoFactory.GetTagDao();
+            return DaoFactory.TagDao.Create(data);
         }
-
 
         public Dictionary<int, string> GetTags()
         {
-            return _tagDao.GetTags();
+            return DaoFactory.TagDao.GetTags();
         }
 
         public Dictionary<int, string> GetTags(string prefix)
         {
-            return _tagDao.GetTags(prefix);
+            return DaoFactory.TagDao.GetTags(prefix);
         }
 
         public string GetById(int id)
         {
-            return _tagDao.GetById(id);
+            return DaoFactory.TagDao.GetById(id);
         }
 
         public int[] GetTagProjects(string tagName)
         {
-            return _tagDao.GetTagProjects(tagName);
+            return DaoFactory.TagDao.GetTagProjects(tagName);
         }
 
         public int[] GetTagProjects(int tagID)
         {
-            return _tagDao.GetTagProjects(tagID);
+            return DaoFactory.TagDao.GetTagProjects(tagID);
         }
 
         public Dictionary<int, string> GetProjectTags(int projectId)
         {
-            return _tagDao.GetProjectTags(projectId);
+            return DaoFactory.TagDao.GetProjectTags(projectId);
         }
 
         public void SetProjectTags(int projectId, string tags)
         {
-            _tagDao.SetProjectTags(projectId, FromString(tags));
+            DaoFactory.TagDao.SetProjectTags(projectId, FromString(tags));
+        }
+
+        public void SetProjectTags(int projectId, IEnumerable<int> tags)
+        {
+            DaoFactory.TagDao.SetProjectTags(projectId, tags);
         }
 
         private string[] FromString(string tags)

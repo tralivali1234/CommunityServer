@@ -29,36 +29,6 @@
 </style>
 <% } %>
 
-<% if (Partner != null)
-   { %>
-<div class="partner-is-label">
-    <% if (Partner.DisplayType == PartnerDisplayType.LogoOnly && !string.IsNullOrEmpty(Partner.LogoUrl))
-       { %>
-    <%: Resource.PartnerIs %>
-    <img src="<%= Partner.LogoUrl %>" align="middle" />
-    <% } %>
-
-    <% if (Partner.DisplayType == PartnerDisplayType.DisplayNameOnly && !string.IsNullOrEmpty(Partner.DisplayName))
-       { %>
-    <%: Resource.PartnerIs %>
-    <%: Partner.DisplayName %>
-    <% } %>
-
-    <% if (Partner.DisplayType == PartnerDisplayType.All && (!string.IsNullOrEmpty(Partner.LogoUrl) || !string.IsNullOrEmpty(Partner.DisplayName)))
-       { %>
-    <%: Resource.PartnerIs %>
-    <% if (!string.IsNullOrEmpty(Partner.LogoUrl))
-       { %>
-    <img src="<%= Partner.LogoUrl %>" align="middle" />
-    <% } %>
-    <% if (!string.IsNullOrEmpty(Partner.DisplayName))
-       { %>
-    <%: Partner.DisplayName %>
-    <% } %>
-    <% } %>
-</div>
-<% } %>
-
 <div class="current-tariff-desc">
     <%= TariffDescription() %>
     <br />
@@ -74,17 +44,6 @@
                            ? "<a class=\"link-black-14 bold\" href=\"" + CommonLinkUtility.GetAdministration(ManagementType.Statistic) + "\">" + FileSizeComment.FilesSizeToString(UsedSize) + "</a>"
                            : "<span class=\"bold\">" + FileSizeComment.FilesSizeToString(UsedSize) + "</span>")
                       + "/" + FileSizeComment.FilesSizeToString(CurrentQuota.MaxTotalSize)) %>
-    <% if (SmsEnable)
-       { %>
-    <br />
-    <asp:PlaceHolder runat="server" ID="SmsBuyHolder"></asp:PlaceHolder>
-    <% } %>
-
-    <% if (VoipEnable)
-       { %>
-    <br />
-    <asp:PlaceHolder runat="server" ID="VoipBuyHolder"></asp:PlaceHolder>
-    <% } %>
 </div>
 
 <div class="tariff-header clearFix">
@@ -164,7 +123,7 @@
                     <%= string.Format(UserControlsCommonResource.TariffNameSMonth,
                                       "<div class=\"tariffs-name\">",
                                       "</div>",
-                                      MonthIsDisable ? SetStar(Resource.TariffRemarkDisabledMonth) : "") %>
+                                      MonthIsDisable ? SetStar(CurrentQuota.Year3 ? Resource.TariffRemarkDisabledYear : Resource.TariffRemarkDisabledMonth) : "") %>
                 </div>
             </td>
             <td width="30%" valign="bottom">
@@ -186,28 +145,28 @@
         </tr>
     </thead>
     <tbody>
-        <% for (var i = 0; i < QuotasYear.Count; i++)
-           {
-               Tuple<string, string, string> buyAttr;
+        <% 
+            for (var i = 0; i < QuotasYear.Count; i++)
+            {
+                Tuple<string, string, string> buyAttr;
+                var quotaYear = QuotasYear[i];
         %>
 
-        <tr class="tariff-item <%= QuotaForDisplay.ActiveUsers == QuotasYear[i].ActiveUsers ? "tariff-item-selected" : string.Empty %>"
-            valign="middle" data-users="<%= QuotasYear[i].ActiveUsers %>" data-storage="<%= FileSizeComment.FilesSizeToString(QuotasYear[i].MaxTotalSize) %>">
+        <tr class="tariff-item <%= QuotaForDisplay.ActiveUsers == quotaYear.ActiveUsers ? "tariff-item-selected" : string.Empty %>"
+            valign="middle" data-users="<%= quotaYear.ActiveUsers %>" data-storage="<%= FileSizeComment.FilesSizeToString(quotaYear.MaxTotalSize) %>">
             <td>
                 <div class="tariffs-body tariffs-body-month">
 
-                    <% var quotaMonth = GetQuotaMonth(QuotasYear[i]);
-                       if (quotaMonth != null || !QuotasYear[i].Free)
+                    <% var quotaMonth = GetQuotaMonth(quotaYear);
+                       if (quotaMonth != null || !quotaYear.Free)
                        { %>
                     <% if (quotaMonth == null)
                        {
-                           var fakePrice = new[] { 10.0m, 20.0m }[i]; %>
+                           var fakePrice = FakePrices[i]; %>
                     <div class="tariffs-price-dscr">
                         <%= string.Format(UserControlsCommonResource.TariffPricePer,
                                           "<span class=\"price-string\">"
-                                          + (InRuble
-                                                 ? GetPriceString(5)
-                                                 : GetPriceString(5, false, RegionDefault.CurrencySymbol))
+                                          + GetPerUserPrice(null)
                                           + "</span>") %>
                     </div>
 
@@ -223,9 +182,7 @@
                     <div class="tariffs-price-dscr">
                         <%= string.Format(UserControlsCommonResource.TariffPricePer,
                                           "<span class=\"price-string\">"
-                                          + (InRuble
-                                                 ? GetPriceString(5)
-                                                 : GetPriceString(5, false, RegionDefault.CurrencySymbol))
+                                          + GetPerUserPrice(quotaMonth)
                                           + "</span>") %>
                     </div>
 
@@ -236,18 +193,6 @@
                     </div>
 
                     <div class="tariffs-price-per"><%= UserControlsCommonResource.TariffBasicPrice %></div>
-
-                    <div class="tariffs-price-sale">
-                        <%= quotaMonth.Price2 != decimal.Zero
-                                ? string.Format(UserControlsCommonResource.TariffPriceOffer, GetPriceString(quotaMonth.Price2))
-                                : "&nbsp;" %>
-                    </div>
-
-                    <div class="tariffs-descr">
-                        <%= quotaMonth.Price2 != decimal.Zero
-                                ? string.Format(Resource.TariffRemarkSale, GetSaleDate())
-                                : "&nbsp;" %>
-                    </div>
 
                     <% buyAttr = GetBuyAttr(quotaMonth); %>
                     <a class="tariffs-buy-action button huge <%= buyAttr.Item1 %>"
@@ -260,38 +205,33 @@
                 </div>
             </td>
 
+            <% var priceMonth = quotaMonth != null ? GetPrice(quotaMonth) : (FakePrices[i] * (InRuble ? SetupInfo.ExchangeRateRuble : 1)); %>
             <td>
                 <div class="tariffs-body tariffs-body-year">
                     <div class="tariffs-price-dscr">
                         <%= string.Format(UserControlsCommonResource.TariffPricePer,
                                           "<span class=\"price-string\">"
-                                          + (InRuble
-                                                 ? GetPriceString(2)
-                                                 : GetPriceString(2, false, RegionDefault.CurrencySymbol))
+                                          + GetPerUserPrice(quotaYear)
                                           + "</span>") %>
                     </div>
 
                     <div class="tariffs-price">
-                        <%= QuotasYear[i].Price == decimal.Zero
+                        <%= quotaYear.Price == decimal.Zero
                                 ? UserControlsCommonResource.TariffFree
-                                : GetPriceString(QuotasYear[i]) %>
+                                : GetPriceString(quotaYear) %>
                     </div>
 
                     <div class="tariffs-price-per"><%= UserControlsCommonResource.TariffLimitedPrice %></div>
 
                     <div class="tariffs-price-sale">
-                        <%= QuotasYear[i].Price2 != decimal.Zero
-                                ? string.Format(UserControlsCommonResource.TariffPriceOffer, GetPriceString(QuotasYear[i].Price2))
-                                : "&nbsp;" %>
+                        <%= string.Format(UserControlsCommonResource.TariffPriceOffer, GetPriceString(GetSaleValue(priceMonth, quotaYear), false)) %>
                     </div>
 
                     <div class="tariffs-descr">
-                        <%= QuotasYear[i].Price2 != decimal.Zero
-                                ? string.Format(Resource.TariffRemarkSale, GetSaleDate())
-                                : "&nbsp;" %>
+                        <%= string.Format(Resource.TariffRemarkSale, GetSaleDate()) %>
                     </div>
 
-                    <% buyAttr = GetBuyAttr(QuotasYear[i]); %>
+                    <% buyAttr = GetBuyAttr(quotaYear); %>
                     <a class="tariffs-buy-action button huge <%= buyAttr.Item1 %>"
                         <%= !string.IsNullOrEmpty(buyAttr.Item2) ? "href=\"" + buyAttr.Item2 + "\"" : string.Empty %>>
                         <%= buyAttr.Item3 %>
@@ -301,16 +241,14 @@
 
             <td>
                 <div class="tariffs-body tariffs-body-year3">
-                    <% var quotaYear3 = GetQuotaYear3(QuotasYear[i]);
+                    <% var quotaYear3 = GetQuotaYear3(quotaYear);
                        if (quotaYear3 != null)
                        { %>
 
                     <div class="tariffs-price-dscr">
                         <%= string.Format(UserControlsCommonResource.TariffPricePer,
                                           "<span class=\"price-string\">"
-                                          + (InRuble
-                                                 ? GetPriceString(1)
-                                                 : GetPriceString(1, false, RegionDefault.CurrencySymbol))
+                                          + GetPerUserPrice(quotaYear3)
                                           + "</span>") %>
                     </div>
 
@@ -323,15 +261,12 @@
                     <div class="tariffs-price-per"><%= UserControlsCommonResource.TariffLimitedPrice %></div>
 
                     <div class="tariffs-price-sale">
-                        <%= quotaYear3.Price2 != decimal.Zero
-                                ? string.Format(UserControlsCommonResource.TariffPriceOffer, GetPriceString(quotaYear3.Price2))
-                                : "&nbsp;" %>
+
+                        <%= string.Format(UserControlsCommonResource.TariffPriceOffer, GetPriceString(GetSaleValue(priceMonth, quotaYear3), false)) %>
                     </div>
 
                     <div class="tariffs-descr">
-                        <%= quotaYear3.Price2 != decimal.Zero
-                                ? string.Format(Resource.TariffRemarkSale, GetSaleDate())
-                                : "&nbsp;" %>
+                        <%= string.Format(Resource.TariffRemarkSale, GetSaleDate()) %>
                     </div>
 
                     <% buyAttr = GetBuyAttr(quotaYear3); %>
@@ -349,20 +284,13 @@
     </tbody>
 </table>
 
-<% if (Partner != null && false) //todo:!!!
-   { %>
-<div class="tariffs-button-block clearFix">
-    <asp:PlaceHolder runat="server" ID="PaymentsCodeHolder"></asp:PlaceHolder>
-</div>
-<% } %>
-
 <% var linkList = new Dictionary<string, string>
        {
-           {"fr", "http://onlyo.co/1LlMqkT"},
-           {"de", "http://onlyo.co/1LlMrWe"},
-           {"en", "http://onlyo.co/1LlMtx4"},
-           {"ru", "http://onlyo.co/1LlMmS8"},
-           {"it", "http://onlyo.co/1LlMpgM"}
+           {"fr", "https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=4577517&doc=azBvMUU2U0lKMjdqcVJQZVhWdHBMQ1g5UUZyc1dHbWUzaG1WRy9xa2RHUT0_IjQ1Nzc1MTci0"},
+           {"de", "https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=4577515&doc=WUphUzBkbW1lVGNKRDl3c01Vb2REdGRFWEN1WGI4OSs0UmdBWUU4ekpKaz0_IjQ1Nzc1MTUi0"},
+           {"en", "https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=4577516&doc=M1c2MGY3aXlYVzZxZGV6M014eFVRS21pSk52ZTNiWXBuYnNJYnpxdHlQVT0_IjQ1Nzc1MTYi0"},
+           {"ru", "https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=4577519&doc=QkpoRmJCSnJyYVo2UnAxcktxWFJqbWZvVjhtZVFodnd4UllCS0tweEcwbz0_IjQ1Nzc1MTki0"},
+           {"it", "https://help.onlyoffice.com/products/files/doceditor.aspx?fileid=4577518&doc=TEFOU3NUcmtZTjl0eUN2WklaWkllMkI3U2t5Rm5va2lDSHJXeTZBK3A5ST0_IjQ1Nzc1MTgi0"}
        };
    string tariffLink;
    if (!linkList.TryGetValue(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, out tariffLink))
@@ -381,33 +309,34 @@
         <p class="confirm-block-text gray-text">
             <%= Resource.FirstName %><span class="required-mark">*</span>
         </p>
-        <input type="text" maxlength="64" tabindex="1" class="text-edit-fname text-edit" required="required" placeholder="<%= Resource.FirstName %>" value="<%= userInfo.FirstName %>">
+        <input type="text" maxlength="64" tabindex="1" class="text-edit-fname text-edit" required="required" placeholder="<%= Resource.FirstName %>" value="<%= userInfo.FirstName.HtmlEncode() %>">
 
         <p class="confirm-block-text gray-text">
             <%= Resource.LastName %><span class="required-mark">*</span>
         </p>
-        <input type="text" maxlength="64" tabindex="2" class="text-edit-lname text-edit" required="required" placeholder="<%= Resource.LastName %>" value="<%= userInfo.LastName %>">
+        <input type="text" maxlength="64" tabindex="2" class="text-edit-lname text-edit" required="required" placeholder="<%= Resource.LastName %>" value="<%= userInfo.LastName.HtmlEncode() %>">
 
         <p class="confirm-block-text gray-text">
-            <%= CustomNamingPeople.Substitute<Resource>("UserPost") %>
+            <%= CustomNamingPeople.Substitute<Resource>("UserPost").HtmlEncode() %>
         </p>
-        <input type="text" maxlength="64" tabindex="3" class="text-edit-title text-edit" required="required" placeholder="<%= CustomNamingPeople.Substitute<Resource>("UserPost") %>" value="<%= userInfo.Title %>">
+        <input type="text" maxlength="64" tabindex="3" class="text-edit-title text-edit" required="required" placeholder="<%= CustomNamingPeople.Substitute<Resource>("UserPost").HtmlEncode() %>" value="<%= userInfo.Title %>">
 
         <p class="confirm-block-text gray-text">
             <%= Resource.Email %><span class="required-mark">*</span>
         </p>
-        <input type="email" maxlength="64" tabindex="4" class="text-edit-email text-edit" required="required" placeholder="<%= Resource.Email %>" value="<%= userInfo.Email %>">
+        <input type="email" maxlength="64" tabindex="4" class="text-edit-email text-edit" required="required" placeholder="<%= Resource.Email %>" value="<%= userInfo.Email.HtmlEncode() %>">
 
         <p class="confirm-block-text gray-text">
             <%= Resource.TitlePhone %><span class="required-mark">*</span>
         </p>
-        <input type="text" maxlength="64" tabindex="5" class="text-edit-phone text-edit" required="required" title="<%= Resource.TitlePhone %>" pattern="\+?\d{4,63}" placeholder="<%= Resource.TitlePhone %>" value="<%= userInfo.MobilePhone %>">
+        <input type="text" maxlength="64" tabindex="5" class="text-edit-phone text-edit" required="required" title="<%= Resource.TitlePhone %>"
+             pattern="\+?\d{4,63}" placeholder="<%= Resource.TitlePhone %>" value="<%= userInfo.MobilePhone %>" data-country="<%= PhoneCountry %>">
 
         <p class="confirm-block-text gray-text">
             <%= UserControlsCommonResource.CompanyTitle %><span class="required-mark">*</span>
         </p>
-        <input type="text" maxlength="64" tabindex="6" class="text-edit-ctitle text-edit" required="required" placeholder="<%= UserControlsCommonResource.CompanyTitle %>" >
-        
+        <input type="text" maxlength="64" tabindex="6" class="text-edit-ctitle text-edit" required="required" placeholder="<%= UserControlsCommonResource.CompanyTitle %>">
+
         <p class="confirm-block-text gray-text">
             <%= UserControlsCommonResource.CompanySizeTitle %><span class="required-mark">*</span>
         </p>
@@ -435,7 +364,7 @@
         <p class="confirm-block-text gray-text">
             <%= UserControlsCommonResource.SiteTitle %><span class="required-mark">*</span>
         </p>
-        <input type="text" maxlength="64" tabindex="8" class="text-edit-site text-edit" required="required" placeholder="<%= UserControlsCommonResource.SiteTitle %>" >
+        <input type="text" maxlength="64" tabindex="8" class="text-edit-site text-edit" required="required" placeholder="<%= UserControlsCommonResource.SiteTitle %>">
 
         <p class="confirm-block-text gray-text">
             <%= UserControlsCommonResource.TariffRequestContent %><span class="required-mark">*</span>
@@ -449,8 +378,7 @@
     </div>
 </div>
 
-<% if (Partner == null)
-   { %>
+
 <div class="support-block clearFix">
     <div class="support-photo"></div>
     <div class="support-actions">
@@ -459,13 +387,9 @@
             <span class="support-mail-btn">
                 <a class="link dotline" href="mailto:support@onlyoffice.com"><%= Resource.SupportBlockEmailBth %></a>
             </span>
-            <span class="support-chat-btn">
-                <a class="link dotline" onclick="window.LC_API.open_chat_window()"><%= Resource.SupportBlockChatBtn %></a>
-            </span>
         </div>
     </div>
 </div>
-<% } %>
 
 <div class="tariff-remark">
     <%= GetRemarks() %>
@@ -503,37 +427,3 @@
         </Body>
     </sc:Container>
 </div>
-
-<% if (!HideBuyRecommendation && false)
-   { %>
-<div id="buyRecommendationDialog" class="display-none">
-    <sc:Container runat="server" ID="buyRecommendationContainer">
-        <Header><%= Resource.TariffBuyRecommendationTitle%></Header>
-        <Body>
-            <span><%: Resource.TariffBuyRecommendation %></span>
-            <br />
-            <br />
-            <label>
-                <input type="checkbox" id="buyRecommendationDisplay" class="checkbox" />
-                <%= Resource.LabelDontShowMessage %>
-            </label>
-            <div class="middle-button-container">
-                <a id="buyRecommendationOk" class="button gray middle">
-                    <%= Resource.OKButton %>
-                </a>
-            </div>
-        </Body>
-    </sc:Container>
-</div>
-<% } %>
-
-<% if (Partner == null)
-   { %>
-<!-- BEGIN livechatinc.com Code -->
-<div class="livechat online" style="display: none; margin-top: 24px;">
-    <a href="javascript:window.LC_API.open_chat_window();">
-        <img style="max-width: 983px;" title="<%= Resource.SupportByChat %>" src="<%= GetChatBannerPath() %>" />
-    </a>
-</div>
-<!-- END livechatinc.com Code -->
-<% } %>

@@ -22,7 +22,7 @@
             <b><%=ForumUCResource.Message%>:</b>
         </div>
         <div>
-            <textarea id="ckEditor" name="forum_text"  style="width:100%; height:400px;" autocomplete="off"><%=_text%></textarea>
+            <textarea id="ckEditor" name="forum_text" style="width:100%; height:400px;visibility:hidden;" autocomplete="off"><%=_text%></textarea>
         </div>
     </div>
     <%if (PostAction == PostAction.Edit)%>
@@ -104,7 +104,7 @@
                 <div style="margin-bottom: 5px; padding: 0px 5px;">
                     <%=DateTimeService.DateTime2StringPostStyle(DateTimeService.CurrentDate())%>
                 </div>
-                <div id="forum_message_previewfck" class="forum_mesBox" style="width: 550px;">
+                <div id="forum_message_previewfck" class="forum_mesBox">
                 </div>
             </td>
         </tr>
@@ -116,4 +116,4 @@
         </a>
     </div>
 </div>
-<asp:PlaceHolder ID="_recentPostsHolder" runat="server"></asp:PlaceHolder>
+<asp:PlaceHolder ID="_recentPostsHolder" runat="server"/>

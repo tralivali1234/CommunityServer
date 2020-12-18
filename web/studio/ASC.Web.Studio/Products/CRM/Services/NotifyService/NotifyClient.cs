@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -43,12 +34,12 @@ using ASC.Notify.Model;
 using ASC.Notify.Patterns;
 using ASC.Notify.Recipients;
 using ASC.Core.Tenants;
-using ASC.Web.CRM.Classes;
 using ASC.CRM.Core;
 using System.Collections.Specialized;
+using ASC.Common.Logging;
+using ASC.Web.CRM.Core;
 using ASC.Web.CRM.Resources;
-using log4net;
-using ASC.Web.Studio.Core.Notify;
+using Autofac;
 
 #endregion
 
@@ -92,11 +83,11 @@ namespace ASC.Web.CRM.Services.NotifyService
 
         }
 
-        public void SendAboutSetAccess(EntityType entityType, int entityID, params Guid[] userID)
+        public void SendAboutSetAccess(EntityType entityType, int entityID, DaoFactory daoFactory, params Guid[] userID)
         {
             if (userID.Length == 0) return;
 
-            var baseData = ExtractBaseDataFrom(entityType, entityID);
+            var baseData = ExtractBaseDataFrom(entityType, entityID, daoFactory);
 
             client.SendNoticeToAsync(
                    NotifyConstants.Event_SetAccess,
@@ -109,9 +100,8 @@ namespace ASC.Web.CRM.Services.NotifyService
                 );
         }
 
-        private NameValueCollection ExtractBaseDataFrom(EntityType entityType, int entityID)
+        private NameValueCollection ExtractBaseDataFrom(EntityType entityType, int entityID, DaoFactory daoFactory)
         {
-
             var result = new NameValueCollection();
 
             String title;
@@ -122,26 +112,26 @@ namespace ASC.Web.CRM.Services.NotifyService
                 case EntityType.Person:
                 case EntityType.Company:
                 case EntityType.Contact:
-                    {
-                        var contact = Global.DaoFactory.GetContactDao().GetByID(entityID);
-                        title = contact != null ? contact.GetTitle() : string.Empty;
-                        relativeURL = "default.aspx?id=" + entityID;
-                        break;
-                    }
+                {
+                    var contact = daoFactory.ContactDao.GetByID(entityID);
+                    title = contact != null ? contact.GetTitle() : string.Empty;
+                    relativeURL = "Default.aspx?id=" + entityID;
+                    break;
+                }
                 case EntityType.Opportunity:
-                    {
-                        var deal = Global.DaoFactory.GetDealDao().GetByID(entityID);
-                        title = deal != null ? deal.Title : string.Empty;
-                        relativeURL = "deals.aspx?id=" + entityID;
-                        break;
-                    }
+                {
+                    var deal = daoFactory.DealDao.GetByID(entityID);
+                    title = deal != null ? deal.Title : string.Empty;
+                    relativeURL = "Deals.aspx?id=" + entityID;
+                    break;
+                }
                 case EntityType.Case:
-                    {
-                        var cases = Global.DaoFactory.GetCasesDao().GetByID(entityID);
-                        title = cases != null ? cases.Title : string.Empty;
-                        relativeURL = "cases.aspx?id=" + entityID;
-                        break;
-                    }
+                {
+                    var cases = daoFactory.CasesDao.GetByID(entityID);
+                    title = cases != null ? cases.Title : string.Empty;
+                    relativeURL = "Cases.aspx?id=" + entityID;
+                    break;
+                }
 
                 default:
                     throw new ArgumentException();
@@ -154,8 +144,7 @@ namespace ASC.Web.CRM.Services.NotifyService
             return result;
         }
 
-        public void SendAboutAddRelationshipEventAdd(RelationshipEvent entity,
-                                                    Hashtable fileListInfoHashtable, params Guid[] userID)
+        public void SendAboutAddRelationshipEventAdd(RelationshipEvent entity, Hashtable fileListInfoHashtable, DaoFactory daoFactory, params Guid[] userID)
         {
             if (userID.Length == 0) return;
 
@@ -163,16 +152,16 @@ namespace ASC.Web.CRM.Services.NotifyService
 
             if (entity.EntityID != 0)
             {
-                baseEntityData = ExtractBaseDataFrom(entity.EntityType, entity.EntityID);
+                baseEntityData = ExtractBaseDataFrom(entity.EntityType, entity.EntityID, daoFactory);
             }
             else
             {
-                var contact = Global.DaoFactory.GetContactDao().GetByID(entity.ContactID);
+                var contact = daoFactory.ContactDao.GetByID(entity.ContactID);
 
                 baseEntityData = new NameValueCollection();
                 baseEntityData["title"] = contact.GetTitle();
                 baseEntityData["id"] = contact.ID.ToString();
-                baseEntityData["entityRelativeURL"] = "default.aspx?id=" + contact.ID;
+                baseEntityData["entityRelativeURL"] = "Default.aspx?id=" + contact.ID;
 
                 if (contact is Person)
                     baseEntityData["entityRelativeURL"] += "&type=people";
@@ -213,16 +202,17 @@ namespace ASC.Web.CRM.Services.NotifyService
 
         }
 
-        public void SendAboutExportCompleted(Guid recipientID, String filePath)
+        public void SendAboutExportCompleted(Guid recipientID, String fileName, String filePath)
         {
             if (recipientID == Guid.Empty) return;
 
             var recipient = ToRecipient(recipientID);
 
-            client.SendNoticeToAsync(NotifyConstants.Event_ExportCompleted,
+            client.SendNoticeToAsync(CoreContext.Configuration.CustomMode ? NotifyConstants.Event_ExportCompletedCustomMode : NotifyConstants.Event_ExportCompleted,
                null,
                new[] { recipient },
                true,
+               new TagValue(NotifyConstants.Tag_EntityTitle, fileName),
                new TagValue(NotifyConstants.Tag_EntityRelativeURL, filePath));
 
         }
@@ -239,26 +229,26 @@ namespace ASC.Web.CRM.Services.NotifyService
             {
                 case EntityType.Contact:
                     entitiyListTitle = CRMContactResource.Contacts;
-                    entitiyListRelativeURL = "products/crm/";
+                    entitiyListRelativeURL = "Products/CRM/";
                     break;
                 case EntityType.Opportunity:
                     entitiyListTitle = CRMCommonResource.DealModuleName;
-                    entitiyListRelativeURL = "products/crm/deals.aspx";
+                    entitiyListRelativeURL = "Products/CRM/Deals.aspx";
                     break;
                 case EntityType.Case:
                     entitiyListTitle = CRMCommonResource.CasesModuleName;
-                    entitiyListRelativeURL = "products/crm/cases.aspx";
+                    entitiyListRelativeURL = "Products/CRM/Cases.aspx";
                     break;
                 case EntityType.Task:
                     entitiyListTitle = CRMCommonResource.TaskModuleName;
-                    entitiyListRelativeURL = "products/crm/tasks.aspx";
+                    entitiyListRelativeURL = "Products/CRM/Tasks.aspx";
                     break;
                 default:
                     throw new ArgumentException(CRMErrorsResource.EntityTypeUnknown);
             }
 
             client.SendNoticeToAsync(
-                NotifyConstants.Event_ImportCompleted,
+                CoreContext.Configuration.CustomMode ? NotifyConstants.Event_ImportCompletedCustomMode : NotifyConstants.Event_ImportCompleted,
                 null,
                 new[] { recipient },
                 true,
@@ -268,86 +258,97 @@ namespace ASC.Web.CRM.Services.NotifyService
 
         public static void SendAutoReminderAboutTask(DateTime scheduleDate)
         {
-            var execAlert = new List<int>();
-
-            var defaultDao = new DaoFactory(Tenant.DEFAULT_TENANT, CRMConstants.StorageModule);
-            
-            foreach (var row in defaultDao.GetTaskDao()
-                                  .GetInfoForReminder(scheduleDate))
+            using (var scope = DIHelper.Resolve(-1))
             {
+                var defaultDao = scope.Resolve<DaoFactory>();
 
-                var tenantId = Convert.ToInt32(row[0]);
-                var taskId = Convert.ToInt32(row[1]);
-                var deadline = Convert.ToDateTime(row[2]);
-                var alertValue = Convert.ToInt32(row[3]);
-                var responsibleID = !string.IsNullOrEmpty(Convert.ToString(row[4])) ? new Guid(Convert.ToString(row[4])) : Guid.Empty;
-                
-                var deadlineReminderDate = deadline.AddMinutes(-alertValue);
+                var execAlert = new List<int>();
 
-                if (deadlineReminderDate.Subtract(scheduleDate).Minutes > 1) continue;
-
-                execAlert.Add(taskId);
-
-                var tenant = CoreContext.TenantManager.GetTenant(tenantId);
-                if (tenant == null ||
-                    tenant.Status != TenantStatus.Active ||
-                    TariffState.NotPaid <= CoreContext.PaymentManager.GetTariff(tenant.TenantId).State)
+                foreach (var row in defaultDao.TaskDao
+                    .GetInfoForReminder(scheduleDate))
                 {
-                    continue;
-                }
 
-                try
-                {
-                    CoreContext.TenantManager.SetCurrentTenant(tenant);
-                    SecurityContext.AuthenticateMe(ASC.Core.Configuration.Constants.CoreSystem);
-                    
-                    var user = CoreContext.UserManager.GetUsers(responsibleID);
+                    var tenantId = Convert.ToInt32(row[0]);
+                    var taskId = Convert.ToInt32(row[1]);
+                    var deadline = Convert.ToDateTime(row[2]);
+                    var alertValue = Convert.ToInt32(row[3]);
+                    var responsibleID = !string.IsNullOrEmpty(Convert.ToString(row[4]))
+                        ? new Guid(Convert.ToString(row[4]))
+                        : Guid.Empty;
 
-                    if (!(!Constants.LostUser.Equals(user) && user.Status == EmployeeStatus.Active)) continue;
-                    
-                    SecurityContext.AuthenticateMe(user.ID);
+                    var deadlineReminderDate = deadline.AddMinutes(-alertValue);
 
-                    Thread.CurrentThread.CurrentCulture = user.GetCulture();
-                    Thread.CurrentThread.CurrentUICulture = user.GetCulture();
+                    if (deadlineReminderDate.Subtract(scheduleDate).Minutes > 1) continue;
 
-                    var dao = new DaoFactory(tenantId, CRMConstants.StorageModule);
-                    var task = dao.GetTaskDao().GetByID(taskId);
+                    execAlert.Add(taskId);
 
-                    if (task == null) continue;
-
-                    ASC.CRM.Core.Entities.Contact taskContact = null;
-                    ASC.CRM.Core.Entities.Cases taskCase = null;
-                    ASC.CRM.Core.Entities.Deal taskDeal = null;
-
-                    if (task.ContactID > 0)
+                    var tenant = CoreContext.TenantManager.GetTenant(tenantId);
+                    if (tenant == null ||
+                        tenant.Status != TenantStatus.Active ||
+                        TariffState.NotPaid <= CoreContext.PaymentManager.GetTariff(tenant.TenantId).State)
                     {
-                        taskContact = dao.GetContactDao().GetByID(task.ContactID);
+                        continue;
                     }
 
-                    if (task.EntityID > 0)
+                    try
                     {
-                        switch (task.EntityType)
+                        CoreContext.TenantManager.SetCurrentTenant(tenant);
+                        SecurityContext.AuthenticateMe(ASC.Core.Configuration.Constants.CoreSystem);
+
+                        var user = CoreContext.UserManager.GetUsers(responsibleID);
+
+                        if (!(!Constants.LostUser.Equals(user) && user.Status == EmployeeStatus.Active)) continue;
+
+                        SecurityContext.AuthenticateMe(user.ID);
+
+                        Thread.CurrentThread.CurrentCulture = user.GetCulture();
+                        Thread.CurrentThread.CurrentUICulture = user.GetCulture();
+
+                        using (var innerScope = DIHelper.Resolve(tenantId))
                         {
-                            case EntityType.Case:
-                                taskCase = dao.GetCasesDao().GetByID(task.EntityID);
-                                break;
-                            case EntityType.Opportunity:
-                                taskDeal = dao.GetDealDao().GetByID(task.EntityID);
-                                break;
+                            var dao = innerScope.Resolve<DaoFactory>();
+                            var task = dao.TaskDao.GetByID(taskId);
+
+                            if (task == null) continue;
+
+                            ASC.CRM.Core.Entities.Contact taskContact = null;
+                            ASC.CRM.Core.Entities.Cases taskCase = null;
+                            ASC.CRM.Core.Entities.Deal taskDeal = null;
+
+                            if (task.ContactID > 0)
+                            {
+                                taskContact = dao.ContactDao.GetByID(task.ContactID);
+                            }
+
+                            if (task.EntityID > 0)
+                            {
+                                switch (task.EntityType)
+                                {
+                                    case EntityType.Case:
+                                        taskCase = dao.CasesDao.GetByID(task.EntityID);
+                                        break;
+                                    case EntityType.Opportunity:
+                                        taskDeal = dao.DealDao.GetByID(task.EntityID);
+                                        break;
+                                }
+                            }
+
+                            var listItem = dao.ListItemDao.GetByID(task.CategoryID);
+
+                            NotifyClient.Instance.SendTaskReminder(task,
+                                listItem != null ? listItem.Title : string.Empty,
+                                taskContact, taskCase, taskDeal);
                         }
                     }
-
-                    var listItem = dao.GetListItemDao().GetByID(task.CategoryID);
-
-                    NotifyClient.Instance.SendTaskReminder(task, listItem != null ? listItem.Title : string.Empty, taskContact, taskCase, taskDeal);
+                    catch (Exception ex)
+                    {
+                        LogManager.GetLogger("ASC.CRM.Tasks")
+                            .Error("SendAutoReminderAboutTask, tenant: " + tenant.TenantDomain, ex);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    LogManager.GetLogger("ASC.CRM.Tasks").Error("SendAutoReminderAboutTask, tenant: " + tenant.TenantDomain, ex);
-                }
+
+                defaultDao.TaskDao.ExecAlert(execAlert);
             }
-
-            defaultDao.GetTaskDao().ExecAlert(execAlert);
         }
 
         public void SendTaskReminder(Task task, String taskCategoryTitle, Contact taskContact, ASC.CRM.Core.Entities.Cases taskCase, ASC.CRM.Core.Entities.Deal taskDeal)
@@ -371,19 +372,19 @@ namespace ASC.Web.CRM.Services.NotifyService
 
             if (taskContact != null)
             {
-                taskContactRelativeUrl = String.Format("products/crm/default.aspx?id={0}{1}", taskContact.ID, taskContact is Person ? "&type=people" : "");
+                taskContactRelativeUrl = String.Format("Products/CRM/Default.aspx?id={0}{1}", taskContact.ID, taskContact is Person ? "&type=people" : "");
                 taskContactTitle = taskContact.GetTitle();
             }
 
             if (taskCase != null)
             {
-                taskCaseRelativeUrl = String.Format("products/crm/cases.aspx?id={0}", taskCase.ID);
+                taskCaseRelativeUrl = String.Format("Products/CRM/Cases.aspx?id={0}", taskCase.ID);
                 taskCaseTitle = taskCase.Title.HtmlEncode();
             }
 
             if (taskDeal != null)
             {
-                taskDealRelativeUrl = String.Format("products/crm/deals.aspx?id={0}", taskDeal.ID);
+                taskDealRelativeUrl = String.Format("Products/CRM/Deals.aspx?id={0}", taskDeal.ID);
                 taskDealTitle = taskDeal.Title.HtmlEncode();
             }
 
@@ -436,19 +437,19 @@ namespace ASC.Web.CRM.Services.NotifyService
 
             if (taskContact != null)
             {
-                taskContactRelativeUrl = String.Format("products/crm/default.aspx?id={0}{1}", taskContact.ID, taskContact is Person ? "&type=people" : "");
+                taskContactRelativeUrl = String.Format("Products/CRM/Default.aspx?id={0}{1}", taskContact.ID, taskContact is Person ? "&type=people" : "");
                 taskContactTitle = taskContact.GetTitle();
             }
 
             if (taskCase != null)
             {
-                taskCaseRelativeUrl = String.Format("products/crm/cases.aspx?id={0}", taskCase.ID);
+                taskCaseRelativeUrl = String.Format("Products/CRM/Cases.aspx?id={0}", taskCase.ID);
                 taskCaseTitle = taskCase.Title.HtmlEncode();
             }
 
             if (taskDeal != null)
             {
-                taskDealRelativeUrl = String.Format("products/crm/deals.aspx?id={0}", taskDeal.ID);
+                taskDealRelativeUrl = String.Format("Products/CRM/Deals.aspx?id={0}", taskDeal.ID);
                 taskDealTitle = taskDeal.Title.HtmlEncode();
             }
            

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -45,6 +36,12 @@
             float: left;
         }
     }
+	/*******************************************************************************
+    button hidden tabs
+*******************************************************************************/
+	.studio-top-button-hidden-tabs{
+		 background: @bg-button-hidden-tabs;
+	}
     /*******************************************************************************
     top logo
 *******************************************************************************/
@@ -65,25 +62,18 @@
             img {
                 border: none;
                 vertical-align: bottom;
+                max-height: 42px;
             }
         }
     }
     &:not(.try-welcome-top) .studio-top-logo .top-logo img { max-height: 23px; }
 
-    .top-logo-partner_name {
-        color: #c5c9d3;
-        font-size: 13px;
-        max-width: 350px;
-        overflow: hidden;
-        white-space: nowrap;
-        display: inline-block;
-        text-overflow: ellipsis;
-        vertical-align: bottom;
+    body.custom-mode .studio-top-logo .top-logo img {
+        max-height: 23px;
     }
 
     .studio-action-panel {
         .dropdown-item {
-            display: block;
             line-height: 32px;
         }
     }
@@ -104,7 +94,7 @@
         }
 
         .usr-prof {
-            .textDotted();
+            text-decoration:none;
             .text-overflow();
             display: inline-block;
             max-width: 220px;
@@ -118,8 +108,6 @@
         padding: 4px;
 
         .inner-text {
-            .borderRadius();
-            background: url("@{img-change-url}top-studio-menu.png") no-repeat 0 0 @bg-header-icons;
             cursor: pointer;
             display: block !important;
             height: 32px;
@@ -140,6 +128,19 @@
                 right: 2px;
                 white-space: nowrap;
             }
+
+            svg {
+                width: 16px;
+                height: 16px;
+                fill: #CFD9E3;
+                position: absolute;
+                top: 8px;
+                left: 8px;
+        }
+
+            &:hover svg {
+                fill: #FFFFFF;
+            }
         }
 
             &.has-led .inner-label,
@@ -149,84 +150,13 @@
                 display: block;
             }
 
-        &.tariffs .inner-text {
-            background-position: 0 0;
-
-            &:hover {
-                background-position: 0 -32px;
-            }
-
-            .inner-label {
+        &.tariffs .inner-text .inner-label {
                 font-size: 9px;
+                max-width: 40px;
+                min-width: 30px;
                 right: -2px;
-                width: 30px;
                 text-align: center;
             }
-        }
-
-        &.calendar .inner-text {
-            background-position: -32px 0;
-
-            &:hover {
-                background-position: -32px -32px;
-            }
-        }
-
-        &.talk .inner-text {
-            background-position: -64px 0;
-
-            &:hover {
-                background-position: -64px -32px;
-            }
-        }
-
-        &.mail .inner-text {
-            background-position: -96px 0;
-
-            &:hover {
-                background-position: -96px -32px;
-            }
-        }
-
-        &.feed .inner-text {
-            background-position: -128px 0;
-
-            &:hover {
-                background-position: -128px -32px;
-            }
-        }
-
-        &.search .inner-text {
-            background-position: -160px 0;
-
-            &:hover {
-                background-position: -160px -32px;
-            }
-        }
-
-        &.settings .inner-text {
-            background-position: -192px 0;
-
-            &:hover {
-                background-position: -192px -32px;
-            }
-        }
-
-        &.video .inner-text {
-            background-position: -224px 0;
-
-            &:hover {
-                background-position: -224px -32px;
-            }
-        }
-
-        &.voip .inner-text {
-            background-position: -256px 0;
-
-            &:hover {
-                background-position: -256px -32px;
-            }
-        }
 
         &.signin {
             margin: 8px 0 0 20px;
@@ -237,6 +167,10 @@
         }
     }
 }
+
+body.desktop .studio-top-panel {
+    display: none;
+}
 /*******************************************************************************
     product-menu
 *******************************************************************************/
@@ -245,58 +179,72 @@
     padding: 4px 0 5px;
     margin: 6px 24px 0 0;
 
+    .active-icon-svg{
+        fill: #cfd9e3;
+        width: 16px;
+        height: 16px;
+    }
+
     .active-icon {
-        background: url("@{img-change-url}dropdown-menu-icons.png") no-repeat 0 15px transparent;
+        background: url("imagescss/icons_nav_panel.png") no-repeat 0 15px transparent;
         display: inline-block;
         float: left;
         height: 16px;
-        margin: 4px 6px 0 0;
+        margin: 2px 6px 0 0;
         vertical-align: middle;
         width: 16px;
 
         &.projects {
-            background-position: 0 -27px;
+            background-position: -15px -52px;
         }
 
         &.crm {
-            background-position: 0 -79px;
-            }
+            background-position: -15px -546px;
+        }
 
         &.documents {
-            background-position: 0 -131px;
+            background-position: -15px -156px;
         }
 
         &.community {
-            background-position: 0 -183px;
+            background-position: -15px -442px;
         }
 
         &.people {
-            background-position: 0 -235px;
+            background-position: -15px -26px;
         }
 
         &.tools {
-            background-position: 0 -287px;
+            background-position: -15px -253px;
         }
 
         &.mail {
-            background-position: 0 -339px;
+            background-position: -15px -1300px;
         }
 
         &.calendar {
-            background-position: 0 -391px;
+            background-position: -15px -208px;
         }
 
         &.feed {
-            background-position: 0 -444px;
+            background-position: -15px -702px;
         }
 
         &.settings {
-            background-position: 0 -495px;
+            background-position: -15px -390px;
+        }
+
+        &.apps {
+            background-position: -15px -832px;
         }
 
         &.talk {
-            background-position: 0 -548px;
+            background-position: -15px -1326px;
         }
+        &.install-apps
+        {
+            background-position: -15px -1347px;
+    }
     }
 
     &.with-subitem {
@@ -310,13 +258,13 @@
     }
 
     .product-cur-link {
-        .textDotted();
         .text-overflow();
+        text-decoration:none;
         color: @textTopPanel;
         float: left;
         font-size: 14px;
         font-weight: bold;
-        max-width: 110px;
+        max-width: 125px;
         outline: none;        
     }
 }
@@ -412,33 +360,6 @@
     }
 }
 
-@media all and (max-width: 1200px) {
-
-    .studio-top-panel {
-        .staff-profile-box {
-            .usr-prof {
-                display: none;
-            }
-
-            .userLink {
-                background: url("@{imagesBaseUrl}user_icon_header.png") 0 bottom no-repeat transparent;
-                height: 12px;
-                padding-top: 3px;
-                width: 12px;
-            }
-        }
-    }
-}
-@media all and (max-width: 1060px) {
-    .studio-top-panel .top-logo-partner_name {
-        max-width: 220px;
-    }
-}
-@media all and (min-width: 1060px) and (max-width: 1300px) {
-    .studio-top-panel .top-logo-partner_name {
-        max-width: 290px;
-    }
-}
 /*******************************************************************************
    FeedReader
 *******************************************************************************/
@@ -457,7 +378,7 @@
         text-align: center;
 
         .list {
-            max-height: 350px;
+            max-height: 360px;
             overflow-y: auto;
             text-align: left;
         }
@@ -597,17 +518,16 @@
 /*******************************************************************************
    For Retina
 *******************************************************************************/
-@media
-only screen and (-webkit-min-device-pixel-ratio: 2),
+@media only screen and (-webkit-min-device-pixel-ratio: 2),
 only screen and (   min--moz-device-pixel-ratio: 2),
 only screen and (     -o-min-device-pixel-ratio: 2/1),
 only screen and (        min-device-pixel-ratio: 2),
 only screen and (                min-resolution: 192dpi),
 only screen and (                min-resolution: 2dppx)
  {
-    .studio-top-panel  .top-item-box .inner-text {  background-image: url("@{img-change-url}top-studio-menu_retina.png"); background-size: 290px 64px;}
-    .product-menu .active-icon { background-image: url("@{img-change-url}dropdown-menu-icons_retina.png"); background-size: 16px 624px; }
-    .studio-action-panel.modules li .dropdown-item { background-image: url("@{img-change-url}dropdown-menu-icons_retina.png"); background-size: 16px 624px; }
+    //.product-menu .active-icon { background-image: url("imagescss/icons_nav_panel_retina.png"); background-size: 32px 1412px; }
+	//.studio-action-panel.modules li .dropdown-item-icon { background-image: url("imagescss/icons_nav_panel_retina.png"); background-size: 32px 1412px; }
+    /*.studio-action-panel.modules li .dropdown-item { background-image: url("@{img-change-url}dropdown-menu-icons_retina.png"); background-size: 16px 624px; }*/
 }
 /*******************************************************************************
    About Compamy Popup
@@ -666,5 +586,96 @@ only screen and (                min-resolution: 2dppx)
 
     li {
         margin-bottom: 6px;
+    }
+}
+.confirmation-copyright {
+    font-size: 11px;
+    margin-top: 48px;
+}
+
+#appsPopupBody {
+    text-align: left;
+
+    .apps-list {
+        max-height: 300px;
+        overflow-y: auto;
+
+        span {
+            border: 1px solid #d1d1d1;
+            display: inline-block;
+            float: left;
+            height: 40px;
+            margin: 5px 5px 0 0;
+            width: 158px;
+            position: relative;
+
+            img {
+                position: absolute;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                right: 0;
+                margin: auto;
+                max-height: 40px;
+                max-width: 150px;
+            }
+        }
+    }
+}
+
+#studio_dropGiftPopupPanel {
+    .drop-list-box {
+        text-align: left;
+        padding-top: 4px;
+    }
+
+    .hdr {
+        font-weight: 600;
+        font-size: 14px;
+        line-height: 19px;
+    }
+
+    .gift-list {
+        margin: 16px 0 16px 0;
+        padding: 0;
+    }
+
+    .gift-item {
+        font-size: 12px;
+        padding: 8px 0 0 32px;
+        min-height: 24px;
+
+        &.gift-item-pro {
+            background: url("images/svg/gift/pro.svg") no-repeat left 6px transparent;
+        }
+
+        &.gift-item-private {
+            background: url("images/svg/gift/private.svg") no-repeat left 6px transparent;
+        }
+
+        &.gift-item-mobile {
+            background: url("images/svg/gift/mobile.svg") no-repeat left 6px transparent;
+        }
+    }
+
+    .btn-box {
+        border-top: 0.5px solid #D1D1D1;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        .left-btn {
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .right-btn {
+            font-weight: bold;
+            font-size: 12px;
+            color: #88888D;
+            cursor: pointer;
+        }
     }
 }

@@ -1,3 +1,20 @@
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
 // tl combobox
 (function ($, win, doc, body) {
   function converText (str) {
@@ -53,7 +70,12 @@
         $helper = $combobox.find('input:first'),
         $option = null,
         value = $this.val();
-        if (value == null && typeof this.value != "undefined"){
+
+      if (!value && !this.value){
+            return;
+        }
+
+      if (value == null && typeof this.value != "undefined"){
             value = this.value;
         }
       var
@@ -78,7 +100,7 @@
   //  $helper.trigger('focus', [false]);
   }
 
-  function onComboboxTitleClick (evt) {
+  function onComboboxTitleClick(evt) {
     var
       $combobox = jQuery(evt.target).parents('span.tl-combobox:first');
 
@@ -98,7 +120,7 @@
       $helper = $combobox.find('input:first'),
       $options = $combobox.find('li.option-item'),
       $selected = $options.filter('.selected-item:first');
-
+    
     $options.removeClass('in-focus');
     if ($selected.length === 0) {
       $selected = $options.not('.hidden').filter(':first');
@@ -219,13 +241,13 @@
     ];
   }
 
-  function renderCombobox (select, options) {
+  function renderCombobox(select, options) {
     var
       html = [],
       option = null,
       optionsvalue = [],
       selectclassname = select.className,
-      selectoption = null;
+      selectoption = options.length ? options[0] : { title: "", value: "" };
 
     for (var i = 0, n = options.length; i < n; i++) {
       option = options[i];
@@ -273,17 +295,16 @@
         node.setAttribute('data-value', optionsvalue[value]);
       }
     }
-
     return o;
   }
 
-  function reRenderCombobox (o, select, options) {
+  function reRenderCombobox(o, select, options) {
     var
       html = [],
       option = null,
       optionsvalue = [],
       selectclassname = select.className,
-      selectoption = null;
+      selectoption = options.length ? options[0] : null;
 
     for (var i = 0, n = options.length; i < n; i++) {
       option = options[i];
@@ -299,15 +320,14 @@
       ul.innerHTML = html.join('');
     } catch (err) {}
 
-    if (selectoption !== null) {
+    if (selectoption != null) {
       try {
         var title = o.firstChild.firstChild;
         title.innerHTML = selectoption.title || '&nbsp;';
         title.setAttribute('title', converText(selectoption.title || '&nbsp;'));
+        o.className = 'tl-combobox' + ' tl-combobox-container' + ' select-value-' + selectoption.value + (selectclassname ? ' ' + selectclassname : '');
       } catch (err) {}
     }
-
-    o.className = 'tl-combobox' + ' tl-combobox-container' + ' select-value-' + selectoption.value + (selectclassname ? ' ' + selectclassname : '');
 
     var
       optionsvalueLen = optionsvalue.length,
@@ -342,6 +362,12 @@
 
     options = select.getElementsByTagName('option');
     optionsInd = options ? options.length : 0;
+
+    if (select.selectedIndex == -1 && options.length) {
+        select.selectedIndex = 0;
+        selectvalue = select.value;
+    }
+
     while (optionsInd--) {
       option = options[optionsInd];
       optionvalue = option.getAttribute('value');
@@ -382,7 +408,6 @@
     //    $select.unbind('focus', onSelectFocus).bind('focus', onSelectFocus);
     //  };
     //})($select), 500);
-
     $select
       //.blur(onSelectBlur)
       //.focus(onSelectFocus)
@@ -401,7 +426,7 @@
 
   $.fn.tlCombobox = $.fn.tlcombobox = function (params) {
     var
-      wasupdated = false,
+      //wasupdated = false,
       select = null,
       combobox = null,
       $selects = $(this),
@@ -431,10 +456,6 @@
       }
     }
 
-    if (jq.browser.mobile === true) {
-      return $selects;
-    }
-
     selectsInd = $selects.length;
     while (selectsInd--) {
       select = $selects[selectsInd];
@@ -448,19 +469,27 @@
       //  };
       //})($(select), $(combobox), bindComboboxEvents), 500);
       $select.addClass('tl-combobox');
-      wasupdated = true;
-    }
 
-    if (wasupdated) {
-      var
-        zindex = 0,
-        $comboboxes = $('span.tl-combobox'),
-        comboboxesInd = $comboboxes.length;
-      while (comboboxesInd--) {
-        $($comboboxes[comboboxesInd]).css('zIndex', ++zindex);
+      if (params && params.hasOwnProperty('align')) {
+          if (params.align == 'left') {
+              $select.parents('span.tl-combobox:first').addClass('left-align');
+          } else {
+              $select.parents('span.tl-combobox:first').removeClass('left-align');
+          }
       }
+
+      //wasupdated = true;
     }
 
+    //if (wasupdated) {
+    //  var
+    //    zindex = 0,
+    //    $comboboxes = $('span.tl-combobox'),
+    //    comboboxesInd = $comboboxes.length;
+    //  while (comboboxesInd--) {
+    //    $($comboboxes[comboboxesInd]).css('zIndex', ++zindex);
+    //  }
+    //}
     return $selects;
   };
 })(jQuery, window, document, document.body);

@@ -1,39 +1,29 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
+
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using ASC.Api.Attributes;
-using ASC.Api.Collections;
 using ASC.Api.Documents;
 using ASC.Api.Employee;
 using ASC.Api.Exceptions;
 using ASC.Api.Projects.Wrappers;
 using ASC.Api.Utils;
-using ASC.Core;
 using ASC.MessagingSystem;
 using ASC.Projects.Core.Domain;
 using ASC.Specific;
@@ -44,32 +34,32 @@ namespace ASC.Api.Projects
 {
     public partial class ProjectApi
     {
-        /// <summary>
-        /// Returns the list with the detailed information about all the message matching the filter parameters specified in the request
-        /// </summary>
-        /// <short>
-        ///  Get message by filter
-        /// </short>
-        ///  <category>Discussions</category>
-        /// <param name="projectid" optional="true"> Project ID</param>
-        /// <param name="tag" optional="true">Project Tag</param>
-        /// <param name="departament" optional="true">Departament GUID</param>
-        /// <param name="participant" optional="true">Participant GUID</param>
-        /// <param name="createdStart" optional="true">Minimum value of message creation date</param>
-        /// <param name="createdStop" optional="true">Maximum value of message creation date</param>
-        /// <param name="lastId">Last message ID</param>
-        /// <param name="myProjects">Messages in my projects</param>
-        /// <param name="follow">Followed messages</param>
-        /// <param name="status"></param>
-        /// <returns>List of messages</returns>
-        /// <exception cref="ItemNotFoundException"></exception>
+        ///<summary>
+        ///Returns the list with the detailed information about all the message matching the filter parameters specified in the request
+        ///</summary>
+        ///<short>
+        /// Get message by filter
+        ///</short>
+        ///<category>Discussions</category>
+        ///<param name="projectid" optional="true"> Project ID</param>
+        ///<param name="tag" optional="true">Project Tag</param>
+        ///<param name="departament" optional="true">Departament GUID</param>
+        ///<param name="participant" optional="true">Participant GUID</param>
+        ///<param name="createdStart" optional="true">Minimum value of message creation date</param>
+        ///<param name="createdStop" optional="true">Maximum value of message creation date</param>
+        ///<param name="lastId">Last message ID</param>
+        ///<param name="myProjects">Messages in my projects</param>
+        ///<param name="follow">Followed messages</param>
+        ///<param name="status"></param>
+        ///<returns>List of messages</returns>
+        ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"message/filter")]
         public IEnumerable<MessageWrapper> GetMessageByFilter(int projectid, int tag, Guid departament, Guid participant,
                                                               ApiDateTime createdStart, ApiDateTime createdStop, int lastId,
                                                               bool myProjects, bool follow, MessageStatus? status)
         {
             var messageEngine = EngineFactory.MessageEngine;
-            var filter = CreateFilter();
+            var filter = CreateFilter(EntityType.Message);
 
             filter.DepartmentId = departament;
             filter.UserId = participant;
@@ -86,7 +76,7 @@ namespace ASC.Api.Projects
 
             SetTotalCount(messageEngine.GetByFilterCount(filter));
 
-            return messageEngine.GetByFilter(filter).NotFoundIfNull().Select(r => new MessageWrapper(r));
+            return messageEngine.GetByFilter(filter).NotFoundIfNull().Select(MessageWrapperSelector).ToList();
         }
 
         ///<summary>
@@ -95,7 +85,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Messages
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<param name="projectid">Project ID</param>
         ///<returns>List of messages</returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -104,9 +94,9 @@ namespace ASC.Api.Projects
         {
             var project = EngineFactory.ProjectEngine.GetByID(projectid).NotFoundIfNull();
 
-            if (!ProjectSecurity.CanReadMessages(project)) throw ProjectSecurity.CreateSecurityException();
+            if (!ProjectSecurity.CanRead<Message>(project)) throw ProjectSecurity.CreateSecurityException();
 
-            return EngineFactory.MessageEngine.GetByProject(projectid).Select(x => new MessageWrapper(x));
+            return EngineFactory.MessageEngine.GetByProject(projectid).Select(MessageWrapperSelector).ToList();
         }
 
         ///<summary>
@@ -115,10 +105,10 @@ namespace ASC.Api.Projects
         ///<short>
         ///Add message
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<param name="projectid">Project ID</param>
         ///<param name="title">Discussion title</param>
-		///<param name="content">Message text</param>
+        ///<param name="content">Message text</param>
         ///<param name="participants">IDs (GUIDs) of users separated with ','</param>
         ///<param name="notify">Notify participants</param>
         ///<returns></returns>
@@ -131,7 +121,7 @@ namespace ASC.Api.Projects
             if (string.IsNullOrEmpty(content)) throw new ArgumentException(@"description can't be empty", "content");
 
             var project = EngineFactory.ProjectEngine.GetByID(projectid).NotFoundIfNull();
-            ProjectSecurity.DemandCreateMessage(project);
+            ProjectSecurity.DemandCreate<Message>(project);
 
             var messageEngine = EngineFactory.MessageEngine;
             var discussion = new Message
@@ -142,9 +132,9 @@ namespace ASC.Api.Projects
             };
 
             messageEngine.SaveOrUpdate(discussion, notify.HasValue ? notify.Value : true, ToGuidList(participants));
-            MessageService.Send(Request, MessageAction.DiscussionCreated, discussion.Project.Title, discussion.Title);
-            
-            return new MessageWrapper(discussion);
+            MessageService.Send(Request, MessageAction.DiscussionCreated, MessageTarget.Create(discussion.ID), discussion.Project.Title, discussion.Title);
+
+            return MessageWrapperSelector(discussion);
         }
 
         ///<summary>
@@ -153,7 +143,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Update message
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<param name="messageid">Message ID</param>
         ///<param name="projectid">Project ID</param>
         ///<param name="title">Discussion title</param>
@@ -164,7 +154,7 @@ namespace ASC.Api.Projects
         ///<exception cref="ArgumentException"></exception>
         ///<exception cref="ItemNotFoundException"></exception>
         [Update(@"message/{messageid:[0-9]+}")]
-        public MessageWrapper UpdateProjectMessage(int messageid, int projectid, string title, string content, string participants, bool? notify)
+        public MessageWrapperFull UpdateProjectMessage(int messageid, int projectid, string title, string content, string participants, bool? notify)
         {
             var messageEngine = EngineFactory.MessageEngine;
             
@@ -177,9 +167,9 @@ namespace ASC.Api.Projects
             discussion.Title = Update.IfNotEmptyAndNotEquals(discussion.Title, title);
 
             messageEngine.SaveOrUpdate(discussion, notify.HasValue ? notify.Value : true, ToGuidList(participants));
-            MessageService.Send(Request, MessageAction.DiscussionUpdated, discussion.Project.Title, discussion.Title);
+            MessageService.Send(Request, MessageAction.DiscussionUpdated, MessageTarget.Create(discussion.ID), discussion.Project.Title, discussion.Title);
 
-            return new MessageWrapper(discussion);
+            return new MessageWrapperFull(this, discussion, new ProjectWrapperFull(this, discussion.Project, EngineFactory.FileEngine.GetRoot(discussion.Project.ID)),  GetProjectMessageSubscribers(messageid));
         }
 
         ///<summary>
@@ -188,7 +178,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Update message status
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<param name="messageid">Message ID</param>
         ///<param name="status">Project ID</param>
         ///<returns></returns>
@@ -203,9 +193,9 @@ namespace ASC.Api.Projects
 
             discussion.Status = status;
             messageEngine.ChangeStatus(discussion);
-            MessageService.Send(Request, MessageAction.DiscussionUpdated, discussion.Project.Title, discussion.Title);
+            MessageService.Send(Request, MessageAction.DiscussionUpdated, MessageTarget.Create(discussion.ID), discussion.Project.Title, discussion.Title);
 
-            return new MessageWrapper(discussion);
+            return MessageWrapperSelector(discussion);
         }
 
         ///<summary>
@@ -214,7 +204,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Delete message
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<param name="messageid">Message ID</param>
         ///<returns></returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -227,16 +217,16 @@ namespace ASC.Api.Projects
             ProjectSecurity.DemandEdit(discussion);
             
             discussionEngine.Delete(discussion);
-            MessageService.Send(Request, MessageAction.DiscussionDeleted, discussion.Project.Title, discussion.Title);
-            
-            return new MessageWrapper(discussion);
+            MessageService.Send(Request, MessageAction.DiscussionDeleted, MessageTarget.Create(discussion.ID), discussion.Project.Title, discussion.Title);
+
+            return MessageWrapperSelector(discussion);
         }
 
         private static IEnumerable<Guid> ToGuidList(string participants)
         {
-            return !string.IsNullOrEmpty(participants) ?
-                participants.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(x => new Guid(x))
-                : new List<Guid>();
+            return participants != null ?
+                 participants.Equals(string.Empty) ? new List<Guid>() : participants.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(x => new Guid(x))
+                : null;
         }
 
         ///<summary>
@@ -245,14 +235,19 @@ namespace ASC.Api.Projects
         ///<short>
         ///Message
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<param name="messageid">Message ID</param>
         ///<returns>Message</returns>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"message/{messageid:[0-9]+}")]
-        public MessageWrapper GetProjectMessage(int messageid)
+        public MessageWrapperFull GetProjectMessage(int messageid)
         {
-            return new MessageWrapper(EngineFactory.MessageEngine.GetByID(messageid).NotFoundIfNull());
+            var discussion = EngineFactory.MessageEngine.GetByID(messageid).NotFoundIfNull();
+            var project = ProjectWrapperFullSelector(discussion.Project, EngineFactory.FileEngine.GetRoot(discussion.Project.ID));
+            var subscribers = GetProjectMessageSubscribers(messageid);
+            var files = EngineFactory.MessageEngine.GetFiles(discussion).Select(FileWrapperSelector);
+            var comments = EngineFactory.CommentEngine.GetComments(discussion);
+            return new MessageWrapperFull(this, discussion, project, subscribers, files, comments.Where(r=>r.Parent.Equals(Guid.Empty)).Select(x => GetCommentInfo(comments, x, discussion)).ToList());
         }
 
         ///<summary>
@@ -261,7 +256,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Message files
         ///</short>
-        /// <category>Files</category>
+        ///<category>Files</category>
         ///<param name="messageid">Message ID</param>
         ///<returns> List of message files</returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -273,16 +268,16 @@ namespace ASC.Api.Projects
 
             ProjectSecurity.DemandReadFiles(message.Project);
 
-            return messageEngine.GetFiles(message).Select(x => new FileWrapper(x));
+            return messageEngine.GetFiles(message).Select(FileWrapperSelector);
         }
 
         ///<summary>
-        /// Uploads the file specified in the request to the selected message
+        ///Uploads the file specified in the request to the selected message
         ///</summary>
         ///<short>
-        /// Upload file to message
+        ///Upload file to message
         ///</short>
-        /// <category>Files</category>
+        ///<category>Files</category>
         ///<param name="messageid">Message ID</param>
         ///<param name="files">File ID</param>
         ///<returns>Message</returns>
@@ -297,28 +292,28 @@ namespace ASC.Api.Projects
             ProjectSecurity.DemandReadFiles(discussion.Project);
 
             var filesList = files.ToList();
-            var fileNames = new List<string>();
+            var attachments = new List<Files.Core.File>();
             foreach (var fileid in filesList)
             {
                 var file = fileEngine.GetFile(fileid).NotFoundIfNull();
-                fileNames.Add(file.Title);
+                attachments.Add(file);
                 messageEngine.AttachFile(discussion, file.ID, true);
             }
 
-            MessageService.Send(Request, MessageAction.DiscussionAttachedFiles, discussion.Project.Title, discussion.Title, fileNames);
+            MessageService.Send(Request, MessageAction.DiscussionAttachedFiles, MessageTarget.Create(discussion.ID), discussion.Project.Title, discussion.Title, attachments.Select(x => x.Title));
 
-            return new MessageWrapper(discussion);
+            return MessageWrapperSelector(discussion);
         }
 
         ///<summary>
-        /// Detaches the selected file from the message with the ID specified in the request
+        ///Detaches the selected file from the message with the ID specified in the request
         ///</summary>
         ///<short>
-        /// Detach file from message
+        ///Detach file from message
         ///</short>
-        /// <category>Files</category>
-		///<param name="messageid">Message ID</param>
-		///<param name="fileid">File ID</param>
+        ///<category>Files</category>
+        ///<param name="messageid">Message ID</param>
+        ///<param name="fileid">File ID</param>
         ///<returns>Message</returns>
         ///<exception cref="ItemNotFoundException"></exception>
         [Delete(@"message/{messageid:[0-9]+}/files")]
@@ -332,9 +327,44 @@ namespace ASC.Api.Projects
             var file = EngineFactory.FileEngine.GetFile(fileid).NotFoundIfNull();
             
             messageEngine.DetachFile(discussion, fileid);
-            MessageService.Send(Request, MessageAction.DiscussionDetachedFile, discussion.Project.Title, discussion.Title, file.Title);
+            MessageService.Send(Request, MessageAction.DiscussionDetachedFile, MessageTarget.Create(discussion.ID), discussion.Project.Title, discussion.Title, file.Title);
 
-            return new MessageWrapper(discussion);
+            return MessageWrapperSelector(discussion);
+        }
+
+        ///<summary>
+        ///Detaches the selected file from the message with the ID specified in the request
+        ///</summary>
+        ///<short>
+        ///Detach file from message
+        ///</short>
+        ///<category>Files</category>
+        ///<param name="messageid">Message ID</param>
+        ///<param name="files">File ID</param>
+        ///<returns>Message</returns>
+        ///<exception cref="ItemNotFoundException"></exception>
+        ///<visible>false</visible>
+        [Delete(@"message/{messageid:[0-9]+}/filesmany")]
+        public MessageWrapper DetachFileFromMessage(int messageid, IEnumerable<int> files)
+        {
+            var messageEngine = EngineFactory.MessageEngine;
+            var fileEngine = EngineFactory.FileEngine;
+
+            var discussion = messageEngine.GetByID(messageid).NotFoundIfNull();
+            ProjectSecurity.DemandReadFiles(discussion.Project);
+
+            var filesList = files.ToList();
+            var attachments = new List<Files.Core.File>();
+            foreach (var fileid in filesList)
+            {
+                var file = fileEngine.GetFile(fileid).NotFoundIfNull();
+                attachments.Add(file);
+                messageEngine.DetachFile(discussion, fileid);
+            }
+
+            MessageService.Send(Request, MessageAction.DiscussionDetachedFile, MessageTarget.Create(discussion.ID), discussion.Project.Title, discussion.Title, attachments.Select(x => x.Title));
+
+            return MessageWrapperSelector(discussion);
         }
 
         ///<summary>
@@ -343,13 +373,13 @@ namespace ASC.Api.Projects
         ///<short>
         ///Latest messages
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<returns>List of messages</returns>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"message")]
         public IEnumerable<MessageWrapper> GetProjectRecentMessages()
         {
-            return EngineFactory.MessageEngine.GetMessages((int)StartIndex, (int)Count).Select(x => new MessageWrapper(x));
+            return EngineFactory.MessageEngine.GetMessages((int)StartIndex, (int)Count).Select(MessageWrapperSelector);
         }
 
         ///<summary>
@@ -358,7 +388,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Message comments
         ///</short>
-        /// <category>Comments</category>
+        ///<category>Comments</category>
         ///<param name="messageid">Message ID</param>
         ///<returns>Comments for message</returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -366,9 +396,9 @@ namespace ASC.Api.Projects
         public IEnumerable<CommentWrapper> GetProjectMessagesComments(int messageid)
         {
             var messageEngine = EngineFactory.MessageEngine;
+            var message = messageEngine.GetByID(messageid).NotFoundIfNull();
 
-            if (!messageEngine.IsExists(messageid)) throw new ItemNotFoundException();
-            return EngineFactory.CommentEngine.GetComments(messageEngine.GetByID(messageid)).Select(x => new CommentWrapper(x));
+            return EngineFactory.CommentEngine.GetComments(message).Select(x => new CommentWrapper(this, x, message));
         }
 
         ///<summary>
@@ -377,7 +407,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Add message comment
         ///</short>
-        /// <category>Comments</category>
+        ///<category>Comments</category>
         ///<param name="messageid">Message ID</param>
         ///<param name="content">Comment content</param>
         ///<param name="parentId">Parrent comment ID</param>
@@ -405,10 +435,10 @@ namespace ASC.Api.Projects
             var message = EngineFactory.CommentEngine.GetEntityByTargetUniqId(comment).NotFoundIfNull();
 
             EngineFactory.CommentEngine.SaveOrUpdateComment(message, comment);
+
+            MessageService.Send(Request, MessageAction.DiscussionCommentCreated, MessageTarget.Create(comment.ID), message.Project.Title, message.Title);
             
-            MessageService.Send(Request, MessageAction.DiscussionCommentCreated, message.Project.Title, message.Title);
-            
-            return new CommentWrapper(comment);
+            return new CommentWrapper(this, comment, message);
         }
 
         ///<summary>
@@ -417,9 +447,9 @@ namespace ASC.Api.Projects
         ///<short>
         ///Subscribe to message action
         ///</short>
-        /// <category>Discussions</category>
-        /// <returns>Discussion</returns>
-		///<param name="messageid">Message ID</param>
+        ///<category>Discussions</category>
+        ///<returns>Discussion</returns>
+        ///<param name="messageid">Message ID</param>
         ///<exception cref="ItemNotFoundException"></exception>
         [Update(@"message/{messageid:[0-9]+}/subscribe")]
         public MessageWrapper SubscribeToMessage(int messageid)
@@ -430,9 +460,9 @@ namespace ASC.Api.Projects
             ProjectSecurity.DemandAuthentication();
 
             discussionEngine.Follow(discussion);
-            MessageService.Send(Request, MessageAction.DiscussionUpdatedFollowing, discussion.Project.Title, discussion.Title);
+            MessageService.Send(Request, MessageAction.DiscussionUpdatedFollowing, MessageTarget.Create(discussion.ID), discussion.Project.Title, discussion.Title);
 
-            return new MessageWrapper(discussion);
+            return new MessageWrapperFull(this, discussion, ProjectWrapperFullSelector(discussion.Project, EngineFactory.FileEngine.GetRoot(discussion.Project.ID)), GetProjectMessageSubscribers(messageid));
         }
 
         ///<summary>
@@ -441,8 +471,8 @@ namespace ASC.Api.Projects
         ///<short>
         ///Check subscription to discussion action
         ///</short>
-        /// <category>Discussions</category>
-		///<param name="messageid">Message ID</param>
+        ///<category>Discussions</category>
+        ///<param name="messageid">Message ID</param>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"message/{messageid:[0-9]+}/subscribe")]
         public bool IsSubscribedToMessage(int messageid)
@@ -462,7 +492,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Get subscribers
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<param name="messageid">Message ID</param>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"message/{messageid:[0-9]+}/subscribes")]
@@ -474,7 +504,7 @@ namespace ASC.Api.Projects
 
             ProjectSecurity.DemandAuthentication();
 
-            return messageEngine.GetSubscribers(message).Select(r=> new EmployeeWraperFull(CoreContext.UserManager.GetUsers(new Guid(r.ID))))
+            return messageEngine.GetSubscribers(message).Select(r=> GetEmployeeWraperFull(new Guid(r.ID)))
                 .OrderBy(r=> r.DisplayName).ToList();
         }
 
@@ -484,7 +514,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Get preview
         ///</short>
-        /// <category>Discussions</category>
+        ///<category>Discussions</category>
         ///<param name="htmltext">html to create preview</param>
         [Create(@"message/discussion/preview")]
         public string GetPreview(string htmltext)

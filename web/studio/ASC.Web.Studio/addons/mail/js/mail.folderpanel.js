@@ -1,25 +1,16 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,13 +19,14 @@ window.folderPanel = (function($) {
     var isInit = false,
         wndQuestion = undefined,
         clearFolderId = -1,
-        folders = [];
+        folders = [],
+        userFoldersInfo = null;
 
     function init() {
         if (isInit === false) {
             isInit = true;
 
-            serviceManager.bind(window.Teamlab.events.getMailFolders, onGetMailFolders);
+            window.Teamlab.bind(window.Teamlab.events.getMailFolders, onGetMailFolders);
             
             if (ASC.Mail.Presets.Folders) {
                 onGetMailFolders({}, ASC.Mail.Presets.Folders);
@@ -62,6 +54,10 @@ window.folderPanel = (function($) {
                 }
                 window.ASC.Mail.ga_track(ga_Categories.folder, ga_Actions.filterClick, text);
 
+                if (TMMail.pageIs('viewmessage') && MailFilter.getFolder() == clearFolderId) {
+                    mailBox.updateAnchor(true, true);
+                }
+
                 clearFolderId = -1;
                 hide();
                 return false;
@@ -78,39 +74,7 @@ window.folderPanel = (function($) {
         wndQuestion.find('.mail-confirmationAction p.questionText').text(questionText);
         wndQuestion.find('div.containerHeaderBlock:first td:first').html(window.MailScriptResource.Delete);
 
-        var margintop = jq(window).scrollTop() - 135;
-        margintop = margintop + 'px';
-        jq.blockUI({
-            message: wndQuestion,
-            css: {
-                left: '50%',
-                top: '25%',
-                opacity: '1',
-                border: 'none',
-                padding: '0px',
-                width: '335px',
-
-                cursor: 'default',
-                textAlign: 'left',
-                position: 'absolute',
-                'margin-left': '-167px',
-                'margin-top': margintop,
-                'background-color': 'White'
-            },
-            overlayCSS: {
-                backgroundColor: '#AAA',
-                cursor: 'default',
-                opacity: '0.3'
-            },
-            focusInput: false,
-            baseZ: 666,
-
-            fadeIn: 0,
-            fadeOut: 0,
-
-            onBlock: function() {
-            }
-        });
+        StudioBlockUIManager.blockUI(wndQuestion, 335, { bindEvents: false });
     }
 
     function hide() {
@@ -121,7 +85,7 @@ window.folderPanel = (function($) {
         $('#foldersContainer').children().each(function() {
             var $this = $(this),
                 folder = parseInt($this.attr('folderid'));
-
+            
             $this.find('a').attr('href', '#' + TMMail.getSysFolderNameById(folder));
 
             if (folder === TMMail.sysfolders.trash.id ||
@@ -143,8 +107,12 @@ window.folderPanel = (function($) {
     }
 
     function markFolder(folderId) {
+        if (folderId === TMMail.sysfolders.userfolder.id)
+            return;
+
         $('#foldersContainer > .active').removeClass('active');
         $('#foldersContainer').children('[folderid=' + folderId + ']').addClass('active');
+        MailFilter.setFolder(folderId);
     }
 
     function getMarkedFolder() {
@@ -164,10 +132,47 @@ window.folderPanel = (function($) {
         return pos;
     }
 
-    function onGetMailFolders(params, newFolders) {
-        if (!newFolders.length) {
+    function onGetMailFolders(params, respFolders) {
+        if (!respFolders.length) {
             return;
         }
+        var isChainsEnabled = commonSettingsPage.isConversationsEnabled();
+        var newFolders = [];
+
+        respFolders.forEach(function (f) {
+            if (f.id == TMMail.sysfolders.userfolder.id) {
+                if (userFoldersInfo === null) {
+                    userFoldersInfo = {
+                        id: f.id,
+                        time_modified: f.time_modified,
+                        total_count: isChainsEnabled ? f.total_count : f.total_messages_count,
+                        unread: isChainsEnabled ? f.unread : f.unread_messages
+                    };
+                } else {
+                    var temp = {
+                        id: f.id,
+                        time_modified: f.time_modified,
+                        total_count: isChainsEnabled ? f.total_count : f.total_messages_count,
+                        unread: isChainsEnabled ? f.unread : f.unread_messages
+                    };
+
+                    if (params.forced ||
+                        userFoldersInfo.unread !== temp.unread ||
+                        userFoldersInfo.total_count !== temp.total_count) {
+                        userFoldersManager.reloadTree(0);
+                        userFoldersInfo = temp;
+                    }
+                }
+                return;
+            }
+
+            newFolders.push({
+                id: f.id,
+                time_modified: f.time_modified,
+                total_count: isChainsEnabled ? f.total_count : f.total_messages_count,
+                unread: isChainsEnabled ? f.unread : f.unread_messages
+            });
+        });
 
         var marked = getMarkedFolder() || -1; // -1 if no folder selected
 
@@ -198,21 +203,27 @@ window.folderPanel = (function($) {
             if (params.check_conversations_on_changes) {
                 var currentFolder = MailFilter.getFolder();
                 pos = searchFolderById(changedFolders, currentFolder);
-                if (pos > -1)
-                    serviceManager.getMailFilteredConversations();
+                if (pos > -1) {
+                    if (commonSettingsPage.isConversationsEnabled())
+                        serviceManager.getMailFilteredConversations();
+                    else
+                        serviceManager.getMailFilteredMessages();
+                }
             }
         }
 
         folders = newFolders;
 
         var storedCount = localStorageManager.getItem("MailUreadMessagesCount");
-        var unread = folders[0].unread_messages;
+        var unread = respFolders[0].unread_messages;
         if (storedCount !== unread) {
             localStorageManager.setItem("MailUreadMessagesCount", unread);
         }
 
         var html = $.tmpl('foldersTmpl', newFolders, { marked: marked });
-        $('#foldersContainer').html(html);
+        var newHtml = [];
+        newHtml.push(html[0], html[1], html[2], html[5], html[3], html[4]);
+        $('#foldersContainer').html(newHtml);
 
         initFolders();
 
@@ -234,9 +245,12 @@ window.folderPanel = (function($) {
     }
 
     function setCount(folderEl, count) {
+        var unreadEl = folderEl.find('.unread');
         folderEl.attr('unread', count);
         var countText = count ? count : "";
-        folderEl.find('.unread').text(countText);
+        unreadEl.toggleClass("new-label-menu", count > 0);
+        unreadEl.toggleClass("nohover", count > 0);
+        unreadEl.text(countText);
     }
 
     function getFolderEl(folderId) {

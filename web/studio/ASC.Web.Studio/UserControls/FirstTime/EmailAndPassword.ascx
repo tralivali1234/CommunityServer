@@ -1,7 +1,10 @@
 ﻿<%@ Control Language="C#" AutoEventWireup="true" CodeBehind="EmailAndPassword.ascx.cs" Inherits="ASC.Web.Studio.UserControls.FirstTime.EmailAndPassword" %>
 
 <%@ Import Namespace="ASC.Core" %>
+<%@ Import Namespace="ASC.Web.Core.Utility" %>
 <%@ Import Namespace="ASC.Web.Studio.Core" %>
+<%@ Import Namespace="ASC.Web.Studio.Core.Users" %>
+<%@ Import Namespace="ASC.Web.Studio.Utility" %>
 <%@ Import Namespace="Resources" %>
 
 <div id="requiredStep" class="clearFix">
@@ -10,10 +13,12 @@
         <div class="clearFix">
             <div class="pwd clearFix">
                 <div class="label">
-                    <%= Resource.EmailAndPasswordTypePassword %> <span class="info"><%= Resource.EmailAndPasswordTypePasswordRecommendations %></span><span>*</span>
+                    <%= Resource.EmailAndPasswordTypePassword %> <span class="info"><%= string.Format(Resource.EmailAndPasswordTypePasswordRecommendation, PasswordSetting.MinLength) %></span><span>*</span>
                 </div>
                 <div class="float-left">
-                    <input type="password" id="newPwd" class="textEdit" maxlength="30" />
+                    <input type="password" id="newPwd" class="textEdit" maxlength="<%= PasswordSettings.MaxLength %>"
+                        data-regex="<%: ASC.Web.Core.Utility.PasswordSettings.GetPasswordRegex(PasswordSetting) %>"
+                        data-help="<%= UserManagerWrapper.GetPasswordHelpMessage() %>" />
                 </div>
             </div>
             <div class="pwd">
@@ -21,7 +26,7 @@
                     <%= Resource.EmailAndPasswordConfirmPassword %><span>*</span>
                 </div>
                 <div>
-                    <input type="password" id="confPwd" class="textEdit" maxlength="30" />
+                    <input type="password" id="confPwd" class="textEdit" maxlength="<%= PasswordSettings.MaxLength %>" />
                 </div>
             </div>
             <% if (IsVisiblePromocode)
@@ -33,6 +38,15 @@
                 </div>
             </div>
             <% } %>
+            <% if (IsAmi)
+                { %>
+            <div>
+                <div class="label"><%= Resource.EmailAndPasswordAmiId %></div>
+                <div>
+                    <input id="amiid" class="textEdit" maxlength="50" />
+                </div>
+            </div>
+            <% } %>
         </div>
         <% if (RequestLicense)
             { %>
@@ -41,9 +55,10 @@
         <div class="header-base"><%= UserControlsCommonResource.LicenseKeyHeader %></div>
         <div class="pwd">
             <div class="label">
-                <%= UserControlsCommonResource.LicenseKeyLabel %><span>*</span>
+                <%= UserControlsCommonResource.LicenseKeyLabelV11 %><span>*</span>
             </div>
             <div class="clearFix">
+                <input type="file" id="uploadButton" />
                 <a id="licenseKey" class="button gray"><%= UserControlsCommonResource.UploadFile %></a>
                 <span id="licenseKeyText"></span>
             </div>
@@ -59,7 +74,7 @@
             </span>
             <span class="email">
                 <span class="emailAddress">
-                    <%= CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).Email %>
+                    <%= CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID).Email.HtmlEncode() %>
                 </span>
                 <span class="changeEmail">
                     <span id="dvChangeMail"><a class="info link dotline blue" onclick="ASC.Controls.EmailAndPasswordManager.ShowChangeEmailAddress();"><%= Resource.EmailAndPasswordTypeChangeIt %></a></span>
@@ -99,16 +114,26 @@
     <label for="policyAccepted">
         <%= string.Format(UserControlsCommonResource.LicenseAgreements,
                           "<a href=\"" + Settings.LicenseAgreementsUrl + "\" target=\"_blank\">",
-                          "</a>") %></label>
+                          "</a>") %><span>*</span></label>
 </div>
 <% }
-   else if (CoreContext.Configuration.Standalone && String.IsNullOrEmpty(SetupInfo.ControlPanelUrl))
+   else if (TenantExtra.Opensource && !CoreContext.Configuration.CustomMode)
    { %>
+<div class="subscribe-accept">
+    <input type="checkbox" id="subscribeFromSite" />
+    <label for="subscribeFromSite">
+        <%= UserControlsCommonResource.SubscribeSite %></label>
+</div>
+<div class="analytics-accept">
+    <input type="checkbox" id="analyticsAcceptedOpenSource" />
+    <label for="analyticsAcceptedOpenSource">
+        <%= string.Format(UserControlsCommonResource.AnalyticsOpenSource) %></label>
+</div>
 <div class="license-accept">
     <input type="checkbox" id="policyAcceptedOpenSource">
     <label for="policyAcceptedOpenSource">
         <%= string.Format(UserControlsCommonResource.LicenseAgreements,
-                          "<a href=\"https://www.gnu.org/licenses/gpl-3.0.html\" target=\"_blank\">",
-                          "</a>") %></label>
+                          "<a href=\"" + OpensourceLicenseAgreementsUrl + "\" target=\"_blank\">",
+                          "</a>") %><span>*</span></label>
 </div>
 <% } %>

@@ -1,33 +1,24 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
-using ASC.Projects.Core.DataInterfaces;
-using ASC.Projects.Data;
 using ASC.Web.Core;
+using ASC.Web.Projects.Core;
+using Autofac;
 
 namespace ASC.Projects.Engine
 {
@@ -35,91 +26,55 @@ namespace ASC.Projects.Engine
     {
         public static readonly Guid ProductId = WebItemManager.ProjectsProductID;
 
-        private readonly IDaoFactory daoFactory;
+        public TypedParameter DisableNotifications { get; set; }
 
-        public bool DisableNotifications { get; set; }
+        public ILifetimeScope Container { get; set; }
 
-        public EngineFactory(string dbId, int tenantID)
+        public EngineFactory(bool disableNotifications)
         {
-            daoFactory = new DaoFactory(dbId, tenantID);
+            DisableNotifications = DIHelper.GetParameter(disableNotifications);
         }
 
         private FileEngine fileEngine;
-        public FileEngine FileEngine
-        {
-            get { return fileEngine ?? (fileEngine = new FileEngine()); }
-        }
+        public FileEngine FileEngine { get { return fileEngine ?? (fileEngine = Container.Resolve<FileEngine>()); } }
 
         private ProjectEngine projectEngine;
-        public ProjectEngine ProjectEngine
-        {
-            get { return projectEngine ?? (projectEngine = new CachedProjectEngine(daoFactory, this)); }
-        }
+        public ProjectEngine ProjectEngine { get { return projectEngine ?? (projectEngine = Container.Resolve<ProjectEngine>(DisableNotifications)); } }
 
         private MilestoneEngine milestoneEngine;
-        public MilestoneEngine MilestoneEngine
-        {
-            get { return milestoneEngine ?? (milestoneEngine = new MilestoneEngine(daoFactory, this)); }
-        }
+        public MilestoneEngine MilestoneEngine { get { return milestoneEngine ?? (milestoneEngine = Container.Resolve<MilestoneEngine>(DisableNotifications)); } }
 
         private CommentEngine commentEngine;
-        public CommentEngine CommentEngine
-        {
-            get { return commentEngine ?? (commentEngine = new CommentEngine(daoFactory, this)); }
-        }
+        public CommentEngine CommentEngine { get { return commentEngine ?? (commentEngine = Container.Resolve<CommentEngine>(DisableNotifications)); } }
 
         private SearchEngine searchEngine;
-        public SearchEngine SearchEngine
-        {
-            get { return searchEngine ?? (searchEngine = new SearchEngine(daoFactory, this)); }
-        }
+        public SearchEngine SearchEngine { get { return searchEngine ?? (searchEngine = Container.Resolve<SearchEngine>()); } }
 
         private TaskEngine taskEngine;
-        public TaskEngine TaskEngine
-        {
-            get { return taskEngine ?? (taskEngine = new TaskEngine(daoFactory, this)); }
-        }
+        public TaskEngine TaskEngine { get { return taskEngine ?? (taskEngine = Container.Resolve<TaskEngine>(DisableNotifications)); } }
 
         private SubtaskEngine subtaskEngine;
-        public SubtaskEngine SubtaskEngine
-        {
-            get { return subtaskEngine ?? (subtaskEngine = new SubtaskEngine(daoFactory, this)); }
-        }
+        public SubtaskEngine SubtaskEngine { get { return subtaskEngine ?? (subtaskEngine = Container.Resolve<SubtaskEngine>(DisableNotifications)); } }
 
         private MessageEngine messageEngine;
-        public MessageEngine MessageEngine
-        {
-            get { return messageEngine ?? (messageEngine = new MessageEngine(daoFactory, this)); }
-        }
+        public MessageEngine MessageEngine { get { return messageEngine ?? (messageEngine = Container.Resolve<MessageEngine>(DisableNotifications)); } }
 
         private TimeTrackingEngine timeTrackingEngine;
-        public TimeTrackingEngine TimeTrackingEngine
-        {
-            get { return timeTrackingEngine ?? (timeTrackingEngine = new TimeTrackingEngine(daoFactory)); }
-        }
+        public TimeTrackingEngine TimeTrackingEngine { get { return timeTrackingEngine ?? (timeTrackingEngine =Container.Resolve<TimeTrackingEngine>()); } }
 
         private ParticipantEngine participantEngine;
-        public ParticipantEngine ParticipantEngine
-        {
-            get { return participantEngine ?? (participantEngine = new ParticipantEngine(daoFactory)); }
-        }
+        public ParticipantEngine ParticipantEngine { get { return participantEngine ?? (participantEngine = Container.Resolve<ParticipantEngine>()); } }
 
         private TagEngine tagEngine;
-        public TagEngine TagEngine
-        {
-            get { return tagEngine ?? (tagEngine = new TagEngine(daoFactory)); }
-        }
+        public TagEngine TagEngine { get { return tagEngine ?? (tagEngine = Container.Resolve<TagEngine>()); } }
 
         private ReportEngine reportEngine;
-        public ReportEngine ReportEngine
-        {
-            get { return reportEngine ?? (reportEngine = new ReportEngine(daoFactory, this)); }
-        }
+        public ReportEngine ReportEngine { get { return reportEngine ?? (reportEngine = Container.Resolve<ReportEngine>()); } }
 
         private TemplateEngine templateEngine;
-        public TemplateEngine TemplateEngine
-        {
-            get { return templateEngine ?? (templateEngine = new TemplateEngine(daoFactory)); }
-        }
+        public TemplateEngine TemplateEngine { get { return templateEngine ?? (templateEngine = Container.Resolve<TemplateEngine>()); } }
+
+        private StatusEngine statusEngine;
+        public StatusEngine StatusEngine { get { return statusEngine ?? (statusEngine = Container.Resolve<StatusEngine>()); } }
     }
 }

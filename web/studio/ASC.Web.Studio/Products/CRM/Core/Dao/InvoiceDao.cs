@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,21 +19,17 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Web.Caching;
+using System.Text.RegularExpressions;
 using ASC.Collections;
-using ASC.Common.Data;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
 using ASC.Core.Tenants;
 using ASC.CRM.Core.Entities;
-using ASC.FullTextIndex;
+using ASC.ElasticSearch;
 using ASC.Web.CRM.Classes;
-using ASC.Web.Core.Utility.Settings;
-using ASC.Web.Studio.Utility;
-using SecurityContext = ASC.Core.SecurityContext;
-using System.Security;
+using ASC.Web.CRM.Core.Search;
 using Newtonsoft.Json;
-using System.Text.RegularExpressions;
+using SecurityContext = ASC.Core.SecurityContext;
 
 namespace ASC.CRM.Core.Dao
 {
@@ -50,8 +37,8 @@ namespace ASC.CRM.Core.Dao
     {
         private readonly HttpRequestDictionary<Invoice> _invoiceCache = new HttpRequestDictionary<Invoice>("crm_invoice");
 
-        public CachedInvoiceDao(int tenantID, string storageKey)
-            : base(tenantID, storageKey)
+        public CachedInvoiceDao(int tenantID)
+            : base(tenantID)
         {
         }
 
@@ -97,91 +84,70 @@ namespace ASC.CRM.Core.Dao
             new KeyValuePair<InvoiceStatus, InvoiceStatus>(InvoiceStatus.Paid, InvoiceStatus.Sent)//Bug 23450
         };
 
-        public InvoiceDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public InvoiceDao(int tenantID)
+            : base(tenantID)
         {
         }
 
         public Boolean IsExist(int invoiceID)
         {
-            using (var db = GetDb())
-            {
-                return IsExist(invoiceID, db);
-            }
+            return IsExistFromDb(invoiceID);
         }
 
 
-        public Boolean IsExist(int invoiceID, DbManager db)
+        public Boolean IsExistFromDb(int invoiceID)
         {
-            return db.ExecuteScalar<bool>(@"select exists(select 1 from crm_invoice where tenant_id = @tid and id = @id)",
+            return Db.ExecuteScalar<bool>(@"select exists(select 1 from crm_invoice where tenant_id = @tid and id = @id)",
                 new { tid = TenantID, id = invoiceID });
         }
 
         public Boolean IsExist(string number)
         {
-            using (var db = GetDb())
-            {
-                return IsExist(number, db);
-            }
+            return IsExistFromDb(number);
         }
 
-        public Boolean IsExist(string number, DbManager db)
+        public Boolean IsExistFromDb(string number)
         {
             var q = new SqlQuery("crm_invoice")
                 .SelectCount()
                 .Where("tenant_id", TenantID)
                 .Where("number", number);
-            return db.ExecuteScalar<int>(q) > 0;
+            return Db.ExecuteScalar<int>(q) > 0;
         }
 
         #region Get
 
         public virtual List<Invoice> GetAll()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceSqlQuery(null, null)).ConvertAll(ToInvoice);
-            }
+            return Db.ExecuteList(GetInvoiceSqlQuery(null, null)).ConvertAll(ToInvoice);
         }
 
         public virtual List<Invoice> GetByID(int[] ids)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceSqlQuery(Exp.In("id", ids), null)).ConvertAll(ToInvoice);
-            }
+            return Db.ExecuteList(GetInvoiceSqlQuery(Exp.In("id", ids), null)).ConvertAll(ToInvoice);
         }
 
         public virtual Invoice GetByID(int id)
         {
-            using (var db = GetDb())
-            {
-                return GetByID(id, db);
-            }
+            return GetByIDFromDb(id);
         }
 
-        public virtual Invoice GetByID(int id, DbManager db)
+        public virtual Invoice GetByIDFromDb(int id)
         {
-            var invoices = db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("id", id), null)).ConvertAll(ToInvoice);
+            var invoices = Db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("id", id), null)).ConvertAll(ToInvoice);
             return invoices.Count > 0 ? invoices[0] : null;
         }
 
         public Invoice GetByNumber(string number)
         {
-            using (var db = GetDb())
-            {
-                var invoices = db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("number", number), null)).ConvertAll(ToInvoice);
-                return invoices.Count > 0 ? invoices[0] : null;
-            }
+            var invoices = Db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("number", number), null)).ConvertAll(ToInvoice);
+            return invoices.Count > 0 ? invoices[0] : null;
         }
 
         public Invoice GetByFileId(Int32 fileID)
         {
-            using (var db = GetDb())
-            {
-                var invoices = db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("file_id", fileID), null)).ConvertAll(ToInvoice);
-                return invoices.Count > 0 ? invoices[0] : null;
-            }
+            var invoices = Db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("file_id", fileID), null)).ConvertAll(ToInvoice);
+            return invoices.Count > 0 ? invoices[0] : null;
         }
 
         public List<Invoice> GetInvoices(
@@ -318,7 +284,7 @@ namespace ASC.CRM.Core.Dao
                         sqlQuery.OrderBy(invoicesTableAlias + ".issue_date", orderBy.IsAsc);
                         break;
                     case InvoiceSortedByType.Contact:
-                        sqlQuery.LeftOuterJoin("crm_contact c_tbl", Exp.EqColumns(invoicesTableAlias + ".contact_id", "c_tbl.id"))
+                        sqlQuery.LeftOuterJoin("crm_contact c_tbl", Exp.EqColumns(invoicesTableAlias + ".contact_id", "c_tbl.id") & Exp.EqColumns(invoicesTableAlias + ".tenant_id", "c_tbl.tenant_id"))
                                 .OrderBy("case when c_tbl.display_name is null then 1 else 0 end, c_tbl.display_name", orderBy.IsAsc)
                                 .OrderBy(invoicesTableAlias + ".number", true);
                         break;
@@ -332,18 +298,12 @@ namespace ASC.CRM.Core.Dao
                 sqlQuery.OrderBy(invoicesTableAlias + ".number", true);
             }
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery).ConvertAll(ToInvoice);
-            }
+            return Db.ExecuteList(sqlQuery).ConvertAll(ToInvoice);
         }
 
         public int GetAllInvoicesCount()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(Query("crm_invoice").SelectCount());
-            }
+            return Db.ExecuteScalar<int>(Query("crm_invoice").SelectCount());
         }
 
 
@@ -378,29 +338,26 @@ namespace ASC.CRM.Core.Dao
 
             int result;
 
-            using (var db = GetDb())
+            if (withParams)
             {
-                if (withParams)
+                var whereConditional = WhereConditional(null, exceptIDs, searchText, status, issueDateFrom, issueDateTo, dueDateFrom, dueDateTo, entityType, entityID, currency);
+                result = whereConditional != null ? Db.ExecuteScalar<int>(Query("crm_invoice").Where(whereConditional).SelectCount()) : 0;
+            }
+            else
+            {
+                var countWithoutPrivate = Db.ExecuteScalar<int>(Query("crm_invoice").SelectCount());
+                var privateCount = exceptIDs.Count;
+
+                if (privateCount > countWithoutPrivate)
                 {
-                    var whereConditional = WhereConditional(null, exceptIDs, searchText, status, issueDateFrom, issueDateTo, dueDateFrom, dueDateTo, entityType, entityID, currency);
-                    result = whereConditional != null ? db.ExecuteScalar<int>(Query("crm_invoice").Where(whereConditional).SelectCount()) : 0;
+                    _log.ErrorFormat(@"Private invoice count more than all cases. Tenant: {0}. CurrentAccount: {1}",
+                                                            TenantID,
+                                                            SecurityContext.CurrentAccount.ID);
+
+                    privateCount = 0;
                 }
-                else
-                {
-                    var countWithoutPrivate = db.ExecuteScalar<int>(Query("crm_invoice").SelectCount());
-                    var privateCount = exceptIDs.Count;
 
-                    if (privateCount > countWithoutPrivate)
-                    {
-                        _log.ErrorFormat(@"Private invoice count more than all cases. Tenant: {0}. CurrentAccount: {1}",
-                                                               TenantID,
-                                                               SecurityContext.CurrentAccount.ID);
-
-                        privateCount = 0;
-                    }
-
-                    result = countWithoutPrivate - privateCount;
-                }
+                result = countWithoutPrivate - privateCount;
             }
 
             if (result > 0)
@@ -414,11 +371,8 @@ namespace ASC.CRM.Core.Dao
         {
             if (ids == null || !ids.Any()) return new List<Invoice>();
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceSqlQuery(Exp.In("id", ids), null))
-                   .ConvertAll(ToInvoice).FindAll(CRMSecurity.CanAccessTo).ToList();
-            }
+            return Db.ExecuteList(GetInvoiceSqlQuery(Exp.In("id", ids), null))
+                .ConvertAll(ToInvoice).FindAll(CRMSecurity.CanAccessTo).ToList();
         }
 
         public List<Invoice> GetEntityInvoices(EntityType entityType, int entityID)
@@ -427,19 +381,16 @@ namespace ASC.CRM.Core.Dao
             if (entityID <= 0)
                 return result;
 
-            using (var db = GetDb())
-            {
-                if (entityType == EntityType.Opportunity)
-                    return db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("entity_id", entityID) & Exp.Eq("entity_type", (int)entityType), null))
-                        .ConvertAll(ToInvoice)
-                        .FindAll(CRMSecurity.CanAccessTo)
-                        .ToList();
+            if (entityType == EntityType.Opportunity)
+                return Db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("entity_id", entityID) & Exp.Eq("entity_type", (int)entityType), null))
+                    .ConvertAll(ToInvoice)
+                    .FindAll(CRMSecurity.CanAccessTo)
+                    .ToList();
 
-                if (entityType == EntityType.Contact || entityType == EntityType.Person || entityType == EntityType.Company)
-                    return GetContactInvoices(entityID);
+            if (entityType == EntityType.Contact || entityType == EntityType.Person || entityType == EntityType.Company)
+                return GetContactInvoices(entityID);
 
-                return result;
-            }
+            return result;
         }
 
         public List<Invoice> GetContactInvoices(int contactID)
@@ -448,51 +399,45 @@ namespace ASC.CRM.Core.Dao
             if (contactID <= 0)
                 return result;
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("contact_id", contactID), null))
-                        .ConvertAll(ToInvoice)
-                        .FindAll(CRMSecurity.CanAccessTo)
-                        .ToList();
-            }
+            return Db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("contact_id", contactID), null))
+                    .ConvertAll(ToInvoice)
+                    .FindAll(CRMSecurity.CanAccessTo)
+                    .ToList();
         }
 
         public string GetNewInvoicesNumber()
         {
-            using (var db = GetDb())
+            var settings = GetSettings();
+
+            if (!settings.Autogenerated)
+                return string.Empty;
+
+            var query = Query("crm_invoice")
+                .Select("number")
+                .OrderBy("id", false)
+                .SetMaxResults(1);
+
+            var stringNumber = Db.ExecuteScalar<string>(query);
+
+            if (string.IsNullOrEmpty(stringNumber) || !stringNumber.StartsWith(settings.Prefix))
+                return string.Concat(settings.Prefix, settings.Number);
+
+            if (!string.IsNullOrEmpty(settings.Prefix))
+                stringNumber = stringNumber.Replace(settings.Prefix, string.Empty);
+
+            int intNumber;
+            if (!Int32.TryParse(stringNumber, out intNumber))
+                intNumber = 0;
+
+            var format = string.Empty;
+            for (var i = 0; i < settings.Number.Length; i++)
             {
-                var settings = GetSettings();
-
-                if (!settings.Autogenerated)
-                    return string.Empty;
-
-                var query = Query("crm_invoice")
-                    .Select("number")
-                    .OrderBy("id", false)
-                    .SetMaxResults(1);
-
-                var stringNumber = db.ExecuteScalar<string>(query);
-
-                if (string.IsNullOrEmpty(stringNumber) || !stringNumber.StartsWith(settings.Prefix))
-                    return string.Concat(settings.Prefix, settings.Number);
-
-                if (!string.IsNullOrEmpty(settings.Prefix))
-                    stringNumber = stringNumber.Replace(settings.Prefix, string.Empty);
-
-                int intNumber;
-                if (!Int32.TryParse(stringNumber, out intNumber))
-                    intNumber = 0;
-
-                var format = string.Empty;
-                for (var i = 0; i < settings.Number.Length; i++)
-                {
-                    format += "0";
-                }
-
-                var nextNumber = intNumber + 1;
-
-                return settings.Prefix + (string.IsNullOrEmpty(format) ? nextNumber.ToString(CultureInfo.InvariantCulture) : nextNumber.ToString(format));
+                format += "0";
             }
+
+            var nextNumber = intNumber + 1;
+
+            return settings.Prefix + (string.IsNullOrEmpty(format) ? nextNumber.ToString(CultureInfo.InvariantCulture) : nextNumber.ToString(format));
         }
 
         public InvoiceSetting GetSettings()
@@ -508,13 +453,14 @@ namespace ASC.CRM.Core.Dao
         {
             _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "invoice.*"));
 
-            using (var db = GetDb())
-            {
-                return SaveOrUpdateInvoice(invoice, db);
-            }
+            var result =  SaveOrUpdateInvoiceInDb(invoice);
+
+            FactoryIndexer<InvoicesWrapper>.IndexAsync(invoice);
+
+            return result;
         }
 
-        private int SaveOrUpdateInvoice(Invoice invoice, DbManager db)
+        private int SaveOrUpdateInvoiceInDb(Invoice invoice)
         {
             if (String.IsNullOrEmpty(invoice.Number) ||
                 invoice.IssueDate == DateTime.MinValue ||
@@ -529,12 +475,12 @@ namespace ASC.CRM.Core.Dao
 
             invoice.PurchaseOrderNumber = !String.IsNullOrEmpty(invoice.PurchaseOrderNumber) ? invoice.PurchaseOrderNumber : String.Empty;
 
-            if (!IsExist(invoice.ID, db))
+            if (!IsExistFromDb(invoice.ID))
             {
-                if (IsExist(invoice.Number, db))
+                if (IsExistFromDb(invoice.Number))
                     throw new ArgumentException();
 
-                invoice.ID = db.ExecuteScalar<int>(
+                invoice.ID = Db.ExecuteScalar<int>(
                                Insert("crm_invoice")
                               .InColumnValue("id", 0)
                               .InColumnValue("status", (int)invoice.Status)
@@ -554,22 +500,22 @@ namespace ASC.CRM.Core.Dao
                               .InColumnValue("description", invoice.Description)
                               .InColumnValue("json_data", null)
                               .InColumnValue("file_id", 0)
-                              .InColumnValue("create_on", DateTime.UtcNow)
+                              .InColumnValue("create_on", invoice.CreateOn == DateTime.MinValue ? DateTime.UtcNow : invoice.CreateOn)
                               .InColumnValue("create_by", SecurityContext.CurrentAccount.ID)
-                              .InColumnValue("last_modifed_on", DateTime.UtcNow)
+                              .InColumnValue("last_modifed_on", invoice.CreateOn == DateTime.MinValue ? DateTime.UtcNow : invoice.CreateOn)
                               .InColumnValue("last_modifed_by", SecurityContext.CurrentAccount.ID)
                               .Identity(1, 0, true));
             }
             else
             {
 
-                var oldInvoice = db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("id", invoice.ID), null))
+                var oldInvoice = Db.ExecuteList(GetInvoiceSqlQuery(Exp.Eq("id", invoice.ID), null))
                     .ConvertAll(ToInvoice)
                     .FirstOrDefault();
 
                 CRMSecurity.DemandEdit(oldInvoice);
 
-                db.ExecuteNonQuery(
+                Db.ExecuteNonQuery(
                     Update("crm_invoice")
                         .Set("status", (int)invoice.Status)
                         .Set("issue_date", TenantUtil.DateTimeToUtc(invoice.IssueDate))
@@ -597,10 +543,7 @@ namespace ASC.CRM.Core.Dao
 
         public virtual Invoice UpdateInvoiceStatus(int invoiceid, InvoiceStatus status)
         {
-            using (var db = GetDb())
-            {
-                return UpdateInvoiceStatus(invoiceid, status, db);
-            }
+            return UpdateInvoiceStatusInDb(invoiceid, status);
         }
 
         public List<Invoice> UpdateInvoiceBatchStatus(int[] invoiceids, InvoiceStatus status)
@@ -610,23 +553,20 @@ namespace ASC.CRM.Core.Dao
 
             var invoices = new List<Invoice>();
 
-            using (var db = GetDb())
+            foreach (var id in invoiceids)
             {
-                foreach (var id in invoiceids)
+                var inv = UpdateInvoiceStatusInDb(id, status);
+                if (inv != null)
                 {
-                    var inv = UpdateInvoiceStatus(id, status, db);
-                    if (inv != null)
-                    {
-                        invoices.Add(inv);
-                    }
+                    invoices.Add(inv);
                 }
             }
             return invoices;
         }
 
-        private Invoice UpdateInvoiceStatus(int invoiceid, InvoiceStatus status, DbManager db)
+        private Invoice UpdateInvoiceStatusInDb(int invoiceid, InvoiceStatus status)
         {
-            var invoice = GetByID(invoiceid, db);
+            var invoice = GetByIDFromDb(invoiceid);
             if (invoice == null)
             {
                 _log.Error("Invoice not found");
@@ -640,7 +580,7 @@ namespace ASC.CRM.Core.Dao
                 return invoice;
             }
 
-            db.ExecuteNonQuery(
+            Db.ExecuteNonQuery(
                 Update("crm_invoice")
                     .Set("status", (int)status)
                     .Set("last_modifed_on", DateTime.UtcNow)
@@ -653,15 +593,12 @@ namespace ASC.CRM.Core.Dao
 
         public virtual int UpdateInvoiceJsonData(int invoiceId, string jsonData)
         {
-            using (var db = GetDb())
-            {
-                return UpdateInvoiceJsonData(invoiceId, jsonData, db);
-            }
+            return UpdateInvoiceJsonDataInDb(invoiceId, jsonData);
         }
 
-        private int UpdateInvoiceJsonData(int invoiceId, string jsonData, DbManager db)
+        private int UpdateInvoiceJsonDataInDb(int invoiceId, string jsonData)
         {
-            db.ExecuteNonQuery(
+            Db.ExecuteNonQuery(
                 Update("crm_invoice")
                     .Set("json_data", jsonData)
                     .Set("last_modifed_on", DateTime.UtcNow)
@@ -679,7 +616,7 @@ namespace ASC.CRM.Core.Dao
                 jsonData.LogoBase64 = null;
             }
             invoice.JsonData = JsonConvert.SerializeObject(jsonData);
-            Global.DaoFactory.GetInvoiceDao().UpdateInvoiceJsonData(invoice.ID, invoice.JsonData);
+            UpdateInvoiceJsonData(invoice.ID, invoice.JsonData);
         }
 
         public void UpdateInvoiceJsonDataAfterLinesUpdated(Invoice invoice)
@@ -689,20 +626,17 @@ namespace ASC.CRM.Core.Dao
             {
                 jsonData.LogoBase64 = null;
             }
-            Global.DaoFactory.GetInvoiceDao().UpdateInvoiceJsonData(invoice.ID, invoice.JsonData);
+            UpdateInvoiceJsonData(invoice.ID, invoice.JsonData);
         }
 
         public virtual int UpdateInvoiceFileID(int invoiceId, int fileId)
         {
-            using (var db = GetDb())
-            {
-                return UpdateInvoiceFileID(invoiceId, fileId, db);
-            }
+            return UpdateInvoiceFileIDInDb(invoiceId, fileId);
         }
 
-        private int UpdateInvoiceFileID(int invoiceId, int fileId, DbManager db)
+        private int UpdateInvoiceFileIDInDb(int invoiceId, int fileId)
         {
-            db.ExecuteNonQuery(
+            Db.ExecuteNonQuery(
                 Update("crm_invoice")
                     .Set("file_id", fileId)
                     .Set("last_modifed_on", DateTime.UtcNow)
@@ -715,10 +649,8 @@ namespace ASC.CRM.Core.Dao
         public InvoiceSetting SaveInvoiceSettings(InvoiceSetting invoiceSetting)
         {
             var tenantSettings = Global.TenantSettings;
-
             tenantSettings.InvoiceSetting = invoiceSetting;
-
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
+            tenantSettings.Save();
 
             return tenantSettings.InvoiceSetting;
         }
@@ -763,16 +695,14 @@ namespace ASC.CRM.Core.Dao
 
             var invoiceID = invoices.Select(x => x.ID).ToArray();
 
-            using (var db = GetDb())
+            using (var tx = Db.BeginTransaction())
             {
-                using (var tx = db.BeginTransaction())
-                {
-                    db.ExecuteNonQuery(Delete("crm_invoice_line").Where(Exp.In("invoice_id", invoiceID)));
-                    db.ExecuteNonQuery(Delete("crm_invoice").Where(Exp.In("id", invoiceID)));
+                Db.ExecuteNonQuery(Delete("crm_invoice_line").Where(Exp.In("invoice_id", invoiceID)));
+                Db.ExecuteNonQuery(Delete("crm_invoice").Where(Exp.In("id", invoiceID)));
 
-                    tx.Commit();
-                }
+                tx.Commit();
             }
+            invoices.ForEach(invoice =>  FactoryIndexer<InvoicesWrapper>.DeleteAsync(invoice));
         }
 
         #endregion
@@ -905,13 +835,17 @@ namespace ASC.CRM.Core.Dao
                    .ToArray();
 
                 if (keywords.Length > 0)
-                    if (FullTextSearch.SupportModule(FullTextSearch.CRMInvoicesModule))
+                {
+                    List<int> invoicesIds;
+                    if (!FactoryIndexer<InvoicesWrapper>.TrySelectIds(s => s.MatchAll(searchText), out invoicesIds))
                     {
-                        var ids = FullTextSearch.Search(FullTextSearch.CRMInvoicesModule.Match(searchText));
-                        conditions.Add(Exp.In(tblAliasPrefix + "id", ids));
+                        conditions.Add(BuildLike(new[] {tblAliasPrefix + "number", tblAliasPrefix + "description"}, keywords));
                     }
                     else
-                    conditions.Add(BuildLike(new[] { tblAliasPrefix + "number", tblAliasPrefix + "description" }, keywords));
+                    {
+                        conditions.Add(Exp.In(tblAliasPrefix + "id", invoicesIds));
+                    }
+                }
             }
 
             if (exceptIDs.Count > 0)
@@ -962,5 +896,72 @@ namespace ASC.CRM.Core.Dao
         }
 
         #endregion
+
+
+        /// <summary>
+        /// Test method
+        /// </summary>
+        /// <param name="invoiceId"></param>
+        /// <param name="creationDate"></param>
+        public void SetInvoiceCreationDate(int invoiceId, DateTime creationDate)
+        {
+            Db.ExecuteNonQuery(
+                Update("crm_invoice")
+                    .Set("create_on", TenantUtil.DateTimeToUtc(creationDate))
+                    .Where(Exp.Eq("id", invoiceId)));
+            // Delete relative  keys
+            _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "invoice.*"));
+        }
+
+        /// <summary>
+        /// Test method
+        /// </summary>
+        /// <param name="invoiceId"></param>
+        /// <param name="lastModifedDate"></param>
+        public void SetInvoiceLastModifedDate(int invoiceId, DateTime lastModifedDate)
+        {
+            Db.ExecuteNonQuery(
+                Update("crm_invoice")
+                    .Set("last_modifed_on", TenantUtil.DateTimeToUtc(lastModifedDate))
+                    .Where(Exp.Eq("id", invoiceId)));
+            // Delete relative  keys
+            _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "invoice.*"));
+        }
+
+        public decimal CalculateInvoiceCost(IEnumerable<InvoiceLine> lines, IEnumerable<InvoiceTax> taxes)
+        {
+            decimal cost = 0;
+            foreach (var line in lines)
+            {
+                var linePrice = Math.Round(line.Price * line.Quantity, 2);
+                var lineDiscount = Math.Round(linePrice * line.Discount / 100, 2);
+
+                linePrice -= lineDiscount;
+
+                decimal lineTax1 = 0;
+                if (line.InvoiceTax1ID > 0)
+                {
+                    var tax1 = taxes.FirstOrDefault(tax => tax.ID == line.InvoiceTax1ID);
+                    if (tax1 != null)
+                    {
+                        lineTax1 = Math.Round(linePrice * tax1.Rate / 100, 2);
+                    }
+                }
+
+                decimal lineTax2 = 0;
+                if (line.InvoiceTax2ID > 0)
+                {
+                    var tax2 = taxes.FirstOrDefault(tax => tax.ID == line.InvoiceTax2ID);
+                    if (tax2 != null)
+                    {
+                        lineTax2 = Math.Round(linePrice * tax2.Rate / 100, 2);
+                    }
+                }
+
+                cost += linePrice + lineTax1 + lineTax2;
+            }
+
+            return Math.Round(cost, 2);
+        }
     }
 }

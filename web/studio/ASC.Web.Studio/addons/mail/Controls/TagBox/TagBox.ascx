@@ -5,16 +5,13 @@
 <%@ Register TagPrefix="sc" Namespace="ASC.Web.Studio.Controls.Common" Assembly="ASC.Web.Studio" %>
 
 <div id="tags_panel" class="expandable top-margin-menu left-margin hidden">
-  <div class="content">
-    <div id="id_tags_panel_content">
-    </div>
-  </div>
-  <div class="more hidden">
+  <div id="id_tags_panel_content"></div>
+  <div class="more" style="display: none">
     <div class="shadow">
     </div>
-    <div class="text link dotline">
+    <a class="more_link text link dotline">
       <%=MailResource.ShowMoreTags%>
-    </div>
+    </a>
   </div>
 </div>
 
@@ -38,7 +35,7 @@
                             </div>
                         </td>
                         <td>
-                            <input id="mail_tag_name" type="text" class="textEdit" maxlength="20" placeholder="<%=MailResource.TagNamePlaceholder%>">
+                            <input id="mail_tag_name" type="text" class="textEdit" maxlength="255" placeholder="<%=MailResource.TagNamePlaceholder%>">
                         </td>
                     </tr>
                 </table>
@@ -59,7 +56,6 @@
                 <p id="deleteTagShure"></p>
             </div>
             <div class="clearFix save">
-                <div class="addemail_error"></div>
                 <div class="progressContainer">
                     <div class="loader" style="display: none;"></div>
                 </div>
@@ -71,29 +67,4 @@
             </div>
         </body>
     </sc:Container>
-</div>
-
-<div id="addTagsPanel" class="actionPanel stick-over">
-    <div id="tagsPanelContent" style="display: block;">
-        <div class="actionPanelSection">
-            <label for="markallrecipients" class="mark_all_checkbox">
-                <input type="checkbox" id="markallrecipients"/>
-                <span  id="markallrecipientsLabel"><%=MailScriptResource.MarkAllSendersLabel%></span>
-            </label>
-        </div>
-        <div class="existsTags">
-        </div>
-        <div class="h_line"></div>
-        <div class="actionPanelSection" style="width: 293px;">
-            <div id="mail_CreateNewTag" class="requiredField">
-               <span class="requiredErrorText" style="padding-right: 49px;"><%: MailScriptResource.ErrorEmptyField %></span>
-                <div class="headerPanelSmall" ><%: MailResource.CreateNewTagLabel %></div>
-                <div class="entertagname">
-                    <div title="Select color" class="square"></div>
-                    <input id="createnewtag" type="text" class="textEdit tagname" placeholder="<%=MailResource.TagNamePlaceholder%>" maxlength="20"/>
-                </div>
-                <button class="entertag_button button blue" type="button"><%=MailScriptResource.OkBtnLabel%></button>
-            </div>
-        </div>
-    </div>
 </div>

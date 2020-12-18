@@ -1,121 +1,109 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
 using System.Configuration;
+using System.Linq;
+using ASC.Common.DependencyInjection;
+using Autofac;
 
-namespace ASC.Thrdparty.Configuration
+namespace ASC.Core.Common.Configuration
 {
     public class ConsumerConfigurationSection : ConfigurationSection
     {
-        public const string SectionName = "consumers";
+        private const string ComponentsPropertyName = "components";
 
-        [ConfigurationProperty("keys")]
-        public KeyElementCollection Keys
+        [ConfigurationProperty(ComponentsPropertyName, IsRequired = false)]
+        public ConsumersElementCollection Containers
         {
-            get { return (KeyElementCollection)base["keys"]; }
-            set { base["keys"] = value; }
+            get
+        {
+                return (ConsumersElementCollection)this[ComponentsPropertyName];
         }
+    }
+    }
 
-        [ConfigurationProperty("connectionstring")]
-        public string ConnectionString
-        {
-            get { return (string)base["connectionstring"]; }
-            set { base["connectionstring"] = value; }
-        }
+    public class ConsumersElementCollection : ConfigurationElementCollection<ConsumerElement>
+    {
+        [ConfigurationProperty("name", IsRequired = false)]
+        public string Name { get { return (string)this["name"]; } }
 
-        public static ConsumerConfigurationSection GetSection()
+        public ConsumersElementCollection()
+            : base("component")
         {
-            return (ConsumerConfigurationSection)ConfigurationManager.GetSection(SectionName);
         }
     }
 
-    public class KeyElementCollection : ConfigurationElementCollection
+    public class ConsumerElement : ComponentElement
+        {
+        public const string OrderElement = "order";
+        public const string PropsElement = "props";
+        public const string AdditionalElement = "additional";
+
+        [ConfigurationProperty(OrderElement, IsRequired = false)]
+        public int Order { get { return Convert.ToInt32(this[OrderElement]); } }
+
+        [ConfigurationProperty(PropsElement, IsRequired = false)]
+        public DictionaryElementCollection Props { get { return this[PropsElement] as DictionaryElementCollection; } }
+
+        [ConfigurationProperty(AdditionalElement, IsRequired = false)]
+        public DictionaryElementCollection Additional { get { return this[AdditionalElement] as DictionaryElementCollection; } }
+        }
+
+    public class ConsumerConfigLoader
     {
-        protected override ConfigurationElement CreateNewElement()
+        public static ContainerBuilder LoadConsumers(string section)
         {
-            return new KeyElement();
+            var container = new ContainerBuilder();
+
+            var autofacConfigurationSection = (ConsumerConfigurationSection)ConfigurationManagerExtension.GetSection(section);
+
+            foreach (var component in autofacConfigurationSection.Containers)
+        {
+                var componentType = Type.GetType(component.Type);
+                var builder = container.RegisterType(componentType)
+                    .AsSelf()
+                    .As<Consumer>()
+                    .SingleInstance();
+
+                if (!string.IsNullOrEmpty(component.Name))
+        {
+                    builder
+                        .Named<Consumer>(component.Name)
+                        .Named(component.Name, componentType)
+                        .Named<Consumer>(component.Name.ToLower())
+                        .Named(component.Name.ToLower(), componentType);
         }
 
-        protected override object GetElementKey(ConfigurationElement element)
+                builder.WithParameter(new NamedParameter("name", component.Name));
+                builder.WithParameter(new NamedParameter(ConsumerElement.OrderElement, component.Order));
+
+                if (component.Props != null && component.Props.Any())
         {
-            return ((KeyElement)element).Name;
+                    builder.WithParameter(new NamedParameter(ConsumerElement.PropsElement, component.Props.ToDictionary(r => r.Key, r => r.Value)));
         }
 
-        public KeyElement GetKey(string name)
+                if (component.Additional != null && component.Additional.Any())
         {
-            return BaseGet(name) as KeyElement;
+                    builder.WithParameter(new NamedParameter(ConsumerElement.AdditionalElement, component.Additional.ToDictionary(r => r.Key, r => r.Value)));
         }
+            }
 
-        public string GetKeyValue(string name)
-        {
-            var keyElement = GetKey(name);
-            return keyElement != null ? keyElement.Value : string.Empty;
-        }
-    }
-
-    public class KeyElement : ConfigurationElement
-    {
-        [ConfigurationProperty("name", IsRequired = true, IsKey = true)]
-        public string Name
-        {
-            get { return (string)base["name"]; }
-            set { base["name"] = value; }
-        }
-
-        [ConfigurationProperty("value", DefaultValue = "")]
-        public string Value
-        {
-            get { return (string)base["value"]; }
-            set { base["value"] = value; }
-        }
-
-        [ConfigurationProperty("consumer")]
-        public string ConsumerName
-        {
-            get { return (string)base["consumer"]; }
-            set { base["consumer"] = value; }
-        }
-
-        [ConfigurationProperty("type", DefaultValue = KeyType.Default)]
-        public KeyType Type
-        {
-            get { return (KeyType)base["type"]; }
-            set { base["type"] = value; }
-        }
-
-        public override bool IsReadOnly()
-        {
-            return false;
-        }
-
-        public enum KeyType
-        {
-            Default,
-            Key,
-            Secret
+            return container;
         }
     }
 }

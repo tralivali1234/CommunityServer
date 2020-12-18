@@ -1,25 +1,16 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -32,11 +23,13 @@ window.MailFilter = (function($) {
         from,
         importance,
         withCalendar,
+        page,
         pageSize,
         periodFrom,
         periodTo,
         withinPeriod,
         folder,
+        userFolder,
         search,
         sort,
         sortOrder,
@@ -54,6 +47,7 @@ window.MailFilter = (function($) {
             tags = new Array();
             from = undefined;
             importance = false;
+            page = 1;
             pageSize = TMMail.option('MessagesPageSize');
             periodFrom = 0;
             withinPeriod = '';
@@ -68,6 +62,7 @@ window.MailFilter = (function($) {
             fromMessage = undefined;
             prevFlag = false;
             withCalendar = false;
+            userFolder = null;
 
             reset();
         }
@@ -75,6 +70,7 @@ window.MailFilter = (function($) {
 
     var reset = function() {
         resetFolder();
+        resetUserFolder();
         resetSearch();
         resetTags();
         resetFrom();
@@ -227,6 +223,19 @@ window.MailFilter = (function($) {
         return folder;
     };
 
+    /*user folder*/
+    var setUserFolder = function (userFolderId) {
+        userFolder = userFolderId;
+    };
+
+    var resetUserFolder = function () {
+        userFolder = null;
+    };
+
+    var getUserFolder = function () {
+        return userFolder;
+    };
+
     /* from date*/
     var setFromDate = function(newFromDate) {
         fromDate = newFromDate;
@@ -294,6 +303,14 @@ window.MailFilter = (function($) {
 
 
     /*page & page size*/
+    var setPage = function (newPage) {
+        page = newPage;
+    };
+
+    var getPage = function () {
+        return page;
+    };
+
     var setPageSize = function(newSize) {
         pageSize = parseInt(newSize);
     };
@@ -317,6 +334,7 @@ window.MailFilter = (function($) {
             periodWithin,
             sortParam,
             sortorder,
+            pageParam,
             pageSizeParam,
             fromDateParam,
             fromMessageParam,
@@ -330,6 +348,7 @@ window.MailFilter = (function($) {
             unreadParam = TMMail.getParamsValue(params, /unread=([^\/]+)/);
             attachmentsParam = TMMail.getParamsValue(params, /(attachments\/)/);
             fromParam = TMMail.getParamsValue(params, /from=([^\/]+)/);
+            pageParam = TMMail.getParamsValue(params, /page=(\d+)/);
             pageSizeParam = TMMail.getParamsValue(params, /page_size=(\d+)/);
             period = TMMail.getParamsValue(params, /period=([^\/]+)/);
             periodWithin = TMMail.getParamsValue(params, /within=([^\/]+)/);
@@ -342,8 +361,18 @@ window.MailFilter = (function($) {
             withCalendarParam = TMMail.getParamsValue(params, /(calendar\/)/);
         }
 
-        var itemId = TMMail.getSysFolderIdByName(folderParam, TMMail.sysfolders.inbox.id);
-        setFolder(itemId);
+        if (!TMMail.pageIs('userfolder')) {
+            var itemId = TMMail.getSysFolderIdByName(folderParam, TMMail.sysfolders.inbox.id);
+            setFolder(itemId);
+        } else {
+            var userFolderId = TMMail.extractUserFolderIdFromAnchor();
+            if (userFolderId) {
+                setFolder(TMMail.sysfolders.userfolder.id);
+                setUserFolder(userFolderId);
+            } else {
+                setFolder(TMMail.sysfolders.inbox.id);
+            }
+        }
 
         if (toParam) {
             setTo(decodeURIComponent(toParam));
@@ -432,6 +461,8 @@ window.MailFilter = (function($) {
             setPrevFlag(false);
         }
 
+        setPage(pageParam ? pageParam : 1);
+
         if (pageSizeParam) {
             setPageSize(pageSizeParam);
         } else {
@@ -460,6 +491,7 @@ window.MailFilter = (function($) {
         f.period = getPeriod();
         f.period_within = getPeriodWithin();
         f.search = getSearch();
+        f.page = page;
         f.page_size = pageSize;
         f.from_date = fromDate;
         f.from_message = fromMessage;
@@ -513,7 +545,19 @@ window.MailFilter = (function($) {
         }
 
         if (f.period.to > 0) {
-            res += 'period=' + f.period.from + ',' + f.period.to + '/';
+            var pFrom = window.moment(f.period.from)
+                .utcOffset(ASC.Resources.Master.CurrentTenantTimeZone.UtcOffset)
+                .startOf('day')
+                .valueOf();
+
+            var pTo = window.moment(f.period.to)
+                .utcOffset(ASC.Resources.Master.CurrentTenantTimeZone.UtcOffset)
+                .startOf('day')
+                .add(23, 'hours')
+                .add(59, 'minutes')
+                .valueOf();
+
+            res += 'period=' + pFrom + ',' + pTo + '/';
         } else if ('' != f.period_within) {
             res += 'within=' + encodeURIComponent(f.period_within) + '/';
         }
@@ -523,6 +567,9 @@ window.MailFilter = (function($) {
         }
 
         if (includePagingInfo === true) {
+            if(!commonSettingsPage.isConversationsEnabled())
+                res += 'page=' + f.page + '/';
+
             res += 'page_size=' + f.page_size + '/';
         }
 
@@ -578,7 +625,15 @@ window.MailFilter = (function($) {
 
     function toData() {
         var res = {};
+
+        if (getUserFolder()) {
+            res.user_folder_id = getUserFolder();
+        }
+
         res.folder = folder;
+
+        if (!commonSettingsPage.isConversationsEnabled())
+            res.page = page;
         res.page_size = pageSize;
         if (getUnread() != undefined) {
             res.unread = getUnread();
@@ -593,34 +648,43 @@ window.MailFilter = (function($) {
             res.period_from = periodFrom;
             res.period_to = periodTo;
         }
-        if (getPeriodWithin() != '') {
+        if (getPeriodWithin()) {
             var within = getPeriodWithin();
-            var now = new Date(),
-                today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0),
-                yesterday = new Date(new Date(today).setDate(now.getDate() - 1)),
-                lastweek = new Date(new Date(today).setDate(today.getDate() - 7));
+            var now = moment.utc().utcOffset(ASC.Resources.Master.CurrentTenantTimeZone.UtcOffset),
+                today = now.clone().startOf('day');
 
-            if ('today' == within) {
-                res.period_from = today.getTime();
-                res.period_to = today.getTime();
-            } else if ('yesterday' == within) {
-                res.period_from = yesterday.getTime();
-                res.period_to = yesterday.getTime();
-            } else if ('lastweek') {
-                res.period_from = lastweek.getTime();
-                res.period_to = today.getTime();
-            } else {
-                setPeriodWithin('');
+            switch (within) {
+            case "today":
+                res.period_from = today.valueOf();
+                res.period_to = today.clone().add(23, 'hours').add(59, 'minutes').valueOf();
+                break;
+            case "yesterday":
+                var yesterday = today.clone().add(-1, 'days');
+                res.period_from = yesterday.valueOf();
+                res.period_to = yesterday.clone().add(23, 'hours').add(59, 'minutes').valueOf();
+                break;
+            case "lastweek":
+                var lastweek = today.clone().add(-7, 'days');
+                res.period_from = lastweek.valueOf();
+                res.period_to = today.clone().add(23, 'hours').add(59, 'minutes').valueOf();
+                break;
+            default:
+                setPeriodWithin("");
+                break;
             }
         }
 
         if (getFrom()) {
-            res.find_address = from;
+            res.from_address = from;
         }
         if (getTo()) {
             var account = accountsManager.getAccountByAddress(to);
             if (account) {
                 res.mailbox_id = account.mailbox_id;
+
+                if (account.is_alias || account.is_group) {
+                    res.to_address = to;
+                }
             }
         }
 
@@ -679,6 +743,7 @@ window.MailFilter = (function($) {
         setWithCalendar: setWithCalendar,
 
         getFolder: getFolder,
+        getUserFolder: getUserFolder,
 
         setSearch: setSearch,
         getSearch: getSearch,
@@ -694,10 +759,14 @@ window.MailFilter = (function($) {
         setSortOrder: setSortOrder,
         getSortOrder: getSortOrder,
 
+        getPage: getPage,
+        setPage: setPage,
+
         setPageSize: setPageSize,
         getPageSize: getPageSize,
 
         setFolder: setFolder,
+        setUserFolder: setUserFolder,
 
         setFromDate: setFromDate,
         getFromDate: getFromDate,

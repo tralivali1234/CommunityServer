@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,9 +19,13 @@ using System;
 using System.IO;
 using System.Web;
 using ASC.Api.Attributes;
-using ASC.Mail.Aggregator.Common;
-using ASC.Mail.Aggregator.Common.Utils;
-using ASC.Mail.Aggregator.Dal;
+using ASC.Mail.Core.Engine;
+using ASC.Mail.Data.Contracts;
+using ASC.Mail.Utils;
+using ASC.Mail.Core.Engine.Operations.Base;
+using System.Threading;
+
+// ReSharper disable InconsistentNaming
 
 namespace ASC.Api.Mail
 {
@@ -50,10 +45,10 @@ namespace ASC.Api.Mail
                 throw new ArgumentException(@"Invalid message id", "id_message");
 
             if (string.IsNullOrEmpty(id_folder))
-                id_folder = DocumentsDal.MY_DOCS_FOLDER_ID;
+                id_folder = DocumentsEngine.MY_DOCS_FOLDER_ID;
 
             var scheme = HttpContext.Current == null ? Uri.UriSchemeHttp : HttpContext.Current.Request.GetUrlRewriter().Scheme;
-            var documentsDal = new DocumentsDal(MailBoxManager, TenantId, Username, scheme);
+            var documentsDal = new DocumentsEngine(TenantId, Username, scheme);
             var savedAttachmentsList = documentsDal.StoreAttachmentsToDocuments(id_message, id_folder);
 
             return savedAttachmentsList.Count;
@@ -67,17 +62,17 @@ namespace ASC.Api.Mail
         /// <returns>Id document in My Documents</returns>
         /// <category>Messages</category>
         [Update(@"messages/attachment/export")]
-        public int ExportAttachmentToDocuments(int id_attachment, string id_folder = null)
+        public object ExportAttachmentToDocuments(int id_attachment, string id_folder = null)
         {
             if (id_attachment < 1)
                 throw new ArgumentException(@"Invalid attachment id", "id_attachment");
 
             if (string.IsNullOrEmpty(id_folder))
-                id_folder = DocumentsDal.MY_DOCS_FOLDER_ID;
+                id_folder = DocumentsEngine.MY_DOCS_FOLDER_ID;
 
             var scheme = HttpContext.Current == null ? Uri.UriSchemeHttp : HttpContext.Current.Request.GetUrlRewriter().Scheme;
 
-            var documentsDal = new DocumentsDal(MailBoxManager, TenantId, Username, scheme);
+            var documentsDal = new DocumentsEngine(TenantId, Username, scheme);
             var documentId = documentsDal.StoreAttachmentToDocuments(id_attachment, id_folder);
             return documentId;
         }
@@ -92,9 +87,10 @@ namespace ASC.Api.Mail
         /// <returns>MailAttachment</returns>
         /// <category>Messages</category>
         [Create(@"messages/attachment/add")]
-        public MailAttachment AddAttachment(int id_message, string name, Stream file, string content_type)
+        public MailAttachmentData AddAttachment(int id_message, string name, Stream file, string content_type)
         {
-            var attachment = MailBoxManager.AttachFile(TenantId, Username, id_message, name, file, content_type);
+            var attachment = MailEngineFactory.AttachmentEngine
+                .AttachFileToDraft(TenantId, Username, id_message, name, file, file.Length, content_type);
 
             return attachment;
         }
@@ -107,12 +103,12 @@ namespace ASC.Api.Mail
         /// <returns>MailAttachment</returns>
         /// <category>Messages</category>
         [Create(@"messages/calendarbody/add")]
-        public MailAttachment AddCalendarBody(int id_message, string ical_body)
+        public MailAttachmentData AddCalendarBody(int id_message, string ical_body)
         {
             if (string.IsNullOrEmpty(ical_body))
                 throw new ArgumentException(@"Empty calendar body", "ical_body");
 
-            var calendar = MailUtil.ParseValidCalendar(ical_body);
+            var calendar = MailUtil.ParseValidCalendar(ical_body, _log);
 
             if (calendar == null)
                 throw new ArgumentException(@"Invalid calendar body", "ical_body");
@@ -125,10 +121,30 @@ namespace ASC.Api.Mail
                     writer.Flush();
                     ms.Position = 0;
 
-                    var attachment = MailBoxManager.AttachFile(TenantId, Username, id_message, calendar.Method.ToLowerInvariant() +  ".ics", ms, "text/calendar");
+                    var attachment = MailEngineFactory.AttachmentEngine
+                        .AttachFileToDraft(TenantId, Username, id_message, calendar.Method.ToLowerInvariant() + ".ics",
+                            ms, ms.Length, "text/calendar");
+
                     return attachment;
                 }
             }
+        }
+
+        /// <summary>
+        /// Download all attachments from message
+        /// </summary>
+        /// <short>
+        /// Download all attachments from message
+        /// </short>
+        /// <param name="messageId">Id of message</param>
+        /// <returns>Attachment Archive</returns>
+        [Update(@"messages/attachment/downloadall/{messageId}")]
+        public MailOperationStatus DownloadAllAttachments(int messageId)
+        {
+            Thread.CurrentThread.CurrentCulture = CurrentCulture;
+            Thread.CurrentThread.CurrentUICulture = CurrentCulture;
+
+            return MailEngineFactory.OperationEngine.DownloadAllAttachments(messageId, TranslateMailOperationStatus);
         }
     }
 }

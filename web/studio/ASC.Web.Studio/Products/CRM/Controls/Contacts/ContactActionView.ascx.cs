@@ -1,32 +1,30 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Web;
+using System.Web.UI.WebControls;
 using ASC.Api;
+using ASC.Common.Logging;
 using ASC.Core;
-using ASC.Core.Users;
 using ASC.CRM.Core;
 using ASC.CRM.Core.Entities;
 using ASC.MessagingSystem;
@@ -35,13 +33,6 @@ using ASC.Web.CRM.Core.Enums;
 using ASC.Web.CRM.Resources;
 using ASC.Web.Studio.Core;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Web;
-using System.Web.UI.WebControls;
 
 
 namespace ASC.Web.CRM.Controls.Contacts
@@ -90,7 +81,7 @@ namespace ASC.Web.CRM.Controls.Contacts
             var networks = new List<ContactInfo>();
             if (TargetContact == null)
             {
-                data = Global.DaoFactory.GetCustomFieldDao().GetFieldsDescription(UrlParameters.Type != "people" ? EntityType.Company : EntityType.Person);
+                data = DaoFactory.CustomFieldDao.GetFieldsDescription(UrlParameters.Type != "people" ? EntityType.Company : EntityType.Person);
 
                 var URLEmail = UrlParameters.Email;
                 if (!String.IsNullOrEmpty(URLEmail))
@@ -110,11 +101,11 @@ namespace ASC.Web.CRM.Controls.Contacts
             }
             else
             {
-                data = Global.DaoFactory.GetCustomFieldDao().GetEnityFields(
+                data = DaoFactory.CustomFieldDao.GetEnityFields(
                     TargetContact is Person ? EntityType.Person : EntityType.Company,
                     TargetContact.ID, true);
 
-                networks = Global.DaoFactory.GetContactInfoDao().GetList(TargetContact.ID, null, null, null).ConvertAll(
+                networks = DaoFactory.ContactInfoDao.GetList(TargetContact.ID, null, null, null).ConvertAll(
                 n => new ContactInfo()
                                     {
                                         Category = n.Category,
@@ -135,7 +126,7 @@ namespace ASC.Web.CRM.Controls.Contacts
 
             if (TargetContact != null)
             {
-                cancelButton.Attributes.Add("href", String.Format("default.aspx?{0}={1}{2}", UrlConstant.ID, TargetContact.ID,
+                cancelButton.Attributes.Add("href", String.Format("Default.aspx?{0}={1}{2}", UrlConstant.ID, TargetContact.ID,
                     !String.IsNullOrEmpty(UrlParameters.Type) ?
                     String.Format("&{0}={1}", UrlConstant.Type, UrlParameters.Type) :
                     String.Empty));
@@ -145,7 +136,7 @@ namespace ASC.Web.CRM.Controls.Contacts
                 cancelButton.Attributes.Add("href",
                              Request.UrlReferrer != null && Request.Url != null && String.Compare(Request.UrlReferrer.PathAndQuery, Request.Url.PathAndQuery) != 0
                                  ? Request.UrlReferrer.OriginalString
-                                 : "default.aspx");
+                                 : "Default.aspx");
             }
 
             InitContactManagerSelector();
@@ -216,7 +207,7 @@ namespace ASC.Web.CRM.Controls.Contacts
             Dictionary<Guid,String> SelectedUsers = null;
             if (TargetContact != null)
             {
-                var AccessSubjectTo = CRMSecurity.GetAccessSubjectTo(TargetContact, EmployeeStatus.Active).ToList();
+                var AccessSubjectTo = CRMSecurity.GetAccessSubjectTo(TargetContact).ToList();
                 SelectedUsers = new Dictionary<Guid, String>();
                 if (AccessSubjectTo.Count != 0)
                 {
@@ -238,7 +229,7 @@ namespace ASC.Web.CRM.Controls.Contacts
         {
             try
             {
-                var dao = Global.DaoFactory;
+                var dao = DaoFactory;
                 Contact contact;
                 List<Contact> contactsForSetManager = new List<Contact>();
 
@@ -280,7 +271,7 @@ namespace ASC.Web.CRM.Controls.Contacts
                         ShareType = shareType
                     };
 
-                    peopleCompany.ID = dao.GetContactDao().SaveContact(peopleCompany);
+                    peopleCompany.ID = dao.ContactDao.SaveContact(peopleCompany);
 
                     companyID = peopleCompany.ID;
                     contactsForSetManager.Add(peopleCompany);
@@ -316,7 +307,7 @@ namespace ASC.Web.CRM.Controls.Contacts
                 contact.ContactTypeID = Convert.ToInt32(Request["baseInfo_contactType"]);
                 if (contact.ContactTypeID != 0)
                 {
-                    var listItem = dao.GetListItemDao().GetByID(contact.ContactTypeID);
+                    var listItem = dao.ListItemDao.GetByID(contact.ContactTypeID);
                     if (listItem == null)
                         throw new Exception(CRMErrorsResource.ContactTypeNotFound);
                 }
@@ -337,21 +328,21 @@ namespace ASC.Web.CRM.Controls.Contacts
                 {
                     contact.ID = TargetContact.ID;
                     contact.StatusID = TargetContact.StatusID;
-                    dao.GetContactDao().UpdateContact(contact);
+                    dao.ContactDao.UpdateContact(contact);
 
                     var messageAction = contact is Company ? MessageAction.CompanyUpdated : MessageAction.PersonUpdated;
-                    MessageService.Send(HttpContext.Current.Request, messageAction, contact.GetTitle());
+                    MessageService.Send(HttpContext.Current.Request, messageAction, MessageTarget.Create(contact.ID), contact.GetTitle());
 
-                    contact = dao.GetContactDao().GetByID(contact.ID);
+                    contact = dao.ContactDao.GetByID(contact.ID);
                 }
                 else
                 {
-                    contact.ID = dao.GetContactDao().SaveContact(contact);
+                    contact.ID = dao.ContactDao.SaveContact(contact);
 
                     var messageAction = contact is Company ? MessageAction.CompanyCreated : MessageAction.PersonCreated;
-                    MessageService.Send(HttpContext.Current.Request, messageAction, contact.GetTitle());
+                    MessageService.Send(HttpContext.Current.Request, messageAction, MessageTarget.Create(contact.ID), contact.GetTitle());
 
-                    contact = dao.GetContactDao().GetByID(contact.ID);
+                    contact = dao.ContactDao.GetByID(contact.ID);
                 }
 
                 contactsForSetManager.Add(contact);
@@ -385,7 +376,7 @@ namespace ASC.Web.CRM.Controls.Contacts
                                 recordIndex++;
                             }
 
-                            dao.GetContactDao().SaveContactList(newAssignedContacts);
+                            dao.ContactDao.SaveContactList(newAssignedContacts);
 
                             if (newAssignedContacts.Count != 0)
                             {
@@ -395,7 +386,7 @@ namespace ASC.Web.CRM.Controls.Contacts
                         }
                         catch (Exception ex)
                         {
-                            log4net.LogManager.GetLogger("ASC.CRM").Error(ex);
+                            LogManager.GetLogger("ASC.CRM").Error(ex);
                         }
 
                     }
@@ -408,11 +399,11 @@ namespace ASC.Web.CRM.Controls.Contacts
 
                     if (TargetContact != null && !CRMSecurity.IsAdmin)
                     {
-                        var restrictedMembers = dao.GetContactDao().GetRestrictedMembers(contact.ID);
+                        var restrictedMembers = dao.ContactDao.GetRestrictedMembers(contact.ID);
                         assignedContactsIDs.AddRange(restrictedMembers.Select(m => m.ID).ToList());
                     }
 
-                    dao.GetContactDao().SetMembers(contact.ID, assignedContactsIDs.ToArray());
+                    dao.ContactDao.SetMembers(contact.ID, assignedContactsIDs.ToArray());
                 }
 
                 #endregion
@@ -422,16 +413,16 @@ namespace ASC.Web.CRM.Controls.Contacts
                 var assignedTags = Request["baseInfo_assignedTags"];
                 if (assignedTags != null)
                 {
-                    var oldTagList = dao.GetTagDao().GetEntityTags(EntityType.Contact, contact.ID);
+                    var oldTagList = dao.TagDao.GetEntityTags(EntityType.Contact, contact.ID);
                     foreach (var tag in oldTagList)
                     {
-                        dao.GetTagDao().DeleteTagFromEntity(EntityType.Contact, contact.ID, tag);
+                        dao.TagDao.DeleteTagFromEntity(EntityType.Contact, contact.ID, tag);
                     }
                     if (assignedTags != string.Empty)
                     {
                         var tagListInfo = JObject.Parse(assignedTags)["tagListInfo"].ToArray();
                         var newTagList = tagListInfo.Select(t => t.ToString()).ToArray();
-                        dao.GetTagDao().SetTagToEntity(EntityType.Contact, contact.ID, newTagList);
+                        dao.TagDao.SetTagToEntity(EntityType.Contact, contact.ID, newTagList);
                     }
                 }
 
@@ -461,17 +452,17 @@ namespace ASC.Web.CRM.Controls.Contacts
                         {
                             if (!String.IsNullOrEmpty(fieldValue))
                             {
-                                dao.GetCustomFieldDao().SetFieldValue(EntityType.Person, contact.ID, fieldID, "");
+                                dao.CustomFieldDao.SetFieldValue(EntityType.Person, contact.ID, fieldID, "");
                             }
-                            dao.GetCustomFieldDao().SetFieldValue(EntityType.Person, contact.ID, fieldID, fieldValue);
+                            dao.CustomFieldDao.SetFieldValue(EntityType.Person, contact.ID, fieldID, fieldValue);
                         }
                         else
                         {
                             if (!String.IsNullOrEmpty(fieldValue))
                             {
-                                dao.GetCustomFieldDao().SetFieldValue(EntityType.Company, contact.ID, fieldID, "");
+                                dao.CustomFieldDao.SetFieldValue(EntityType.Company, contact.ID, fieldID, "");
                             }
-                            dao.GetCustomFieldDao().SetFieldValue(EntityType.Company, contact.ID, fieldID, fieldValue);
+                            dao.CustomFieldDao.SetFieldValue(EntityType.Company, contact.ID, fieldID, fieldValue);
                         }
                     }
                     else if (item.StartsWith("contactInfo_"))
@@ -529,34 +520,27 @@ namespace ASC.Web.CRM.Controls.Contacts
                 if (addressList.Count > 0)
                     contactInfos.AddRange(addressList.Values.ToList());
 
-                dao.GetContactInfoDao().DeleteByContact(contact.ID);
-                dao.GetContactInfoDao().SaveList(contactInfos);
+                dao.ContactInfoDao.DeleteByContact(contact.ID);
+                dao.ContactInfoDao.SaveList(contactInfos, contact);
 
                 #endregion
 
                 #region Photo
 
-                var photoPath = Request["uploadPhotoPath"];
+                var imagePath = Request["uploadPhotoPath"];
 
-                if (!String.IsNullOrEmpty(photoPath))
+                if (!String.IsNullOrEmpty(imagePath))
                 {
-                    if (photoPath != "null")
+                    if (imagePath != "null")
                     {
-                        if (photoPath.StartsWith(PathProvider.BaseAbsolutePath))
-                        {
-                            var tmpDirName = photoPath.Substring(0, photoPath.LastIndexOf('/'));
-                            ContactPhotoManager.TryUploadPhotoFromTmp(contact.ID, TargetContact == null, tmpDirName);
-                        }
-                        else
-                        {
-                            ContactPhotoManager.UploadPhoto(photoPath, contact.ID);
-                        }
+                        ContactPhotoManager.TryUploadPhotoFromTmp(contact.ID, TargetContact == null, TargetContact == null ? imagePath : "");
                     }
                 }
                 else if (TargetContact != null)
                 {
                     ContactPhotoManager.DeletePhoto(TargetContact.ID);
                 }
+
                 #endregion
 
 
@@ -579,18 +563,18 @@ namespace ASC.Web.CRM.Controls.Contacts
                     }
                     catch(Exception ex)
                     {
-                        log4net.LogManager.GetLogger("ASC.CRM").Error(ex);
+                        LogManager.GetLogger("ASC.CRM").Error(ex);
                     }
                 }
 
                 #endregion
 
                 Response.Redirect(String.Compare(e.CommandArgument.ToString(), "0", true) == 0
-                                      ? String.Format("default.aspx?id={0}{1}", contact.ID,
+                                      ? String.Format("Default.aspx?id={0}{1}", contact.ID,
                                                       contact is Company
                                                           ? ""
                                                           : String.Format("&{0}=people", UrlConstant.Type))
-                                      : String.Format("default.aspx?action=manage{0}",
+                                      : String.Format("Default.aspx?action=manage{0}",
                                                       contact is Company
                                                           ? ""
                                                           : String.Format("&{0}=people", UrlConstant.Type)), false);
@@ -598,7 +582,7 @@ namespace ASC.Web.CRM.Controls.Contacts
             }
             catch (Exception ex)
             {
-                log4net.LogManager.GetLogger("ASC.CRM").Error(ex);
+                LogManager.GetLogger("ASC.CRM").Error(ex);
                 var cookie = HttpContext.Current.Request.Cookies.Get(ErrorCookieKey);
                 if (cookie == null)
                 {
@@ -656,9 +640,9 @@ namespace ASC.Web.CRM.Controls.Contacts
                 {
                     var notifyUsers = selectedManagers.Where(n => n != SecurityContext.CurrentAccount.ID).ToArray();
                     if (contact is Person)
-                        Services.NotifyService.NotifyClient.Instance.SendAboutSetAccess(EntityType.Person, contact.ID, notifyUsers);
+                        Services.NotifyService.NotifyClient.Instance.SendAboutSetAccess(EntityType.Person, contact.ID, DaoFactory, notifyUsers);
                     else
-                        Services.NotifyService.NotifyClient.Instance.SendAboutSetAccess(EntityType.Company, contact.ID, notifyUsers);
+                        Services.NotifyService.NotifyClient.Instance.SendAboutSetAccess(EntityType.Company, contact.ID, DaoFactory, notifyUsers);
                 }
 
                 CRMSecurity.SetAccessTo(contact, selectedManagers);
@@ -667,13 +651,13 @@ namespace ASC.Web.CRM.Controls.Contacts
 
         protected string GetContactPhone(int contactID)
         {
-            var phones = Global.DaoFactory.GetContactInfoDao().GetList(contactID, ContactInfoType.Phone, null, true);
+            var phones = DaoFactory.ContactInfoDao.GetList(contactID, ContactInfoType.Phone, null, true);
             return phones.Count == 0 ? String.Empty : phones[0].Data.HtmlEncode();
         }
 
         protected string GetContactEmail(int contactID)
         {
-            var emails = Global.DaoFactory.GetContactInfoDao().GetList(contactID, ContactInfoType.Email, null, true);
+            var emails = DaoFactory.ContactInfoDao.GetList(contactID, ContactInfoType.Email, null, true);
             return emails.Count == 0 ? String.Empty : emails[0].Data.HtmlEncode();
         }
 

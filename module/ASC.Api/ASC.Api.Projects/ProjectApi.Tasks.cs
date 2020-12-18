@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,15 +19,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ASC.Api.Attributes;
-using ASC.Api.Collections;
 using ASC.Api.Documents;
 using ASC.Api.Exceptions;
 using ASC.Api.Projects.Wrappers;
 using ASC.Api.Utils;
+using ASC.Common.Logging;
+using ASC.Core.Tenants;
 using ASC.MessagingSystem;
 using ASC.Projects.Core.Domain;
 using ASC.Projects.Engine;
 using ASC.Specific;
+using ASC.Web.Projects;
 
 namespace ASC.Api.Projects
 {
@@ -50,14 +43,15 @@ namespace ASC.Api.Projects
         ///<short>
         ///My tasks
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<returns>List of tasks</returns>
         [Read(@"task/@self")]
         public IEnumerable<TaskWrapper> GetMyTasks()
         {
             return EngineFactory
                 .TaskEngine.GetByResponsible(CurrentUserId)
-                .Select(x => new TaskWrapper(x));
+                .Select(TaskWrapperSelector)
+                .ToList();
         }
 
         ///<summary>
@@ -66,7 +60,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///My tasks by status
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="status">Status of task. One of notaccept|open|closed|disable|unclassified|notinmilestone</param>
         ///<returns>List of tasks</returns>
         [Read(@"task/@self/{status:(notaccept|open|closed|disable|unclassified|notinmilestone)}")]
@@ -74,35 +68,41 @@ namespace ASC.Api.Projects
         {
             return EngineFactory
                 .TaskEngine.GetByResponsible(CurrentUserId, status)
-                .Select(x => new TaskWrapper(x));
+                .Select(TaskWrapperSelector)
+                .ToList();
         }
 
         ///<summary>
-        /// Returns the detailed information about the task with the ID specified in the request
+        ///Returns the detailed information about the task with the ID specified in the request
         ///</summary>
         ///<short>
-        /// Get task
+        ///Get task
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="taskid">Task ID</param>
         ///<returns>Task</returns>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"task/{taskid:[0-9]+}")]
-        public TaskWrapper GetTask(int taskid)
+        public TaskWrapperFull GetTask(int taskid)
         {
             var task = EngineFactory.TaskEngine.GetByID(taskid).NotFoundIfNull();
-            if (task.Milestone == 0) return new TaskWrapper(task);
-
+            var commentsCount = EngineFactory.CommentEngine.Count(task);
+            var isSubscribed = EngineFactory.TaskEngine.IsSubscribed(task);
             var milestone = EngineFactory.MilestoneEngine.GetByID(task.Milestone, false);
-            return new TaskWrapper(task, milestone);
+            var timeSpend = EngineFactory.TimeTrackingEngine.GetByTask(task.ID).Sum(r => r.Hours);
+            var project = ProjectWrapperFullSelector(task.Project, EngineFactory.FileEngine.GetRoot(task.Project.ID));
+            var files = EngineFactory.TaskEngine.GetFiles(task).Select(FileWrapperSelector);
+            var comments = EngineFactory.CommentEngine.GetComments(task);
+            var filteredComments = comments.Where(r => r.Parent.Equals(Guid.Empty)).Select(x => GetCommentInfo(comments, x, task)).ToList();
+            return new TaskWrapperFull(this, task, milestone, project, files, filteredComments, commentsCount, isSubscribed, timeSpend);
         }
 
         public TaskWrapper GetTask(Task task)
         {
-            if (task.Milestone == 0) return new TaskWrapper(task);
+            if (task.Milestone == 0) return TaskWrapperSelector(task);
 
             var milestone = EngineFactory.MilestoneEngine.GetByID(task.Milestone, false);
-            return new TaskWrapper(task, milestone);
+            return new TaskWrapper(this, task, milestone);
         }
 
         ///<visible>false</visible>
@@ -110,19 +110,20 @@ namespace ASC.Api.Projects
         public IEnumerable<TaskWrapper> GetTask(IEnumerable<int> taskid)
         {
             var tasks = EngineFactory.TaskEngine.GetByID(taskid.ToList()).NotFoundIfNull();
-            return tasks.Select(r => new TaskWrapper(r));
+            return tasks.Select(TaskWrapperSelector).ToList();
         }
 
         ///<summary>
         ///Returns the list with the detailed information about all the tasks matching the filter parameters specified in the request
         ///</summary>
         ///<short>
-        /// Get task by filter
+        ///Get task by filter
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="projectid" optional="true"> Project Id</param>
         ///<param name="tag" optional="true">Project Tag</param>
         ///<param name="status" optional="true">Task Status</param>
+        ///<param name="substatus" optional="true">Custom Task Status</param>
         ///<param name="departament" optional="true">Departament GUID</param>
         ///<param name="participant" optional="true">Participant GUID</param>
         ///<param name="creator">Creator GUID</param>
@@ -132,20 +133,21 @@ namespace ASC.Api.Projects
         ///<param name="lastId">Last task ID</param>
         ///<param name="myProjects">Tasks in My Projects</param>
         ///<param name="myMilestones">Tasks in My Milestones</param>
+        ///<param name="nomilestone">Tasks without Milestone</param>
         ///<param name="follow">Followed tasks</param>
         ///<returns>List of tasks</returns>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"task/filter")]
         public IEnumerable<TaskWrapper> GetTaskByFilter(int projectid, bool myProjects, int? milestone,
-            bool myMilestones, int tag,
-            TaskStatus? status, bool follow, Guid departament, Guid? participant, Guid creator,
+            bool myMilestones, bool nomilestone, int tag,
+            TaskStatus? status, int? substatus, bool follow, Guid departament, Guid? participant, Guid creator,
             ApiDateTime deadlineStart, ApiDateTime deadlineStop, int lastId)
         {
-            var filter = CreateFilter();
+            var filter = CreateFilter(EntityType.Task);
             filter.DepartmentId = departament;
             filter.ParticipantId = participant;
             filter.UserId = creator;
-            filter.Milestone = milestone;
+            filter.Milestone = nomilestone ? 0 : milestone;
             filter.FromDate = deadlineStart;
             filter.ToDate = deadlineStop;
             filter.TagId = tag;
@@ -153,6 +155,7 @@ namespace ASC.Api.Projects
             filter.MyProjects = myProjects;
             filter.MyMilestones = myMilestones;
             filter.Follow = follow;
+            filter.Substatus = substatus;
 
             if (projectid != 0)
                 filter.ProjectIds.Add(projectid);
@@ -164,16 +167,18 @@ namespace ASC.Api.Projects
 
             SetTotalCount(filterResult.FilterCount.TasksTotal);
 
-            return filterResult.FilterResult.Select(r => new TaskWrapper(r));
+            ProjectSecurity.GetTaskSecurityInfo(filterResult.FilterResult);
+
+            return filterResult.FilterResult.Select(TaskWrapperSelector).ToList();
         }
 
         ///<summary>
         ///Returns the list with the detailed information about all the tasks matching the filter parameters specified in the request
         ///</summary>
         ///<short>
-        /// Get task by filter
+        ///Get task by filter
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="projectid" optional="true"> Project Id</param>
         ///<param name="tag" optional="true">Project Tag</param>
         ///<param name="status" optional="true">Task Status</param>
@@ -196,7 +201,7 @@ namespace ASC.Api.Projects
             TaskStatus? status, bool follow, Guid departament, Guid? participant, Guid creator,
             ApiDateTime deadlineStart, ApiDateTime deadlineStop, int lastId)
         {
-            var filter = CreateFilter();
+            var filter = CreateFilter(EntityType.Task);
             filter.DepartmentId = departament;
             filter.ParticipantId = participant;
             filter.UserId = creator;
@@ -219,16 +224,16 @@ namespace ASC.Api.Projects
 
             SetTotalCount(filterResult.FilterCount.TasksTotal);
 
-            return filterResult.FilterResult.Select(r => new SimpleTaskWrapper(r));
+            return filterResult.FilterResult.Select(r => new SimpleTaskWrapper(this, r));
         }
 
         ///<summary>
-        /// Returns the list of all files attached to the task with the ID specified in the request
+        ///Returns the list of all files attached to the task with the ID specified in the request
         ///</summary>
         ///<short>
-        /// Get task files
+        ///Get task files
         ///</short>
-        /// <category>Files</category>
+        ///<category>Files</category>
         ///<param name="taskid">Task ID</param>
         ///<returns>List of files</returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -241,16 +246,16 @@ namespace ASC.Api.Projects
 
             ProjectSecurity.DemandReadFiles(task.Project);
 
-            return taskEngine.GetFiles(task).Select(x => new FileWrapper(x));
+            return taskEngine.GetFiles(task).Select(FileWrapperSelector);
         }
 
         ///<summary>
-        /// Uploads the file specified in the request to the selected task
+        ///Uploads the file specified in the request to the selected task
         ///</summary>
         ///<short>
-        /// Upload file to task
+        ///Upload file to task
         ///</short>
-        /// <category>Files</category>
+        ///<category>Files</category>
         ///<param name="taskid">Task ID</param>
         ///<param name="files">File ID</param>
         ///<returns>List of tasks</returns>
@@ -266,26 +271,26 @@ namespace ASC.Api.Projects
             ProjectSecurity.DemandReadFiles(task.Project);
 
             var filesList = files.ToList();
-            var fileNames = new List<string>();
+            var attachments = new List<Files.Core.File>();
             foreach (var fileid in filesList)
             {
                 var file = fileEngine.GetFile(fileid).NotFoundIfNull();
-                fileNames.Add(file.Title);
+                attachments.Add(file);
                 taskEngine.AttachFile(task, file.ID, true);
             }
 
-            MessageService.Send(Request, MessageAction.TaskAttachedFiles, task.Project.Title, task.Title, fileNames);
+            MessageService.Send(Request, MessageAction.TaskAttachedFiles, MessageTarget.Create(task.ID), task.Project.Title, task.Title, attachments.Select(x => x.Title));
 
-            return new TaskWrapper(task);
+            return TaskWrapperSelector(task);
         }
 
         ///<summary>
-        /// Detaches the selected file from the task with the ID specified in the request
+        ///Detaches the selected file from the task with the ID specified in the request
         ///</summary>
         ///<short>
-        /// Detach file from task
+        ///Detach file from task
         ///</short>
-        /// <category>Files</category>
+        ///<category>Files</category>
         ///<param name="taskid">Task ID</param>
         ///<param name="fileid">File ID</param>
         ///<returns>Task</returns>
@@ -302,46 +307,116 @@ namespace ASC.Api.Projects
 
             var file = fileEngine.GetFile(fileid).NotFoundIfNull();
             taskEngine.DetachFile(task, fileid);
-            MessageService.Send(Request, MessageAction.TaskDetachedFile, task.Project.Title, task.Title, file.Title);
+            MessageService.Send(Request, MessageAction.TaskDetachedFile, MessageTarget.Create(task.ID), task.Project.Title, task.Title, file.Title);
 
-            return new TaskWrapper(task);
+            return TaskWrapperSelector(task);
         }
 
         ///<summary>
-        /// Updates the status of the task with the ID specified in the request
+        ///Detaches the selected file from the task with the ID specified in the request
         ///</summary>
         ///<short>
-        ///Update task status
+        ///Detach file from task
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Files</category>
         ///<param name="taskid">Task ID</param>
-        ///<param name="status">Status of task. Can be one of: open|closed</param>
-        ///<returns>Updated task</returns>
+        ///<param name="files">files</param>
+        ///<returns>Task</returns>
         ///<exception cref="ItemNotFoundException"></exception>
+        ///<visible>false</visible>
+        [Delete(@"task/{taskid:[0-9]+}/filesmany")]
+        public TaskWrapper DetachFileFromTask(int taskid, List<int> files)
+        {
+            var fileEngine = EngineFactory.FileEngine;
+            var taskEngine = EngineFactory.TaskEngine;
+
+            var task = taskEngine.GetByID(taskid).NotFoundIfNull();
+
+            ProjectSecurity.DemandReadFiles(task.Project);
+
+            var filesList = files.ToList();
+            var attachments = new List<Files.Core.File>();
+            foreach (var fileid in filesList)
+            {
+                var file = fileEngine.GetFile(fileid).NotFoundIfNull();
+                attachments.Add(file);
+                taskEngine.AttachFile(task, file.ID, true);
+            }
+
+            MessageService.Send(Request, MessageAction.TaskDetachedFile, MessageTarget.Create(task.ID), task.Project.Title, task.Title, attachments.Select(x => x.Title));
+
+            return TaskWrapperSelector(task);
+        }
+
+        /// <summary>
+        /// Updates the status of the task with the ID specified in the request
+        /// </summary>
+        /// <short>
+        /// Update task status
+        /// </short>
+        /// <category>Tasks</category>
+        /// <param name="taskid">Task ID</param>
+        /// <param name="status">Status of task. Can be one of: open|closed</param>
+        /// <param name="statusId"></param>
+        /// <returns>Updated task</returns>
+        /// <exception cref="ItemNotFoundException"></exception>
         [Update(@"task/{taskid:[0-9]+}/status")]
-        public TaskWrapper UpdateTask(int taskid, TaskStatus status)
+        public TaskWrapperFull UpdateTask(int taskid, TaskStatus status, int statusId = 0)
         {
             var task = EngineFactory.TaskEngine.GetByID(taskid).NotFoundIfNull();
 
-            EngineFactory.TaskEngine.ChangeStatus(task, status);
-            MessageService.Send(Request, MessageAction.TaskUpdatedStatus, task.Project.Title, task.Title, LocalizedEnumConverter.ConvertToString(task.Status));
+            var customStatus = EngineFactory.StatusEngine.GetWithDefaults().FirstOrDefault(r => r.Id == statusId) ??
+                                        CustomTaskStatus.GetDefaults().First(r => r.StatusType == status);
 
-            return GetTask(task);
+            EngineFactory.TaskEngine.ChangeStatus(task, customStatus);
+            MessageService.Send(Request, MessageAction.TaskUpdatedStatus, MessageTarget.Create(task.ID), task.Project.Title, task.Title, LocalizedEnumConverter.ConvertToString(task.Status));
+
+            return GetTask(taskid);
         }
 
         ///<summary>
-        /// Updates the milestone of the task with the ID specified in the request
+        ///Updates the status of the tasks with the IDs specified in the request
+        ///</summary>
+        ///<short>
+        ///Update tasks status
+        ///</short>
+        ///<category>Tasks</category>
+        ///<param name="taskids">Tasks ID</param>
+        ///<param name="status">Status of tasks. Can be one of: open|closed</param>
+        ///<param name="statusId">Custom status id</param>
+        [Update(@"task/status")]
+        public IEnumerable<TaskWrapperFull> UpdateTasks(int[] taskids, TaskStatus status, int statusId = 0)
+        {
+            var result = new List<TaskWrapperFull>(taskids.Length);
+
+            foreach (var taskId in taskids)
+            {
+                try
+                {
+                    result.Add(UpdateTask(taskId, status, statusId));
+                }
+                catch (Exception e)
+                {
+                    LogManager.GetLogger("ASC").Error("UpdateTasks", e);
+                }
+            }
+
+            return result;
+        }
+
+        ///<summary>
+        ///Updates the milestone of the task with the ID specified in the request
         ///</summary>
         ///<short>
         ///Update task milestone
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="taskid">Task ID</param>
         ///<param name="milestoneid">Milestone ID</param>
         ///<returns>Updated task</returns>
         ///<exception cref="ItemNotFoundException"></exception>
         [Update(@"task/{taskid:[0-9]+}/milestone")]
-        public TaskWrapper UpdateTask(int taskid, int milestoneid)
+        public TaskWrapperFull UpdateTask(int taskid, int milestoneid)
         {
             if (milestoneid < 0) throw new ArgumentNullException("milestoneid");
 
@@ -354,12 +429,131 @@ namespace ASC.Api.Projects
             taskEngine.MoveToMilestone(task, milestoneid);
             if (milestone != null)
             {
-                MessageService.Send(Request, MessageAction.TaskMovedToMilestone, task.Project.Title, milestone.Title, task.Title);
+                MessageService.Send(Request, MessageAction.TaskMovedToMilestone, MessageTarget.Create(task.ID), task.Project.Title, milestone.Title, task.Title);
             }
             else
             {
-                MessageService.Send(Request, MessageAction.TaskUnlinkedMilestone, task.Project.Title, task.Title);
+                MessageService.Send(Request, MessageAction.TaskUnlinkedMilestone, MessageTarget.Create(task.ID), task.Project.Title, task.Title);
             }
+
+            return GetTask(taskid);
+        }
+
+        ///<summary>
+        ///Updates the milestone of the tasks with the IDs specified in the request
+        ///</summary>
+        ///<short>
+        ///Update tasks milestone
+        ///</short>
+        ///<category>Tasks</category>
+        ///<param name="taskids">Task ID</param>
+        ///<param name="milestoneid">Milestone ID</param>
+        ///<returns>Updated tasks</returns>
+        ///<exception cref="ItemNotFoundException"></exception>
+        [Update(@"task/milestone")]
+        public IEnumerable<TaskWrapperFull> UpdateTasks(int[] taskids, int milestoneid)
+        {
+            if (milestoneid < 0) throw new ArgumentNullException("milestoneid");
+
+            var result = new List<TaskWrapperFull>(taskids.Length);
+
+            foreach (var taskid in taskids)
+            {
+                try
+                {
+                    result.Add(UpdateTask(taskid, milestoneid));
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+
+            return result;
+        }
+
+        ///<summary>
+        ///Copy task
+        ///</summary>
+        ///<short>
+        ///Copy task
+        ///</short>
+        ///<category>Tasks</category>
+        ///<param name="projectid">Project ID</param>
+        ///<param name="description">Description</param>
+        ///<param name="deadline">Deadline time</param>
+        ///<param name="priority">Priority: Low|Normal|High</param>
+        ///<param name="title">Title</param>
+        ///<param name="milestoneid">Milestone ID</param>
+        ///<param name="responsibles">List responsibles</param>
+        ///<param name="notify">Notify responsible</param>
+        ///<param name="startDate"></param>
+        ///<param name="copyFrom"></param>
+        ///<param name="copySubtasks"></param>
+        ///<param name="copyFiles"></param>
+        ///<param name="removeOld"></param>
+        ///<returns>Created task</returns>
+        ///<exception cref="ItemNotFoundException"></exception>
+        [Create(@"task/{copyFrom:[0-9]+}/copy")]
+        public TaskWrapper CopyTask(int projectid, string description, ApiDateTime deadline,
+                                          TaskPriority priority, string title, int milestoneid,
+                                          IEnumerable<Guid> responsibles, bool notify, ApiDateTime startDate,
+                                          int copyFrom, bool copySubtasks, bool copyFiles, bool removeOld)
+        {
+            if (string.IsNullOrEmpty(title)) throw new ArgumentException(@"title can't be empty", "title");
+
+            var projectEngine = EngineFactory.ProjectEngine;
+            var taskEngine = EngineFactory.TaskEngine;
+
+            var copyFromTask = taskEngine.GetByID(copyFrom).NotFoundIfNull();
+            var project = projectEngine.GetByID(projectid).NotFoundIfNull();
+
+            if (!EngineFactory.MilestoneEngine.IsExists(milestoneid) && milestoneid > 0)
+            {
+                throw new ItemNotFoundException("Milestone not found");
+            }
+
+            var team = projectEngine.GetTeam(project.ID);
+            var teamIds = team.Select(r => r.ID).ToList();
+
+            if (responsibles.Any(responsible => !teamIds.Contains(responsible)))
+            {
+                throw new ArgumentException(@"responsibles", "responsibles");
+            }
+
+            var task = new Task
+            {
+                CreateBy = CurrentUserId,
+                CreateOn = TenantUtil.DateTimeNow(),
+                Deadline = deadline,
+                Description = description ?? "",
+                Priority = priority,
+                Status = TaskStatus.Open,
+                Title = title,
+                Project = project,
+                Milestone = milestoneid,
+                Responsibles = new List<Guid>(responsibles.Distinct()),
+                StartDate = startDate
+            };
+
+            taskEngine.SaveOrUpdate(task, null, notify);
+
+            if (copySubtasks)
+            {
+                taskEngine.CopySubtasks(copyFromTask, task, team);
+            }
+
+            if (copyFiles)
+            {
+                taskEngine.CopyFiles(copyFromTask, task);
+            }
+
+            if (removeOld)
+            {
+                taskEngine.Delete(copyFromTask);
+            }
+
+            MessageService.Send(Request, MessageAction.TaskCreated, MessageTarget.Create(task.ID), project.Title, task.Title);
 
             return GetTask(task);
         }
@@ -370,7 +564,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Update Task
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="taskid">task ID</param>
         ///<param name="description">description</param>
         ///<param name="deadline">deadline time</param>
@@ -386,7 +580,7 @@ namespace ASC.Api.Projects
         ///<returns>Updated task</returns>
         ///<exception cref="ItemNotFoundException"></exception>
         [Update(@"task/{taskid:[0-9]+}")]
-        public TaskWrapper UpdateProjectTask(
+        public TaskWrapperFull UpdateProjectTask(
             int taskid,
             string description,
             ApiDateTime deadline,
@@ -410,41 +604,61 @@ namespace ASC.Api.Projects
                 throw new ItemNotFoundException("Milestone not found");
             }
 
-            task.Responsibles = new List<Guid>(responsibles.Distinct());
+            var distinctResponsibles = new List<Guid>(responsibles.Distinct());
 
-            task.Deadline = Update.IfNotEquals(task.Deadline, deadline);
-            task.Description = Update.IfNotEquals(task.Description, description);
+            var hasChanges = !(task.Responsibles.Count == distinctResponsibles.Count && task.Responsibles.All(distinctResponsibles.Contains));
+
+            task.Responsibles = distinctResponsibles;
+
+            task.Deadline = Update.IfNotEquals(TenantUtil.DateTimeToUtc(task.Deadline), deadline, ref hasChanges);
+            task.Description = Update.IfNotEquals(task.Description, description, ref hasChanges);
 
             if (priority.HasValue)
             {
-                task.Priority = Update.IfNotEquals(task.Priority, priority.Value);
+                task.Priority = Update.IfNotEquals(task.Priority, priority.Value, ref hasChanges);
             }
 
-            task.Title = Update.IfNotEmptyAndNotEquals(task.Title, title);
-            task.Milestone = Update.IfNotEquals(task.Milestone, milestoneid);
-            task.StartDate = Update.IfNotEquals(task.StartDate, startDate);
+            task.Title = Update.IfNotEmptyAndNotEquals(task.Title, title, ref hasChanges);
+            task.Milestone = Update.IfNotEquals(task.Milestone, milestoneid, ref hasChanges);
+            task.StartDate = Update.IfNotEquals(TenantUtil.DateTimeToUtc(task.StartDate), startDate, ref hasChanges);
 
             if (projectID.HasValue)
             {
-                var project = EngineFactory.ProjectEngine.GetByID((int)projectID).NotFoundIfNull();
-                task.Project = project;
+                if (task.Project.ID != projectID.Value)
+                {
+                    var project = EngineFactory.ProjectEngine.GetByID(projectID.Value).NotFoundIfNull();
+                    task.Project = project;
+                    hasChanges = true;
+                }
             }
 
             if (progress.HasValue)
             {
-                task.Progress = progress.Value;
+                task.Progress = Update.IfNotEquals(task.Progress, progress.Value, ref hasChanges);
             }
 
-            taskEngine.SaveOrUpdate(task, null, notify);
+            if (hasChanges)
+            {
+                taskEngine.SaveOrUpdate(task, null, notify);
+            }
 
             if (status.HasValue)
             {
-                taskEngine.ChangeStatus(task, status.Value);
+                var newStatus = CustomTaskStatus.GetDefaults().First(r => r.StatusType == status.Value);
+
+                if (task.Status != newStatus.StatusType || task.CustomTaskStatus != newStatus.Id)
+                {
+                    hasChanges = true;
+                    taskEngine.ChangeStatus(task, newStatus);
+                }
             }
 
-            MessageService.Send(Request, MessageAction.TaskUpdated, task.Project.Title, task.Title);
+            if (hasChanges)
+            {
+                MessageService.Send(Request, MessageAction.TaskUpdated, MessageTarget.Create(task.ID), task.Project.Title, task.Title);
+            }
 
-            return GetTask(task);
+            return GetTask(taskid);
         }
 
         ///<summary>
@@ -453,7 +667,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Delete task
         ///</short>
-        /// <category>Projects</category>
+        ///<category>Tasks</category>
         ///<param name="taskid">task ID</param>
         ///<returns>Deleted task</returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -465,9 +679,39 @@ namespace ASC.Api.Projects
             var task = taskEngine.GetByID(taskid).NotFoundIfNull();
 
             taskEngine.Delete(task);
-            MessageService.Send(Request, MessageAction.TaskDeleted, task.Project.Title, task.Title);
+            MessageService.Send(Request, MessageAction.TaskDeleted, MessageTarget.Create(task.ID), task.Project.Title, task.Title);
 
-            return new TaskWrapper(task);
+            return TaskWrapperSelector(task);
+        }
+
+        ///<summary>
+        ///Deletes the tasks with the IDs specified in the request from the project
+        ///</summary>
+        ///<short>
+        ///Delete tasks
+        ///</short>
+        ///<category>Tasks</category>
+        ///<param name="taskids">task ID</param>
+        ///<returns>Deleted tasks</returns>
+        ///<exception cref="ItemNotFoundException"></exception>
+        [Delete(@"task")]
+        public IEnumerable<TaskWrapper> DeleteTasks(int[] taskids)
+        {
+            var result = new List<TaskWrapper>(taskids.Length);
+
+            foreach (var taskId in taskids)
+            {
+                try
+                {
+                    result.Add(DeleteTask(taskId));
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+
+            return result;
         }
 
         ///<summary>
@@ -476,14 +720,15 @@ namespace ASC.Api.Projects
         ///<short>
         ///Task comments
         ///</short>
-        /// <category>Comments</category>
+        ///<category>Comments</category>
         ///<param name="taskid">Task ID</param>
         ///<returns>List of comments</returns>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"task/{taskid:[0-9]+}/comment")]
         public IEnumerable<CommentWrapper> GetTaskComments(int taskid)
         {
-            return EngineFactory.CommentEngine.GetComments(EngineFactory.TaskEngine.GetByID(taskid).NotFoundIfNull()).Select(x => new CommentWrapper(x));
+            var task = EngineFactory.TaskEngine.GetByID(taskid).NotFoundIfNull();
+            return EngineFactory.CommentEngine.GetComments(task).Select(x => new CommentWrapper(this, x, task));
         }
 
 
@@ -493,7 +738,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Add task comment
         ///</short>
-        /// <category>Comments</category>
+        ///<category>Comments</category>
         ///<param name="taskid">Task ID</param>
         ///<param name="content">Comment text</param>
         ///<param name="parentid">Parent comment ID</param>
@@ -506,12 +751,12 @@ namespace ASC.Api.Projects
             if (parentid != Guid.Empty && EngineFactory.CommentEngine.GetByID(parentid) == null) throw new ItemNotFoundException("parent comment not found");
 
             var comment = new Comment
-                {
-                    Content = content,
-                    TargetUniqID = ProjectEntity.BuildUniqId<Task>(taskid),
-                    CreateBy = CurrentUserId,
-                    CreateOn = Core.Tenants.TenantUtil.DateTimeNow()
-                };
+            {
+                Content = content,
+                TargetUniqID = ProjectEntity.BuildUniqId<Task>(taskid),
+                CreateBy = CurrentUserId,
+                CreateOn = Core.Tenants.TenantUtil.DateTimeNow()
+            };
 
             if (parentid != Guid.Empty)
             {
@@ -522,9 +767,9 @@ namespace ASC.Api.Projects
 
             EngineFactory.CommentEngine.SaveOrUpdateComment(task, comment);
 
-            MessageService.Send(Request, MessageAction.TaskCommentCreated, task.Project.Title, task.Title);
+            MessageService.Send(Request, MessageAction.TaskCommentCreated, MessageTarget.Create(comment.ID), task.Project.Title, task.Title);
 
-            return new CommentWrapper(comment);
+            return new CommentWrapper(this, comment, task);
         }
 
         ///<summary>
@@ -533,8 +778,8 @@ namespace ASC.Api.Projects
         ///<short>
         ///Notify task responsible
         ///</short>
-        /// <category>Tasks</category>
-        /// <returns>Task</returns>
+        ///<category>Tasks</category>
+        ///<returns>Task</returns>
         ///<param name="taskid">Task ID</param>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"task/{taskid:[0-9]+}/notify")]
@@ -546,7 +791,7 @@ namespace ASC.Api.Projects
 
             taskEngine.SendReminder(task);
 
-            return new TaskWrapper(task);
+            return TaskWrapperSelector(task);
         }
 
         ///<summary>
@@ -555,8 +800,8 @@ namespace ASC.Api.Projects
         ///<short>
         ///Subscribe to task action
         ///</short>
-        /// <category>Tasks</category>
-        /// <returns>Task</returns>
+        ///<category>Tasks</category>
+        ///<returns>Task</returns>
         ///<param name="taskid">Task ID</param>
         ///<exception cref="ItemNotFoundException"></exception>
         [Update(@"task/{taskid:[0-9]+}/subscribe")]
@@ -568,9 +813,9 @@ namespace ASC.Api.Projects
             ProjectSecurity.DemandAuthentication();
 
             taskEngine.Follow(task);
-            MessageService.Send(Request, MessageAction.TaskUpdatedFollowing, task.Project.Title, task.Title);
+            MessageService.Send(Request, MessageAction.TaskUpdatedFollowing, MessageTarget.Create(task.ID), task.Project.Title, task.Title);
 
-            return new TaskWrapper(task);
+            return TaskWrapperSelector(task);
         }
 
         ///<summary>
@@ -579,7 +824,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Check subscription to task action
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="taskid">Task ID</param>
         ///<exception cref="ItemNotFoundException"></exception>
         [Read(@"task/{taskid:[0-9]+}/subscribe")]
@@ -600,7 +845,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Add link 
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="parentTaskId">Parent Task ID</param>
         ///<param name="dependenceTaskId">Dependent Task ID</param>
         ///<param name="linkType">Link Type</param>
@@ -614,9 +859,9 @@ namespace ASC.Api.Projects
             var parentTask = taskEngine.GetByID(parentTaskId).NotFoundIfNull();
 
             taskEngine.AddLink(parentTask, dependentTask, linkType);
-            MessageService.Send(Request, MessageAction.TasksLinked, parentTask.Project.Title, parentTask.Title, dependentTask.Title);
+            MessageService.Send(Request, MessageAction.TasksLinked, MessageTarget.Create(new[] { parentTask.ID, dependentTask.ID }), parentTask.Project.Title, parentTask.Title, dependentTask.Title);
 
-            return new TaskWrapper(dependentTask);
+            return TaskWrapperSelector(dependentTask);
         }
 
         ///<summary>
@@ -625,7 +870,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Remove link 
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="dependenceTaskId">Dependent Task ID</param>
         ///<param name="parentTaskId">Parent Task ID</param>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -638,9 +883,9 @@ namespace ASC.Api.Projects
             var parentTask = taskEngine.GetByID(parentTaskId).NotFoundIfNull();
 
             taskEngine.RemoveLink(dependentTask, parentTask);
-            MessageService.Send(Request, MessageAction.TasksUnlinked, parentTask.Project.Title, parentTask.Title, dependentTask.Title);
+            MessageService.Send(Request, MessageAction.TasksUnlinked, MessageTarget.Create(new[] { parentTask.ID, dependentTask.ID }), parentTask.Project.Title, parentTask.Title, dependentTask.Title);
 
-            return new TaskWrapper(dependentTask);
+            return TaskWrapperSelector(dependentTask);
         }
 
         #endregion
@@ -648,12 +893,12 @@ namespace ASC.Api.Projects
         #region subtasks
 
         ///<summary>
-        /// Creates the subtask with the selected title and responsible within the parent task specified in the request
+        ///Creates the subtask with the selected title and responsible within the parent task specified in the request
         ///</summary>
         ///<short>
-        /// Create subtask
+        ///Create subtask
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="taskid">Parent task ID</param>
         ///<param name="responsible">Subtask responsible</param>
         ///<param name="title">Subtask title</param>
@@ -668,26 +913,53 @@ namespace ASC.Api.Projects
             if (task.Status == TaskStatus.Closed) throw new ArgumentException(@"task can't be closed");
 
             var subtask = new Subtask
-                {
-                    Responsible = responsible,
-                    Task = task.ID,
-                    Status = TaskStatus.Open,
-                    Title = title
-                };
+            {
+                Responsible = responsible,
+                Task = task.ID,
+                Status = TaskStatus.Open,
+                Title = title
+            };
 
             subtask = EngineFactory.SubtaskEngine.SaveOrUpdate(subtask, task);
-            MessageService.Send(Request, MessageAction.SubtaskCreated, task.Project.Title, task.Title, subtask.Title);
+            MessageService.Send(Request, MessageAction.SubtaskCreated, MessageTarget.Create(subtask.ID), task.Project.Title, task.Title, subtask.Title);
 
-            return new SubtaskWrapper(subtask, task);
+            return new SubtaskWrapper(this, subtask, task);
         }
 
         ///<summary>
-        /// Updates the subtask with the selected title and responsible with the subtask ID specified in the request
+        ///Copy subtask
         ///</summary>
         ///<short>
-        /// Update subtask
+        ///Copy subtask
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
+        ///<param name="taskid">Task ID</param>
+        ///<param name="subtaskid">Subtask ID</param>
+        ///<returns>New task</returns>
+        ///<exception cref="ItemNotFoundException"></exception>
+        [Create(@"task/{taskid:[0-9]+}/{subtaskid:[0-9]+}/copy")]
+        public SubtaskWrapper CopySubtask(int taskid, int subtaskid)
+        {
+            var taskEngine = EngineFactory.TaskEngine;
+            var task = taskEngine.GetByID(taskid).NotFoundIfNull();
+
+            var subtaskEngine = EngineFactory.SubtaskEngine;
+            var subtask = subtaskEngine.GetById(subtaskid).NotFoundIfNull();
+
+            var team = EngineFactory.ProjectEngine.GetTeam(task.Project.ID);
+
+            var newSubtask = subtaskEngine.Copy(subtask, task, team);
+
+            return new SubtaskWrapper(this, newSubtask, task);
+        }
+
+        ///<summary>
+        ///Updates the subtask with the selected title and responsible with the subtask ID specified in the request
+        ///</summary>
+        ///<short>
+        ///Update subtask
+        ///</short>
+        ///<category>Tasks</category>
         ///<param name="taskid">Task ID</param>
         ///<param name="subtaskid">Subtask ID</param>
         ///<param name="responsible">Subtask responsible</param>
@@ -701,20 +973,25 @@ namespace ASC.Api.Projects
             var task = EngineFactory.TaskEngine.GetByID(taskid).NotFoundIfNull();
             var subtask = task.SubTasks.Find(r => r.ID == subtaskid).NotFoundIfNull();
 
-            subtask.Responsible = responsible;
-            subtask.Title = Update.IfNotEmptyAndNotEquals(subtask.Title, title);
+            var hasChanges = false;
 
-            EngineFactory.SubtaskEngine.SaveOrUpdate(subtask, task);
-            MessageService.Send(Request, MessageAction.SubtaskUpdated, task.Project.Title, task.Title, subtask.Title);
+            subtask.Responsible = Update.IfNotEquals(subtask.Responsible, responsible, ref hasChanges);
+            subtask.Title = Update.IfNotEmptyAndNotEquals(subtask.Title, title, ref hasChanges);
 
-            return new SubtaskWrapper(subtask, task);
+            if (hasChanges)
+            {
+                EngineFactory.SubtaskEngine.SaveOrUpdate(subtask, task);
+                MessageService.Send(Request, MessageAction.SubtaskUpdated, MessageTarget.Create(subtask.ID), task.Project.Title, task.Title, subtask.Title);
+            }
+
+            return new SubtaskWrapper(this, subtask, task);
         }
 
         ///<summary>
-        /// Deletes the selected subtask from the parent task with the ID specified in the request
+        ///Deletes the selected subtask from the parent task with the ID specified in the request
         ///</summary>
         ///<short>
-        /// Delete subtask
+        ///Delete subtask
         ///</short>
         ///<category>Tasks</category>
         ///<param name="taskid">Task ID</param>
@@ -727,18 +1004,18 @@ namespace ASC.Api.Projects
             var subtask = task.SubTasks.Find(r => r.ID == subtaskid).NotFoundIfNull();
 
             EngineFactory.SubtaskEngine.Delete(subtask, task);
-            MessageService.Send(Request, MessageAction.SubtaskDeleted, task.Project.Title, task.Title, subtask.Title);
+            MessageService.Send(Request, MessageAction.SubtaskDeleted, MessageTarget.Create(subtask.ID), task.Project.Title, task.Title, subtask.Title);
 
-            return new SubtaskWrapper(subtask, task);
+            return new SubtaskWrapper(this, subtask, task);
         }
 
         ///<summary>
-        /// Updates the selected subtask status in the parent task with the ID specified in the request
+        ///Updates the selected subtask status in the parent task with the ID specified in the request
         ///</summary>
         ///<short>
         ///Update subtask status
         ///</short>
-        /// <category>Tasks</category>
+        ///<category>Tasks</category>
         ///<param name="taskid">Task ID</param>
         ///<param name="subtaskid">Subtask ID</param>
         ///<param name="status">Status of task. Can be one of: open|closed|disable|unclassified</param>
@@ -752,9 +1029,9 @@ namespace ASC.Api.Projects
             ProjectSecurity.DemandEdit(task, subtask);
 
             EngineFactory.SubtaskEngine.ChangeStatus(task, subtask, status);
-            MessageService.Send(Request, MessageAction.SubtaskUpdatedStatus, task.Project.Title, task.Title, subtask.Title, LocalizedEnumConverter.ConvertToString(subtask.Status));
+            MessageService.Send(Request, MessageAction.SubtaskUpdatedStatus, MessageTarget.Create(subtask.ID), task.Project.Title, task.Title, subtask.Title, LocalizedEnumConverter.ConvertToString(subtask.Status));
 
-            return new SubtaskWrapper(subtask, task);
+            return new SubtaskWrapper(this, subtask, task);
         }
 
         #endregion

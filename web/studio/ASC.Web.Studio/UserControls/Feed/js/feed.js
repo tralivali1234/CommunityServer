@@ -1,79 +1,63 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-window.Feed = (function(productsAccessRightsParam) {
+ASC.Feed = (function() {
     var $ = jq;
 
-    var userId = Teamlab.profile.id;
+    var userId = Teamlab.profile.id,
+        basePath = '',
+        readedDate,
+        feedChunk = 30,
+        currentFeedsCount = 0,
+        currentGroupFeedsCount = 0,
+        guestId = '712d9ec3-5d2b-4b13-824f-71f00191dcca',
+        firstLoad = true,
+        $view = $('#feed-view'),
+        $emptyScreen = $view.find('#emptyFeedScr'),
+        $emptyFilterScreen = $view.find('#emptyFeedFilterScr'),
+        $managerEmptyScreen = $view.find('#manager-empty-screen'),
 
-    var basePath = '';
+        $communityEmptyScreen = $view.find('#emptyListCommunity'),
+        $crmEmptyScreen = $view.find('#emptyListCrm'),
+        $projectsEmptyScreen = $view.find('#emptyListProjects'),
+        $documentsEmptyScreen = $view.find('#emptyListDocuments'),
 
-    var readedDate;
+        $firstLoader = $view.find('.loader-page'),
 
-    var feedChunk = 30;
-    var currentFeedsCount = 0;
-    var currentGroupFeedsCount = 0;
+        $pageMenu = $('#feed-page-menu'),
 
-    var guestId = '712d9ec3-5d2b-4b13-824f-71f00191dcca';
+        $list = $('#feed-list'),
 
-    var firstLoad = true;
+        $showNextBtn = $('#show-next-feeds-btn'),
+        $showNextLoader = $('#show-next-feeds-loader'),
+        filter,
+        feedTemplateId = 'feedTmpl',
+        feedCommentTemplateId = 'feedCommentTmpl',
+        productsAccessRights;
 
-    var productsAccessRights = productsAccessRightsParam.split(',');
-    for (var i = 0; i < productsAccessRights.length; i++) {
-        productsAccessRights[i] = productsAccessRights[i].toLowerCase() == 'true';
-    }
+    function init(productsAccessRightsParam) {
+        filter = new FeedFilter();
+        filter.onSetFilter = onSetFilter;
+        filter.onResetFilter = onResetFilter;
 
-    var $view = $('#feed-view');
-
-    var $emptyScreen = $view.find('#emptyFeedScr');
-    var $emptyFilterScreen = $view.find('#emptyFeedFilterScr');
-    var $managerEmptyScreen = $view.find('#manager-empty-screen');
-
-    var $communityEmptyScreen = $view.find('#emptyListCommunity');
-    var $crmEmptyScreen = $view.find('#emptyListCrm');
-    var $projectsEmptyScreen = $view.find('#emptyListProjects');
-    var $documentsEmptyScreen = $view.find('#emptyListDocuments');
-
-    var $firstLoader = $view.find('.loader-page');
-
-    var $pageMenu = $('#feed-page-menu');
-
-    var $list = $('#feed-list');
-
-    var $showNextBtn = $('#show-next-feeds-btn');
-    var $showNextLoader = $('#show-next-feeds-loader');
-
-    var filter = new FeedFilter();
-    filter.onSetFilter = onSetFilter;
-    filter.onResetFilter = onResetFilter;
-
-    var feedTemplateId = 'feedTmpl';
-    var feedCommentTemplateId = 'feedCommentTmpl';
-
-    function init() {
+        productsAccessRights = productsAccessRightsParam.split(',');
+        for (var i = 0; i < productsAccessRights.length; i++) {
+            productsAccessRights[i] = productsAccessRights[i].toLowerCase() == 'true';
+        }
         initFilter();
         bindEvents();
     }
@@ -210,7 +194,8 @@ window.Feed = (function(productsAccessRightsParam) {
                             filtertitle: ASC.Resources.Master.FeedResource.ByUser + ':',
                             group: ASC.Resources.Master.FeedResource.ByUser,
                             hashmask: 'author/{0}',
-                            groupby: 'authorid'
+                            groupby: 'authorid',
+                            showme: false
                         }
                     ]),
                 sorters: []
@@ -394,7 +379,7 @@ window.Feed = (function(productsAccessRightsParam) {
 
         var template = feed;
 
-        template.author = getUser(template.authorId);
+        template.author = window.UserManager.getUser(template.authorId);
 
         template.isGuest = template.author == null || template.authorId == guestId;
         template.isNew = checkNew(template);
@@ -409,7 +394,7 @@ window.Feed = (function(productsAccessRightsParam) {
 
         if (template.comments) {
             for (var j = 0; j < template.comments.length; j++) {
-                template.comments[j].author = getUser(template.comments[j].authorId);
+                template.comments[j].author = window.UserManager.getUser(template.comments[j].authorId) || window.UserManager.getRemovedProfile();
             }
         }
 
@@ -435,7 +420,7 @@ window.Feed = (function(productsAccessRightsParam) {
     }
 
     function getFeedProductText(template) {
-        var productsCollection = FeedProductsColection;
+        var productsCollection = ASC.Feed.Products;
         if (!productsCollection) {
             return null;
         }
@@ -444,7 +429,7 @@ window.Feed = (function(productsAccessRightsParam) {
     }
 
     function getFeedActionText(template) {
-        var textsCollection = FeedTextsColection;
+        var textsCollection = ASC.Feed.Texts;
         if (!textsCollection) {
             return null;
         }
@@ -467,7 +452,7 @@ window.Feed = (function(productsAccessRightsParam) {
     }
 
     function getFeedLocation(template) {
-        var textsColection = FeedTextsColection;
+        var textsColection = ASC.Feed.Texts;
         if (!textsColection) {
             return null;
         }
@@ -535,7 +520,7 @@ window.Feed = (function(productsAccessRightsParam) {
 
                 for (var j = 0; j < template.groupedFeeds.length; j++) {
                     var g = template.groupedFeeds[j];
-                    var author = getUser(g.AuthorId);
+                    var author = window.UserManager.getUser(g.AuthorId);
 
                     g.Title = author ? author.displayName : null;
                     g.ItemUrl = author ? author.profileUrl : null;
@@ -574,45 +559,6 @@ window.Feed = (function(productsAccessRightsParam) {
                 template.itemClass = 'documents';
                 break;
         }
-    }
-
-    function getUsers(ids) {
-        if (!ids || !ids.length) {
-            return null;
-        }
-
-        var users = ASC.Resources.Master.ApiResponses_Profiles.response;
-        if (!users) {
-            return null;
-        }
-
-        var result = [];
-        for (var j = 0; j < users.length; j++) {
-            if (~ids.indexOf(users[j].id)) {
-                result.push(users[j]);
-            }
-        }
-
-        return result;
-    }
-
-    function getUser(id) {
-        if (!id) {
-            return null;
-        }
-
-        var users = ASC.Resources.Master.ApiResponses_Profiles.response;
-        if (!users) {
-            return null;
-        }
-
-        for (var j = 0; j < users.length; j++) {
-            if (users[j].id == id) {
-                return users[j];
-            }
-        }
-
-        return null;
     }
 
     function bindEvents() {
@@ -829,7 +775,7 @@ window.Feed = (function(productsAccessRightsParam) {
                 return;
             }
 
-            commentText = commentText.replace(/\n/g, '<br />');
+            commentText = Encoder.htmlEncode(commentText).replace(/&#10;/g, '<br />');
 
             var itemId = $(this).attr('data-id');
             var entity = $(this).attr('data-entity');
@@ -1065,7 +1011,7 @@ window.Feed = (function(productsAccessRightsParam) {
         toastr.error(ASC.Resources.Master.Resource.CommonJSErrorMsg);
     }
 
-    return {
+    return jq.extend({
         init: init
-    };
-});
+    }, ASC.Feed);
+})();

@@ -1,37 +1,29 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
-using System.Data;
+using System.Data.Common;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using ASC.Core.Tenants;
 using ASC.Common.Data;
+using ASC.Common.Logging;
 using ASC.Data.Backup.Extensions;
-using ASC.Data.Backup.Logging;
 using ASC.Data.Backup.Tasks.Modules;
 using ASC.Data.Storage;
 
@@ -48,7 +40,9 @@ namespace ASC.Data.Backup.Tasks
         public bool BlockOldPortalAfterStart { get; set; }
         public bool DeleteOldPortalAfterCompletion { get; set; }
 
-        public TransferPortalTask(ILog logger, int tenantId, string fromConfigPath, string toConfigPath)
+        public int Limit { get; private set; }
+
+        public TransferPortalTask(ILog logger, int tenantId, string fromConfigPath, string toConfigPath, int limit)
             : base(logger, tenantId, fromConfigPath)
         {
             if (toConfigPath == null)
@@ -59,11 +53,12 @@ namespace ASC.Data.Backup.Tasks
             DeleteBackupFileAfterCompletion = true;
             BlockOldPortalAfterStart = true;
             DeleteOldPortalAfterCompletion = true;
+            Limit = limit;
         }
 
         public override void RunJob()
         {
-            Logger.Debug("begin transfer {0}", TenantId);
+            Logger.DebugFormat("begin transfer {0}", TenantId);
             var fromDbFactory = new DbFactory(ConfigPath);
             var toDbFactory = new DbFactory(ToConfigPath);
             string tenantAlias = GetTenantAlias(fromDbFactory);
@@ -82,7 +77,7 @@ namespace ASC.Data.Backup.Tasks
                 SetStepsCount(ProcessStorage ? 3 : 2);
 
                 //save db data to temporary file
-                var backupTask = new BackupPortalTask(Logger, TenantId, ConfigPath, backupFilePath) {ProcessStorage = false};
+                var backupTask = new BackupPortalTask(Logger, TenantId, ConfigPath, backupFilePath, Limit) {ProcessStorage = false};
                 backupTask.ProgressChanged += (sender, args) => SetCurrentStepProgress(args.Progress);
                 foreach (var moduleName in IgnoredModules)
                 {
@@ -130,41 +125,40 @@ namespace ASC.Data.Backup.Tasks
                 {
                     File.Delete(backupFilePath);
                 }
-                Logger.Debug("end transfer {0}", TenantId);
+                Logger.DebugFormat("end transfer {0}", TenantId);
             }
         }
 
         private void DoTransferStorage(ColumnMapper columnMapper)
         {
             Logger.Debug("begin transfer storage");
-            var fileGroups = GetFilesToProcess().GroupBy(file => file.Module).ToList();
+            var fileGroups = GetFilesToProcess(TenantId).GroupBy(file => file.Module).ToList();
             int groupsProcessed = 0;
             foreach (var group in fileGroups)
             {
-                ICrossModuleTransferUtility transferUtility =
-                    StorageFactory.GetCrossModuleTransferUtility(
-                        ConfigPath, TenantId, group.Key,
-                        ToConfigPath, columnMapper.GetTenantMapping(), group.Key);
+                var baseStorage = StorageFactory.GetStorage(ConfigPath, TenantId.ToString(), group.Key);
+                var destStorage = StorageFactory.GetStorage(ToConfigPath, columnMapper.GetTenantMapping().ToString(), group.Key);
+                var utility = new CrossModuleTransferUtility(baseStorage, destStorage);
 
                 foreach (BackupFileInfo file in group)
                 {
                     string adjustedPath = file.Path;
 
                     IModuleSpecifics module = ModuleProvider.GetByStorageModule(file.Module, file.Domain);
-                    if (module == null || module.TryAdjustFilePath(columnMapper, ref adjustedPath))
+                    if (module == null || module.TryAdjustFilePath(false, columnMapper, ref adjustedPath))
                     {
                         try
                         {
-                            transferUtility.CopyFile(file.Domain, file.Path, file.Domain, adjustedPath);
+                            utility.CopyFile(file.Domain, file.Path, file.Domain, adjustedPath);
                         }
                         catch (Exception error)
                         {
-                            Logger.Warn("Can't copy file ({0}:{1}): {2}", file.Module, file.Path, error);
+                            Logger.WarnFormat("Can't copy file ({0}:{1}): {2}", file.Module, file.Path, error);
                         }
                     }
                     else
                     {
-                        Logger.Warn("Can't adjust file path \"{0}\".", file.Path);
+                        Logger.WarnFormat("Can't adjust file path \"{0}\".", file.Path);
                     }
                 }
                 SetCurrentStepProgress((int)(++groupsProcessed * 100 / (double)fileGroups.Count));
@@ -218,7 +212,7 @@ namespace ASC.Data.Backup.Tasks
             }
         }
 
-        private static string GetUniqAlias(IDbConnection connection, string alias)
+        private static string GetUniqAlias(DbConnection connection, string alias)
         {
             return alias + connection.CreateCommand("select count(*) from tenants_tenants where alias like '" + alias + "%'")
                                      .WithTimeout(120)

@@ -1,30 +1,21 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-window.ASC.Files.TreePrototype = function (root, rootId) {
+window.ASC.Files.TreePrototype = function (rootSelector, rootId) {
     var getTreeNode = function (folderId) {
         if (folderId == treeNodeRootId) {
             return treeNodeRoot;
@@ -44,7 +35,7 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
         return treeNode.parents(".jstree .tree-node");
     };
 
-    var renderTreeView = function (treeNode, htmlData) {
+    var renderTreeView = function (treeNode, htmlData, expandNode) {
         if ((treeNode.find("ul").html() || "").trim() != "") {
             resetNode(treeNode);
         }
@@ -52,8 +43,8 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
         if (htmlData != "") {
             treeNode.removeClass("jstree-empty").append("<ul>" + htmlData + "</ul>");
             treeNode.find("ul a").each(function () {
-                var hash = getFolderId(this);
-                hash = ASC.Files.Constants.URL_BASE + "#" + ASC.Files.Common.getCorrectHash(hash);
+                var entryId = getFolderId(this);
+                var hash = ASC.Files.UI.getEntryLink("folder", entryId);
                 jq(this).attr("href", hash);
             });
         } else {
@@ -61,7 +52,9 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
         }
 
         treeNode.find(".jstree-load-node").removeClass("jstree-load-node");
-        treeNode.addClass("jstree-open").removeClass("jstree-closed");
+        if (expandNode !== false) {
+            treeNode.addClass("jstree-open").removeClass("jstree-closed");
+        }
     };
 
     var resetNode = function (treeNode) {
@@ -80,12 +73,19 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
             folderId = getFolderId(treeNode);
         }
 
-        if (treeNode.length && folderId != ASC.Files.Constants.FOLDER_ID_TRASH) {
-            if (treeNode.is(":has(ul)")) {
-                treeNode.toggleClass("jstree-closed", open != null ? !open : null).toggleClass("jstree-open", open);
-            } else {
-                getTreeSubFolders(folderId, sync);
-            }
+        if (!treeNode.length
+            || folderId == ASC.Files.Constants.FOLDER_ID_FAVORITES
+            || folderId == ASC.Files.Constants.FOLDER_ID_RECENT
+            || folderId == ASC.Files.Constants.FOLDER_ID_PRIVACY && !ASC.Desktop
+            || folderId == ASC.Files.Constants.FOLDER_ID_TEMPLATES
+            || folderId == ASC.Files.Constants.FOLDER_ID_TRASH) {
+            return;
+        }
+
+        if (treeNode.is(":has(ul)")) {
+            treeNode.toggleClass("jstree-closed", open != null ? !open : null).toggleClass("jstree-open", open);
+        } else {
+            getTreeSubFolders(folderId, sync);
         }
     };
 
@@ -99,21 +99,25 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
     };
 
     var select = function (treeNode, checkSelected) {
-        treeNodeRoot.find("a.selected").removeClass("selected");
+        treeNodeRoot.find(".node-selected").removeClass("node-selected");
         treeNodeRoot.find(".parent-selected").removeClass("parent-selected");
 
-        treeNode.children("a").addClass("selected");
+        treeNode.addClass("node-selected");
         treeNode.parents(".jstree .jstree-closed").addClass("jstree-open").removeClass("jstree-closed");
         treeNode.parents(".jstree .tree-node").addClass("parent-selected");
 
-        if (treeNode && treeNode.offset()) {
-            var nodeY = treeNode.offset().top;
-            nodeY -= treeNodeRoot.offset().top;
-            nodeY += treeNodeRoot.scrollTop();
-            nodeY -= 30;
+        //if (treeNode && treeNode.offset()) {
+        //    var nodeY = treeNode.offset().top;
+        //    nodeY -= treeNodeRoot.offset().top;
+        //    nodeY += treeNodeRoot.scrollTop();
+        //    nodeY -= 30;
 
-            treeNodeRoot.scrollTop(nodeY);
-        }
+        //    if (treeNodeRoot.is("#treeViewContainer")) {
+        //        treeNodeRoot.parents(".nav-content").scrollTop(nodeY);
+        //    } else {
+        //        treeNodeRoot.scrollTop(nodeY);
+        //    }
+        //}
 
         tree.selectedFolderId = checkSelected ? getFolderId(treeNode) : null;
     };
@@ -127,7 +131,11 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
 
         ASC.Files.ServiceManager.getTreeSubFolders(
             ASC.Files.ServiceManager.events.GetTreeSubFolders,
-            { folderId: folderId, ajaxsync: (ajaxsync === true) });
+            {
+                treeNodeRoot: treeNodeRoot,
+                folderId: folderId,
+                ajaxsync: (ajaxsync === true)
+            });
     };
 
     var openPath = function (folderId) {
@@ -158,7 +166,7 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
             treeNode = treeNodeRoot;
         }
 
-        renderTreeView(treeNode, htmlData);
+        renderTreeView(treeNode, htmlData, treeNodeRoot == params.treeNodeRoot);
     };
 
     var onGetTreePath = function (jsonData, params, errorMessage) {
@@ -205,11 +213,15 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
     };
 
     this.resetFolder = function (folderId) {
-        resetNode(getTreeNode(folderId));
+        var treeNode = getTreeNode(folderId);
+        var beOpened = treeNode.hasClass("jstree-open");
+
+        resetNode(treeNode);
+        return beOpened;
     };
 
     this.rollUp = function () {
-        treeNodeRoot.find("a.selected").removeClass("selected");
+        treeNodeRoot.removeClass("node-selected");
         treeNodeRoot.find(".parent-selected").removeClass("parent-selected");
         treeNodeRoot.find(".jstree-open").addClass("jstree-closed").removeClass("jstree-open");
 
@@ -249,9 +261,23 @@ window.ASC.Files.TreePrototype = function (root, rootId) {
         return getFolderId(treeNodeRoot.find(".tree-node:visible:first"));
     };
 
+    this.displayAsRoot = function (folderId) {
+        var treeNode = getTreeNode(folderId);
+
+        jq(".jstree-root-as").removeClass("jstree-root-as");
+        treeNode.parents(".tree-node").addClass("jstree-root-parent").addBack().addClass("jstree-root-as");
+
+        jq(".jstree-root-out").removeClass("jstree-root-out");
+        treeNode.parent().children(".tree-node:not([data-id=\"" + (folderId + "").replace(/\\/g, "\\\\").replace(/\"/g, "\\\"") + "\"])").addClass("jstree-root-out");
+    };
+
+    this.entryObject = function () {
+        return treeNodeRoot;
+    };
+
 
     var tree = this;
-    var treeNodeRoot = jq(root);
+    var treeNodeRoot = jq(rootSelector);
     var treeNodeRootId = rootId;
 
     treeNodeRoot.on("click", ".jstree-expander", expand);

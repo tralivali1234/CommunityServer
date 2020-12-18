@@ -6,12 +6,14 @@
 <%@ Import Namespace="ASC.Web.CRM.Resources" %>
 <%@ Register TagPrefix="sc" Namespace="ASC.Web.Studio.Controls.Common" Assembly="ASC.Web.Studio" %>
 
-<div>
+<div class="header-base settingsHeader"><%= CRMSettingResource.TaskTemplates %></div>
+
+<div id="TaskTemplateViewTabs"></div>
+
+<div class="clearFix settingsNewItemBlock">
     <a class="link dotline plus" onclick="ASC.CRM.TaskTemplateView.showTemplateConatainerPanel();" >
         <%= CRMSettingResource.AddNewTaskTemplateContainer%>
     </a>
-
-    <div id="TaskTemplateViewTabs"></div>
 </div>
 
 <div id="templateConatainerPanel" style="display: none">
@@ -52,7 +54,7 @@
             <div class="templateHeader-splitter requiredField">
                 <span class="requiredErrorText"><%= CRMJSResource.EmptyTaskTitle%></span>
                 <div class="headerPanelSmall templateHeaderSmall-splitter bold"><%= CRMTaskResource.TaskTitle%>:</div>
-                <input class="textEdit" id="tbxTemplateTitle" style="width:100%" type="text" maxlength="100"/>
+                <input class="textEdit" id="tbxTemplateTitle" style="width:100%" type="text" maxlength="255"/>
             </div>
 
             <div class="templateHeader-splitter">
@@ -124,8 +126,7 @@
 </div>
 
 
-<ul id="templateConatainerContent" class="clearFix">
-</ul>
+<ul id="templateConatainerContent" class="clearFix"></ul>
 
 <div id="emptyContent" style="display: none">
     <asp:PlaceHolder ID="_phEmptyContent" runat="server"></asp:PlaceHolder>

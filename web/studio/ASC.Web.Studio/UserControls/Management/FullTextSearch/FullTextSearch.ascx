@@ -15,7 +15,7 @@
                 </div>
                 <div class="port requiredField">
                     <div class="fts-settings-title"><%= Resource.Port %>:</div>
-                    <input type="text" class="fts-settings-field textEdit" value="<%= CurrentSettings.Port.HasValue ? CurrentSettings.Port.Value.ToString(CultureInfo.InvariantCulture) : ""%>" />
+                    <input type="text" class="fts-settings-field textEdit" value="<%= CurrentSettings.Port.ToString(CultureInfo.InvariantCulture)%>" />
                 </div>
             </div>
         </div>
@@ -27,6 +27,10 @@
         </div>
     </div>
     <div class="settings-help-block">
-        <%= String.Format(Resource.FullTextSearchSettingsHelp.HtmlEncode(), "<br />") %>
+        <p><%= String.Format(Resource.FullTextSearchSettingsHelp.HtmlEncode(), "<br />") %></p>
+        <% if (!string.IsNullOrEmpty(HelpLink))
+           { %>
+        <a href="<%= HelpLink + "/server/windows/community/troubleshooting.aspx#SphinxIssue" %>" target="_blank"><%= Resource.LearnMore %></a>
+        <% } %>
     </div>
 </div>

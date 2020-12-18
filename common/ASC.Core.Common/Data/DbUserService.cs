@@ -1,38 +1,29 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Linq;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
 using ASC.Core.Tenants;
 using ASC.Core.Users;
 using ASC.Security.Cryptography;
-using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Linq;
 
 namespace ASC.Core.Data
 {
@@ -55,21 +46,85 @@ namespace ASC.Core.Data
             return ExecList(q).ConvertAll(ToUser).SingleOrDefault();
         }
 
-        public UserInfo GetUser(int tenant, string login, string passwordHash)
+        public UserInfo GetUserByPasswordHash(int tenant, string login, string passwordHash)
         {
             if (string.IsNullOrEmpty(login)) throw new ArgumentNullException("login");
 
-            var q = GetUserQuery()
-                .InnerJoin("core_usersecurity s", Exp.EqColumns("u.id", "s.userid"))
-                .Where(login.Contains('@') ? "u.email" : "u.id", login)
-                .Where("s.pwdhash", passwordHash)
-                .Where("removed", false);
+            Guid userId;
+            if (Guid.TryParse(login, out userId))
+            {
+                RegeneratePassword(tenant, userId);
+
+                var q = GetUserQuery()
+                    .InnerJoin("core_usersecurity s", Exp.EqColumns("u.id", "s.userid"))
+                    .Where("u.id", userId)
+                    .Where(Exp.Or(
+                        Exp.Eq("s.pwdhash", GetPasswordHash(userId, passwordHash)),
+                        Exp.Eq("s.pwdhash", Hasher.Base64Hash(passwordHash, HashAlg.SHA256)) //todo: remove old scheme
+                               ))
+                    .Where("u.removed", false);
+                if (tenant != Tenant.DEFAULT_TENANT)
+                {
+                    q.Where("u.tenant", tenant);
+                }
+                return ExecList(q).ConvertAll(ToUser).FirstOrDefault();
+            }
+            else
+            {
+                var q = GetUserQuery()
+                    .Where("u.email", login)
+                    .Where("u.removed", false);
+                if (tenant != Tenant.DEFAULT_TENANT)
+                {
+                    q.Where("u.tenant", tenant);
+                }
+
+                var users = ExecList(q).ConvertAll(ToUser);
+                UserInfo result = null;
+                foreach(var user in users)
+                {
+                    RegeneratePassword(tenant, user.ID);
+
+                    q = new SqlQuery("core_usersecurity s")
+                        .SelectCount()
+                        .Where("s.userid", user.ID)
+                        .Where(Exp.Or(
+                            Exp.Eq("s.pwdhash", GetPasswordHash(user.ID, passwordHash)),
+                            Exp.Eq("s.pwdhash", Hasher.Base64Hash(passwordHash, HashAlg.SHA256)) //todo: remove old scheme
+                                   ));
+                    var count = ExecScalar<int>(q);
+                    if (count > 0)
+                    {
+                        if (tenant != Tenant.DEFAULT_TENANT) return user;
+
+                        //need for regenerate all passwords only
+                        //todo: remove with old scheme
+                        result = user;
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        //todo: remove
+        private void RegeneratePassword(int tenant, Guid userId)
+        {
+            var q = new SqlQuery("core_usersecurity")
+                .Select("tenant", "pwdhashsha512")
+                .Where("userid", userId.ToString());
             if (tenant != Tenant.DEFAULT_TENANT)
             {
-                q.Where("u.tenant", tenant);
+                q.Where("tenant", tenant);
             }
+            var result = ExecList(q)
+                .ConvertAll(r => new Tuple<int, string>(Convert.ToInt32(r[0]), (string)r[1]))
+                .FirstOrDefault();
+            if (result == null || string.IsNullOrEmpty(result.Item2)) return;
 
-            return ExecList(q).ConvertAll(ToUser).FirstOrDefault();
+            var password = Crypto.GetV(result.Item2, 1, false);
+            var passwordHash = PasswordHasher.GetClientPassword(password);
+            SetUserPasswordHash(result.Item1, userId, passwordHash);
         }
 
         public UserInfo SaveUser(int tenant, UserInfo user)
@@ -131,6 +186,8 @@ namespace ASC.Core.Data
                     .InColumnValue("phone", user.MobilePhone)
                     .InColumnValue("phone_activation", user.MobilePhoneActivationStatus)
                     .InColumnValue("sid", user.Sid)
+                    .InColumnValue("sso_name_id", user.SsoNameId)
+                    .InColumnValue("sso_session_id", user.SsoSessionId)
                     .InColumnValue("create_on", user.CreateDate);
 
                 db.ExecuteNonQuery(i);
@@ -191,21 +248,21 @@ namespace ASC.Core.Data
             return photo ?? new byte[0];
         }
 
-        public string GetUserPassword(int tenant, Guid id)
+        public DateTime GetUserPasswordStamp(int tenant, Guid id)
         {
-            var q = Query("core_usersecurity", tenant).Select("pwdhashsha512").Where("userid", id.ToString());
-            var h2 = ExecScalar<string>(q);
-            return !string.IsNullOrEmpty(h2) ? Crypto.GetV(h2, 1, false) : null;
+            var q = Query("core_usersecurity", tenant).Select("LastModified").Where("userid", id.ToString());
+            var stamp = ExecScalar<string>(q);
+            return !string.IsNullOrEmpty(stamp) ? Convert.ToDateTime(stamp) : DateTime.MinValue;
         }
 
-        public void SetUserPassword(int tenant, Guid id, string password)
+        public void SetUserPasswordHash(int tenant, Guid id, string passwordHash)
         {
-            var h1 = !string.IsNullOrEmpty(password) ? Hasher.Base64Hash(password, HashAlg.SHA256) : null;
-            var h2 = !string.IsNullOrEmpty(password) ? Crypto.GetV(password, 1, true) : null;
+            var h1 = GetPasswordHash(id, passwordHash);
             var i = Insert("core_usersecurity", tenant)
                 .InColumnValue("userid", id.ToString())
                 .InColumnValue("pwdhash", h1)
-                .InColumnValue("pwdhashsha512", h2);
+                .InColumnValue("pwdhashsha512", null) //todo: remove
+                ;
             ExecNonQuery(i);
         }
 
@@ -317,7 +374,7 @@ namespace ASC.Core.Data
             return new SqlQuery("core_user u")
                 .Select("u.id", "u.username", "u.firstname", "u.lastname", "u.sex", "u.bithdate", "u.status", "u.title")
                 .Select("u.workfromdate", "u.terminateddate", "u.contacts", "u.email", "u.location", "u.notes", "u.removed")
-                .Select("u.last_modified", "u.tenant", "u.activation_status", "u.culture", "u.phone", "u.phone_activation", "u.sid", "u.create_on");
+                .Select("u.last_modified", "u.tenant", "u.activation_status", "u.culture", "u.phone", "u.phone_activation", "u.sid", "u.sso_name_id", "u.sso_session_id", "u.create_on");
         }
 
         private static SqlQuery GetUserQuery(int tenant, DateTime from)
@@ -368,7 +425,9 @@ namespace ASC.Core.Data
                     MobilePhone = (string)r[19],
                     MobilePhoneActivationStatus = (MobilePhoneActivationStatus)Convert.ToInt32(r[20]),
                     Sid = (string)r[21],
-                    CreateDate = Convert.ToDateTime(r[22])
+                    SsoNameId = (string)r[22],
+                    SsoSessionId = (string)r[23],
+                    CreateDate = Convert.ToDateTime(r[24])
                 };
             u.ContactsFromString((string)r[10]);
             return u;

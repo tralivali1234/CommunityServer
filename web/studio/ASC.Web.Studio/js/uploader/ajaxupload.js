@@ -289,7 +289,9 @@
             input.setAttribute('name', this._settings.name);
             input.setAttribute('class', 'fileuploadinput' + (this._settings.name==="userfile"?"":this._settings.name));
             input.setAttribute('title', this._settings.title);
-
+            if (this._settings.accept) {
+                input.setAttribute('accept', this._settings.accept);
+            };
             var styles = {
                 'position': 'absolute'
 			, 'margin': '-5px 0 0 -175px'
@@ -496,6 +498,13 @@
                         // In Opera 9.64 event was fired second time
                         // when body.innerHTML changed from false 
                         // to server response approx. after 1 sec
+                        return;
+                    }
+
+                    // fixing Chrome 83
+                    if (doc.body && doc.body.innerHTML == "") {
+                        // In Chrome 83 event was fired second time
+                        // when body changed to null
                         return;
                     }
 

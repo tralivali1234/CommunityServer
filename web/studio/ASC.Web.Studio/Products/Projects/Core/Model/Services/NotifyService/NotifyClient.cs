@@ -1,25 +1,16 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -30,17 +21,23 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Web;
-
+using ASC.Common.Logging;
 using ASC.Core;
 using ASC.Core.Common.Notify;
 using ASC.Core.Common.Notify.Push;
 
 using ASC.Notify;
+using ASC.Notify.Engine;
 using ASC.Notify.Model;
 using ASC.Notify.Patterns;
 using ASC.Notify.Recipients;
 
 using ASC.Projects.Core.Domain;
+using ASC.Projects.Engine;
+using ASC.Web.Projects.Classes;
+using ASC.Web.Projects.Core;
+using ASC.Web.Projects.Resources;
+using Autofac;
 
 namespace ASC.Projects.Core.Services.NotifyService
 {
@@ -49,6 +46,8 @@ namespace ASC.Projects.Core.Services.NotifyService
         private static NotifyClient instance;
         private readonly INotifyClient client;
         private readonly INotifySource source;
+        private static bool registered;
+        private static readonly object Locker = new object();
 
         public static NotifyClient Instance
         {
@@ -65,7 +64,7 @@ namespace ASC.Projects.Core.Services.NotifyService
             }
         }
 
-        public INotifyClient Client
+        private INotifyClient Client
         {
             get { return client; }
         }
@@ -77,6 +76,102 @@ namespace ASC.Projects.Core.Services.NotifyService
             this.source = source;
         }
 
+        public static void RegisterSecurityInterceptor()
+        {
+            var securityInterceptor = new SendInterceptorSkeleton(
+            "ProjectInterceptorSecurity",
+            InterceptorPlace.DirectSend,
+            InterceptorLifetime.Global,
+            (r, p) =>
+            {
+                try
+                {
+                    using (var scope = DIHelper.Resolve())
+                    {
+                        var projectSecurity = scope.Resolve<ProjectSecurity>();
+                        var factory = scope.Resolve<EngineFactory>();
+                        var data = r.ObjectID.Split('_');
+                        var entityType = data[0];
+                        var entityId = Convert.ToInt32(data[1]);
+
+                        var projectId = 0;
+
+                        if (data.Length == 3)
+                            projectId = Convert.ToInt32(r.ObjectID.Split('_')[2]);
+
+                        switch (entityType)
+                        {
+                            case "Task":
+                                var task = factory.TaskEngine.GetByID(entityId, false);
+
+                                if (task == null && projectId != 0)
+                                {
+                                    var project = factory.ProjectEngine.GetByID(projectId, false);
+                                    return !projectSecurity.CanRead(project, new Guid(r.Recipient.ID));
+                                }
+
+                                return !projectSecurity.CanRead(task, new Guid(r.Recipient.ID));
+                            case "Message":
+                                var discussion = factory.MessageEngine.GetByID(entityId, false);
+
+                                if (discussion == null && projectId != 0)
+                                {
+                                    var project = factory.ProjectEngine.GetByID(projectId, false);
+                                    return !projectSecurity.CanRead(project, new Guid(r.Recipient.ID));
+                                }
+
+                                return !projectSecurity.CanRead(discussion, new Guid(r.Recipient.ID));
+                            case "Milestone":
+                                var milestone = factory.MilestoneEngine.GetByID(entityId, false);
+
+                                if (milestone == null && projectId != 0)
+                                {
+                                    var project = factory.ProjectEngine.GetByID(projectId, false);
+                                    return !projectSecurity.CanRead(project, new Guid(r.Recipient.ID));
+                                }
+
+                                return !projectSecurity.CanRead(milestone, new Guid(r.Recipient.ID));
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManager.GetLogger("ASC").Error("Send", ex);
+                }
+                return false;
+            });
+
+            Instance.Client.AddInterceptor(securityInterceptor);
+        }
+
+        public static void RegisterSendMethods()
+        {
+            if (!registered)
+            {
+                lock (Locker)
+                {
+                    if (!registered)
+                    {
+                        Instance.Client.RegisterSendMethod(NotifyHelper.SendMsgMilestoneDeadline, "0 0 7 ? * *")
+                            .RegisterSendMethod(NotifyHelper.SendAutoReports, "0 0 * ? * *")
+                            .RegisterSendMethod(NotifyHelper.SendAutoReminderAboutTask, "0 0 * ? * *");
+                        registered = true;
+                    }
+                }
+            }
+        }
+
+        public static void UnregisterSendMethods()
+        {
+            if (registered)
+            {
+                Instance.Client.UnregisterSendMethod(NotifyHelper.SendMsgMilestoneDeadline)
+                               .UnregisterSendMethod(NotifyHelper.SendAutoReports)
+                               .UnregisterSendMethod(NotifyHelper.SendAutoReminderAboutTask);
+
+                Instance.Client.RemoveInterceptor("ProjectInterceptorSecurity");
+            }
+        }
 
         public void SendInvaiteToProjectTeam(Guid userId, Project project)
         {
@@ -645,8 +740,8 @@ namespace ASC.Projects.Core.Services.NotifyService
 
             if (task.Responsibles.Count != 0)
             {
-                var recip = task.Responsibles.Distinct().Select(ToRecipient).Where(r => r != null);
-                resp = recip.Select(r => r.Name).Aggregate(string.Empty, (a, b) => a + ", " + b);
+                var recip = task.Responsibles.Distinct().Select(ToRecipient).Where(r => r != null).ToList();
+                resp = recip.Select(r => r.Name).Aggregate((a, b) => a + ", " + b);
             }
             var interceptor = new InitiatorInterceptor(new DirectRecipient(SecurityContext.CurrentAccount.ID.ToString(), ""));
             client.AddInterceptor(interceptor);
@@ -886,7 +981,7 @@ namespace ASC.Projects.Core.Services.NotifyService
                     new TagValue(NotifyConstants.Tag_ProjectTitle, task.Project.Title),
                     new TagValue(NotifyConstants.Tag_EntityTitle, task.Title),
                     new TagValue(NotifyConstants.Tag_EntityID, task.ID),
-                    new TagValue(NotifyConstants.Tag_SubEntityTitle, milestone.Title),
+                    new TagValue(NotifyConstants.Tag_SubEntityTitle, milestone != null ? milestone.Title : TaskResource.None),
                     new TagValue(NotifyConstants.Tag_AdditionalData, description),
                     ReplyToTagProvider.Comment("project.task", task.ID.ToString(CultureInfo.InvariantCulture)));
             }
@@ -919,7 +1014,7 @@ namespace ASC.Projects.Core.Services.NotifyService
             return null;
         }
 
-        public void SendAboutMessageAction(List<IRecipient> recipients, Message message, bool isNew, Hashtable fileListInfoHashtable)
+        public void SendAboutMessageAction(List<IRecipient> recipients, Message message, bool isNew, List<Tuple<string, string>> fileListInfoHashtable)
         {
             var tags = new List<ITagValue>
                 {

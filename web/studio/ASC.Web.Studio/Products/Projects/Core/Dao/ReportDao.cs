@@ -1,25 +1,16 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,9 +18,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ASC.Common.Data;
 using ASC.Common.Data.Sql;
-using ASC.Common.Data.Sql.Expressions;
 using ASC.Core;
 using ASC.Core.Tenants;
 using ASC.Projects.Core.DataInterfaces;
@@ -40,45 +29,39 @@ namespace ASC.Projects.Data.DAO
 {
     class ReportDao : BaseDao, IReportDao
     {
-        private readonly string[] columns = new[] { "id", "type", "name", "filter", "cron", "create_by", "create_on", "tenant_id", "auto" };
+        private readonly string[] templateColumns = { "id", "type", "name", "filter", "cron", "create_by", "create_on", "tenant_id", "auto" };
+        private readonly string[] columns = { "id", "type", "name", "fileId", "create_by", "create_on", "tenant_id" };
         private readonly Converter<object[], ReportTemplate> converter;
+        private readonly Converter<object[], ReportFile> fileConverter;
 
-        public ReportDao(string dbId, int tenantID)
-            : base(dbId, tenantID)
+        public ReportDao(int tenantID)
+            : base(tenantID)
         {
             converter = ToTemplate;
+            fileConverter = ToReportFile;
         }
 
 
         public List<ReportTemplate> GetTemplates(Guid userId)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(Query(ReportTable)
-                                     .Select(columns)
-                                     .Where("create_by", userId.ToString())
-                                     .OrderBy("name", true))
-                    .ConvertAll(converter);
-            }
+            return Db.ExecuteList(Query(ReportTemplateTable)
+                                    .Select(templateColumns)
+                                    .Where("create_by", userId.ToString())
+                                    .OrderBy("name", true))
+                .ConvertAll(converter);
         }
 
         public List<ReportTemplate> GetAutoTemplates()
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(new SqlQuery(ReportTable).Select(columns)
-                                                          .Where("auto", true)
-                                                          .OrderBy("tenant_id", true))
-                    .ConvertAll(converter);
-            }
+            return Db.ExecuteList(new SqlQuery(ReportTemplateTable).Select(templateColumns)
+                                                        .Where("auto", true)
+                                                        .OrderBy("tenant_id", true))
+                .ConvertAll(converter);
         }
 
         public ReportTemplate GetTemplate(int id)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(Query(ReportTable).Select(columns).Where("id", id)).ConvertAll(converter).SingleOrDefault();
-            }
+            return Db.ExecuteList(Query(ReportTemplateTable).Select(templateColumns).Where("id", id)).ConvertAll(converter).SingleOrDefault();
         }
 
         public ReportTemplate SaveTemplate(ReportTemplate template)
@@ -86,106 +69,75 @@ namespace ASC.Projects.Data.DAO
             if (template == null) throw new ArgumentNullException("template");
             if (template.CreateOn == default(DateTime)) template.CreateOn = DateTime.Now;
             if (template.CreateBy.Equals(Guid.Empty)) template.CreateBy = CurrentUserID;
-            using (var db = new DbManager(DatabaseId))
-            {
-                var insert = new SqlInsert(ReportTable, true)
-                    .InColumns(columns)
-                    .Values(
-                        template.Id,
-                        template.ReportType,
-                        template.Name,
-                        template.Filter.ToXml(),
-                        template.Cron,
-                        template.CreateBy.ToString(),
-                        TenantUtil.DateTimeToUtc(template.CreateOn),
-                        Tenant,
-                        template.AutoGenerated)
-                    .Identity(0, 0, true);
-                template.Id = db.ExecuteScalar<int>(insert);
-                return template;
-            }
+
+            var insert = new SqlInsert(ReportTemplateTable, true)
+                .InColumns(templateColumns)
+                .Values(
+                    template.Id,
+                    template.ReportType,
+                    template.Name,
+                    template.Filter.ToXml(),
+                    template.Cron,
+                    template.CreateBy.ToString(),
+                    TenantUtil.DateTimeToUtc(template.CreateOn),
+                    Tenant,
+                    template.AutoGenerated)
+                .Identity(0, 0, true);
+            template.Id = Db.ExecuteScalar<int>(insert);
+            return template;
         }
 
         public void DeleteTemplate(int id)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                db.ExecuteNonQuery(Delete(ReportTable).Where("id", id));
-            }
+            Db.ExecuteNonQuery(Delete(ReportTemplateTable).Where("id", id));
         }
 
-        public IList<object[]> BuildUsersStatisticsReport(TaskFilter filter)
+
+
+        public ReportFile Save(ReportFile reportFile)
         {
-            var query = new SqlQuery(TasksTable + " t")
-                .Select("r.responsible_id")
-                .InnerJoin(TasksResponsibleTable + " r", Exp.EqColumns("r.task_id", "t.id") & Exp.EqColumns("r.tenant_id", "t.tenant_id"))
-                .SelectSum("0")
-                .SelectSum("case t.status when 2 then 0 else 1 end")
-                .SelectSum("case t.status when 2 then 1 else 0 end")
-                .Where("t.tenant_id", Tenant)
-                .GroupBy(1);
-            if (filter.HasUserId)
-            {
-                query.Where(Exp.In("r.responsible_id", filter.GetUserIds()));
-            }
-            else
-            {
-                query.Where(!Exp.Eq("r.responsible_id", Guid.Empty.ToString()));
-            }
+            if (reportFile == null) throw new ArgumentNullException("reportFile");
+            if (reportFile.CreateOn == default(DateTime)) reportFile.CreateOn = DateTime.Now;
+            if (reportFile.CreateBy.Equals(Guid.Empty)) reportFile.CreateBy = CurrentUserID;
 
-            query.Where(filter.HasProjectIds ? Exp.In("t.project_id", filter.ProjectIds) : Exp.Gt("t.project_id", 0));
-
-            if (filter.TagId != 0)
-            {
-                query.InnerJoin(ProjectTagTable + " ptag", Exp.EqColumns("ptag.project_id", "t.project_id"));
-                query.Where("ptag.tag_id", filter.TagId);
-            }
-
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(query)
-                    .ConvertAll(r => new object[] {ToGuid(r[0]), Convert.ToInt64(r[1]), Convert.ToInt64(r[2]), Convert.ToInt64(r[3])});
-            }
+            var insert = new SqlInsert(ReportTable, true)
+                .InColumns(columns)
+                .Values(
+                    reportFile.Id,
+                    reportFile.ReportType,
+                    reportFile.Name,
+                    reportFile.FileId,
+                    reportFile.CreateBy.ToString(),
+                    TenantUtil.DateTimeToUtc(reportFile.CreateOn),
+                    CoreContext.TenantManager.GetCurrentTenant().TenantId)
+                .Identity(0, 0, true);
+            reportFile.Id = Db.ExecuteScalar<int>(insert);
+            return reportFile;
         }
 
-        public IList<object[]> BuildUsersActivityReport(TaskFilter filter)
+        public IEnumerable<ReportFile> Get()
         {
-            /* query:
-                select u, sum(case t when 't' then c else 0 end), sum(case t when 'm' then c else 0 end), sum(case t when 'd' then c else 0 end)
-                from (
-                    select create_by u, 't' t, count(*) c from projects_tasks where tenant_id = 0 group by 1, 2
-                    union all
-                    select create_by u, 'm' t, count(*) c from projects_milestones where tenant_id = 0 group by 1, 2
-                    union all
-                    select create_by u, 'd' t, count(*) c from projects_messages where tenant_id = 0 group by 1, 2) s
-                group by 1
-             */
+            return Db.ExecuteList(Query(ReportTable)
+                                    .Select(columns)
+                                    .Where("create_by", SecurityContext.CurrentAccount.ID)
+                                    .OrderBy("create_on", false))
+                .ConvertAll(fileConverter);
+        }
 
-            var where = Exp.Eq("tenant_id", Tenant) & Exp.Between("create_on", filter.GetFromDate(true), filter.GetToDate(true));
-            if (filter.HasUserId)
-            {
-                where &= Exp.In("create_by", filter.GetUserIds());
-            }
+        public ReportFile GetByFileId(int id)
+        {
+            return Db.ExecuteList(Query(ReportTable)
+                .Select(columns)
+                .Where("create_by", SecurityContext.CurrentAccount.ID)
+                .Where("fileId", id))
+                .ConvertAll(fileConverter).SingleOrDefault();
+        }
 
-            var subq = new SqlQuery(TasksTable).Select("create_by u").Select("'t'").Select("count(*) c").Where(where).GroupBy(1, 2)
-                .UnionAll(new SqlQuery(MilestonesTable).Select("create_by u").Select("'m'").Select("count(*) c").Where(where).GroupBy(1, 2))
-                .UnionAll(new SqlQuery(MessagesTable).Select("create_by u").Select("'d'").Select("count(*) c").Where(where).GroupBy(1, 2));
-
-            var q = new SqlQuery()
-                .Select("u")
-                .SelectSum("case t when 't' then c else 0 end")
-                .SelectSum("case t when 'm' then c else 0 end")
-                .SelectSum("case t when 'd' then c else 0 end")
-                .From(subq, "s")
-                .GroupBy(1);
-
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(q)
-                    .Select(r => new { UserId = new Guid((string)r[0]), Tasks = Convert.ToInt32(r[1]), Milestones = Convert.ToInt32(r[2]), Messages = Convert.ToInt32(r[3]) })
-                    .Select(r => new object[] { r.UserId, r.Tasks, r.Milestones, r.Messages, 0, r.Tasks + r.Milestones + r.Messages })
-                    .ToList();
-            }
+        public void Remove(ReportFile report)
+        {
+            Db.ExecuteNonQuery(Delete(ReportTable)
+                .Where("create_by", SecurityContext.CurrentAccount.ID)
+                .Where("id", report.Id));
         }
 
         private static ReportTemplate ToTemplate(IList<object> r)
@@ -201,6 +153,20 @@ namespace ASC.Projects.Data.DAO
                 CreateOn = TenantUtil.DateTimeFromUtc(tenant.TimeZone, Convert.ToDateTime(r[6])),
                 Tenant = tenant.TenantId,
                 AutoGenerated = Convert.ToBoolean(r[8]),
+            };
+            return template;
+        }
+
+        private static ReportFile ToReportFile(IList<object> r)
+        {
+            var template = new ReportFile
+            {
+                Id = Convert.ToInt32(r[0]),
+                ReportType = (ReportType)Convert.ToInt32(r[1]),
+                Name = (string)r[2],
+                FileId = r[3],
+                CreateBy = ToGuid(r[4]),
+                CreateOn = TenantUtil.DateTimeFromUtc(CoreContext.TenantManager.GetCurrentTenant().TimeZone, Convert.ToDateTime(r[5]))
             };
             return template;
         }

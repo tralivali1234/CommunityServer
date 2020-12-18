@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -32,56 +23,62 @@
     &.confirm-personal {
         text-align: center;
 
+		.confirm-block-title{
+			margin: 0!important;
+		}
         .default-personal-popup_h {
-            font-size: 36px;
+            font-size: 29px;
             font-weight: normal;
             margin: 0;
-            text-transform: uppercase;
+            //text-transform: uppercase;
         }
 
         .default-personal-popup_line {
-            background-color: #86d6f6;
+			display: none;
+           /* background-color: #86d6f6;
             display: inline-block;
             height: 72px;
             width: 1px;
-            margin-bottom: 18px;
+            margin-bottom: 18px;*/
         }
 
         .default-personal-popup_text {
-            font-size: 21px;
-            margin-bottom: 40px;
+            font-size: 18px;
+			margin-bottom: 40px;
+			margin-top: 34px;
         }
 
         .rightPart {
             float: none;
             margin: 0 auto;
-            width: 550px;
+            width: 360px;
 
             .property {
                 margin-bottom: 36px;
 
                 .name {
-                    display: inline-block;
-                    width: 145px;
-                    text-align: right;
-                    color: #2d86ab;
-                    font-weight: bold;
-                    text-transform: uppercase;
+                    display: block;
+					margin-top: 28px;
+					margin-left: 5px;
+					font-size: 18px;
+					width: 93px;
+					color: #bdbdbd;
+					font-weight: 400;
                 }
 
                 .value {
-                    display: inline-block;
+                    display: block;
                     width: 350px;
                     text-align: left;
                 }
 
                 .textEdit {
-                    border: 1px solid #86d6f6;
-                    width: 190px;
-                    padding: 8px 15px;
-                    margin: 0 16px;
-                    .borderRadius();
-
+                    border: none;
+					border-bottom: 2px solid #bdbdbd;
+					border-radius: 0;
+					width: 100%;
+					margin-top: 4px;
+					font-size: 14px;
                     &:focus {
                         border-color: #2d86ab;
                     }
@@ -94,8 +91,8 @@
         }
 
         .big-button-container {
-            margin: 40px auto 120px;
-            width: 220px;
+            margin: 59px auto 120px;
+			width: 355px;
         }
 
         .HelpCenterSwitcher {
@@ -103,78 +100,26 @@
         }
 
         #buttonConfirmInvite {
-            background-color: #89ac35;
-            background-image: none;
-            border: none;
-            color: #fff;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: bold;
-            padding: 11px 42px;
-            margin: 0;
-            text-align: center;
-            text-transform: uppercase;
-            width: auto;
+            background-color: #f16240;
+			background-image: none;
+			border: none;
+			color: white;
+			cursor: pointer;
+			font-size: 18px;
+			font-weight: 600;
+			padding: 17px 42px;
+			margin: 0;
+			text-align: center;
+			width: 267px;
+   
             .borderRadius();
 
             &:hover {
-                background-color: #95b840;
+                background-color: #fd6a46;
             }
 
             &:active {
-                background-color: #7c9e2a;
-            }
-        }
-
-        #social .account-links {
-            .info {
-                display: none;
-            }
-
-            & > .float-left {
-                float: none;
-            }
-
-            ul {
-                width: 130px;
-                height: 53px;
-
-                li {
-                    width: 53px;
-                    height: 53px;
-                    margin-right: 8px;
-
-                    a {
-                        background: url("images/sprite_acc.png") no-repeat transparent;
-                        height: 53px;
-                        margin: 0;
-                        width: 53px;
-
-                        &.google {
-                            background-position: 0 0;
-
-                            &:hover {
-                                background-position: -61px 0;
-                            }
-                        }
-
-                        &.facebook {
-                            background-position: 0 -61px;
-
-                            &:hover {
-                                background-position: -61px -61px;
-                            }
-                        }
-
-                        &.linkedin {
-                            background-position: 0 -122px;
-
-                            &:hover {
-                                background-position: -61px -122px;
-                            }
-                        }
-                    }
-                }
+                background-color: #e65836;
             }
         }
 
@@ -268,4 +213,51 @@
     border-radius: @value;
     -moz-border-radius: @value;
     -webkit-border-radius: @value;
+}
+
+@media screen and (max-width: 900px){
+	#studioPageContent{
+		min-width: auto;
+
+		.mainPageLayout{
+			min-width: auto;
+			padding: 24px 0 0;
+
+			.confirmBlock{
+				width: auto;
+
+			}
+			.confirmBlock.confirm-personal .rightPart{
+				float: none;
+				margin: 0 auto;
+				width: 320px;
+			}
+			.confirmBlock.confirm-personal .rightPart .property{
+				margin-bottom: 36px;
+				display: block;
+				position: relative;
+				width: 300px;
+				margin: 0 auto;
+				
+				.value{
+					display: block;
+					width: auto;
+					text-align: left;
+				}
+				.textEdit{
+					width: 300px;
+					margin-top: 4px;
+					padding-left: 0;
+					padding-right: 0;
+				}
+			}
+			.confirmBlock.confirm-personal .big-button-container{
+				margin: 59px auto 120px;
+				width: 300px;
+			}
+			.confirmBlock.confirm-personal #buttonConfirmInvite{
+				width: 215px;
+			}
+		}
+	}
 }

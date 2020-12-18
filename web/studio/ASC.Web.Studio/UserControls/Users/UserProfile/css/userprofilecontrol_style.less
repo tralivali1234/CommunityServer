@@ -1,27 +1,19 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
+
 
 @import "../../../../skins/base.less";
 
@@ -103,9 +95,6 @@
     margin-right: 8px;
 }
 
-.profile-container {
-    margin: 32px 0 0;
-}
 .image-container {
     border: 1px solid #C9C9C9;
     width: 200px;
@@ -185,7 +174,7 @@
     }
 
     .baseLinkAction {
-        background: url(./images/btn-edit.png) no-repeat 0 0 transparent;
+        background: url('../../../../skins/default/images/svg/people/pencilgray.svg') no-repeat 0 0 transparent;
         border: 0;
         display: inline-block;
         width: 16px;
@@ -196,7 +185,7 @@
         color: #FFF !important;
 
         &:hover {
-            background-position: bottom;
+            background: url('../../../../skins/default/images/svg/people/pencilblue.svg') no-repeat 0 0 transparent;
         }
     }
 }
@@ -271,7 +260,8 @@ body.media-width-0-1200 {
                     background-position: -48px center;
                 }
 
-                &.mail .label {
+                &.mail .label,
+                &.extmail .label {
                     background-position: -24px center;
                 }
 
@@ -295,7 +285,8 @@ body.media-width-0-1200 {
                     background-position: -144px center;
                 }
 
-                &.skype .label {
+                &.skype .label,
+                &.extskype .label {
                     background-position: -120px center;
                 }
 
@@ -327,11 +318,13 @@ body.media-width-0-1200 {
                     background-position: -96px center;
                 }
 
-                &.phone .label {
+                &.phone .label,
+                &.extphone .label {
                     background-position: -48px center;
                 }
 
-                &.mobphone .label {
+                &.mobphone .label,
+                &.extmobphone .label {
                     background-position: -72px center;
                 }
             }
@@ -341,107 +334,82 @@ body.media-width-0-1200 {
 
 
 /* <AccountLinkControl> */
-.social-logins .account-links ul {
-    display: block;
+.social-logins ul.account-links {
     height: 80px;
 
     li {
-        background: none;
-        width: auto;
-        min-width: 100px;
-        line-height: normal;
-        margin: 0 0 0 52px;
-        padding: 0;
+        margin: 0 32px 16px 0;
         float: left;
         white-space: nowrap;
 
-        &:first-child {
-            margin-left: 0;
-        }
-
         span {
+            color: #787878;
             display: block;
             margin: 8px 0 0;
-            color: #787878;
+
+            white-space: normal;
+            word-wrap: break-word;
+            -ms-word-wrap: break-word;
+        }
+        &.connected span {
+            color: #116d9d;
         }
 
         a {
-            display: inline-block;
             border-bottom: 1px dotted #000000;
-            margin: 4px 0 0;
             color: #000000;
+            display: inline-block;
+            margin: 4px 0 0;
             text-decoration: none;
         }
 
-        .label {
-            display: block;
-            background-image: url(./images/social-icons.png);
+        .icon {
+            background-color: transparent;
             background-position: 0 0;
             background-repeat: no-repeat;
-            background-color: #83888d;
-            width: 32px;
-            height: 32px;
-            .borderRadius(3px);
+            height: 34px;
             margin: 0;
+            width: 105px;
+            .borderRadius(3px);
+        }
+        &.google .icon {
+            background-image: url("../../../../skins/default/images/svg/people/google.png");
         }
 
-        &.connected {
-            .label {
-                background-color: #4ca5d6;
+        &.twitter .icon {
+            background-image: url("../../../../skins/default/images/svg/people/twitter.png");
+        }
+
+        &.facebook .icon {
+            background-image: url("../../../../skins/default/images/svg/people/facebook.png");
+        }
+
+        &.linkedin .icon {
+            background-image: url("../../../../skins/default/images/svg/people/linkedin.png");
+        }
+
+        &.mailru .icon {
+            background-image: url("../../../../skins/default/images/svg/people/mailru.png");
+        }
+
+        &.yandex {
+            .icon {
+                background-image: url("../../../../skins/default/images/svg/people/yandex.png");
+            }
+
+            &.ru .icon {
+                background-image: url("../../../../skins/default/images/svg/people/yandex_ru.png");
             }
         }
 
-        &.google {
-            .label {
-                background-position: -96px 0;
+        &.vk {
+            .icon {
+                background-image: url("../../../../skins/default/images/svg/people/vk.png");
             }
-        }
 
-        &.twitter {
-            .label {
-                background-position: -64px 0;
+            &.ru .icon {
+                background-image: url("../../../../skins/default/images/svg/people/vk_ru.png");
             }
-        }
-
-        &.facebook {
-            .label {
-                background-position: -32px 0;
-            }
-        }
-
-        &.linkedin {
-            .label {
-                background-position: -128px 0;
-            }
-        }
-    }
-}
-
-body.media-width-0-1400 {
-    .social-logins .account-links ul li {
-        margin: 0 0 0 30px;
-        &:first-child {
-            margin-left: 0;
-        }
-        span {
-            max-width: 100px;
-            -ms-word-wrap: break-word;
-            word-wrap: break-word;
-            white-space: normal;
-        }
-    }
-}
-body.media-width-0-1200 {
-    .social-logins .account-links ul li {
-        margin: 0 0 0 10px;
-        &:first-child {
-            margin-left: 0;
-        }
-        span {
-            max-width: 100px;
-            -ms-word-wrap: break-word;
-            word-wrap: break-word;
-            white-space: normal;
         }
     }
 }
@@ -473,12 +441,13 @@ a {
 
     .profile-action-usericon {
         width: 200px;
+        height: 200px;
 
         img {
             border: none;
             display: block;
             margin: 0 auto;
-            max-height: 320px;
+            max-height: 200px;
             max-width: 200px;
         }
     }
@@ -515,4 +484,15 @@ a {
 
 #studio_deleteProfileDialog .email {
     padding-top:3px;   
+}
+
+#confirmationDeleteUserPanel, #deleteUsersDialog {
+    .confirmationAction {
+        margin-bottom: 8px;
+    }
+
+    .warning-header {
+        margin: 20px 0;
+        font-size: 18px;
+    }
 }

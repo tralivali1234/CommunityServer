@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -34,14 +25,14 @@ using System.Text;
 using System.Threading;
 using System.Web;
 using ASC.Core;
+using ASC.Core.Common.Configuration;
 using ASC.Core.Tenants;
 using ASC.Core.Users;
 using ASC.FederatedLogin;
 using ASC.FederatedLogin.Helpers;
+using ASC.FederatedLogin.LoginProviders;
 using ASC.MessagingSystem;
 using ASC.Security.Cryptography;
-using ASC.Thrdparty;
-using ASC.Thrdparty.Configuration;
 using ASC.Web.Core;
 using ASC.Web.Core.Files;
 using ASC.Web.Core.Users;
@@ -59,26 +50,32 @@ using SecurityContext = ASC.Core.SecurityContext;
 
 namespace ASC.Web.Files.ThirdPartyApp
 {
-    public class BoxApp : IThirdPartyApp
+    public class BoxApp : Consumer, IThirdPartyApp, IOAuthProvider
     {
         public const string AppAttr = "box";
 
-        private const string BoxUrlToken = "https://www.box.com/api/oauth2/token";
         private const string BoxUrlUserInfo = "https://api.box.com/2.0/users/me";
         private const string BoxUrlFile = "https://api.box.com/2.0/files/{fileId}";
         private const string BoxUrlUpload = "https://upload.box.com/api/2.0/files/{fileId}/content";
 
+        public string Scopes { get { return ""; } }
+        public string CodeUrl { get { return ""; } }
+        public string AccessTokenUrl { get { return "https://www.box.com/api/oauth2/token"; } }
+        public string RedirectUri { get { return ""; } }
+        public string ClientID { get { return this["boxAppClientId"]; } }
+        public string ClientSecret { get { return this["boxAppSecretKey"]; } }
 
-        private static string ClientId
+        public bool IsEnabled
         {
-            get { return KeyStorage.Get("boxAppClientId"); }
+            get { return !string.IsNullOrEmpty(ClientID) && !string.IsNullOrEmpty(ClientSecret); }
         }
 
-        private static string SecretKey
-        {
-            get { return KeyStorage.Get("boxAppSecretKey"); }
-        }
+        public BoxApp() { }
 
+        public BoxApp(string name, int order, Dictionary<string, string> additional)
+            : base(name, order, additional)
+        {
+        }
 
         public bool Request(HttpContext context)
         {
@@ -99,7 +96,7 @@ namespace ASC.Web.Files.ThirdPartyApp
 
         public string GetRefreshUrl()
         {
-            return BoxUrlToken;
+            return AccessTokenUrl;
         }
 
         public File GetFile(string fileId, out bool editable)
@@ -202,21 +199,16 @@ namespace ASC.Web.Files.ThirdPartyApp
             {
                 try
                 {
-                    var key = DocumentServiceConnector.GenerateRevisionId(downloadUrl ?? Guid.NewGuid().ToString());
                     if (stream != null)
                     {
-                        using (var tmpStream = new MemoryStream())
-                        {
-                            stream.CopyTo(tmpStream);
-
-                            Global.Logger.Debug("BoxApp: GetExternalUri format: " + fileType);
-                            downloadUrl = DocumentServiceConnector.GetExternalUri(tmpStream, fileType, key);
-                        }
+                        downloadUrl = PathProvider.GetTempUrl(stream, fileType);
+                        downloadUrl = DocumentServiceConnector.ReplaceCommunityAdress(downloadUrl);
                     }
 
                     Global.Logger.Debug("BoxApp: GetConvertedUri from " + fileType + " to " + currentType + " - " + downloadUrl);
 
-                    DocumentServiceConnector.GetConvertedUri(downloadUrl, fileType, currentType, key, false, out downloadUrl);
+                    var key = DocumentServiceConnector.GenerateRevisionId(downloadUrl);
+                    DocumentServiceConnector.GetConvertedUri(downloadUrl, fileType, currentType, key, null, false, out downloadUrl);
                     stream = null;
                 }
                 catch (Exception e)
@@ -274,7 +266,14 @@ namespace ASC.Web.Files.ThirdPartyApp
                 using (var response = request.GetResponse())
                 using (var responseStream = response.GetResponseStream())
                 {
-                    var result = responseStream != null ? new StreamReader(responseStream).ReadToEnd() : null;
+                    string result = null;
+                    if (responseStream != null)
+                    {
+                        using (var readStream = new StreamReader(responseStream))
+                        {
+                            result = readStream.ReadToEnd();
+                        }
+                    }
 
                     Global.Logger.Debug("BoxApp: save file response - " + result);
                 }
@@ -284,7 +283,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                 Global.Logger.Error("BoxApp: Error save file", e);
                 request.Abort();
                 var httpResponse = (HttpWebResponse)e.Response;
-                if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
+                if (httpResponse.StatusCode == HttpStatusCode.Forbidden || httpResponse.StatusCode == HttpStatusCode.Unauthorized)
                 {
                     throw new SecurityException(FilesCommonResource.ErrorMassage_SecurityException, e);
                 }
@@ -293,7 +292,7 @@ namespace ASC.Web.Files.ThirdPartyApp
         }
 
 
-        private static void RequestCode(HttpContext context)
+        private void RequestCode(HttpContext context)
         {
             var token = GetToken(context.Request["code"]);
             if (token == null)
@@ -327,7 +326,7 @@ namespace ASC.Web.Files.ThirdPartyApp
 
                 var cookiesKey = SecurityContext.AuthenticateMe(userInfo.ID);
                 CookiesManager.SetCookies(CookiesType.AuthKey, cookiesKey);
-                MessageService.Send(HttpContext.Current.Request, MessageAction.LoginSuccessViaSocialAccount);
+                MessageService.Send(HttpContext.Current.Request, MessageAction.LoginSuccessViaSocialApp);
 
                 if (isNew)
                 {
@@ -380,8 +379,7 @@ namespace ASC.Web.Files.ThirdPartyApp
                 request.Method = "GET";
                 request.Headers.Add("Authorization", "Bearer " + token);
 
-                using (var response = request.GetResponse())
-                using (var stream = new ResponseStream(response))
+                using (var stream = new ResponseStream(request.GetResponse()))
                 {
                     stream.StreamCopyTo(context.Response.OutputStream);
                 }
@@ -392,13 +390,16 @@ namespace ASC.Web.Files.ThirdPartyApp
                 context.Response.Write(ex.Message);
                 Global.Logger.Error("BoxApp: Error request " + context.Request.Url, ex);
             }
+
             try
             {
                 context.Response.Flush();
-                context.Response.End();
+                context.Response.SuppressContent = true;
+                context.ApplicationInstance.CompleteRequest();
             }
-            catch (HttpException)
+            catch (HttpException ex)
             {
+                Global.Logger.Error("BoxApp StreamFile", ex);
             }
         }
 
@@ -479,12 +480,10 @@ namespace ASC.Web.Files.ThirdPartyApp
                     userInfo.LastName = FilesCommonResource.UnknownLastName;
                 }
 
-                var pwd = UserManagerWrapper.GeneratePassword();
-
                 try
                 {
                     SecurityContext.AuthenticateMe(ASC.Core.Configuration.Constants.CoreSystem);
-                    userInfo = UserManagerWrapper.AddUser(userInfo, pwd);
+                    userInfo = UserManagerWrapper.AddUser(userInfo, UserManagerWrapper.GeneratePassword());
                 }
                 finally
                 {
@@ -521,16 +520,12 @@ namespace ASC.Web.Files.ThirdPartyApp
             return null;
         }
 
-        private static Token GetToken(string code)
+        private Token GetToken(string code)
         {
             try
             {
                 Global.Logger.Debug("BoxApp: GetAccessToken by code " + code);
-                var token = OAuth20TokenHelper.GetAccessToken(BoxUrlToken,
-                                                              ClientId,
-                                                              SecretKey,
-                                                              string.Empty,
-                                                              code);
+                var token = OAuth20TokenHelper.GetAccessToken<BoxApp>(code);
                 return new Token(token, AppAttr);
             }
             catch (Exception ex)

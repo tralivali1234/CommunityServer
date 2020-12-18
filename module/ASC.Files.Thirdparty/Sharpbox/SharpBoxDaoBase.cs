@@ -1,31 +1,28 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text.RegularExpressions;
 using AppLimit.CloudComputing.SharpBox;
-using ASC.Common.Caching;
+using AppLimit.CloudComputing.SharpBox.Exceptions;
 using ASC.Common.Data;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
@@ -35,19 +32,11 @@ using ASC.Files.Core;
 using ASC.Files.Core.Security;
 using ASC.Security.Cryptography;
 using ASC.Web.Files.Classes;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace ASC.Files.Thirdparty.Sharpbox
 {
     internal abstract class SharpBoxDaoBase : IDisposable
     {
-        private static readonly ICache Cache = AscCache.Memory;
-
         protected class ErrorEntry : ICloudDirectoryEntry
         {
             public ErrorEntry(Exception e, object id)
@@ -153,6 +142,10 @@ namespace ASC.Files.Thirdparty.Sharpbox
             TenantID = CoreContext.TenantManager.GetCurrentTenant().TenantId;
         }
 
+        public void Dispose()
+        {
+            SharpBoxProviderInfo.Dispose();
+        }
 
         protected DbManager GetDb()
         {
@@ -309,14 +302,6 @@ namespace ASC.Files.Thirdparty.Sharpbox
             return path;
         }
 
-        public void Dispose()
-        {
-            if (SharpBoxProviderInfo.Storage.IsOpened)
-            {
-                SharpBoxProviderInfo.Storage.Close();
-            }
-        }
-
         protected Folder ToFolder(ICloudDirectoryEntry fsEntry)
         {
             if (fsEntry == null) return null;
@@ -441,21 +426,14 @@ namespace ASC.Files.Thirdparty.Sharpbox
                 RootFolderId = MakeId(RootFolder()),
                 RootFolderType = SharpBoxProviderInfo.RootFolderType,
                 RootFolderCreator = SharpBoxProviderInfo.Owner,
-                SharedByMe = false,
+                Shared = false,
                 Version = 1
             };
         }
 
         protected ICloudDirectoryEntry RootFolder()
         {
-            var key = SharpBoxProviderInfo.ID + "root";
-            var root = Cache.Get<ICloudDirectoryEntry>(key);
-            if (root == null)
-            {
-                root = SharpBoxProviderInfo.Storage.GetRoot();
-                if (root != null) Cache.Insert(key, root, TimeSpan.FromMinutes(1));
-            }
-            return root;
+            return SharpBoxProviderInfo.Storage.GetRoot();
         }
 
         protected ICloudDirectoryEntry GetFolderById(object folderId)
@@ -465,7 +443,15 @@ namespace ASC.Files.Thirdparty.Sharpbox
                 var path = MakePath(folderId);
                 return path == "/"
                            ? RootFolder()
-                           : SharpBoxProviderInfo.Storage.GetFolder(MakePath(folderId));
+                           : SharpBoxProviderInfo.Storage.GetFolder(path);
+            }
+            catch (SharpBoxException sharpBoxException)
+            {
+                if (sharpBoxException.ErrorCode == SharpBoxErrorCodes.ErrorFileNotFound)
+                {
+                    return null;
+                }
+                return new ErrorEntry(sharpBoxException, folderId);
             }
             catch (Exception ex)
             {
@@ -477,7 +463,15 @@ namespace ASC.Files.Thirdparty.Sharpbox
         {
             try
             {
-                return SharpBoxProviderInfo.Storage.GetFile(MakePath(fileId), RootFolder());
+                return SharpBoxProviderInfo.Storage.GetFile(MakePath(fileId), null);
+            }
+            catch (SharpBoxException sharpBoxException)
+            {
+                if (sharpBoxException.ErrorCode == SharpBoxErrorCodes.ErrorFileNotFound)
+                {
+                    return null;
+                }
+                return new ErrorEntry(sharpBoxException, fileId);
             }
             catch (Exception ex)
             {

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -47,24 +38,43 @@ namespace System.Web
 
         public static Uri GetUrlRewriter(NameValueCollection headers, Uri requestUri)
         {
-            if (headers == null || headers.Count == 0 || requestUri == null)
+            if (requestUri == null)
             {
-                return requestUri;
+                return null;
             }
 
-            var rewriterUri = ParseRewriterUrl(headers[UrlRewriterHeader]);
-            if (rewriterUri != null)
+            if (!string.IsNullOrEmpty(requestUri.Query))
             {
-                var result = new UriBuilder(requestUri);
-                result.Scheme = rewriterUri.Scheme;
-                result.Host = rewriterUri.Host;
-                result.Port = rewriterUri.Port;
-                return result.Uri;
+                var urlRewriterQuery = HttpUtility.ParseQueryString(requestUri.Query);
+                var rewriterUri = ParseRewriterUrl(urlRewriterQuery[UrlRewriterHeader]);
+                if (rewriterUri != null)
+                {
+                    var result = new UriBuilder(requestUri)
+                    {
+                        Scheme = rewriterUri.Scheme,
+                        Host = rewriterUri.Host,
+                        Port = rewriterUri.Port
+                    };
+                    return result.Uri;
+                }
             }
-            else
+
+            if (headers != null && !string.IsNullOrEmpty(headers[UrlRewriterHeader]))
             {
-                return requestUri;
+                var rewriterUri = ParseRewriterUrl(headers[UrlRewriterHeader]);
+                if (rewriterUri != null)
+                {
+                    var result = new UriBuilder(requestUri)
+                    {
+                        Scheme = rewriterUri.Scheme,
+                        Host = rewriterUri.Host,
+                        Port = rewriterUri.Port
+                    };
+                    return result.Uri;
+                }
             }
+
+            return requestUri;
         }
 
         public static Uri PushRewritenUri(this HttpContext context)
@@ -93,15 +103,15 @@ namespace System.Web
                         if (rewrittenUri.IsDefaultPort)
                         {
                             request.ServerVariables.Set("HTTP_HOST",
-                                                    rewrittenUri.Host);
+                                                        rewrittenUri.Host);
                         }
                         else
                         {
                             request.ServerVariables.Set("HTTP_HOST",
-                                                    rewrittenUri.Host + ":" + requestUri.Port);
+                                                        rewrittenUri.Host + ":" + requestUri.Port);
                         }
                         //Hack:
-                        typeof(HttpRequest).InvokeMember("_url",
+                        typeof (HttpRequest).InvokeMember("_url",
                                                           BindingFlags.NonPublic | BindingFlags.SetField |
                                                           BindingFlags.Instance,
                                                           null, HttpContext.Current.Request,
@@ -112,7 +122,6 @@ namespace System.Web
                     }
                     catch (Exception)
                     {
-
                     }
                 }
             }
@@ -137,16 +146,22 @@ namespace System.Web
             return request != null && !string.IsNullOrEmpty(request["desktop"]);
         }
 
+        public static bool SailfishApp(this HttpRequest request)
+        {
+            return request != null
+                   && (!string.IsNullOrEmpty(request["sailfish"])
+                       || !string.IsNullOrEmpty(request.UserAgent) && request.UserAgent.Contains("SailfishOS"));
+        }
+
 
         private static Uri ParseRewriterUrl(string s)
         {
-            Uri result = null;
-            var cmp = StringComparison.OrdinalIgnoreCase;
-
             if (string.IsNullOrEmpty(s))
             {
-                return result;
+                return null;
             }
+
+            const StringComparison cmp = StringComparison.OrdinalIgnoreCase;
             if (0 < s.Length && (s.StartsWith("0", cmp)))
             {
                 s = Uri.UriSchemeHttp + s.Substring(1);
@@ -168,6 +183,7 @@ namespace System.Web
                 s = HttpUtility.UrlDecode(s);
             }
 
+            Uri result;
             Uri.TryCreate(s, UriKind.Absolute, out result);
             return result;
         }

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -39,7 +30,11 @@ using ASC.Web.CRM.Resources;
 using ASC.CRM.Core;
 using ASC.Web.Studio.Core;
 using System.Web;
+using ASC.Common.Logging;
+using ASC.CRM.Core.Dao;
+using ASC.Web.CRM.Core;
 using ASC.Web.Studio.Utility;
+using Autofac;
 using Newtonsoft.Json;
 
 namespace ASC.Web.CRM.Controls.Invoices
@@ -60,7 +55,7 @@ namespace ASC.Web.CRM.Controls.Invoices
         {
             get
             {
-                var number = ActionType == InvoiceActionType.Edit ? TargetInvoice.Number : Global.DaoFactory.GetInvoiceDao().GetNewInvoicesNumber();
+                var number = ActionType == InvoiceActionType.Edit ? TargetInvoice.Number : DaoFactory.InvoiceDao.GetNewInvoicesNumber();
                 return number.HtmlEncode();
             }
         }
@@ -84,7 +79,7 @@ namespace ASC.Web.CRM.Controls.Invoices
 
             if (!havePermission)
             {
-                Response.Redirect(PathProvider.StartURL() + "invoices.aspx");
+                Response.Redirect(PathProvider.StartURL() + "Invoices.aspx");
             }
 
             RegisterClientScriptHelper.DataInvoicesActionView(Page, TargetInvoice);
@@ -98,56 +93,69 @@ namespace ASC.Web.CRM.Controls.Invoices
         {
             try
             {
-                var dao = Global.DaoFactory;
-
-                var invoice = GetInvoice();
-                var billingAddressID = Convert.ToInt32(Request["billingAddressID"]);
-                var deliveryAddressID = Convert.ToInt32(Request["deliveryAddressID"]);
-
-                var messageAction = MessageAction.InvoiceCreated;
-
-                if (invoice.ID > 0)
+                using (var scope = DIHelper.Resolve())
                 {
-                    messageAction = MessageAction.InvoiceUpdated;
-                    RemoveInvoiceFile(invoice.FileID);
+                    var dao = scope.Resolve<DaoFactory>();
+
+                    var invoice = GetInvoice(dao);
+
+                    var billingAddressID = Convert.ToInt32(Request["billingAddressID"]);
+                    var deliveryAddressID = Convert.ToInt32(Request["deliveryAddressID"]);
+
+                    var messageAction = MessageAction.InvoiceCreated;
+
+                    if (invoice.ID > 0)
+                    {
+                        messageAction = MessageAction.InvoiceUpdated;
+                        RemoveInvoiceFile(invoice.FileID, dao);
+                    }
+
+                    invoice.ID = dao.InvoiceDao.SaveOrUpdateInvoice(invoice);
+                    MessageService.Send(HttpContext.Current.Request, messageAction, MessageTarget.Create(invoice.ID),
+                        invoice.Number);
+
+                    var invoiceLines = GetInvoiceLines(dao);
+
+                    foreach (var line in invoiceLines)
+                    {
+                        line.InvoiceID = invoice.ID;
+                        line.ID = dao.InvoiceLineDao.SaveOrUpdateInvoiceLine(line);
+                    }
+
+                    RemoveUnusedLines(invoice.ID, invoiceLines, dao);
+
+                    dao.InvoiceDao.UpdateInvoiceJsonData(invoice, billingAddressID, deliveryAddressID);
+
+                    if (Global.CanDownloadInvoices)
+                    {
+                        PdfQueueWorker.StartTask(HttpContext.Current, TenantProvider.CurrentTenantID, SecurityContext.CurrentAccount.ID, invoice.ID);
+                    }
+
+                    string redirectUrl;
+                    if (ActionType == InvoiceActionType.Create && UrlParameters.ContactID != 0)
+                    {
+                        redirectUrl =
+                            string.Format(
+                                e.CommandArgument.ToString() == "1"
+                                    ? "Invoices.aspx?action=create&contactID={0}"
+                                    : "Default.aspx?id={0}#invoices", UrlParameters.ContactID);
+                    }
+                    else
+                    {
+                        redirectUrl = e.CommandArgument.ToString() == "1"
+                            ? "Invoices.aspx?action=create"
+                            : string.Format("Invoices.aspx?id={0}", invoice.ID);
+                    }
+
+                    Response.Redirect(redirectUrl, false);
+                    Context.ApplicationInstance.CompleteRequest();
                 }
-
-                invoice.ID = dao.GetInvoiceDao().SaveOrUpdateInvoice(invoice);
-                MessageService.Send(HttpContext.Current.Request, messageAction, invoice.Number);
-
-                var invoiceLines = GetInvoiceLines();
-
-                foreach (var line in invoiceLines)
-                {
-                    line.InvoiceID = invoice.ID;
-                    line.ID = dao.GetInvoiceLineDao().SaveOrUpdateInvoiceLine(line);
-                }
-
-                RemoveUnusedLines(invoice.ID, invoiceLines);
-
-                dao.GetInvoiceDao().UpdateInvoiceJsonData(invoice, billingAddressID, deliveryAddressID);
-
-                if (Global.CanDownloadInvoices)
-                {
-                    new InvoiceFileUpdateHelper().UpdateInvoiceFileIDInThread(invoice.ID);
-                }
-
-                string redirectUrl;
-                if (ActionType == InvoiceActionType.Create && UrlParameters.ContactID != 0)
-                {
-                    redirectUrl = string.Format(e.CommandArgument.ToString() == "1" ? "invoices.aspx?action=create&contactID={0}" : "default.aspx?id={0}#invoices", UrlParameters.ContactID);
-                }
-                else
-                {
-                    redirectUrl = e.CommandArgument.ToString() == "1" ? "invoices.aspx?action=create" : string.Format("invoices.aspx?id={0}", invoice.ID);
-                }
-
-                Response.Redirect(redirectUrl, false);
-                Context.ApplicationInstance.CompleteRequest();
             }
             catch (Exception ex)
             {
-                log4net.LogManager.GetLogger("ASC.CRM").Error(ex);
+                if (!(ex is InvoiceValidationException))
+                    LogManager.GetLogger("ASC.CRM").Error(ex);
+
                 var cookie = HttpContext.Current.Request.Cookies.Get(ErrorCookieKey);
                 if (cookie == null)
                 {
@@ -176,26 +184,26 @@ namespace ASC.Web.CRM.Controls.Invoices
                 cancelButton.Attributes.Add("href",
                                             Request.UrlReferrer != null && Request.Url != null && String.Compare(Request.UrlReferrer.PathAndQuery, Request.Url.PathAndQuery) != 0
                                                 ? Request.UrlReferrer.OriginalString
-                                                : "invoices.aspx");
+                                                : "Invoices.aspx");
             }
 
             if (ActionType == InvoiceActionType.Edit)
             {
                 saveButton.Text = CRMCommonResource.SaveChanges;
-                cancelButton.Attributes.Add("href", String.Format("invoices.aspx?id={0}", TargetInvoice.ID));
+                cancelButton.Attributes.Add("href", String.Format("Invoices.aspx?id={0}", TargetInvoice.ID));
             }
 
             if (ActionType == InvoiceActionType.Duplicate)
             {
                 saveButton.Text = CRMInvoiceResource.DuplicateInvoiceButton;
                 saveAndCreateNewButton.Text = CRMInvoiceResource.DuplicateAndCreateNewInvoiceButton;
-                cancelButton.Attributes.Add("href", String.Format("invoices.aspx?id={0}", TargetInvoice.ID));
+                cancelButton.Attributes.Add("href", String.Format("Invoices.aspx?id={0}", TargetInvoice.ID));
             }
         }
 
         private void RegisterScript()
         {
-            Page.RegisterClientScript(typeof(Masters.ClientScripts.ExchangeRateViewData));
+            Page.RegisterClientScript(new Masters.ClientScripts.ExchangeRateViewData());
 
             var sb = new StringBuilder();
 
@@ -207,10 +215,8 @@ namespace ASC.Web.CRM.Controls.Invoices
             Page.RegisterInlineScript(sb.ToString());
         }
 
-        private Invoice GetInvoice()
+        private Invoice GetInvoice(DaoFactory dao)
         {
-            var dao = Global.DaoFactory;
-
             var invoice = new Invoice();
 
             if (ActionType == InvoiceActionType.Edit)
@@ -222,30 +228,30 @@ namespace ASC.Web.CRM.Controls.Invoices
             else
             {
                 invoice.Number = Request["invoiceNumber"];
-                if (dao.GetInvoiceDao().IsExist(invoice.Number))
-                    throw new Exception(CRMErrorsResource.InvoiceNumberBusy);
+                if (dao.InvoiceDao.IsExist(invoice.Number))
+                    throw new InvoiceValidationException(CRMErrorsResource.InvoiceNumberBusy);
             }
 
             DateTime issueDate;
             if (!DateTime.TryParse(Request["invoiceIssueDate"], out issueDate))
-                throw new Exception("invalid issueDate");
+                throw new InvoiceValidationException("invalid issueDate");
             invoice.IssueDate = issueDate;
 
             invoice.ContactID = Convert.ToInt32(Request["invoiceContactID"]);
-            if (invoice.ContactID <= 0) throw new Exception(CRMErrorsResource.InvoiceContactNotFound);
-            var contact = dao.GetContactDao().GetByID(invoice.ContactID);
+            if (invoice.ContactID <= 0) throw new InvoiceValidationException(CRMErrorsResource.InvoiceContactNotFound);
+            var contact = dao.ContactDao.GetByID(invoice.ContactID);
             if (contact == null || !CRMSecurity.CanAccessTo(contact))
             {
-                throw new Exception(CRMErrorsResource.InvoiceContactNotFound);
+                throw new InvoiceValidationException(CRMErrorsResource.InvoiceContactNotFound);
             }
 
             invoice.ConsigneeID = Convert.ToInt32(Request["invoiceConsigneeID"]);
             if (invoice.ConsigneeID > 0)
             {
-                var consignee = dao.GetContactDao().GetByID(invoice.ConsigneeID);
+                var consignee = dao.ContactDao.GetByID(invoice.ConsigneeID);
                 if (consignee == null || !CRMSecurity.CanAccessTo(consignee))
                 {
-                    throw new Exception(CRMErrorsResource.InvoiceConsigneeNotFound);
+                    throw new InvoiceValidationException(CRMErrorsResource.InvoiceConsigneeNotFound);
                 }
             }
             else
@@ -259,49 +265,49 @@ namespace ASC.Web.CRM.Controls.Invoices
             invoice.EntityID = Convert.ToInt32(Request["invoiceOpportunityID"]);
             if (invoice.EntityID > 0)
             {
-                var deal = dao.GetDealDao().GetByID(invoice.EntityID);
+                var deal = dao.DealDao.GetByID(invoice.EntityID);
                 if (deal == null || !CRMSecurity.CanAccessTo(deal))
-                    throw new Exception(CRMErrorsResource.DealNotFound);
+                    throw new InvoiceValidationException(CRMErrorsResource.DealNotFound);
 
-                var dealMembers = dao.GetDealDao().GetMembers(invoice.EntityID);
+                var dealMembers = dao.DealDao.GetMembers(invoice.EntityID);
                 if (!dealMembers.Contains(invoice.ContactID))
-                    throw new Exception("contact doesn't have this opportunity");
+                    throw new InvoiceValidationException("contact doesn't have this opportunity");
             }
 
             DateTime dueDate;
             if (!DateTime.TryParse(Request["invoiceDueDate"], out dueDate))
-                throw new Exception(CRMErrorsResource.InvoiceDueDateInvalid);
+                throw new InvoiceValidationException(CRMErrorsResource.InvoiceDueDateInvalid);
             if (issueDate > dueDate)
-                throw new Exception(CRMErrorsResource.InvoiceIssueMoreThanDue);
+                throw new InvoiceValidationException(CRMErrorsResource.InvoiceIssueMoreThanDue);
             invoice.DueDate = dueDate;
 
             invoice.Language = Request["invoiceLanguage"];
             if (string.IsNullOrEmpty(invoice.Language) || SetupInfo.EnabledCultures.All(c => c.Name != invoice.Language))
-                throw new Exception(CRMErrorsResource.LanguageNotFound);
+                throw new InvoiceValidationException(CRMErrorsResource.LanguageNotFound);
 
             invoice.Currency = Request["invoiceCurrency"];
             if (string.IsNullOrEmpty(invoice.Currency))
             {
-                throw new Exception(CRMErrorsResource.CurrencyNotFound);
+                throw new InvoiceValidationException(CRMErrorsResource.CurrencyNotFound);
             }
             else
             {
                 invoice.Currency = invoice.Currency.ToUpper();
                 if (CurrencyProvider.Get(invoice.Currency) == null)
                 {
-                    throw new Exception(CRMErrorsResource.CurrencyNotFound);
+                    throw new InvoiceValidationException(CRMErrorsResource.CurrencyNotFound);
                 }
             }
 
             invoice.ExchangeRate = Convert.ToDecimal(Request["invoiceExchangeRate"], new CultureInfo("en-US"));
             if (invoice.ExchangeRate <= 0)
-                throw new Exception(CRMErrorsResource.ExchangeRateNotSet);
+                throw new InvoiceValidationException(CRMErrorsResource.ExchangeRateNotSet);
 
             invoice.PurchaseOrderNumber = Request["invoicePurchaseOrderNumber"];
 
             invoice.Terms = Request["invoiceTerms"];
             if (string.IsNullOrEmpty(invoice.Terms))
-                throw new Exception(CRMErrorsResource.InvoiceTermsNotFound);
+                throw new InvoiceValidationException(CRMErrorsResource.InvoiceTermsNotFound);
 
             invoice.Description = Request["invoiceDescription"];
 
@@ -312,14 +318,12 @@ namespace ASC.Web.CRM.Controls.Invoices
             return invoice;
         }
 
-        private List<InvoiceLine> GetInvoiceLines()
+        private List<InvoiceLine> GetInvoiceLines(DaoFactory dao)
         {
-            var dao = Global.DaoFactory;
-
             var invoiceLines = new List<InvoiceLine>();
 
             if (!Request.Form.AllKeys.Any(x => x.StartsWith("iLineItem_")))
-                throw new Exception(CRMErrorsResource.InvoiceItemsListEmpty);
+                throw new InvoiceValidationException(CRMErrorsResource.InvoiceItemsListEmpty);
 
             foreach (var customField in Request.Form.AllKeys)
             {
@@ -332,14 +336,14 @@ namespace ASC.Web.CRM.Controls.Invoices
                 var invoiceTax1ID = Convert.ToInt32(Request["iLineTax1_" + id + "_" + sortOrder]);
                 var invoiceTax2ID = Convert.ToInt32(Request["iLineTax2_" + id + "_" + sortOrder]);
 
-                if (!dao.GetInvoiceItemDao().IsExist(invoiceItemID))
-                    throw new Exception(CRMErrorsResource.InvoiceItemNotFound);
+                if (!dao.InvoiceItemDao.IsExist(invoiceItemID))
+                    throw new InvoiceValidationException(CRMErrorsResource.InvoiceItemNotFound);
 
-                if (invoiceTax1ID > 0 && !dao.GetInvoiceTaxDao().IsExist(invoiceTax1ID))
-                    throw new Exception(CRMErrorsResource.InvoiceTaxNotFound);
+                if (invoiceTax1ID > 0 && !dao.InvoiceTaxDao.IsExist(invoiceTax1ID))
+                    throw new InvoiceValidationException(CRMErrorsResource.InvoiceTaxNotFound);
 
-                if (invoiceTax2ID > 0 && !dao.GetInvoiceTaxDao().IsExist(invoiceTax2ID))
-                    throw new Exception(CRMErrorsResource.InvoiceTaxNotFound);
+                if (invoiceTax2ID > 0 && !dao.InvoiceTaxDao.IsExist(invoiceTax2ID))
+                    throw new InvoiceValidationException(CRMErrorsResource.InvoiceTaxNotFound);
 
                 var line = new InvoiceLine
                 {
@@ -348,9 +352,9 @@ namespace ASC.Web.CRM.Controls.Invoices
                     InvoiceTax1ID = invoiceTax1ID,
                     InvoiceTax2ID = invoiceTax2ID,
                     Description = Request["iLineDescription_" + id + "_" + sortOrder],
-                    Quantity = Convert.ToInt32(Request["iLineQuantity_" + id + "_" + sortOrder]),
+                    Quantity = Convert.ToDecimal(Request["iLineQuantity_" + id + "_" + sortOrder], new CultureInfo("en-US")),
                     Price = Convert.ToDecimal(Request["iLinePrice_" + id + "_" + sortOrder], new CultureInfo("en-US")),
-                    Discount = Convert.ToInt32(Request["iLineDiscount_" + id + "_" + sortOrder]),
+                    Discount = Convert.ToDecimal(Request["iLineDiscount_" + id + "_" + sortOrder], new CultureInfo("en-US")),
                     SortOrder = sortOrder
                 };
 
@@ -360,42 +364,42 @@ namespace ASC.Web.CRM.Controls.Invoices
             return invoiceLines;
         }
 
-        private void RemoveUnusedLines(int invoiceID, List<InvoiceLine> lines)
+        private void RemoveUnusedLines(int invoiceID, List<InvoiceLine> lines, DaoFactory dao)
         {
-            var dao = Global.DaoFactory;
-            var oldLines = dao.GetInvoiceLineDao().GetInvoiceLines(invoiceID);
+            var oldLines = dao.InvoiceLineDao.GetInvoiceLines(invoiceID);
 
             foreach (var line in oldLines)
             {
                 var contains = lines.Any(x => x.ID == line.ID);
                 if (!contains)
                 {
-                    dao.GetInvoiceLineDao().DeleteInvoiceLine(line.ID);
+                    dao.InvoiceLineDao.DeleteInvoiceLine(line.ID);
                 }
             }
         }
 
-        private void RemoveInvoiceFile(int fileID)
+        private void RemoveInvoiceFile(int fileID, DaoFactory dao)
         {
-            var dao = Global.DaoFactory;
-            var events = dao.GetFileDao().GetEventsByFile(fileID);
+            var events = dao.FileDao.GetEventsByFile(fileID);
             foreach (var eventId in events)
             {
-                var item = dao.GetRelationshipEventDao().GetByID(eventId);
-                if (item != null && item.CategoryID == (int)HistoryCategorySystem.FilesUpload && dao.GetRelationshipEventDao().GetFiles(item.ID).Count == 1)
-                    dao.GetRelationshipEventDao().DeleteItem(item);
+                var item = dao.RelationshipEventDao.GetByID(eventId);
+                if (item != null && item.CategoryID == (int)HistoryCategorySystem.FilesUpload && dao.RelationshipEventDao.GetFiles(item.ID).Count == 1)
+                    dao.RelationshipEventDao.DeleteItem(item);
             }
         }
 
         #endregion
-    }
 
-    public class NewThreadParams
-    {
-        public int TenantId { get; set; }
-        public int InvoiceId { get; set; }
-        public HttpContext Ctx { get; set; }
-        public Uri Url { get; set; }
-        public Guid CurrentUser { get; set; }
+        #region InvoiceValidationException
+
+        private class InvoiceValidationException : Exception
+        {
+            public InvoiceValidationException(string message) : base(message)
+            {
+            }
+        }
+
+        #endregion
     }
 }

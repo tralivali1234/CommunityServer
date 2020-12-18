@@ -1,42 +1,35 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Collections;
-using ASC.Common.Data;
-using ASC.Common.Data.Sql;
-using ASC.Common.Data.Sql.Expressions;
-using ASC.Core.Tenants;
-using ASC.FullTextIndex;
-using ASC.Projects.Core.DataInterfaces;
-using ASC.Projects.Core.Domain;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Linq;
+
+using ASC.Collections;
+using ASC.Common.Data.Sql;
+using ASC.Common.Data.Sql.Expressions;
+using ASC.Core.Tenants;
+using ASC.ElasticSearch;
+using ASC.Projects.Core.DataInterfaces;
+using ASC.Projects.Core.Domain;
+using ASC.Web.Projects;
+using ASC.Web.Projects.Core.Search;
 
 namespace ASC.Projects.Data.DAO
 {
@@ -44,15 +37,14 @@ namespace ASC.Projects.Data.DAO
     {
         private readonly HttpRequestDictionary<Task> taskCache = new HttpRequestDictionary<Task>("task");
 
-        public CachedTaskDao(string dbId, int tenantID)
-            : base(dbId, tenantID)
+        public CachedTaskDao(int tenantID) : base(tenantID)
         {
         }
 
-        public override void Delete(int id)
+        public override void Delete(Task task)
         {
-            ResetCache(id);
-            base.Delete(id);
+            ResetCache(task.ID);
+            base.Delete(task);
         }
 
         public override Task GetById(int id)
@@ -65,13 +57,13 @@ namespace ASC.Projects.Data.DAO
             return base.GetById(id);
         }
 
-        public override Task Save(Task task)
+        public override Task Update(Task task)
         {
             if (task != null)
             {
                 ResetCache(task.ID);
             }
-            return base.Save(task);
+            return base.Update(task);
         }
 
         private void ResetCache(int taskId)
@@ -83,11 +75,14 @@ namespace ASC.Projects.Data.DAO
 
     class TaskDao : BaseDao, ITaskDao
     {
-        public static readonly string[] TaskColumns = new[] { "id", "title", "description", "status", "create_by", "create_on", "last_modified_by", "last_modified_on", "priority", "milestone_id", "sort_order", "deadline", "start_date", "progress", "responsibles" };
+        public static readonly string[] TaskColumns = new[] { "id", "title", "description", "status", "create_by", "create_on", "last_modified_by", "last_modified_on", "priority", "milestone_id", "sort_order", "deadline", "start_date", "progress", "responsibles", "status_id" };
         private readonly Converter<object[], Task> converter;
 
-        public TaskDao(string dbId, int tenantID)
-            : base(dbId, tenantID)
+        private ISubtaskDao SubtaskDao { get { return DaoFactory.SubtaskDao; } }
+
+        public IDaoFactory DaoFactory { get; set; }
+
+        public TaskDao(int tenantID) : base(tenantID)
         {
             converter = ToTask;
         }
@@ -97,10 +92,7 @@ namespace ASC.Projects.Data.DAO
 
         public List<Task> GetAll()
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(CreateQuery()).ConvertAll(converter);
-            }
+            return Db.ExecuteList(CreateQuery()).ConvertAll(converter);
         }
 
         public List<Task> GetByProject(int projectId, TaskStatus? status, Guid participant)
@@ -134,10 +126,7 @@ namespace ASC.Projects.Data.DAO
                 query.Where(Exp.Exists(existSubtask) | Exp.Exists(existResponsible));
             }
 
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(query).ConvertAll(converter);
-            }
+            return Db.ExecuteList(query).ConvertAll(converter);
         }
 
         public List<Task> GetByFilter(TaskFilter filter, bool isAdmin, bool checkAccess)
@@ -169,10 +158,7 @@ namespace ASC.Projects.Data.DAO
 
             query = CreateQueryFilter(query, filter, isAdmin, checkAccess);
 
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(query).ConvertAll(ToTaskMilestone);
-            }
+            return Db.ExecuteList(query).ConvertAll(ToTaskMilestone);
         }
 
         public TaskFilterCountOperationResult GetByFilterCount(TaskFilter filter, bool isAdmin, bool checkAccess)
@@ -187,15 +173,92 @@ namespace ASC.Projects.Data.DAO
                 .SelectCount("t1.id").Select("t1.status")
                 .From(query, "t1")
                 .GroupBy("status");
-            using (var db = new DbManager(DatabaseId))
+
+
+            var result = Db.ExecuteList(queryCount).ToDictionary(r => Convert.ToInt32(r[1]), r => Convert.ToInt32(r[0]));
+            var tasksOpen = result.Where(row => row.Key != (int)TaskStatus.Closed).Sum(row => row.Value);
+            //that's right. open its not closed.
+            int tasksClosed;
+            result.TryGetValue((int)TaskStatus.Closed, out tasksClosed);
+            return new TaskFilterCountOperationResult { TasksOpen = tasksOpen, TasksClosed = tasksClosed };
+        }
+
+        public IEnumerable<TaskFilterCountOperationResult> GetByFilterCountForStatistic(TaskFilter filter, bool isAdmin, bool checkAccess)
+        {
+            var result = new List<TaskFilterCountOperationResult>();
+            var query = new SqlQuery(TasksTable + " t")
+                .Select("t.status", "r.responsible_id")
+                .InnerJoin(ProjectsTable + " p", Exp.EqColumns("t.project_id", "p.id") & Exp.EqColumns("t.tenant_id", "p.tenant_id"))
+                .InnerJoin(TasksResponsibleTable + " r", Exp.EqColumns("r.task_id", "t.id") & Exp.EqColumns("r.tenant_id", "t.tenant_id"))
+                .Where("t.tenant_id", Tenant);
+
+            if (filter.HasUserId)
             {
-                var result = db.ExecuteList(queryCount).ToDictionary(r => Convert.ToInt32(r[1]), r => Convert.ToInt32(r[0]));
-                var tasksOpen = result.Where(row => row.Key != (int)TaskStatus.Closed).Sum(row => row.Value);
-                //that's right. open its not closed.
-                int tasksClosed;
-                result.TryGetValue((int)TaskStatus.Closed, out tasksClosed);
-                return new TaskFilterCountOperationResult { TasksOpen = tasksOpen, TasksClosed = tasksClosed };
+                query.Where(Exp.In("r.responsible_id", filter.GetUserIds()));
             }
+            else
+            {
+                query.Where(!Exp.Eq("r.responsible_id", Guid.Empty.ToString()));
+            }
+
+            filter.UserId = Guid.Empty;
+
+            query = CreateQueryFilterCount(query, filter, isAdmin, checkAccess);
+
+            var queryCount = new SqlQuery()
+                .SelectCount()
+                .Select("t1.responsible_id")
+                .Select("t1.status")
+                .From(query, "t1")
+                .GroupBy("responsible_id", "status");
+
+            if (filter.ParticipantId.HasValue && !filter.ParticipantId.Value.Equals(Guid.Empty))
+            {
+                queryCount.Where("t1.responsible_id", filter.ParticipantId.Value);
+            }
+
+            var fromDb = Db.ExecuteList(queryCount)
+                .Select(r => new
+                {
+                    Id = Guid.Parse((string)r[1]),
+                    Count = Convert.ToInt32(r[0]),
+                    Status = Convert.ToInt32(r[2])
+                }).GroupBy(r => r.Id);
+
+            foreach (var r in fromDb)
+            {
+                var tasksOpen = r.Where(row => row.Status != (int)TaskStatus.Closed).Sum(row => row.Count);
+                var tasksClosed = r.Where(row => row.Status == (int)TaskStatus.Closed).Sum(row => row.Count);
+                result.Add(new TaskFilterCountOperationResult { UserId = r.Key, TasksOpen = tasksOpen, TasksClosed = tasksClosed });
+            }
+
+            return result;
+        }
+
+        public List<Tuple<Guid, int, int>> GetByFilterCountForReport(TaskFilter filter, bool isAdmin, bool checkAccess)
+        {
+            var query = new SqlQuery(TasksTable + " t")
+                .Select("t.create_by", "t.project_id")
+                .InnerJoin(ProjectsTable + " p", Exp.EqColumns("t.project_id", "p.id") & Exp.EqColumns("t.tenant_id", "p.tenant_id"))
+                .Where("t.tenant_id", Tenant)
+                .Where(Exp.Between("t.create_on", filter.GetFromDate(), filter.GetToDate()));
+
+            if (filter.HasUserId)
+            {
+                query.Where(Exp.In("t.create_by", filter.GetUserIds()));
+                filter.UserId = Guid.Empty;
+                filter.DepartmentId = Guid.Empty;
+            }
+
+            query = CreateQueryFilterCount(query, filter, isAdmin, checkAccess);
+
+            var queryCount = new SqlQuery()
+                .SelectCount()
+                .Select("t1.create_by", "t1.project_id")
+                .From(query, "t1")
+                .GroupBy("create_by", "project_id");
+
+            return Db.ExecuteList(queryCount).ConvertAll(b => new Tuple<Guid, int, int>(Guid.Parse((string)b[1]), Convert.ToInt32(b[2]), Convert.ToInt32(b[0])));
         }
 
         public List<Task> GetByResponsible(Guid responsibleId, IEnumerable<TaskStatus> statuses)
@@ -221,10 +284,7 @@ namespace ASC.Projects.Data.DAO
                 }
             }
 
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(q).ConvertAll(converter);
-            }
+            return Db.ExecuteList(q).ConvertAll(converter);
         }
 
         public List<Task> GetMilestoneTasks(int milestoneId)
@@ -236,89 +296,62 @@ namespace ASC.Projects.Data.DAO
                 .OrderBy("t.priority", false)
                 .OrderBy("t.create_on", false);
 
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(query).ConvertAll(converter);
-            }
+            return Db.ExecuteList(query).ConvertAll(converter);
         }
 
         public List<Task> GetById(ICollection<int> ids)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var query = CreateQuery().Where(Exp.In("t.id", ids.ToArray()));
-                return db.ExecuteList(query).ConvertAll(converter);
-            }
+            var query = CreateQuery().Where(Exp.In("t.id", ids.ToArray()));
+            return Db.ExecuteList(query).ConvertAll(converter);
         }
 
         public virtual Task GetById(int id)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var query = CreateQuery().Where("t.id", id);
-                return db.ExecuteList(query).ConvertAll(converter).SingleOrDefault();
-            }
+            var query = CreateQuery().Where("t.id", id);
+            return Db.ExecuteList(query).ConvertAll(converter).SingleOrDefault();
         }
 
         public bool IsExists(int id)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var count = db.ExecuteScalar<long>(Query(TasksTable).SelectCount().Where("id", id));
-                return 0 < count;
-            }
+            var count = Db.ExecuteScalar<long>(Query(TasksTable).SelectCount().Where("id", id));
+            return 0 < count;
         }
 
         public List<object[]> GetTasksForReminder(DateTime deadline)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var deadlineDate = deadline.Date;
-                var q = new SqlQuery(TasksTable)
-                    .Select("tenant_id", "id", "deadline")
-                    .Where(Exp.Between("deadline", deadlineDate.AddDays(-1), deadlineDate.AddDays(1)))
-                    .Where(!Exp.Eq("status", TaskStatus.Closed));
+            var deadlineDate = deadline.Date;
+            var q = new SqlQuery(TasksTable + " t")
+                .Select("t.tenant_id", "t.id", "t.deadline")
+                .InnerJoin(ProjectsTable + " p", Exp.EqColumns("t.project_id", "p.id") & Exp.EqColumns("t.tenant_id", "p.tenant_id"))
+                .Where(Exp.Between("t.deadline", deadlineDate.AddDays(-1), deadlineDate.AddDays(1)))
+                .Where(!Exp.Eq("t.status", TaskStatus.Closed))
+                .Where("p.status", ProjectStatus.Open);
 
-                return db.ExecuteList(q)
-                    .ConvertAll(r => new object[] { Convert.ToInt32(r[0]), Convert.ToInt32(r[1]), Convert.ToDateTime(r[2]) });
-            }
+            return Db.ExecuteList(q)
+                .ConvertAll(r => new object[] { Convert.ToInt32(r[0]), Convert.ToInt32(r[1]), Convert.ToDateTime(r[2]) });
         }
 
-        public virtual Task Save(Task task)
+        public Task Create(Task task)
         {
-            using (var db = new DbManager(DatabaseId))
-            using (var tr = db.BeginTransaction(IsolationLevel.ReadUncommitted))
+            using (var tr = Db.BeginTransaction(IsolationLevel.ReadUncommitted))
             {
-                task.Responsibles.RemoveAll(r => r.Equals(Guid.Empty));
-
-                if (task.Deadline.Kind != DateTimeKind.Local && task.Deadline != DateTime.MinValue)
-                    task.Deadline = TenantUtil.DateTimeFromUtc(task.Deadline);
-
-                if (task.StartDate.Kind != DateTimeKind.Local && task.StartDate != DateTime.MinValue)
-                    task.StartDate = TenantUtil.DateTimeFromUtc(task.StartDate);
-
-                var insert = Insert(TasksTable)
+                var insert = Insert(TasksTable, false)
                     .InColumnValue("id", task.ID)
                     .InColumnValue("project_id", task.Project != null ? task.Project.ID : 0)
                     .InColumnValue("title", task.Title)
                     .InColumnValue("create_by", task.CreateBy.ToString())
                     .InColumnValue("create_on", TenantUtil.DateTimeToUtc(task.CreateOn))
-                    .InColumnValue("last_modified_by", task.LastModifiedBy.ToString())
-                    .InColumnValue("last_modified_on", TenantUtil.DateTimeToUtc(task.LastModifiedOn))
                     .InColumnValue("description", task.Description)
                     .InColumnValue("priority", task.Priority)
                     .InColumnValue("status", task.Status)
                     .InColumnValue("milestone_id", task.Milestone)
                     .InColumnValue("sort_order", task.SortOrder)
                     .InColumnValue("deadline", task.Deadline)
-                    .InColumnValue("status_changed", task.StatusChangedOn)
                     .InColumnValue("start_date", task.StartDate)
                     .InColumnValue("progress", task.Progress)
                     .Identity(1, 0, true);
 
-                task.ID = db.ExecuteScalar<int>(insert);
-
-                db.ExecuteNonQuery(Delete(TasksResponsibleTable).Where("task_id", task.ID));
+                task.ID = Db.ExecuteScalar<int>(insert);
 
                 if (task.Responsibles.Any())
                 {
@@ -329,7 +362,7 @@ namespace ASC.Projects.Data.DAO
                         insert.Values(Tenant, task.ID, responsible);
                     }
 
-                    db.ExecuteNonQuery(insert);
+                    Db.ExecuteNonQuery(insert);
                 }
 
                 tr.Commit();
@@ -338,15 +371,59 @@ namespace ASC.Projects.Data.DAO
             }
         }
 
-        public virtual void Delete(int id)
+        public virtual Task Update(Task task)
         {
-            using (var db = new DbManager(DatabaseId))
-            using (var tx = db.BeginTransaction())
+            using (var tr = Db.BeginTransaction(IsolationLevel.ReadUncommitted))
             {
-                db.ExecuteNonQuery(Delete(CommentsTable).Where("target_uniq_id", ProjectEntity.BuildUniqId<Task>(id)));
-                db.ExecuteNonQuery(Delete(TasksResponsibleTable).Where("task_id", id));
-                db.ExecuteNonQuery(Delete(TasksTable).Where("id", id));
-                db.ExecuteNonQuery(Delete(SubtasksTable).Where("task_id", id));
+                var update = Update(TasksTable)
+                    .Set("project_id", task.Project != null ? task.Project.ID : 0)
+                    .Set("title", task.Title)
+                    .Set("last_modified_by", task.LastModifiedBy.ToString())
+                    .Set("last_modified_on", TenantUtil.DateTimeToUtc(task.LastModifiedOn))
+                    .Set("description", task.Description)
+                    .Set("priority", task.Priority)
+                    .Set("status", task.Status)
+                    .Set("milestone_id", task.Milestone)
+                    .Set("sort_order", task.SortOrder)
+                    .Set("deadline", task.Deadline)
+                    .Set("status_changed", TenantUtil.DateTimeToUtc(task.StatusChangedOn))
+                    .Set("start_date", task.StartDate)
+                    .Set("progress", task.Progress)
+                    .Set("status_id", task.CustomTaskStatus)
+                    .Where("id", task.ID);
+
+                Db.ExecuteNonQuery(update);
+
+                Db.ExecuteNonQuery(Delete(TasksResponsibleTable).Where("task_id", task.ID));
+
+                if (task.Responsibles.Any())
+                {
+                    var insert = new SqlInsert(TasksResponsibleTable).InColumns("tenant_id", "task_ID", "responsible_id");
+
+                    foreach (var responsible in task.Responsibles.Distinct())
+                    {
+                        insert.Values(Tenant, task.ID, responsible);
+                    }
+
+                    Db.ExecuteNonQuery(insert);
+                }
+
+                tr.Commit();
+
+                return task;
+            }
+        }
+
+        public virtual void Delete(Task task)
+        {
+            using (var tx = Db.BeginTransaction())
+            {
+                var id = task.ID;
+                task.Links.ForEach(RemoveLink);
+                task.SubTasks.ForEach(subTask => SubtaskDao.Delete(subTask.ID));
+                Db.ExecuteNonQuery(Delete(CommentsTable).Where("target_uniq_id", task.UniqID));
+                Db.ExecuteNonQuery(Delete(TasksResponsibleTable).Where("task_id", id));
+                Db.ExecuteNonQuery(Delete(TasksTable).Where("id", id));
 
                 tx.Commit();
             }
@@ -356,39 +433,29 @@ namespace ASC.Projects.Data.DAO
 
         public List<object[]> GetRecurrence(DateTime date)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var q = new SqlQuery("projects_tasks")
-                    .Select("tenant_id", "task_id")
-                    .InnerJoin("projects_tasks_recurrence as ptr", Exp.Eq("ptr.task_id", "t.id"))
-                    .Where(Exp.Ge("ptr.start_date", date))
-                    .Where(Exp.Le("ptr.end_date", date))
-                    .Where(Exp.Eq("t.status", TaskStatus.Open));
+            var q = new SqlQuery("projects_tasks")
+                .Select("tenant_id", "task_id")
+                .InnerJoin("projects_tasks_recurrence as ptr", Exp.Eq("ptr.task_id", "t.id"))
+                .Where(Exp.Ge("ptr.start_date", date))
+                .Where(Exp.Le("ptr.end_date", date))
+                .Where(Exp.Eq("t.status", TaskStatus.Open));
 
-                return db.ExecuteList(q).ConvertAll(r => new object[] { Convert.ToInt32(r[0]), Convert.ToInt32(r[1]) });
-            }
+            return Db.ExecuteList(q).ConvertAll(r => new object[] { Convert.ToInt32(r[0]), Convert.ToInt32(r[1]) });
         }
 
         public void SaveRecurrence(Task task, string cron, DateTime startDate, DateTime endDate)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                Insert("projects_tasks_recurrence")
-                    .InColumnValue("task_id", task.ID)
-                    .InColumnValue("cron", cron)
-                    .InColumnValue("title", task.Title)
-                    .InColumnValue("startDate", startDate)
-                    .InColumnValue("endDate", endDate);
-
-            }
+            Insert("projects_tasks_recurrence")
+                .InColumnValue("task_id", task.ID)
+                .InColumnValue("cron", cron)
+                .InColumnValue("title", task.Title)
+                .InColumnValue("startDate", startDate)
+                .InColumnValue("endDate", endDate);
         }
 
         public void DeleteReccurence(int taskId)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                db.ExecuteNonQuery(Delete("projects_tasks_recurrence").Where("task_id", taskId));
-            }
+            Db.ExecuteNonQuery(Delete("projects_tasks_recurrence").Where("task_id", taskId));
         }
 
         #endregion
@@ -397,65 +464,50 @@ namespace ASC.Projects.Data.DAO
 
         public void AddLink(TaskLink link)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var query = Insert(TasksLinksTable)
-                    .InColumnValue("task_id", link.DependenceTaskId)
-                    .InColumnValue("parent_id", link.ParentTaskId)
-                    .InColumnValue("link_type", link.LinkType);
+            var query = Insert(TasksLinksTable)
+                .InColumnValue("task_id", link.DependenceTaskId)
+                .InColumnValue("parent_id", link.ParentTaskId)
+                .InColumnValue("link_type", link.LinkType);
 
-                db.ExecuteNonQuery(query);
-            }
+            Db.ExecuteNonQuery(query);
         }
 
         public void RemoveLink(TaskLink link)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var query = Delete(TasksLinksTable)
-                    .Where((Exp.Eq("task_id", link.DependenceTaskId) & Exp.Eq("parent_id", link.ParentTaskId)) |
-                           (Exp.Eq("task_id", link.ParentTaskId) & Exp.Eq("parent_id", link.DependenceTaskId)));
+            var query = Delete(TasksLinksTable)
+                .Where((Exp.Eq("task_id", link.DependenceTaskId) & Exp.Eq("parent_id", link.ParentTaskId)) |
+                        (Exp.Eq("task_id", link.ParentTaskId) & Exp.Eq("parent_id", link.DependenceTaskId)));
 
-                db.ExecuteNonQuery(query);
-            }
+            Db.ExecuteNonQuery(query);
         }
 
         public bool IsExistLink(TaskLink link)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var query = Query(TasksLinksTable)
-                    .SelectCount()
-                    .Where((Exp.Eq("task_id", link.DependenceTaskId) & Exp.Eq("parent_id", link.ParentTaskId)) |
-                           (Exp.Eq("task_id", link.ParentTaskId) & Exp.Eq("parent_id", link.DependenceTaskId)));
+            var query = Query(TasksLinksTable)
+                .SelectCount()
+                .Where((Exp.Eq("task_id", link.DependenceTaskId) & Exp.Eq("parent_id", link.ParentTaskId)) |
+                        (Exp.Eq("task_id", link.ParentTaskId) & Exp.Eq("parent_id", link.DependenceTaskId)));
 
-                return db.ExecuteScalar<long>(query) > 0;
-            }
+            return Db.ExecuteScalar<long>(query) > 0;
         }
 
         public IEnumerable<TaskLink> GetLinks(int taskID)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var query = Query(TasksLinksTable)
-                    .Select("task_id", "parent_id", "link_type")
-                    .Where(Exp.Eq("task_id", taskID) | Exp.Eq("parent_id", taskID));
+            var query = Query(TasksLinksTable)
+                .Select("task_id", "parent_id", "link_type")
+                .Where(Exp.Eq("task_id", taskID) | Exp.Eq("parent_id", taskID));
 
-                return db.ExecuteList(query).ConvertAll(ToTaskLink);
-            }
+            return Db.ExecuteList(query).ConvertAll(ToTaskLink);
         }
 
         public IEnumerable<TaskLink> GetLinks(List<Task> tasks)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                var query = Query(TasksLinksTable)
-                    .Select("task_id", "parent_id", "link_type")
-                    .Where(Exp.Or(Exp.In("task_id", tasks.Select(r => r.ID).ToList()),
-                                  Exp.In("parent_id", tasks.Select(r => r.ID).ToList())));
+            var query = Query(TasksLinksTable)
+                .Select("task_id", "parent_id", "link_type")
+                .Where(Exp.Or(Exp.In("task_id", tasks.Select(r => r.ID).ToList()),
+                                Exp.In("parent_id", tasks.Select(r => r.ID).ToList())));
 
-                return db.ExecuteList(query).ConvertAll(ToTaskLink);
-            }
+            return Db.ExecuteList(query).ConvertAll(ToTaskLink);
         }
 
         #endregion
@@ -473,6 +525,7 @@ namespace ASC.Projects.Data.DAO
                 .Select("t.id", "t.title", "t.create_by", "t.create_on", "t.last_modified_by", "t.last_modified_on")
                 .Select("t.description", "t.priority", "t.status", "t.milestone_id", "t.sort_order", "t.deadline", "t.start_date", "t.progress")
                 .Select("group_concat(distinct ptr.responsible_id) task_resp")
+                .Select("t.status_id")
                 .Where("t.tenant_id", Tenant)
                 .GroupBy("t.id");
         }
@@ -485,6 +538,11 @@ namespace ASC.Projects.Data.DAO
             }
             else
             {
+                if (ProjectsCommonSettings.Load().HideEntitiesInPausedProjects)
+                {
+                    query.Where(!Exp.Eq("p.status", ProjectStatus.Paused));
+                }
+
                 if (filter.MyProjects)
                 {
                     query.InnerJoin(ParticipantTable + " ppp", Exp.EqColumns("p.id", "ppp.project_id") & Exp.Eq("ppp.removed", false) & Exp.EqColumns("t.tenant_id", "ppp.tenant"));
@@ -494,17 +552,36 @@ namespace ASC.Projects.Data.DAO
 
             if (filter.TagId != 0)
             {
-                query.InnerJoin(ProjectTagTable + " ptag", Exp.EqColumns("ptag.project_id", "t.project_id"));
-                query.Where("ptag.tag_id", filter.TagId);
+                if (filter.TagId == -1)
+                {
+                    query.LeftOuterJoin(ProjectTagTable + " ptag", Exp.EqColumns("ptag.project_id", "t.project_id"));
+                    query.Where("ptag.tag_id", null);
+                }
+                else
+                {
+                    query.InnerJoin(ProjectTagTable + " ptag", Exp.EqColumns("ptag.project_id", "t.project_id"));
+                    query.Where("ptag.tag_id", filter.TagId);
+                }
             }
 
-            if (filter.TaskStatuses.Count != 0)
+            if (filter.Substatus.HasValue)
+            {
+                var substatus = filter.Substatus.Value;
+                if (substatus > -1)
+                {
+                    query.InnerJoin(StatusTable + " pstat", Exp.EqColumns("pstat.tenant_id", "t.tenant_id") & Exp.Eq("pstat.id", filter.Substatus.Value));
+                    query.Where(Exp.Eq("t.status_id", filter.Substatus.Value) | (Exp.Eq("t.status_id", null) & Exp.EqColumns("t.status", "pstat.statusType") & Exp.Eq("pstat.isDefault", true)));
+                }
+                else
+                {
+                    query.Where("t.status", -substatus).Where("t.status_id", null);
+
+                }
+            }
+            else if (filter.TaskStatuses.Count != 0)
             {
                 var status = filter.TaskStatuses.First();
-                if (status == TaskStatus.Open)
-                    query.Where(!Exp.Eq("t.status", TaskStatus.Closed));
-                else
-                    query.Where("t.status", TaskStatus.Closed);
+                query.Where("t.status", status);
             }
 
             if (!filter.UserId.Equals(Guid.Empty))
@@ -536,12 +613,14 @@ namespace ASC.Projects.Data.DAO
 
             if (!string.IsNullOrEmpty(filter.SearchText))
             {
-                if (FullTextSearch.SupportModule(FullTextSearch.ProjectsTasksModule))
+                List<int> taskIds;
+                if (FactoryIndexer<TasksWrapper>.TrySelectIds(s => s.MatchAll(filter.SearchText), out taskIds))
                 {
-                    var taskIds = FullTextSearch.Search(FullTextSearch.ProjectsTasksModule.Match(filter.SearchText));
-
-                    if (FullTextSearch.SupportModule(FullTextSearch.ProjectsSubtasksModule))
-                        taskIds.AddRange(FullTextSearch.Search(FullTextSearch.ProjectsSubtasksModule.Select("task_id").Match(filter.SearchText)));
+                    IReadOnlyCollection<SubtasksWrapper> subtaskIds;
+                    if (FactoryIndexer<SubtasksWrapper>.TrySelect(s => s.MatchAll(filter.SearchText), out subtaskIds))
+                    {
+                        taskIds.AddRange(subtaskIds.Select(r => r.Task).ToList());
+                    }
 
                     query.Where(Exp.In("t.id", taskIds));
                 }
@@ -687,7 +766,8 @@ namespace ASC.Projects.Data.DAO
                 StartDate = !startDate.Equals(DateTime.MinValue) ? DateTime.SpecifyKind(startDate, DateTimeKind.Local) : default(DateTime),
                 Progress = Convert.ToInt32(r[13 + offset]),
                 Responsibles = !string.IsNullOrEmpty((string)r[14 + offset]) ? new List<Guid>(((string)r[14 + offset]).Split(',').Select(ToGuid)) : new List<Guid>(),
-                SubTasks = new List<Subtask>()
+                SubTasks = new List<Subtask>(),
+                CustomTaskStatus = r[15 + offset] != null ? (int?)Convert.ToInt32(r[15 + offset]) : null
             };
 
             return task;
@@ -719,12 +799,9 @@ namespace ASC.Projects.Data.DAO
             };
         }
 
-        internal List<Task> GetTasks(Exp where)
+        public List<Task> GetTasks(Exp where)
         {
-            using (var db = new DbManager(DatabaseId))
-            {
-                return db.ExecuteList(CreateQuery().Where(where)).ConvertAll(converter);
-            }
+            return Db.ExecuteList(CreateQuery().Where(where)).ConvertAll(converter);
         }
 
         private static string GetSortFilter(string sortBy, bool sortOrder)

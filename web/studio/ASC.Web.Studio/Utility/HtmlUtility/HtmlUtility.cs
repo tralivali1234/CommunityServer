@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,9 +19,10 @@ using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Web;
+using ASC.Common.Logging;
 using ASC.Core;
 using ASC.Core.Users;
-using System.Collections.Generic;
+using ASC.Web.Core.WhiteLabel;
 using HtmlAgilityPack;
 
 namespace ASC.Web.Studio.Utility.HtmlUtility
@@ -67,18 +59,19 @@ namespace ASC.Web.Studio.Utility.HtmlUtility
                     }
                 }
 
+                ProcessMaliciousTag(doc);
+                ProcessMaliciousAttributes(doc);
                 ProcessAscUserTag(doc);
                 ProcessCodeTags(doc);
                 ProcessExternalLinks(doc);
-                ProcessScriptTag(doc);
-                ProcessMaliciousAttributes(doc);
                 ProcessZoomImages(doc);
 
                 return doc.DocumentNode.InnerHtml;
             }
             catch (Exception e)
             {
-                return e.Message + "<br/> Please contact us: <a href='mailto:support@onlyoffice.com'>support@onlyoffice.com</a>";
+                LogManager.GetLogger("ASC.Web").Error(e);
+                return string.Format("{0}<br/>Please contact us: <a href='mailto:{1}'>{1}</a>", e.Message, CompanyWhiteLabelSettings.Instance.Email);
             }
         }
 
@@ -138,28 +131,6 @@ namespace ASC.Web.Studio.Utility.HtmlUtility
             return result;
         }
 
-        private static readonly List<string> BlockedAttrs = new List<string>
-            {
-                "onload",
-                "onunload",
-                "onclick",
-                "ondblclick",
-                "onmousedown",
-                "onmouseup",
-                "onmouseover",
-                "onmousemove",
-                "onmouseout",
-                "onfocus",
-                "onblur",
-                "onkeypress",
-                "onkeydown",
-                "onkeyup",
-                "onsubmit",
-                "onreset",
-                "onselect",
-                "onchange"
-            };
-
         private static void ProcessMaliciousAttributes(HtmlDocument doc)
         {
             var nodes = doc.DocumentNode.SelectNodes("//*");
@@ -168,19 +139,26 @@ namespace ASC.Web.Studio.Utility.HtmlUtility
                 return;
             }
 
-            foreach (var node in doc.DocumentNode.SelectNodes("//*"))
+            foreach (var node in nodes)
             {
                 var toRemove = node.Attributes
-                                   .Where(htmlAttribute => BlockedAttrs.Contains(htmlAttribute.Name.ToLowerInvariant())
-                                                           ||
-                                                           htmlAttribute.Value.StartsWith("javascript", StringComparison.OrdinalIgnoreCase)
-                                                           ||
-                                                           htmlAttribute.Value.StartsWith("data", StringComparison.OrdinalIgnoreCase)
-                                                           ||
-                                                           htmlAttribute.Value.StartsWith("vbscript", StringComparison.OrdinalIgnoreCase)
+                                   .Where(htmlAttribute =>
+                                       {
+                                           var name = htmlAttribute.Name;
+                                           if (name.Contains("/")) name = name.Split('/').Last();
+                                           var value = htmlAttribute.Value.Replace("&Tab;", "").TrimStart();
+                                           return name.StartsWith("on", StringComparison.OrdinalIgnoreCase)
+                                                  || value.StartsWith("javascript", StringComparison.OrdinalIgnoreCase)
+                                                  || value.StartsWith("data", StringComparison.OrdinalIgnoreCase)
+                                                  || value.StartsWith("vbscript", StringComparison.OrdinalIgnoreCase)
+                                                  || value.StartsWith(">", StringComparison.OrdinalIgnoreCase);
+                                       }
                     ).ToList();
                 foreach (var htmlAttribute in toRemove)
                 {
+                    if (node.Name == "img" && htmlAttribute.Name == "src")
+                        continue;
+
                     node.Attributes.Remove(htmlAttribute);
                 }
             }
@@ -255,9 +233,18 @@ namespace ASC.Web.Studio.Utility.HtmlUtility
             }
         }
 
-        private static void ProcessScriptTag(HtmlDocument doc)
+        private static void ProcessMaliciousTag(HtmlDocument doc)
         {
-            var nodes = doc.DocumentNode.SelectNodes("//script");
+            var nodes = doc.DocumentNode.SelectNodes("//*");
+            if (nodes == null || nodes.Count == 0)
+                return;
+
+            foreach (var node in nodes.Where(node => Regex.IsMatch(node.Name, "\\W")))
+            {
+                node.ParentNode.RemoveChild(node);
+            }
+
+            nodes = doc.DocumentNode.SelectNodes("//script|//meta|//style");
 
             if (nodes == null || nodes.Count == 0)
                 return;
@@ -300,18 +287,27 @@ namespace ASC.Web.Studio.Utility.HtmlUtility
         private static void ProcessExternalLinks(HtmlDocument doc)
         {
             var links = doc.DocumentNode.SelectNodes("//a");
+
             if (links == null) return;
 
-            var con = HttpContext.Current;
-            var internalHost = con.Request.GetUrlRewriter().Host;
-            if ((con.Request.GetUrlRewriter().Port != 80 && con.Request.GetUrlRewriter().Scheme.Equals("http", StringComparison.InvariantCultureIgnoreCase))
-                || (con.Request.GetUrlRewriter().Port != 443 && con.Request.GetUrlRewriter().Scheme.Equals("https", StringComparison.InvariantCultureIgnoreCase)))
+            var context = HttpContext.Current;
+
+            if (context == null) return;
+
+            var uri = context.Request.GetUrlRewriter();
+
+            if (uri == null) return;
+
+            var internalHost = uri.Host;
+
+            if ((uri.Port != 80 && uri.Scheme.Equals("http", StringComparison.InvariantCultureIgnoreCase))
+                || (uri.Port != 443 && uri.Scheme.Equals("https", StringComparison.InvariantCultureIgnoreCase)))
             {
-                internalHost = string.Format(@"^{2}:\/\/{0}:{1}", internalHost, con.Request.GetUrlRewriter().Port, con.Request.GetUrlRewriter().Scheme);
+                internalHost = string.Format(@"^{2}:\/\/{0}:{1}", internalHost, uri.Port, uri.Scheme);
             }
             else
             {
-                internalHost = string.Format(@"^{2}:\/\/{0}(:{1})?", internalHost, con.Request.GetUrlRewriter().Port, con.Request.GetUrlRewriter().Scheme);
+                internalHost = string.Format(@"^{2}:\/\/{0}(:{1})?", internalHost, uri.Port, uri.Scheme);
             }
 
             var rxInternalHost = new Regex(internalHost, RegexOptions.Compiled | RegexOptions.CultureInvariant);

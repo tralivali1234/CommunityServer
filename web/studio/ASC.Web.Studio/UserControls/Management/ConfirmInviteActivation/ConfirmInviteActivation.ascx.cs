@@ -1,25 +1,16 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -39,7 +30,6 @@ using ASC.FederatedLogin.Profile;
 using ASC.MessagingSystem;
 using ASC.Web.Core;
 using ASC.Web.Core.Users;
-using ASC.Web.Core.Utility.Settings;
 using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Core.Notify;
 using ASC.Web.Studio.Core.Users;
@@ -47,9 +37,6 @@ using ASC.Web.Studio.UserControls.Statistics;
 using ASC.Web.Studio.UserControls.Users.UserProfile;
 using ASC.Web.Studio.Utility;
 using Resources;
-using System.Text.RegularExpressions;
-using System.Configuration;
-using ASC.Web.Core.WhiteLabel;
 
 namespace ASC.Web.Studio.UserControls.Management
 {
@@ -69,26 +56,6 @@ namespace ASC.Web.Studio.UserControls.Management
         protected string _email
         {
             get { return (Request["email"] ?? String.Empty).Trim(); }
-        }
-
-        protected string _firstName
-        {
-            get { return (Request["firstname"] ?? String.Empty).Trim(); }
-        }
-
-        protected string _lastName
-        {
-            get { return (Request["lastname"] ?? String.Empty).Trim(); }
-        }
-
-        protected string _pwd
-        {
-            get { return (Request["pwd"] ?? "").Trim(); }
-        }
-
-        protected string _rePwd
-        {
-            get { return (Request["repwd"] ?? "").Trim(); }
         }
 
         protected ConfirmType _type
@@ -152,9 +119,8 @@ namespace ASC.Web.Studio.UserControls.Management
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            Page.RegisterBodyScripts("~/usercontrols/management/confirminviteactivation/js/confirm_invite_activation.js");
-
-            Page.RegisterStyle("~/usercontrols/management/confirminviteactivation/css/confirm_invite_activation.less");
+            Page.RegisterBodyScripts("~/js/third-party/xregexp.js", "~/UserControls/Management/ConfirmInviteActivation/js/confirm_invite_activation.js")
+                .RegisterStyle("~/UserControls/Management/ConfirmInviteActivation/css/confirm_invite_activation.less");
 
             var uid = Guid.Empty;
             try
@@ -185,10 +151,12 @@ namespace ASC.Web.Studio.UserControls.Management
 
                 user = CoreContext.UserManager.GetUserByEmail(email);
                 var usr = CoreContext.UserManager.GetUsers(uid);
-                if (usr.ID.Equals(ASC.Core.Users.Constants.LostUser.ID) || usr.ID.Equals(ASC.Core.Configuration.Constants.Guest.ID))
+                if (usr.ID.Equals(Constants.LostUser.ID) || usr.ID.Equals(ASC.Core.Configuration.Constants.Guest.ID))
                     usr = CoreContext.UserManager.GetUsers(CoreContext.TenantManager.GetCurrentTenant().OwnerId);
 
-                _userAvatar = usr.GetMediumPhotoURL();
+                var photoData = UserPhotoManager.GetUserPhotoData(usr.ID, UserPhotoManager.MediumFotoSize);
+
+                _userAvatar = photoData == null ? usr.GetMediumPhotoURL() : "data:image/png;base64," + Convert.ToBase64String(photoData);
                 _userName = usr.DisplayUserName(true);
                 _userPost = (usr.Title ?? "").HtmlEncode();
             }
@@ -205,7 +173,7 @@ namespace ASC.Web.Studio.UserControls.Management
                     return;
                 }
 
-                if (!user.ID.Equals(ASC.Core.Users.Constants.LostUser.ID))
+                if (!user.ID.Equals(Constants.LostUser.ID))
                 {
                     ShowError(CustomNamingPeople.Substitute<Resource>("ErrorEmailAlreadyExists"));
                     return;
@@ -216,11 +184,11 @@ namespace ASC.Web.Studio.UserControls.Management
             {
                 if (user.IsActive)
                 {
-                    ShowError(Resource.ErrorConfirmURLError);
+                    Response.Redirect(CommonLinkUtility.GetDefault());
                     return;
                 }
 
-                if (user.ID.Equals(ASC.Core.Users.Constants.LostUser.ID) || user.Status == EmployeeStatus.Terminated)
+                if (user.ID.Equals(Constants.LostUser.ID) || user.Status == EmployeeStatus.Terminated)
                 {
                     ShowError(string.Format(Resource.ErrorUserNotFoundByEmail, email));
                     return;
@@ -230,8 +198,8 @@ namespace ASC.Web.Studio.UserControls.Management
             var tenant = CoreContext.TenantManager.GetCurrentTenant();
             if (tenant != null)
             {
-                var settings = SettingsManager.Instance.LoadSettings<IPRestrictionsSettings>(tenant.TenantId);
-                if (settings.Enable && !IPSecurity.IPSecurity.Verify(tenant.TenantId))
+                var settings = IPRestrictionsSettings.Load();
+                if (settings.Enable && !IPSecurity.IPSecurity.Verify(tenant))
                 {
                     ShowError(Resource.ErrorAccessRestricted);
                     return;
@@ -243,7 +211,9 @@ namespace ASC.Web.Studio.UserControls.Management
 
             var firstName = GetFirstName();
             var lastName = GetLastName();
-            var pwd = (Request["pwdInput"] ?? "").Trim();
+
+            var passwordHash = (Request["passwordHash"] ?? "").Trim();
+            var analytics = (Request["analytics"] ?? "").Trim() == "True"; 
             var mustChangePassword = false;
             LoginProfile thirdPartyProfile;
 
@@ -294,10 +264,9 @@ namespace ASC.Web.Studio.UserControls.Management
                     return;
                 }
 
-                var checkPassResult = CheckPassword(pwd);
-                if (!String.IsNullOrEmpty(checkPassResult))
+                if (String.IsNullOrEmpty(passwordHash))
                 {
-                    _errorMessage = checkPassResult;
+                    _errorMessage = Resource.ErrorPasswordEmpty;
                     return;
                 }
             }
@@ -317,27 +286,34 @@ namespace ASC.Web.Studio.UserControls.Management
                     if (Request["__EVENTTARGET"] == "confirmInvite")
                     {
                         var fromInviteLink = _type == ConfirmType.LinkInvite;
-                        newUser = CreateNewUser(firstName, lastName, email, pwd, _employeeType, fromInviteLink);
+                        newUser = CreateNewUser(firstName, lastName, email, passwordHash, _employeeType, fromInviteLink);
 
                         var messageAction = _employeeType == EmployeeType.User ? MessageAction.UserCreatedViaInvite : MessageAction.GuestCreatedViaInvite;
-                        MessageService.Send(HttpContext.Current.Request, MessageInitiator.System, messageAction, newUser.DisplayUserName(false));
+                        MessageService.Send(HttpContext.Current.Request, MessageInitiator.System, messageAction, MessageTarget.Create(newUser.ID), newUser.DisplayUserName(false));
                         
                         userID = newUser.ID;
+
+                        var settings = TenantAnalyticsSettings.LoadForCurrentUser();
+                        settings.Analytics = analytics;
+
+                        settings.SaveForCurrentUser();
+
                     }
 
                     if (Request["__EVENTTARGET"] == "thirdPartyLogin")
                     {
-                        if (!String.IsNullOrEmpty(CheckPassword(pwd)))
+                        if (String.IsNullOrEmpty(passwordHash))
                         {
-                            pwd = UserManagerWrapper.GeneratePassword();
+                            passwordHash = UserManagerWrapper.GeneratePassword();
                             mustChangePassword = true;
                         }
+
                         var valueRequest = Request["__EVENTARGUMENT"];
                         thirdPartyProfile = new LoginProfile(valueRequest);
-                        newUser = CreateNewUser(GetFirstName(thirdPartyProfile), GetLastName(thirdPartyProfile), GetEmailAddress(thirdPartyProfile), pwd, _employeeType, false);
+                        newUser = CreateNewUser(GetFirstName(thirdPartyProfile), GetLastName(thirdPartyProfile), GetEmailAddress(thirdPartyProfile), passwordHash, _employeeType, false);
 
                         var messageAction = _employeeType == EmployeeType.User ? MessageAction.UserCreatedViaInvite : MessageAction.GuestCreatedViaInvite;
-                        MessageService.Send(HttpContext.Current.Request, MessageInitiator.System, messageAction, newUser.DisplayUserName(false));
+                        MessageService.Send(HttpContext.Current.Request, MessageInitiator.System, messageAction, MessageTarget.Create(newUser.ID), newUser.DisplayUserName(false));
                         
                         userID = newUser.ID;
                         if (!String.IsNullOrEmpty(thirdPartyProfile.Avatar))
@@ -351,25 +327,34 @@ namespace ASC.Web.Studio.UserControls.Management
                 }
                 else if (_type == ConfirmType.Activation)
                 {
+                    if (!UserFormatter.IsValidUserName(firstName, lastName))
+                        throw new Exception(Resource.ErrorIncorrectUserName);
+
+                    SecurityContext.SetUserPasswordHash(user.ID, passwordHash);
+
                     user.ActivationStatus = EmployeeActivationStatus.Activated;
                     user.FirstName = firstName;
                     user.LastName = lastName;
                     CoreContext.UserManager.SaveUserInfo(user);
-                    SecurityContext.SetUserPassword(user.ID, pwd);
 
                     userID = user.ID;
 
                     //notify
                     if (user.IsVisitor()) { 
-                        StudioNotifyService.Instance.GuestInfoAddedAfterInvite(user, pwd);
-                        MessageService.Send(HttpContext.Current.Request, MessageInitiator.System, MessageAction.GuestActivated, user.DisplayUserName(false));
+                        StudioNotifyService.Instance.GuestInfoAddedAfterInvite(user);
+                        MessageService.Send(HttpContext.Current.Request, MessageInitiator.System, MessageAction.GuestActivated, MessageTarget.Create(user.ID), user.DisplayUserName(false));
                     }
                     else
                     {
-                        StudioNotifyService.Instance.UserInfoAddedAfterInvite(user, pwd);
-                        MessageService.Send(HttpContext.Current.Request, MessageInitiator.System, MessageAction.UserActivated, user.DisplayUserName(false));
+                        StudioNotifyService.Instance.UserInfoAddedAfterInvite(user);
+                        MessageService.Send(HttpContext.Current.Request, MessageInitiator.System, MessageAction.UserActivated, MessageTarget.Create(user.ID), user.DisplayUserName(false));
                     }
                 }
+            }
+            catch (SecurityContext.PasswordException)
+            {
+                _errorMessage = HttpUtility.HtmlEncode(Resource.ErrorPasswordRechange);
+                return;
             }
             catch (Exception exception)
             {
@@ -384,7 +369,7 @@ namespace ASC.Web.Studio.UserControls.Management
             user = CoreContext.UserManager.GetUsers(userID);
             try
             {
-                var cookiesKey = SecurityContext.AuthenticateMe(user.Email, pwd);
+                var cookiesKey = SecurityContext.AuthenticateMe(user.Email, passwordHash);
                 CookiesManager.SetCookies(CookiesType.AuthKey, cookiesKey);
                 MessageService.Send(HttpContext.Current.Request, MessageAction.LoginSuccess);
                 StudioNotifyService.Instance.UserHasJoin();
@@ -403,7 +388,7 @@ namespace ASC.Web.Studio.UserControls.Management
             UserHelpTourHelper.IsNewUser = true;
             if (CoreContext.Configuration.Personal)
                 PersonalSettings.IsNewUser = true;
-            Response.Redirect("~/");
+            Response.Redirect(CommonLinkUtility.GetDefault());
         }
 
         private static void SaveContactImage(Guid userID, string url)
@@ -411,16 +396,17 @@ namespace ASC.Web.Studio.UserControls.Management
             using (var memstream = new MemoryStream())
             {
                 var req = WebRequest.Create(url);
-                var response = req.GetResponse();
-                var stream = response.GetResponseStream();
+                using (var response = req.GetResponse())
+                using (var stream = response.GetResponseStream())
+                {
+                    var buffer = new byte[512];
+                    int bytesRead;
+                    while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+                        memstream.Write(buffer, 0, bytesRead);
+                    var bytes = memstream.ToArray();
 
-                var buffer = new byte[512];
-                int bytesRead;
-                while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
-                    memstream.Write(buffer, 0, bytesRead);
-                var bytes = memstream.ToArray();
-
-                UserPhotoManager.SaveOrUpdatePhoto(userID, bytes);
+                    UserPhotoManager.SaveOrUpdatePhoto(userID, bytes);
+                }
             }
         }
 
@@ -437,30 +423,13 @@ namespace ASC.Web.Studio.UserControls.Management
                     + " "
                     + String.Format(Resource.ForSignInFollowMessage,
                                     string.Format("<a href=\"{0}\">",
-                                                  VirtualPathUtility.ToAbsolute("~/auth.aspx")),
+                                                  VirtualPathUtility.ToAbsolute("~/Auth.aspx")),
                                     "</a>");
 
             _confirmHolder.Visible = false;
         }
 
-        private static string CheckPassword(string pwd)
-        {
-            if (String.IsNullOrEmpty(pwd))
-                return Resource.ErrorPasswordEmpty;
-
-            try
-            {
-                UserManagerWrapper.CheckPasswordPolicy(pwd);
-            }
-            catch (Exception ex)
-            {
-                return ex.Message;
-            }
-
-            return String.Empty;
-        }
-
-        private static UserInfo CreateNewUser(string firstName, string lastName, string email, string pwd, EmployeeType employeeType, bool fromInviteLink)
+        private static UserInfo CreateNewUser(string firstName, string lastName, string email, string passwordHash, EmployeeType employeeType, bool fromInviteLink)
         {
             var isVisitor = employeeType == EmployeeType.Visitor;
 
@@ -479,10 +448,10 @@ namespace ASC.Web.Studio.UserControls.Management
             if (CoreContext.Configuration.Personal)
             {
                 userInfo.ActivationStatus = EmployeeActivationStatus.Activated;
-                userInfo.CultureName = Thread.CurrentThread.CurrentUICulture.Name;
+                userInfo.CultureName = CoreContext.Configuration.CustomMode ? "ru-RU" : Thread.CurrentThread.CurrentUICulture.Name;
             }
 
-            return UserManagerWrapper.AddUser(userInfo, pwd, true, true, isVisitor, fromInviteLink);
+            return UserManagerWrapper.AddUser(userInfo, passwordHash, true, true, isVisitor, fromInviteLink);
         }
     }
 }

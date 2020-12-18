@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,8 +20,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.ServiceModel;
+using ASC.Common.Logging;
 using ASC.Core.Common.Contracts;
-using ASC.Data.Backup.Logging;
 using ASC.Data.Backup.Storage;
 using ASC.Data.Backup.Utils;
 
@@ -38,11 +29,11 @@ namespace ASC.Data.Backup.Service
 {
     internal class BackupService : IBackupService
     {
-        private readonly ILog log = LogFactory.Create("ASC.Backup.Service");
+        private readonly ILog log = LogManager.GetLogger("ASC.Backup.Service");
 
         public BackupProgress StartBackup(StartBackupRequest request)
         {
-            var progress = BackupWorker.StartBackup(request.TenantId, request.UserId, request.BackupMail, request.StorageType, request.StorageBasePath);
+            var progress = BackupWorker.StartBackup(request);
             if (!string.IsNullOrEmpty(progress.Error))
             {
                 throw new FaultException(progress.Error);
@@ -55,6 +46,7 @@ namespace ASC.Data.Backup.Service
             var progress = BackupWorker.GetBackupProgress(tenantId);
             if (progress != null && !string.IsNullOrEmpty(progress.Error))
             {
+                BackupWorker.ResetBackupError(tenantId);
                 throw new FaultException(progress.Error);
             }
             return progress;
@@ -66,7 +58,8 @@ namespace ASC.Data.Backup.Service
             var backupRecord = backupRepository.GetBackupRecord(id);
             backupRepository.DeleteBackupRecord(backupRecord.Id);
 
-            var storage = BackupStorageFactory.GetBackupStorage(backupRecord.StorageType, backupRecord.TenantId);
+            var storage = BackupStorageFactory.GetBackupStorage(backupRecord);
+            if (storage == null) return;
             storage.Delete(backupRecord.StoragePath);
         }
 
@@ -78,7 +71,8 @@ namespace ASC.Data.Backup.Service
                 try
                 {
                     backupRepository.DeleteBackupRecord(backupRecord.Id);
-                    var storage = BackupStorageFactory.GetBackupStorage(backupRecord.StorageType, backupRecord.TenantId);
+                    var storage = BackupStorageFactory.GetBackupStorage(backupRecord);
+                    if (storage == null) continue;
                     storage.Delete(backupRecord.StoragePath);
                 }
                 catch (Exception error)
@@ -94,7 +88,8 @@ namespace ASC.Data.Backup.Service
             var backupRepository = BackupStorageFactory.GetBackupRepository();
             foreach (var record in backupRepository.GetBackupRecordsByTenantId(tenantId))
             {
-                var storage = BackupStorageFactory.GetBackupStorage(record.StorageType, record.TenantId);
+                var storage = BackupStorageFactory.GetBackupStorage(record);
+                if (storage == null) continue;
                 if (storage.IsExists(record.StoragePath))
                 {
                     backupHistory.Add(new BackupHistoryRecord
@@ -136,6 +131,14 @@ namespace ASC.Data.Backup.Service
 
         public BackupProgress StartRestore(StartRestoreRequest request)
         {
+            if (request.StorageType == BackupStorageType.Local)
+            {
+                if (string.IsNullOrEmpty(request.FilePathOrId) || !File.Exists(request.FilePathOrId))
+                {
+                    throw new FileNotFoundException();
+                }
+            }
+
             if (!request.BackupId.Equals(Guid.Empty))
             {
                 var backupRepository = BackupStorageFactory.GetBackupRepository();
@@ -147,9 +150,10 @@ namespace ASC.Data.Backup.Service
 
                 request.FilePathOrId = backupRecord.StoragePath;
                 request.StorageType = backupRecord.StorageType;
+                request.StorageParams = backupRecord.StorageParams;
             }
 
-            var progress = BackupWorker.StartRestore(request.TenantId, request.StorageType, request.FilePathOrId, request.NotifyAfterCompletion);
+            var progress = BackupWorker.StartRestore(request);
             if (!string.IsNullOrEmpty(progress.Error))
             {
                 throw new FaultException(progress.Error);
@@ -162,9 +166,15 @@ namespace ASC.Data.Backup.Service
             var progress = BackupWorker.GetRestoreProgress(tenantId);
             if (progress != null && !string.IsNullOrEmpty(progress.Error))
             {
+                BackupWorker.ResetRestoreError(tenantId);
                 throw new FaultException(progress.Error);
             }
             return progress;
+        }
+
+        public string GetTmpFolder()
+        {
+            return BackupWorker.TempFolder;
         }
 
         public List<TransferRegion> GetTransferRegions()
@@ -195,7 +205,8 @@ namespace ASC.Data.Backup.Service
                         BackupMail = request.BackupMail,
                         NumberOfBackupsStored = request.NumberOfBackupsStored,
                         StorageType = request.StorageType,
-                        StorageBasePath = request.StorageBasePath
+                        StorageBasePath = request.StorageBasePath,
+                        StorageParams = request.StorageParams
                     });
         }
 
@@ -215,7 +226,8 @@ namespace ASC.Data.Backup.Service
                                BackupMail = schedule.BackupMail,
                                NumberOfBackupsStored = schedule.NumberOfBackupsStored,
                                Cron = schedule.Cron,
-                               LastBackupTime = schedule.LastBackupTime
+                               LastBackupTime = schedule.LastBackupTime,
+                               StorageParams = schedule.StorageParams
                            }
                        : null;
         }

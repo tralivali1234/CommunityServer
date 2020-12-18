@@ -9,6 +9,9 @@
 
 <asp:Content ID="PageContent" ContentPlaceHolderID="BTPageContent" runat="server">
     <style type="text/css">
+        #studioPageContent main {
+            padding: 0;
+        }
         #studioPageContent .mainPageLayout {
             min-width: 270px;
         }
@@ -22,7 +25,13 @@
         .mainContainerClass {
             border: medium none;
         }
-    </style>
+        body {
+            overflow: auto;
+        }
+        #studioPageContent{
+            min-width: 270px;
+        }
+</style>
 
 <% if (Project != null)
 { %>                   
@@ -91,28 +100,23 @@
             </div>
             <select id="teamList" class="comboBox">
                 <% foreach (var user in Users) %>
-                <%
-                   { %>
+                <% { %>
                     <% if (user.ID == Participant.ID) %>
-                    <%
+                    <% { %>
+                        <option selected="selected" value="<%= user.ID %>" id="optionUser_<%= user %>"><%= DisplayUserSettings.GetFullUserName(user.UserInfo) %></option>
+                    <% }
+                       else if (!Participant.IsVisitor)
                        { %>
-                    <option selected="selected" value="<%= user.ID %>" id="optionUser_<%= user %>"><%= DisplayUserSettings.GetFullUserName(user.UserInfo) %></option>
-                    <% } 
-                       else {
-                           var userName = DisplayUserSettings.GetFullUserName(user.UserInfo);
-                           if (userName != "profile removed" && !Participant.IsVisitor)
-                           { %>
-                                <option value="<%= user.ID %>" id="optionUser_<%= user.ID %>"><%= userName %></option>
-                        <% }
-                      } %>
-                <% } %>        
+                        <option value="<%= user.ID %>" id="optionUser_<%= user.ID %>"><%= DisplayUserSettings.GetFullUserName(user.UserInfo) %></option>
+                    <% } %>
+                <% } %>
             </select>
         </div>  
         <div class="block-cnt-splitter">
             <div class="headerPanelSmall">
                 <b><%= TimeTrackingResource.Date %>:</b>
             </div>
-            <input type="text" id="inputDate" class="textEditCalendar" />
+            <input type="text" id="inputDate" class="textEditCalendar" autocomplete="off"/>
         </div>      
         <div class="block-cnt-splitter time-fields-container">
             <div class="headerPanelSmall">
@@ -127,7 +131,7 @@
             <div class="headerPanelSmall">
                 <b><%= ProjectResource.ProjectDescription %>:</b>
             </div>
-            <textarea id="textareaTimeDesc" style="resize:none;" MaxLength="250"></textarea>
+            <textarea id="textareaTimeDesc" style="resize:none;max-height:55px;height:55px;" MaxLength="250" cols="22" rows="3"></textarea>
         </div>
         <div class="block-cnt-splitter">
             <a class="button blue middle" id="addLog">
@@ -144,7 +148,4 @@
    </div>
 <% } %>
 
-</asp:Content>
-
-<asp:Content ID="projectsClientTemplatesResourcesPlaceHolder" ContentPlaceHolderID="projectsClientTemplatesResourcesPlaceHolder" runat="server">
 </asp:Content>

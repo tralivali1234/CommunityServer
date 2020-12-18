@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -64,7 +55,12 @@ namespace ASC.Files.Thirdparty.SharePoint
 
         public File GetFile(object parentId, string title)
         {
-            return ProviderInfo.ToFile(ProviderInfo.GetFolderFiles(parentId).FirstOrDefault(x => x.Name.Contains(title)));
+            return ProviderInfo.ToFile(ProviderInfo.GetFolderFiles(parentId).FirstOrDefault(item => item.Name.Equals(title, StringComparison.InvariantCultureIgnoreCase)));
+        }
+
+        public File GetFileStable(object fileId, int fileVersion)
+        {
+            return ProviderInfo.ToFile(ProviderInfo.GetFileById(fileId));
         }
 
         public List<File> GetFileHistory(object fileId)
@@ -77,26 +73,80 @@ namespace ASC.Files.Thirdparty.SharePoint
             return fileIds.Select(fileId => ProviderInfo.ToFile(ProviderInfo.GetFileById(fileId))).ToList();
         }
 
+        public List<File> GetFilesFiltered(object[] fileIds, FilterType filterType, bool subjectGroup, Guid subjectID, string searchText, bool searchInContent)
+        {
+            if (fileIds == null || fileIds.Length == 0 || filterType == FilterType.FoldersOnly) return new List<File>();
+
+            var files = GetFiles(fileIds).AsEnumerable();
+
+            //Filter
+            if (subjectID != Guid.Empty)
+            {
+                files = files.Where(x => subjectGroup
+                                             ? CoreContext.UserManager.IsUserInGroup(x.CreateBy, subjectID)
+                                             : x.CreateBy == subjectID);
+            }
+
+            switch (filterType)
+            {
+                case FilterType.FoldersOnly:
+                    return new List<File>();
+                case FilterType.DocumentsOnly:
+                    files = files.Where(x => FileUtility.GetFileTypeByFileName(x.Title) == FileType.Document);
+                    break;
+                case FilterType.PresentationsOnly:
+                    files = files.Where(x => FileUtility.GetFileTypeByFileName(x.Title) == FileType.Presentation);
+                    break;
+                case FilterType.SpreadsheetsOnly:
+                    files = files.Where(x => FileUtility.GetFileTypeByFileName(x.Title) == FileType.Spreadsheet);
+                    break;
+                case FilterType.ImagesOnly:
+                    files = files.Where(x => FileUtility.GetFileTypeByFileName(x.Title) == FileType.Image);
+                    break;
+                case FilterType.ArchiveOnly:
+                    files = files.Where(x => FileUtility.GetFileTypeByFileName(x.Title) == FileType.Archive);
+                    break;
+                case FilterType.MediaOnly:
+                    files = files.Where(x =>
+                        {
+                            FileType fileType;
+                            return (fileType = FileUtility.GetFileTypeByFileName(x.Title)) == FileType.Audio || fileType == FileType.Video;
+                        });
+                    break;
+                case FilterType.ByExtension:
+                    if (!string.IsNullOrEmpty(searchText))
+                        files = files.Where(x => FileUtility.GetFileExtension(x.Title).Contains(searchText));
+                    break;
+            }
+
+            if (!string.IsNullOrEmpty(searchText))
+                files = files.Where(x => x.Title.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) != -1);
+
+            return files.ToList();
+        }
+
         public List<object> GetFiles(object parentId)
         {
             return ProviderInfo.GetFolderFiles(parentId).Select(r => ProviderInfo.ToFile(r).ID).ToList();
         }
 
-        public List<File> GetFiles(object parentId, OrderBy orderBy, FilterType filterType, Guid subjectID, string searchText, bool withSubfolders = false)
+        public List<File> GetFiles(object parentId, OrderBy orderBy, FilterType filterType, bool subjectGroup, Guid subjectID, string searchText, bool searchInContent, bool withSubfolders = false)
         {
             if (filterType == FilterType.FoldersOnly) return new List<File>();
 
             //Get only files
             var files = ProviderInfo.GetFolderFiles(parentId).Select(r => ProviderInfo.ToFile(r));
+
             //Filter
+            if (subjectID != Guid.Empty)
+            {
+                files = files.Where(x => subjectGroup
+                                             ? CoreContext.UserManager.IsUserInGroup(x.CreateBy, subjectID)
+                                             : x.CreateBy == subjectID);
+            }
+
             switch (filterType)
             {
-                case FilterType.ByUser:
-                    files = files.Where(x => x.CreateBy == subjectID);
-                    break;
-                case FilterType.ByDepartment:
-                    files = files.Where(x => CoreContext.UserManager.IsUserInGroup(x.CreateBy, subjectID));
-                    break;
                 case FilterType.FoldersOnly:
                     return new List<File>();
                 case FilterType.DocumentsOnly:
@@ -113,6 +163,13 @@ namespace ASC.Files.Thirdparty.SharePoint
                     break;
                 case FilterType.ArchiveOnly:
                     files = files.Where(x => FileUtility.GetFileTypeByFileName(x.Title) == FileType.Archive).ToList();
+                    break;
+                case FilterType.MediaOnly:
+                    files = files.Where(x =>
+                    {
+                        FileType fileType;
+                        return (fileType = FileUtility.GetFileTypeByFileName(x.Title)) == FileType.Audio || fileType == FileType.Video;
+                    });
                     break;
                 case FilterType.ByExtension:
                     if (!string.IsNullOrEmpty(searchText))
@@ -134,6 +191,9 @@ namespace ASC.Files.Thirdparty.SharePoint
                     files = orderBy.IsAsc ? files.OrderBy(x => x.Title) : files.OrderByDescending(x => x.Title);
                     break;
                 case SortedByType.DateAndTime:
+                    files = orderBy.IsAsc ? files.OrderBy(x => x.ModifiedOn) : files.OrderByDescending(x => x.ModifiedOn);
+                    break;
+                case SortedByType.DateAndTimeCreation:
                     files = orderBy.IsAsc ? files.OrderBy(x => x.CreateOn) : files.OrderByDescending(x => x.CreateOn);
                     break;
                 default:
@@ -155,10 +215,7 @@ namespace ASC.Files.Thirdparty.SharePoint
             if (fileToDownload == null)
                 throw new ArgumentNullException("file", Web.Files.Resources.FilesCommonResource.ErrorMassage_FileNotFound);
 
-            var fileStream = ProviderInfo.GetFileStream(fileToDownload.ServerRelativeUrl);
-
-            if (fileStream != null && offset > 0)
-                fileStream.Seek(offset, SeekOrigin.Begin);
+            var fileStream = ProviderInfo.GetFileStream(fileToDownload.ServerRelativeUrl, (int) offset);
 
             return fileStream;
         }
@@ -179,19 +236,33 @@ namespace ASC.Files.Thirdparty.SharePoint
 
             if (file.ID != null)
             {
-                return ProviderInfo.ToFile(ProviderInfo.CreateFile((string) file.ID, fileStream));
+                var sharePointFile = ProviderInfo.CreateFile((string)file.ID, fileStream);
+
+                var resultFile = ProviderInfo.ToFile(sharePointFile);
+                if (!sharePointFile.Name.Equals(file.Title))
+                {
+                    var folder = ProviderInfo.GetFolderById(file.FolderID);
+                    file.Title = GetAvailableTitle(file.Title, folder, IsExist);
+
+                    var id = ProviderInfo.RenameFile(SharePointDaoSelector.ConvertId(resultFile.ID).ToString(), file.Title);
+                    return GetFile(SharePointDaoSelector.ConvertId(id));
+                }
+                return resultFile;
             }
 
             if (file.FolderID != null)
             {
                 var folder = ProviderInfo.GetFolderById(file.FolderID);
-
                 file.Title = GetAvailableTitle(file.Title, folder, IsExist);
-
                 return ProviderInfo.ToFile(ProviderInfo.CreateFile(folder.ServerRelativeUrl + "/" + file.Title, fileStream));
             }
 
             return null;
+        }
+
+        public File ReplaceFileVersion(File file, Stream fileStream)
+        {
+            return SaveFile(file, fileStream);
         }
 
         public void DeleteFile(object fileId)
@@ -201,12 +272,14 @@ namespace ASC.Files.Thirdparty.SharePoint
 
         public bool IsExist(string title, object folderId)
         {
-            return ProviderInfo.GetFolderFiles(folderId).FirstOrDefault(x => x.Name.Contains(title)) != null;
+            return ProviderInfo.GetFolderFiles(folderId)
+                .Any(item => item.Name.Equals(title, StringComparison.InvariantCultureIgnoreCase));
         }
 
         public bool IsExist(string title, Microsoft.SharePoint.Client.Folder folder)
         {
-            return ProviderInfo.GetFolderFiles(folder.ServerRelativeUrl).FirstOrDefault(x => x.Name.Contains(title)) != null;
+            return ProviderInfo.GetFolderFiles(folder.ServerRelativeUrl)
+                .Any(item => item.Name.Equals(title, StringComparison.InvariantCultureIgnoreCase));
         }
 
         public object MoveFile(object fileId, object toFolderId)
@@ -284,24 +357,18 @@ namespace ASC.Files.Thirdparty.SharePoint
 
         #region Only in TMFileDao
 
-        public List<File> GetFiles(object[] parentIds, string searchText = "", bool searchSubfolders = false)
+        public void ReassignFiles(object[] fileIds, Guid newOwnerId)
+        {
+        }
+
+        public List<File> GetFiles(object[] parentIds, FilterType filterType, bool subjectGroup, Guid subjectID, string searchText, bool searchInContent)
         {
             return new List<File>();
         }
 
-        public IEnumerable<File> Search(string text, FolderType folderType)
+        public IEnumerable<File> Search(string text, bool bunch)
         {
             return null;
-        }
-
-        public void DeleteFolder(object fileId)
-        {
-            //Do nothing
-        }
-
-        public void DeleteFileStream(object file)
-        {
-            //Do nothing
         }
 
         public bool IsExistOnStorage(File file)
@@ -322,6 +389,11 @@ namespace ASC.Files.Thirdparty.SharePoint
         public Stream GetDifferenceStream(File file)
         {
             return null;
+        }
+
+        public bool ContainChanges(object fileId, int fileVersion)
+        {
+            return false;
         }
 
         #endregion

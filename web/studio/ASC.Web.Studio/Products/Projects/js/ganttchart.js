@@ -1,30 +1,21 @@
-/*
+﻿/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-(function (window) {
+ASC.Projects.GantChart = (function (window) {
 
     'use strict';
 
@@ -174,7 +165,7 @@
         kHandlerBeforeMenuAddTaskLink = '350',
         kHandlerBeforeChangeResponsibles = '360',
         kHanderShowTaskPopUpWindow = '500',
-        kHanderShowAddPopUpMenuWindow = '501',
+        kHanderShowTaskPopUpCustomWindow = '501',
         kHanderShowEditPopUpMenuWindow = '502',
         kHanderShowRespPopUpMenuWindow = '503',
         kHanderShowEditElemPopUpMenuWindow = '504',
@@ -272,6 +263,10 @@
 
         kDetailsWidgetSettings = { backgroundColor: '#ffffff', titleColor: '#999999', descriptionColor: '#666666', width: 170, maxWidth: 300 },
         lockImg = new Image();
+
+    function findCustomStatus(fn) {
+        return ASC.Projects.Master.customStatuses.find(fn);
+    }
 
     function deepCopy(obj) {
         if (!obj) { return obj; } // null, undefined values check
@@ -3899,7 +3894,7 @@
                             var project_id = inner.timeline.storage.p[inner.collection.indexer[index].p].id();
                             stopSystemEvent(e);
 
-                            window.open('tasks.aspx?prjID=' + project_id);
+                            window.open('Tasks.aspx?prjID=' + project_id);
 
                             return true;
                         }
@@ -4306,11 +4301,11 @@
             this.disableMode = flag;
 
             if (this.splitter) {
-                this.splitter.style.display = flag ? 'none' : '';
+                this.splitter.style.display = flag || this.visibleRows.length === 0 ? 'none' : '';
             }
 
             if (this.splitterFake) {
-                this.splitterFake.style.display = flag ? 'none' : '';
+                this.splitterFake.style.display = flag || this.visibleRows.length === 0 ? 'none' : '';
             }
 
             if (this.btnFlds) {
@@ -4774,11 +4769,17 @@
                                 domLine.childNodes[5].style.left = statusX;
                                 // domLine.childNodes[5].style.color = color;
 
-                                if (kElementCompleted === task._status) {
-                                    domLine.childNodes[5].textContent = closeStatus;
-                                } else {
-                                    domLine.childNodes[5].textContent = openStatus;
+                                var cs = ASC.Projects.Master.customStatuses.find(function (item) {
+                                    return task._customTaskStatus == item.id;
+                                });
+
+                                if (!cs) {
+                                    cs = ASC.Projects.Master.customStatuses.find(function (item) {
+                                        return task._status == item.statusType && item.isDefault;
+                                    });
                                 }
+
+                                domLine.childNodes[5].textContent = cs.title;
                             }
 
                             if (task._priority && showRowPrior) {
@@ -4959,11 +4960,17 @@
                             domLine.childNodes[5].style.left = statusX;
                             //domLine.childNodes[5].style.color = color;
 
-                            if (kElementCompleted === task._status) {
-                                domLine.childNodes[5].textContent = closeStatus;
-                            } else {
-                                domLine.childNodes[5].textContent = openStatus;
+                            var cs = findCustomStatus(function (item) {
+                                return task._customTaskStatus == item.id;
+                            });
+
+                            if (!cs) {
+                                cs = findCustomStatus(function (item) {
+                                    return task._status == item.statusType && item.isDefault;
+                                });
                             }
+
+                            domLine.childNodes[5].textContent = cs.title;
                         }
 
                         if (task._priority && showRowPrior) {
@@ -5695,6 +5702,7 @@
 
             if (undefined !== select.t && undefined !== select.m && undefined !== select.p) {
                 task = this.timeline.storage.getTask(select.p, select.m, select.t);
+                task.project = this.timeline.storage.getProject(select.p);
 
                 this.timeline._modelController.statusElement = {
                     p: select.p, m: select.m, t: select.t,
@@ -5702,12 +5710,15 @@
                     ids: this.timeline.storage.taskIds(select.p, select.m, select.t)
                 };
 
+                handler = this.timeline.handlers[kHanderShowTaskPopUpCustomWindow];
                 handler(task, coords, true);
+                delete task.project;
                 return true;
             }
 
             if (undefined !== select.t && undefined === select.m && undefined !== select.p) {
                 task = this.timeline.storage.getTask(select.p, undefined, select.t);
+                task.project = this.timeline.storage.getProject(select.p);
 
                 this.timeline._modelController.statusElement = {
                     p: select.p, m: select.m, t: select.t,
@@ -5715,7 +5726,9 @@
                     ids: this.timeline.storage.taskIds(select.p, select.m, select.t)
                 };
 
+                handler = this.timeline.handlers[kHanderShowTaskPopUpCustomWindow];
                 handler(task, coords, true);
+                delete task.project;
                 return true;
             }
 
@@ -8614,7 +8627,7 @@
         }
     };
 
-    function Task(id, owner, title, performer, description, begin, end, status, milestone, priority, subtasks, responsibles, links, beginFail) {
+    function Task(id, owner, title, performer, description, begin, end, status, customTaskStatus, milestone, priority, subtasks, responsibles, links, beginFail, createdBy) {
         this._id = parseInt(id);
         this._owner = parseInt(owner) || -1;
         this._title = title;
@@ -8624,6 +8637,7 @@
         this._beginDate = begin;
         this._endDate = end;
         this._status = status || kElementActive;
+        this._customTaskStatus = customTaskStatus;
         this.milestone = (undefined !== milestone) ? parseInt(milestone) : -1;
         this._priority = parseInt(priority) || 0;
         this._subtasks = subtasks || 0;
@@ -8649,6 +8663,7 @@
         // test time
         this.duration = Math.max(this.duration, 24);
         this.endTime = Math.max(this.endTime, this.beginTime + this.duration);
+        this.createdBy = createdBy;
 
         this._isMilestone = false;
 
@@ -8910,6 +8925,9 @@
         status: function () {
             return this._status;
         },
+        customTaskStatus: function () {
+            return this._customTaskStatus;
+        },
         subtasks: function () {
             return this._subtasks;
         },
@@ -8925,7 +8943,7 @@
     };
 
     function taskWithIds(p, m, t) { // p, m, t - id
-        return new Task(t, p, '', '', '', new Date(), new Date(), kElementActive, m);
+        return new Task(t, p, '', '', '', new Date(), new Date(), kElementActive, undefined, m);
     }
 
     function Milestone(id, owner, title, description, responsible, deadline, status, isKey) {
@@ -9924,7 +9942,7 @@
                 }
             }
         },
-        addTaskOperation: function (id, p, m, t) {
+        addTaskOperation: function (id, p, m, t, cs) {
             var tr = this.delegate;
             if (tr) {
 
@@ -9945,7 +9963,7 @@
                         tr.handlers[id](p, p['task'], p['parent']);    //  p - linkLineEdit
                     }
 
-                    return
+                    return;
                 } else if (kHandlerBeforeMoveTaskWithLinks === id) {
                     this.top = { id: id, move: p };
                     if (tr.handlers[id]) {
@@ -9978,7 +9996,7 @@
 
                     case kHandlerBeforeChangeTaskStatus: {
                         if (tr.handlers[id]) {
-                            tr.handlers[id](ids.p, ids.m, ids.t, taskRef);
+                            tr.handlers[id](ids.p, ids.m, ids.t, taskRef, cs);
                         } else {
                             this.completeElement(this.top);
                         }
@@ -10002,7 +10020,7 @@
                         { this.completeElement(this.top); } break;
 
                     case kHandlerBeforeChangeTaskStatus:
-                        { this.completeElement(this.top); } break;
+                        { this.completeElement(this.top, arg); } break;
 
                     case kHandlerBeforeAddTaskLink:
                         { this.addLink(this.top.link); } break;
@@ -10147,7 +10165,7 @@
                 t.update();
             }
         },
-        completeElement: function (element) {
+        completeElement: function (element, cs) {
             var t = this.delegate, ref = null, oldStatus, newStatus;
             if (t) {
                 if (element.p === undefined) element.p = -1;
@@ -10195,13 +10213,8 @@
                     ref = t.storage.getTask(element.p, undefined, element.t);
                     if (ref) {
 
-                        newStatus = ref._status;
+                        newStatus = cs;
                         oldStatus = ref._status;
-
-                        if (newStatus != kElementCompleted)
-                            newStatus = kElementCompleted;
-                        else
-                            newStatus = kElementActive;
 
                         // undo
 
@@ -10212,7 +10225,12 @@
                                 taskId: element.ids.t, milestoneId: element.ids.m, projectId: element.ids.m
                             });
 
-                        ref._status = newStatus;
+                        var cs1 = findCustomStatus(function (item) {
+                            return item.id === newStatus;
+                        });
+
+                        ref._status = cs1.statusType;
+                        ref._customTaskStatus = newStatus;
 
                         //
 
@@ -10227,13 +10245,8 @@
                     ref = t.storage.getTask(element.p, element.m, element.t);
                     if (ref) {
 
-                        newStatus = ref._status;
+                        newStatus = cs;
                         oldStatus = ref._status;
-
-                        if (newStatus != kElementCompleted)
-                            newStatus = kElementCompleted;
-                        else
-                            newStatus = kElementActive;
 
                         // undo
 
@@ -10244,7 +10257,12 @@
                                 taskId: element.ids.t, milestoneId: element.ids.m, projectId: element.ids.m
                             });
 
-                        ref._status = newStatus;
+                        var cs = ASC.Projects.Master.customStatuses.find(function (item) {
+                            return item.id === newStatus;
+                        });
+
+                        ref._status = cs.statusType;
+                        ref._customTaskStatus = newStatus;
 
                         //
 
@@ -10545,13 +10563,13 @@
 
         // create chart items
 
-        addTask: function (id, owner, title, performer, description, begin, end, status, milestone, priority, subtasks, responsibles, links, isUndoOperation, beginFail) {
+        addTask: function (id, owner, title, performer, description, begin, end, status, customTaskStatus, milestone, priority, subtasks, responsibles, links, isUndoOperation, beginFail, createdBy) {
             var t = this.delegate,
                 task = null,
                 element = null;
 
             if (t) {
-                task = new Task(id, owner, title, performer, description, begin, end, status, milestone, priority, subtasks, responsibles, links, beginFail);
+                task = new Task(id, owner, title, performer, description, begin, end, status, customTaskStatus, milestone, priority, subtasks, responsibles, links, beginFail, createdBy);
                 t.storage.addTask(task);
 
                 // undo
@@ -11607,13 +11625,8 @@
         finalizeStatus: function (status) {
             if (this.statusElement) {
                 if (undefined !== this.statusElement.t) {
-                    if (status) {
-                        status = kElementCompleted;
-                    } else {
-                        status = kElementActive;
-                    }
                     if (status !== this.statusElement.status) {
-                        this.addTaskOperation(kHandlerBeforeChangeTaskStatus, this.statusElement.p, this.statusElement.m, this.statusElement.t);
+                        this.addTaskOperation(kHandlerBeforeChangeTaskStatus, this.statusElement.p, this.statusElement.m, this.statusElement.t, status);
                     }
                 } else {
                     if (status) {
@@ -11638,19 +11651,12 @@
                             t.editElementTitle(this.statusElement.p, this.statusElement.m === undefined ? -1 : this.statusElement.m, this.statusElement.t);
                         } else if ('delete' === type) {
                             this.addTaskOperation(kHandlerBeforeDeleteTask, this.statusElement.p, this.statusElement.m, this.statusElement.t);
-                        } else if ('open' === type) {
+                        } else if (typeof(type) === "number") {
                             if (this.statusElement.ref) {
-                                if (kElementCompleted === this.statusElement.ref.status()) {
-                                    this.addTaskOperation(kHandlerBeforeChangeTaskStatus, this.statusElement.p, this.statusElement.m, this.statusElement.t);
+                                if (type !== this.statusElement.ref.customTaskStatus()) {
+                                    this.addTaskOperation(kHandlerBeforeChangeTaskStatus, this.statusElement.p, this.statusElement.m, this.statusElement.t, type);
                                 }
                             }
-                        } else if ('closed' === type) {
-                            if (this.statusElement.ref) {
-                                if (kElementCompleted !== this.statusElement.ref.status()) {
-                                    this.addTaskOperation(kHandlerBeforeChangeTaskStatus, this.statusElement.p, this.statusElement.m, this.statusElement.t);
-                                }
-                            }
-
                         } else if ('addlink' === type) {
                             if (kElementCompleted !== this.statusElement.task._status) {
                                 if (t.handlers[kHandlerBeforeMenuAddTaskLink]) {
@@ -13969,7 +13975,7 @@
                     };
                 }
 
-                lockImg.src = "../projects/app_themes/default/images/small-icons.png"; // PRIVATE ICON
+                lockImg.src = "/Products/Projects/App_Themes/default/images/small-icons.png"; // PRIVATE ICON
 
                 this._userDefaults = new UserDefaults(this);
                 this.storage = new Storage(this);
@@ -14237,7 +14243,10 @@
             this.menuTask.addHandler(function () {
                 if (kElementCompleted === t.menuTask.ref._status) {
                     //if (t._modelController.checkStatus({p: t.menuTask.p, m: t.menuTask.m, t: t.menuTask.t})) {
-                    t._modelController.addTaskOperation(kHandlerBeforeChangeTaskStatus, t.menuTask.p, t.menuTask.m == -1 ? undefined : t.menuTask.m, t.menuTask.t);
+                    var cs = findCustomStatus(function (item) {
+                        return item.statusType === 1 && item.isDefault;
+                    });
+                    t._modelController.addTaskOperation(kHandlerBeforeChangeTaskStatus, t.menuTask.p, t.menuTask.m == -1 ? undefined : t.menuTask.m, t.menuTask.t, cs.id);
                     //}
                     t.menuTask.reset();
                 } else {
@@ -14271,7 +14280,10 @@
                 t.isLBMDown = false;
             });
             this.menuTask.addHandler(function () {
-                t._modelController.addTaskOperation(kHandlerBeforeChangeTaskStatus, t.menuTask.p, t.menuTask.m == -1 ? undefined : t.menuTask.m, t.menuTask.t);
+                var cs = findCustomStatus(function (item) {
+                    return item.statusType === 2 && item.isDefault;
+                });
+                t._modelController.addTaskOperation(kHandlerBeforeChangeTaskStatus, t.menuTask.p, t.menuTask.m == -1 ? undefined : t.menuTask.m, t.menuTask.t, cs.id);
                 t.menuTask.reset();
             });
             this.menuTask.addHandler(function () {
@@ -15805,7 +15817,7 @@
             if (this.taskDescWidget.ref) {
                 if (!this.taskDescWidget.checkBound(this.pressMouse.x, this.pressMouse.y)) {
                     if (this.taskDescWidget.checkInBoundDetailsLink(this.pressMouse.x, this.pressMouse.y)) {
-                        this.taskDescWidget.setLinkRef('tasks.aspx?prjID=' + this.taskDescWidget.ref.t._owner + '&id=' + this.taskDescWidget.ref.t._id);
+                        this.taskDescWidget.setLinkRef('Tasks.aspx?prjID=' + this.taskDescWidget.ref.t._owner + '&id=' + this.taskDescWidget.ref.t._id);
                     }
 
                     this.offMenus();
@@ -21571,4 +21583,4 @@
     prot = UserDefaults.prototype;
     prot['setFontFamily'] = prot.setFontFamily;
 
-})(window);
+});

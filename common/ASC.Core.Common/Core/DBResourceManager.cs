@@ -1,30 +1,20 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using log4net;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -41,15 +31,21 @@ using System.Web;
 using ASC.Common.Data;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
+using ASC.Common.Logging;
 
 namespace TMResourceData
 {
     public class DBResourceManager : ResourceManager
     {
         public static bool WhiteLableEnabled = false;
+        public static bool ResourcesFromDataBase { get; private set; }
         private static readonly ILog log = LogManager.GetLogger("ASC.Resources");
         private readonly ConcurrentDictionary<string, ResourceSet> resourceSets = new ConcurrentDictionary<string, ResourceSet>();
 
+        static DBResourceManager()
+        {
+            ResourcesFromDataBase = string.Equals(ConfigurationManagerExtension.AppSettings["resources.from-db"], "true");
+        }
 
         public DBResourceManager(string filename, Assembly assembly)
                     : base(filename, assembly)
@@ -149,7 +145,7 @@ namespace TMResourceData
                 try
                 {
                     var defaultValue = ((int)cacheTimeout.TotalMinutes).ToString();
-                    cacheTimeout = TimeSpan.FromMinutes(Convert.ToInt32(ConfigurationManager.AppSettings["resources.cache-timeout"] ?? defaultValue));
+                    cacheTimeout = TimeSpan.FromMinutes(Convert.ToInt32(ConfigurationManagerExtension.AppSettings["resources.cache-timeout"] ?? defaultValue));
                 }
                 catch (Exception err)
                 {
@@ -247,15 +243,15 @@ namespace TMResourceData
 
             private static Dictionary<string, string> LoadResourceSet(string filename, string culture)
             {
-                using (var db = new DbManager("tmresource"))
+                using (var dbManager = DbManager.FromHttpContext("tmresource"))
                 {
                     var q = new SqlQuery("res_data d")
                         .Select("d.title", "d.textvalue")
                         .InnerJoin("res_files f", Exp.EqColumns("f.id", "d.fileid"))
                         .Where("f.resname", filename)
                         .Where("d.culturetitle", culture);
-                    return db.ExecuteList(q)
-                        .ToDictionary(r => (string)r[0], r => (string)r[1], StringComparer.InvariantCultureIgnoreCase);
+                    return dbManager.ExecuteList(q)
+                        .ToDictionary(r => (string) r[0], r => (string) r[1], StringComparer.InvariantCultureIgnoreCase);
                 }
             }
         }
@@ -265,8 +261,8 @@ namespace TMResourceData
     {
         private static readonly ILog log = LogManager.GetLogger("ASC.Resources");
         private static readonly ConcurrentDictionary<int, string> whiteLabelDictionary = new ConcurrentDictionary<int, string>();
-        private static readonly string replPattern = ConfigurationManager.AppSettings["resources.whitelabel-text.replacement.pattern"] ?? "(?<=[^@/\\\\]|^)({0})(?!\\.com)";
-        public static string DefaultLogo = "";
+        private static readonly string replPattern = ConfigurationManagerExtension.AppSettings["resources.whitelabel-text.replacement.pattern"] ?? "(?<=[^@/\\\\]|^)({0})(?!\\.com)";
+        public static string DefaultLogoText = "";
 
 
         public static void SetNewText(int tenantId, string newText)
@@ -323,7 +319,7 @@ namespace TMResourceData
                             newTextReplacement = newTextReplacement.Replace("{", "{{").Replace("}", "}}");
                         }
                         
-                        var pattern = string.Format(replPattern, DefaultLogo);
+                        var pattern = string.Format(replPattern, DefaultLogoText);
                         //Hack for resource strings with mails looked like ...@onlyoffice... or with website http://www.onlyoffice.com link or with the https://www.facebook.com/pages/OnlyOffice/833032526736775
 
                         return Regex.Replace(resourceValue, pattern, newTextReplacement, RegexOptions.IgnoreCase).Replace("™", "");

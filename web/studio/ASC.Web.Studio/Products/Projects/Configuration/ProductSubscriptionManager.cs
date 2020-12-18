@@ -1,25 +1,16 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -30,9 +21,12 @@ using System.Linq;
 using ASC.Core;
 using ASC.Notify.Model;
 using ASC.Projects.Core.Services.NotifyService;
+using ASC.Projects.Engine;
 using ASC.Web.Core.Subscriptions;
 using ASC.Web.Projects.Classes;
+using ASC.Web.Projects.Core;
 using ASC.Web.Projects.Resources;
+using Autofac;
 
 namespace ASC.Web.Projects.Configuration
 {
@@ -62,113 +56,121 @@ namespace ASC.Web.Projects.Configuration
 
         private List<SubscriptionObject> GetNewCommentForMessageObjects(Guid moduleOrGroupID, bool getEntity)
         {
-            var result = new List<SubscriptionObject>();
-            var objects = new List<string>(GetSubscriptions(NotifyConstants.Event_NewCommentForMessage));
-            var subscriptionType = GetSubscriptionTypes().Find(item => item.ID == _newCommentForMessage);
-            var filterProjectID = GetProjectIDByGroupID(moduleOrGroupID);
-            var messageEngine = Global.EngineFactory.MessageEngine;
-
-            foreach (var item in objects)
+            using (var scope = DIHelper.Resolve())
             {
-                try
+                var result = new List<SubscriptionObject>();
+                var objects = new List<string>(GetSubscriptions(NotifyConstants.Event_NewCommentForMessage));
+                var subscriptionType = GetSubscriptionTypes().Find(item => item.ID == _newCommentForMessage);
+                var filterProjectID = GetProjectIDByGroupID(moduleOrGroupID);
+                var messageEngine = scope.Resolve<EngineFactory>().MessageEngine;
+
+                foreach (var item in objects)
                 {
-                    if (item == null) continue;
-
-                    var messageID = int.Parse(item.Split(new[] {'_'})[1]);
-                    var projectID = int.Parse(item.Split(new[] {'_'})[2]);
-                    if (filterProjectID > 0 && projectID != filterProjectID) continue;
-
-                    if (getEntity)
+                    try
                     {
-                        var message = messageEngine.GetByID(messageID);
-                        if (message != null && message.Project != null)
+                        if (item == null) continue;
+
+                        var messageID = int.Parse(item.Split(new[] {'_'})[1]);
+                        var projectID = int.Parse(item.Split(new[] {'_'})[2]);
+                        if (filterProjectID > 0 && projectID != filterProjectID) continue;
+
+                        if (getEntity)
                         {
-                            result.Add(new SubscriptionObject
-                                           {
-                                               ID = item,
-                                               Name = message.Title,
-                                               URL = String.Concat(PathProvider.BaseAbsolutePath,
-                                                                   String.Format("messages.aspx?prjID={0}&id={1}",
-                                                                                 message.Project.ID, message.ID)),
-                                               SubscriptionGroup = _bindingProjectToGroup[projectID],
-                                               SubscriptionType = subscriptionType
-                                           });
-                        }
-                    }
-                    else
-                    {
-                        if (_bindingProjectID.ContainsKey(projectID) && _bindingMessageID[projectID].Contains(messageID))
-                        {
-                            result.Add(new SubscriptionObject
+                            var message = messageEngine.GetByID(messageID);
+                            if (message != null && message.Project != null)
                             {
-                                ID = item,
-                                SubscriptionGroup = _bindingProjectToGroup[projectID],
-                                SubscriptionType = subscriptionType
-                            });
+                                result.Add(new SubscriptionObject
+                                {
+                                    ID = item,
+                                    Name = message.Title,
+                                    URL = String.Concat(PathProvider.BaseAbsolutePath,
+                                        String.Format("Messages.aspx?prjID={0}&id={1}",
+                                            message.Project.ID, message.ID)),
+                                    SubscriptionGroup = _bindingProjectToGroup[projectID],
+                                    SubscriptionType = subscriptionType
+                                });
+                            }
+                        }
+                        else
+                        {
+                            if (_bindingProjectID.ContainsKey(projectID) &&
+                                _bindingMessageID[projectID].Contains(messageID))
+                            {
+                                result.Add(new SubscriptionObject
+                                {
+                                    ID = item,
+                                    SubscriptionGroup = _bindingProjectToGroup[projectID],
+                                    SubscriptionType = subscriptionType
+                                });
+                            }
                         }
                     }
+                    catch (Exception)
+                    {
+                        continue;
+                    }
                 }
-                catch (Exception)
-                {
-                    continue;
-                }
-            }
 
-            return result;
+                return result;
+            }
         }
 
         private List<SubscriptionObject> GetNewCommentForTaskObjects(Guid moduleOrGroupID, bool getEntity)
-        {   
-            var result = new List<SubscriptionObject>();
-            var objects = new List<string>(GetSubscriptions(NotifyConstants.Event_NewCommentForTask));
-            var subscriptionType = GetSubscriptionTypes().Find(item => item.ID == _newCommentForTask);
-            var filterProjectID = GetProjectIDByGroupID(moduleOrGroupID);
-            var taskEngine = Global.EngineFactory.TaskEngine;
-            foreach (var item in objects)
+        {
+            using (var scope = DIHelper.Resolve())
             {
-                try
+                var result = new List<SubscriptionObject>();
+                var objects = new List<string>(GetSubscriptions(NotifyConstants.Event_NewCommentForTask));
+                var subscriptionType = GetSubscriptionTypes().Find(item => item.ID == _newCommentForTask);
+                var filterProjectID = GetProjectIDByGroupID(moduleOrGroupID);
+                var taskEngine = scope.Resolve<EngineFactory>().TaskEngine;
+
+                foreach (var item in objects)
                 {
-                    if (item == null) continue;
-
-                    var taskID = int.Parse(item.Split(new[] {'_'})[1]);
-                    var projectID = int.Parse(item.Split(new[] {'_'})[2]);
-                    if (filterProjectID > 0 && projectID != filterProjectID) continue;
-
-                    if (getEntity)
+                    try
                     {
-                        var task = taskEngine.GetByID(taskID);
-                        if (task != null && task.Project != null)
+                        if (item == null) continue;
+
+                        var taskID = int.Parse(item.Split(new[] {'_'})[1]);
+                        var projectID = int.Parse(item.Split(new[] {'_'})[2]);
+                        if (filterProjectID > 0 && projectID != filterProjectID) continue;
+
+                        if (getEntity)
                         {
-                            result.Add(new SubscriptionObject
-                                           {
-                                               ID = item,
-                                               Name = task.Title,
-                                               URL = String.Concat(PathProvider.BaseAbsolutePath,
-                                                                   String.Format("tasks.aspx?prjID={0}&id={1}", task.Project.ID, task.ID)),
-                                               SubscriptionGroup = _bindingProjectToGroup[projectID],
-                                               SubscriptionType = subscriptionType
-                                           });
-                        }
-                    }
-                    else
-                    {
-                        if (_bindingProjectID.ContainsKey(projectID) && _bindingTaskID[projectID].Contains(taskID))
-                        {
-                            result.Add(new SubscriptionObject
+                            var task = taskEngine.GetByID(taskID);
+                            if (task != null && task.Project != null)
                             {
-                                ID = item,
-                                SubscriptionGroup = _bindingProjectToGroup[projectID],
-                                SubscriptionType = subscriptionType
-                            });
+                                result.Add(new SubscriptionObject
+                                {
+                                    ID = item,
+                                    Name = task.Title,
+                                    URL = String.Concat(PathProvider.BaseAbsolutePath,
+                                        String.Format("Tasks.aspx?prjID={0}&id={1}", task.Project.ID, task.ID)),
+                                    SubscriptionGroup = _bindingProjectToGroup[projectID],
+                                    SubscriptionType = subscriptionType
+                                });
+                            }
+                        }
+                        else
+                        {
+                            if (_bindingProjectID.ContainsKey(projectID) && _bindingTaskID[projectID].Contains(taskID))
+                            {
+                                result.Add(new SubscriptionObject
+                                {
+                                    ID = item,
+                                    SubscriptionGroup = _bindingProjectToGroup[projectID],
+                                    SubscriptionType = subscriptionType
+                                });
+                            }
                         }
                     }
+                    catch (Exception)
+                    {
+                        continue;
+                    }
                 }
-                catch (Exception)
-                {
-                    continue;
-                }
+                return result;
             }
-            return result;
         }
 
         public List<SubscriptionObject> GetSubscriptionObjects(Guid subItem)
@@ -289,74 +291,79 @@ namespace ASC.Web.Projects.Configuration
 
         public List<SubscriptionGroup> GetSubscriptionGroups()
         {
-            var preparateData = new List<string>();
-
-            preparateData.AddRange(new List<string>(GetSubscriptions(NotifyConstants.Event_NewCommentForTask)));
-            preparateData.AddRange(new List<string>(GetSubscriptions(NotifyConstants.Event_NewCommentForMessage)));
-
-            var projects = Global.EngineFactory.ProjectEngine.GetAll().OrderBy(r=> r.Title).ToList();
-            var messages = Global.EngineFactory.MessageEngine.GetAll().ToList();
-            var tasks = Global.EngineFactory.TaskEngine.GetAll().ToList();
-
-            foreach (var item in preparateData)
+            using (var scope = DIHelper.Resolve())
             {
-                try
+                var factory = scope.Resolve<EngineFactory>();
+                var preparateData = new List<string>();
+
+                preparateData.AddRange(new List<string>(GetSubscriptions(NotifyConstants.Event_NewCommentForTask)));
+                preparateData.AddRange(new List<string>(GetSubscriptions(NotifyConstants.Event_NewCommentForMessage)));
+
+                var projects = factory.ProjectEngine.GetAll().OrderBy(r => r.Title).ToList();
+                var messages = factory.MessageEngine.GetAll().ToList();
+                var tasks = factory.TaskEngine.GetAll().ToList();
+
+                foreach (var item in preparateData)
                 {
-                    if (item == null) continue;
-
-                    var subItems = item.Split(new[] {'_'});
-                    var entityType = subItems[0];
-                    var entityID = int.Parse(subItems[1]);
-                    var projectID = int.Parse(subItems[2]);
-
-                    var project = projects.Find(p => p.ID == projectID);
-                    if (project == null) continue;
-
-                    if (!_bindingProjectToGroup.ContainsKey(projectID))
+                    try
                     {
-                        var generatedProjectID = Guid.NewGuid();
-                        _bindingProjectID.Add(projectID, generatedProjectID);
-                        _bindingProjectToGroup.Add(projectID, new SubscriptionGroup {ID = generatedProjectID, Name = project.HtmlTitle});
+                        if (item == null) continue;
+
+                        var subItems = item.Split(new[] {'_'});
+                        var entityType = subItems[0];
+                        var entityID = int.Parse(subItems[1]);
+                        var projectID = int.Parse(subItems[2]);
+
+                        var project = projects.Find(p => p.ID == projectID);
+                        if (project == null) continue;
+
+                        if (!_bindingProjectToGroup.ContainsKey(projectID))
+                        {
+                            var generatedProjectID = Guid.NewGuid();
+                            _bindingProjectID.Add(projectID, generatedProjectID);
+                            _bindingProjectToGroup.Add(projectID,
+                                new SubscriptionGroup {ID = generatedProjectID, Name = project.HtmlTitle});
+                        }
+
+                        if (entityType == "Message")
+                        {
+                            var message = messages.Find(m => m.ID == entityID);
+                            if (message == null) continue;
+
+                            if (!_bindingMessageID.ContainsKey(projectID))
+                            {
+                                _bindingMessageID.Add(projectID, new List<int> {entityID});
+                            }
+                            else
+                            {
+                                _bindingMessageID[projectID].Add(entityID);
+                            }
+                        }
+
+                        if (entityType == "Task")
+                        {
+                            var task = tasks.Find(t => t.ID == entityID);
+                            if (task == null) continue;
+
+                            if (!_bindingTaskID.ContainsKey(projectID))
+                            {
+                                _bindingTaskID.Add(projectID, new List<int> {entityID});
+                            }
+                            else
+                            {
+                                _bindingTaskID[projectID].Add(entityID);
+                            }
+                        }
                     }
-
-                    if (entityType == "Message")
+                    catch (Exception)
                     {
-                        var message = messages.Find(m => m.ID == entityID);
-                        if (message == null) continue;
-
-                        if (!_bindingMessageID.ContainsKey(projectID))
-                        {
-                            _bindingMessageID.Add(projectID, new List<int> { entityID });
-                        }
-                        else
-                        {
-                            _bindingMessageID[projectID].Add(entityID);
-                        }
-                    }
-
-                    if (entityType == "Task")
-                    {
-                        var task = tasks.Find(t => t.ID == entityID);
-                        if (task == null) continue;
-
-                        if (!_bindingTaskID.ContainsKey(projectID))
-                        {
-                            _bindingTaskID.Add(projectID, new List<int> { entityID });
-                        }
-                        else
-                        {
-                            _bindingTaskID[projectID].Add(entityID);
-                        }
+                        continue;
                     }
                 }
-                catch (Exception)
-                {
-                    continue;
-                }
+
+
+                return new List<SubscriptionGroup>(_bindingProjectToGroup.Values);
             }
-
-
-            return new List<SubscriptionGroup>(_bindingProjectToGroup.Values);
         }
 
         private IEnumerable<string> GetSubscriptions(INotifyAction action)

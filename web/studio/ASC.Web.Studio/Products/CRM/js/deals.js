@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -58,16 +49,15 @@ ASC.CRM.myFilter = {
 
     createFilter: function (filter) {
         var o = document.createElement('div');
+        o.classList.add("default-value");
         o.innerHTML = [
-          '<div class="default-value">',
             '<span class="title">',
-              filter.title,
+                filter.title,
             '</span>',
             '<span class="selector-wrapper">',
-              '<span class="contact-selector"></span>',
+                '<span class="contact-selector"></span>',
             '</span>',
             '<span class="btn-delete">&times;</span>',
-          '</div>'
         ].join('');
         return o;
     },
@@ -75,7 +65,9 @@ ASC.CRM.myFilter = {
     customizeFilter: function ($container, $filteritem, filter) {
         var isParticipant = $filteritem.attr("data-id") == ASC.CRM.myFilter.idFilterByParticipant;
 
-        jq("#" + ASC.CRM.myFilter.headerContainerId)
+        var $filterSwitcher = jq("#" + ASC.CRM.myFilter.headerContainerId);
+
+        $filterSwitcher
         .off("showList")
         .on("showList", function (event, item) {
             if (isParticipant) {
@@ -83,16 +75,27 @@ ASC.CRM.myFilter = {
             } else {
                 ASC.CRM.myFilter.onSelectContact(event, item);
             }
+            $filteritem.removeClass("default-value");
         });
-        jq('#' + ASC.CRM.myFilter.headerContainerId).next().andSelf().appendTo($filteritem.find('span.contact-selector:first'));
+
+        $filterSwitcher.next().andSelf().appendTo($filteritem.find('span.contact-selector:first'));
+
+        if (!filter.isset) {
+            setTimeout(function () {
+                if ($filteritem.hasClass("default-value")) {
+                    $filterSwitcher.click();
+                }
+            }, 0);
+        }
+
         return {};
     },
 
     destroyFilter: function ($container, $filteritem, filter) {
-        if (!jq('#' + ASC.CRM.myFilter.headerContainerId).parent().is("#" + ASC.CRM.myFilter.hiddenContainerId)) {
-            var $filterSwitcher = jq('#' + ASC.CRM.myFilter.headerContainerId);
-            $filterSwitcher.off("showList")
+        var $filterSwitcher = jq('#' + ASC.CRM.myFilter.headerContainerId);
 
+        if (!$filterSwitcher.parent().is("#" + ASC.CRM.myFilter.hiddenContainerId)) {
+            $filterSwitcher.off("showList");
             $filterSwitcher.find(".inner-text .value").text(ASC.CRM.Resources.CRMCommonResource.Select);
             $filterSwitcher.contactadvancedSelector("reset");
             $filterSwitcher.next().andSelf().appendTo(jq('#' + ASC.CRM.myFilter.hiddenContainerId));
@@ -101,8 +104,10 @@ ASC.CRM.myFilter = {
 
     processFilter: function ($container, $filteritem, filtervalue, params) {
         if (params && params.id && isFinite(params.id)) {
-            jq("#" + ASC.CRM.myFilter.headerContainerId).find(".inner-text .value").text(params.displayName);
-            jq("#" + ASC.CRM.myFilter.headerContainerId).contactadvancedSelector("select", [params.id]);
+            var $filterSwitcher = jq('#' + ASC.CRM.myFilter.headerContainerId);
+            $filterSwitcher.find(".inner-text .value").text(params.displayName);
+            $filterSwitcher.contactadvancedSelector("select", [params.id]);
+            $filteritem.removeClass("default-value");
         }
     }
 };
@@ -128,8 +133,6 @@ ASC.CRM.ListDealView = (function() {
 
     var _getDeals = function(startIndex) {
         var filters = ASC.CRM.ListDealView.getFilterSettings(startIndex);
-
-        //EventTracker.Track('crm_search_opportunities_by_filter');
 
         Teamlab.getCrmOpportunities({ startIndex: startIndex || 0 }, { filter: filters, success: callback_get_opportunities_by_filter });
     };
@@ -163,7 +166,7 @@ ASC.CRM.ListDealView = (function() {
 
         if (!ASC.CRM.ListDealView.isFirstLoad) {
             LoadingBanner.displayLoading();
-            jq("#dealFilterContainer, #dealList").show();
+            jq("#dealFilterContainer, #dealHeaderMenu, #dealList, #tableForDealNavigation").show();
             jq('#dealsAdvansedFilter').advansedFilter("resize");
         }
         jq("#mainSelectAllDeals").prop("checked", false);
@@ -228,8 +231,7 @@ ASC.CRM.ListDealView = (function() {
 
     var _renderNoDealsEmptyScreen = function() {
         jq("#dealTable tbody tr").remove();
-        jq("#dealList").hide();
-        jq("#dealFilterContainer").hide();
+        jq("#dealFilterContainer, #dealHeaderMenu, #dealList, #tableForDealNavigation").hide();
         ASC.CRM.Common.hideExportButtons();
         jq("#emptyContentForDealsFilter:not(.display-none)").addClass("display-none");
         jq("#dealsEmptyScreen.display-none").removeClass("display-none");
@@ -237,7 +239,8 @@ ASC.CRM.ListDealView = (function() {
 
     var _renderNoDealsForQueryEmptyScreen = function() {
         jq("#dealTable tbody tr").remove();
-        jq("#dealList").hide();
+        jq("#dealHeaderMenu, #dealList, #tableForDealNavigation").hide();
+        jq("#dealFilterContainer").show();
         ASC.CRM.Common.hideExportButtons();
         jq("#mainSelectAllDeals").attr("disabled", true);
         jq("#dealsEmptyScreen:not(.display-none)").addClass("display-none");
@@ -283,7 +286,6 @@ ASC.CRM.ListDealView = (function() {
         if (ASC.CRM.ListDealView.noDealsForQuery) {
             _renderNoDealsForQueryEmptyScreen();
 
-            jq("#dealFilterContainer").show();
             _resizeFilter();
 
             ASC.CRM.ListDealView.isFirstLoad ? hideFirstLoader() : LoadingBanner.hideLoading();
@@ -315,7 +317,7 @@ ASC.CRM.ListDealView = (function() {
         jq("#dealsEmptyScreen:not(.display-none)").addClass("display-none");
         ASC.CRM.Common.showExportButtons();
 
-        jq("#dealFilterContainer").show();
+        jq("#dealFilterContainer, #dealHeaderMenu, #tableForDealNavigation").show();
         _resizeFilter();
 
         jq("#mainSelectAllDeals").removeAttr("disabled");
@@ -369,16 +371,25 @@ ASC.CRM.ListDealView = (function() {
     var callback_delete_batch_opportunities = function(params, data) {
         var newDealsList = new Array();
         for (var i = 0, len_i = ASC.CRM.ListDealView.dealList.length; i < len_i; i++) {
+            var dealItem = ASC.CRM.ListDealView.dealList[i];
             var isDeleted = false;
-            for (var j = 0, len_j = params.dealsIDsForDelete.length; j < len_j; j++)
-                if (params.dealsIDsForDelete[j] == ASC.CRM.ListDealView.dealList[i].id) {
-                isDeleted = true;
-                break;
-            }
-            if (!isDeleted)
-                newDealsList.push(ASC.CRM.ListDealView.dealList[i]);
 
+            for (var j = 0, len_j = params.dealsIDsForDelete.length; j < len_j; j++)
+                if (params.dealsIDsForDelete[j] == dealItem.id) {
+                    isDeleted = true;
+                    break;
+                }
+
+            if (!isDeleted)
+                newDealsList.push(dealItem);
+            else if (dealItem.bidValue)
+                for (var k = 0, len_k = ASC.CRM.ListDealView.bidList.length; k < len_k; k++) 
+                    if (ASC.CRM.ListDealView.bidList[k].bidCurrencyAbbreviation == dealItem.bidCurrency.abbreviation) {
+                        ASC.CRM.ListDealView.bidList[k].bidValue -= dealItem.bidValue * (dealItem.perPeriodValue ? dealItem.perPeriodValue : 1);
+                        break;
+                    }
         }
+
         ASC.CRM.ListDealView.dealList = newDealsList;
 
         ASC.CRM.ListDealView.Total -= params.dealsIDsForDelete.length;
@@ -471,7 +482,7 @@ ASC.CRM.ListDealView = (function() {
         ASC.CRM.ListContactView.isFirstLoad = false;
         jq(".containerBodyBlock").children(".loader-page").hide();
         if (!jq("#dealsEmptyScreen").is(":visible") && !jq("#emptyContentForDealsFilter")) {
-            jq("#dealFilterContainer, #dealList").show();
+            jq("#dealFilterContainer, #dealHeaderMenu, #dealList, #tableForDealNavigation").show();
             jq('#dealsAdvansedFilter').advansedFilter("resize");
         }
     };
@@ -486,7 +497,7 @@ ASC.CRM.ListDealView = (function() {
         }
         if (deal == null) return;
 
-        jq("#dealActionMenu .editDealLink").attr("href", jq.format("deals.aspx?id={0}&action=manage", dealID));
+        jq("#dealActionMenu .editDealLink").attr("href", jq.format("Deals.aspx?id={0}&action=manage", dealID));
 
         jq("#dealActionMenu .deleteDealLink").unbind("click").bind("click", function() {
             jq("#dealActionMenu").hide();
@@ -494,18 +505,20 @@ ASC.CRM.ListDealView = (function() {
             ASC.CRM.ListDealView.showConfirmationPanelForDelete(deal.title, dealID, true);
         });
 
-        jq("#dealActionMenu .showProfileLink").attr("href", jq.format("deals.aspx?id={0}", dealID));
+        jq("#dealActionMenu .showProfileLink").attr("href", jq.format("Deals.aspx?id={0}", dealID));
 
         jq("#dealActionMenu .showProfileLinkNewTab").unbind("click").bind("click", function () {
             jq("#dealActionMenu").hide();
             jq("#dealTable .entity-menu.active").removeClass("active");
-            window.open(jq.format("deals.aspx?id={0}", dealID), "_blank");
+            window.open(jq.format("Deals.aspx?id={0}", dealID), "_blank");
         });
+
+        var showSeporators = false;
 
         if (ASC.CRM.Data.IsCRMAdmin === true || Teamlab.profile.id == deal.createdBy.id) {
             jq("#dealActionMenu .setPermissionsLink").show();
             jq("#dealActionMenu .setPermissionsLink").unbind("click").bind("click", function() {
-                jq("#dealcaseActionMenu").hide();
+                jq("#dealActionMenu").hide();
                 jq("#dealTable .entity-menu.active").removeClass("active");
 
                 ASC.CRM.ListDealView.deselectAll();
@@ -513,17 +526,25 @@ ASC.CRM.ListDealView = (function() {
 
                 _showSetPermissionsPanel({ isBatch: false });
             });
+            showSeporators = true;
         } else {
             jq("#dealActionMenu .setPermissionsLink").hide();
         }
 
         if (ASC.CRM.Data.IsCRMAdmin === true && jq("#dealActionMenu .createProject").length == 1) {
-            var basePathForLink = StudioManager.getLocationPathToModule("projects") + "projects.aspx?action=add&opportunityID=";
+            var basePathForLink = StudioManager.getLocationPathToModule("Projects") + "Projects.aspx?action=add&opportunityID=";
             jq("#dealActionMenu .createProject").attr("href", basePathForLink + dealID);
             jq("#dealActionMenu .createProject").unbind("click").bind("click", function() {
                 jq("#dealTable .entity-menu.active").removeClass("active");
                 jq("#dealActionMenu").hide();
             });
+            showSeporators = true;
+        }
+
+        if (showSeporators) {
+            jq("#dealActionMenu .dropdown-item-seporator:first").show();
+        } else {
+            jq("#dealActionMenu .dropdown-item-seporator:first").hide();
         }
     };
 
@@ -608,15 +629,21 @@ ASC.CRM.ListDealView = (function() {
         });
 
 
-        jq("#dealTable").unbind("contextmenu").bind("contextmenu", function(event) {
+        jq("body").unbind("contextmenu").bind("contextmenu", function(event) {
             var e = jq.fixEvent(event);
 
             if (typeof e == "undefined" || !e) {
                 return true;
             }
 
-            var target = jq(e.srcElement || e.target),
-                dealId = parseInt(target.closest("tr.with-entity-menu").attr("id").split('_')[1]);
+            var target = jq(e.srcElement || e.target);
+
+            if (!target.parents("#dealTable").length) {
+                jq("#dealActionMenu").hide();
+                return true;
+            }
+
+            var dealId = parseInt(target.closest("tr.with-entity-menu").attr("id").split('_')[1]);
             if (!dealId) {
                 return true;
             }
@@ -632,7 +659,7 @@ ASC.CRM.ListDealView = (function() {
         ScrolledGroupMenu.init({
             menuSelector: "#dealHeaderMenu",
             menuAnchorSelector: "#mainSelectAllDeals",
-            menuSpacerSelector: "#dealList .header-menu-spacer",
+            menuSpacerSelector: "main .filter-content .header-menu-spacer",
             userFuncInTop: function() { jq("#dealHeaderMenu .menu-action-on-top").hide(); },
             userFuncNotInTop: function() { jq("#dealHeaderMenu .menu-action-on-top").show(); }
         });
@@ -734,7 +761,7 @@ ASC.CRM.ListDealView = (function() {
         }
         LoadingBanner.hideLoaderBtn("#deleteDealsPanel");
         PopupKeyUpActionProvider.EnableEsc = false;
-        StudioBlockUIManager.blockUI("#deleteDealsPanel", 500, 500, 0);
+        StudioBlockUIManager.blockUI("#deleteDealsPanel", 500);
     };
 
     var _showSetPermissionsPanel = function(params) {
@@ -759,7 +786,7 @@ ASC.CRM.ListDealView = (function() {
             _setPermissions(params);
         });
         PopupKeyUpActionProvider.EnableEsc = false;
-        StudioBlockUIManager.blockUI("#setPermissionsDealsPanel", 600, 500, 0);
+        StudioBlockUIManager.blockUI("#setPermissionsDealsPanel", 600);
     };
 
     var _setPermissions = function(params) {
@@ -815,12 +842,12 @@ ASC.CRM.ListDealView = (function() {
     
     var _initEmptyScreen = function (emptyListImgSrc, emptyFilterListImgSrc) {
         //init emptyScreen for all list
-        var buttonHTML = ["<a class='link dotline plus' href='deals.aspx?action=manage'>",
+        var buttonHTML = ["<a class='link dotline plus' href='Deals.aspx?action=manage'>",
             ASC.CRM.Resources.CRMDealResource.CreateFirstDeal,
             "</a>"].join('');
         
         if (jq.browser.mobile != true) {
-            buttonHTML += ["<br/><a class='crm-importLink link' href='deals.aspx?action=import'>",
+            buttonHTML += ["<br/><a class='crm-importLink link' href='Deals.aspx?action=import'>",
                 ASC.CRM.Resources.CRMDealResource.ImportDeals,
                 "</a>"].join('');
         }
@@ -874,13 +901,8 @@ ASC.CRM.ListDealView = (function() {
         ASC.CRM.ListDealView.advansedFilter = jq("#dealsAdvansedFilter")
             .advansedFilter({
                 anykey      : false,
-                hint        : ASC.CRM.Resources.CRMCommonResource.AdvansedFilterInfoText.format(
-                            '<b>',
-                            '</b>',
-                            '<br/><br/><a href="' + ASC.Resources.Master.FilterHelpCenterLink + '" target="_blank">',
-                            '</a>'),
-                hintDefaultDisable: !ASC.Resources.Master.FilterHelpCenterLink,
-                maxfilters  : 3,
+                hintDefaultDisable: true,
+                maxfilters  : -1,
                 colcount    : 2,
                 maxlength   : "100",
                 store       : true,
@@ -1123,13 +1145,15 @@ ASC.CRM.ListDealView = (function() {
             ASC.CRM.ListDealView.advansedFilter = null;
         },
 
-        init: function (parentSelector) {
+        init: function (parentSelector, filterSelector, pagingSelector) {
             if (jq(parentSelector).length == 0) return;
             ASC.CRM.Common.setDocumentTitle(ASC.CRM.Resources.CRMDealResource.MyDeals);
             ASC.CRM.ListDealView.clear();
             jq(parentSelector).removeClass("display-none");
 
+            jq.tmpl("dealsListFilterTmpl").appendTo(filterSelector);
             jq.tmpl("dealsListBaseTmpl", { IsCRMAdmin: ASC.CRM.Data.IsCRMAdmin, CanCreateProjects: ASC.CRM.Data.CanCreateProjects }).appendTo(parentSelector);
+            jq.tmpl("dealsListPagingTmpl").appendTo(pagingSelector);
 
             jq('#privatePanelWrapper').appendTo("#permissionsDealsPanelInnerHtml");
 
@@ -1217,7 +1241,8 @@ ASC.CRM.ListDealView = (function() {
                 jq("#dealsAdvansedFilter .btn-toggle-sorter").trackEvent(ga_Categories.deals, ga_Actions.filterClick, 'sort');
                 jq("#dealsAdvansedFilter .advansed-filter-input").trackEvent(ga_Categories.deals, ga_Actions.filterClick, "search_text", "enter");
             });
-
+            
+            ASC.CRM.PartialExport.init(ASC.CRM.ListDealView.advansedFilter, "opportunity");
         },
 
         setFilter: function(evt, $container, filter, params, selectedfilters) { _changeFilter(); },
@@ -1270,8 +1295,6 @@ ASC.CRM.ListDealView = (function() {
         },
 
         _dealItemFactory : function(deal, selectedIDs) {
-            var tmpDate = new Date(),
-                nowDate = new Date(tmpDate.getFullYear(), tmpDate.getMonth(), tmpDate.getDate(), 0, 0, 0, 0);
 
             deal.isOverdue = false;
 
@@ -1286,7 +1309,7 @@ ASC.CRM.ListDealView = (function() {
                     break;
                 case 0:
                     deal.closedStatusString = "";
-                    if (deal.expectedCloseDateString != "" && deal.expectedCloseDate.getTime() < nowDate.getTime()) {
+                    if (deal.expectedCloseDateString != "" && deal.expectedCloseDate < new Date()) {
                         deal.isOverdue = true;
                         deal.classForTitle = "linkHeaderMedium red-text";
                     } else {
@@ -1297,7 +1320,7 @@ ASC.CRM.ListDealView = (function() {
 
             deal.bidNumberFormat = ASC.CRM.Common.numberFormat(deal.bidValue,
                                   {
-                                      before: ASC.CRM.Common.getCurrencySymbol(deal.bidCurrency.symbol, deal.bidCurrency.abbreviation),
+                                      before: deal.bidCurrency.symbol,
                                       thousands_sep: " ",
                                       dec_point: ASC.CRM.Data.CurrencyDecimalSeparator
                                   });
@@ -1363,7 +1386,7 @@ ASC.CRM.ListDealView = (function() {
             ASC.CRM.ExchangeRateView.init(ASC.CRM.ListDealView.bidList);
             jq("#ExchangeRateTabs>a:first").click();
             PopupKeyUpActionProvider.EnableEsc = false;
-            StudioBlockUIManager.blockUI('#exchangeRatePopUp', 550, 674, 0);
+            StudioBlockUIManager.blockUI('#exchangeRatePopUp', 550);
         },
 
         selectAll: function(obj) {
@@ -1490,7 +1513,7 @@ ASC.CRM.ListDealView = (function() {
                 ASC.CRM.ListDealView.deleteDeal(dealID, isListView);
             });
             PopupKeyUpActionProvider.EnableEsc = false;
-            StudioBlockUIManager.blockUI("#confirmationDeleteOneDealPanel", 500, 500, 0);
+            StudioBlockUIManager.blockUI("#confirmationDeleteOneDealPanel", 500);
         },
 
         deleteDeal: function(dealID, isListView) {
@@ -1514,9 +1537,9 @@ ASC.CRM.ListDealView = (function() {
                     success: function (params, opportunity) {
                         ASC.CRM.Common.unbindOnbeforeUnloadEvent();
                         if (params.contact_id != "") {
-                            location.href = jq.format("default.aspx?id={0}#deals", params.contact_id);
+                            location.href = jq.format("Default.aspx?id={0}#deals", params.contact_id);
                         } else {
-                            location.href = "deals.aspx";
+                            location.href = "Deals.aspx";
                         }
                     }
                 });
@@ -1601,7 +1624,7 @@ ASC.CRM.DealActionView = (function() {
                 ASC.CRM.Resources.CRMJSResource.ConfirmGoToCustomFieldPage,
             "</div>"].join(''),
             OKBtn: ASC.CRM.Resources.CRMCommonResource.OK,
-            OKBtnHref: "settings.aspx?type=custom_field#opportunity",
+            OKBtnHref: "Settings.aspx?type=custom_field#opportunity",
             CancelBtn: ASC.CRM.Resources.CRMCommonResource.Cancel,
             progressText: ""
         }).insertAfter("#otherDealsCustomFieldPanel");
@@ -1701,7 +1724,7 @@ ASC.CRM.DealActionView = (function() {
                 window.dealMemberSelector.ExcludedArrayIDs = [];
         });
 
-        jq("#infoContent_dealClientSelector_0 .crm-editLink").bind('click', function () {
+        jq("#infoContent_dealClientSelector_0 .crm-removeLink").bind('click', function () {
             window.dealMemberSelector.ExcludedArrayIDs = [];
         });
         
@@ -1712,7 +1735,7 @@ ASC.CRM.DealActionView = (function() {
 
         jq("#advUserSelectorResponsible").useradvancedSelector({
             showme: false,
-            inPopup: true,
+            inPopup: false,
             onechosen: true,
             showGroups: true,
             withGuests: false
@@ -1746,7 +1769,15 @@ ASC.CRM.DealActionView = (function() {
             jq("#advUserSelectorResponsible").attr("data-responsible-id", window.responsibleId);
             jq("#advUserSelectorResponsible .dealResponsibleLabel").text(Encoder.htmlDecode(responsible.title));
         } else {
-            jq("#advUserSelectorResponsible").attr("data-responsible-id", "");
+            responsible = window.UserManager.getUser(window.responsibleId);
+            if (responsible != null) {
+                jq("#advUserSelectorResponsible").attr("data-responsible-id", responsible.id);
+                jq("#advUserSelectorResponsible .dealResponsibleLabel").text(Encoder.htmlDecode(responsible.displayName + (responsible.isTerminated ? " (" + ASC.CRM.Resources.DisabledEmployeeTitle.toLowerCase() + ")" : "")));
+            } else {
+                responsible = window.UserManager.getRemovedProfile();
+                jq("#advUserSelectorResponsible").attr("data-responsible-id", "");
+                jq("#advUserSelectorResponsible .dealResponsibleLabel").text(Encoder.htmlDecode(responsible.displayName));
+            }
         }
 
         jq("#advUserSelectorResponsible").on("showList", function (event, item) {
@@ -1892,7 +1923,7 @@ ASC.CRM.DealActionView = (function() {
                 }).insertAfter("#crm_dealMakerDialog");
 
                 PopupKeyUpActionProvider.EnableEsc = false;
-                StudioBlockUIManager.blockUI("#saveDealError", 500, 400, 0);
+                StudioBlockUIManager.blockUI("#saveDealError", 500);
             }
 
             initFields();
@@ -2050,10 +2081,10 @@ ASC.CRM.DealActionView = (function() {
 
         showGotoAddSettingsPanel: function () {
             if (window.onbeforeunload == null) {//No need the confirmation
-                location.href = "settings.aspx?type=custom_field#opportunity";
+                location.href = "Settings.aspx?type=custom_field#opportunity";
             } else {
                 PopupKeyUpActionProvider.EnableEsc = false;
-                StudioBlockUIManager.blockUI("#confirmationGotoSettingsPanel", 500, 200, 0);
+                StudioBlockUIManager.blockUI("#confirmationGotoSettingsPanel", 500);
             }
         }
     };
@@ -2519,7 +2550,7 @@ ASC.CRM.ExchangeRateView = (function() {
 
             tmpBidNumberFormat = ASC.CRM.Common.numberFormat(bidList[i].bidValue,
                 {
-                    before: ASC.CRM.Common.getCurrencySymbol(bidList[i].bidCurrencySymbol, bidList[i].bidCurrencyAbbreviation),
+                    before: bidList[i].bidCurrencySymbol,
                     thousands_sep: " ",
                     dec_point: ASC.CRM.Data.CurrencyDecimalSeparator
                 });
@@ -2537,7 +2568,7 @@ ASC.CRM.ExchangeRateView = (function() {
         }
 
         tmpBidNumberFormat = ASC.CRM.Common.numberFormat(sum, {
-            before:  ASC.CRM.Common.getCurrencySymbol(ASC.CRM.Data.defaultCurrency.symbol, ASC.CRM.Data.defaultCurrency.abbreviation),
+            before:  ASC.CRM.Data.defaultCurrency.symbol,
             thousands_sep: " ",
             dec_point: ASC.CRM.Data.CurrencyDecimalSeparator
         });
@@ -2765,39 +2796,26 @@ ASC.CRM.DealTabView = (function () {
         }
     };
 
-    var callback_get_dealstab_data = function (params, allDeals, contactDeals) {
-        if (typeof (params[0].__count) != "undefined" && params[0].__count != 0) {
+    var callback_get_dealstab_data = function (params, contactDeals) {
+        initDealsSelector();
 
-            for (var i = 0, n = contactDeals.length; i < n; i++) {
-                var idToExclude = contactDeals[i].id;
-                for (var j = 0, m = allDeals.length; j < m; j++) {
-                    if (allDeals[j].id == idToExclude) {
-                        allDeals.splice(j, 1);
-                        break;
-                    }
-                }
-            }
-            initDealsSelector(allDeals);
-        }
-
-        if (typeof (params[1].__count) != "undefined" && params[1].__count != 0) {
+        if (contactDeals && contactDeals.length) {
             jq("#emptyContentForDealsFilter:not(.display-none)").addClass("display-none");
             jq("#dealList.display-none").removeClass("display-none");
-            callback_get_opportunities_for_contact(params[1], contactDeals);
+            callback_get_opportunities_for_contact(params, contactDeals);
             jq("#dealsInContactPanel").show();
         } else {
             jq("#dealList:not(.display-none)").addClass("display-none");
             jq("#emptyContentForDealsFilter.display-none").removeClass("display-none");
         }
-        LoadingBanner.hideLoading();
     };
 
     var callback_add_deal = function (params, deal) {
         jq("#dealList.display-none").removeClass("display-none");
+
         ASC.CRM.ListDealView._dealItemFactory(deal, []);
 
         jq.tmpl("dealTmpl", deal).prependTo("#dealTable tbody");
-        removeDealFromList(params.element);
 
         jq("#emptyContentForDealsFilter:not(.display-none)").addClass("display-none");
 
@@ -2805,72 +2823,32 @@ ASC.CRM.DealTabView = (function () {
     };
 
     var _getDealTabViewData = function () {
-        LoadingBanner.displayLoading();
-
-        var filterForContactDeals = _getApiFilter(0),
-            filterForLinkDeals = {
-                startIndex: 0,
-                sortBy:	"title",
-                sortOrder:	"ascending",
-                stageType:	"Open"
-        };
-
-        Teamlab.joint()
-            .getCrmOpportunities({}, { filter: filterForLinkDeals })
-            .getCrmOpportunities({}, { filter: filterForContactDeals })
-            .start({}, {
-                success: callback_get_dealstab_data
-            });
-    };
-
-    var initDealsSelector = function (dealList) {
-        if (jq.browser.mobile === true) {
-            var chooseOption = {
-                id: 0,
-                title: ASC.CRM.Resources.CRMJSResource.LinkWithDeal
-            };
-            dealList.splice(0, 0, chooseOption);
-
-            jq.tmpl("dealSelectorOptionTmpl", dealList).appendTo("#dealsInContactPanel select");
-            jq("#dealsInContactPanel select")
-                .change(function (evt) {
-                    chooseDeal(jq(this).children("option:selected"), this.value);
+        Teamlab.getCrmOpportunities({},
+                {
+                    filter: _getApiFilter(0),
+                    before: LoadingBanner.displayLoading,
+                    success: callback_get_dealstab_data,
+                    error: function (params, error) {
+                        console.log(error);
+                    },
+                    after: LoadingBanner.hideLoading
                 });
-        } else {
-            jq.tmpl("dealSelectorItemTmpl", dealList).appendTo("#dealSelectorContainer>.dropdown-content");
+    };
+  
+    var initDealsSelector = function () {
 
-            jq.dropdownToggle({
-                dropdownID: "dealSelectorContainer",
-                switcherSelector: "#dealsInContactPanel .selectDeal>div",
-                addTop: 2
-            });
-
-            if (dealList.length > 0) {
-                jq("#dealsInContactPanel .selectDeal .menuAction").addClass("unlockAction");
-                jq("#dealSelectorContainer").removeClass("display-none");
-            }
-            jq("#dealSelectorContainer").on("click", ".dropdown-content>li", function () {
-                jq("#dealSelectorContainer").hide();
-                var id = jq(this).attr("data-id");
-                chooseDeal(jq(this), id);
-            });
-        }
+        window["dealsSelector"] = new ASC.CRM.DealSelector.DealSelector({
+                        ObjName: "dealsSelector",
+                        Description: ASC.CRM.Resources.CRMDealResource.FindDealByName,
+                        ContactID: ASC.CRM.DealTabView.contactID,
+                        InternalSearch: false,
+                        ParentSelector: "#dealsInContactPanel",
+                        SelectItemEvent: chooseDeal
+                    });
     };
 
-    var chooseDeal = function (element, id) {
-        Teamlab.addCrmDealForContact({ element: element },  ASC.CRM.DealTabView.contactID, id, callback_add_deal);
-    };
-
-    var removeDealFromList = function (element) {
-        element.remove();
-        if (jq.browser.mobile === true) {
-            jq("dealsInContactPanel select").val(0).tlCombobox();
-        } else {
-            if (jq("#dealSelectorContainer .dropdown-item").length == 0) {
-                jq("#dealsInContactPanel .selectDeal .menuAction").removeClass("unlockAction");
-                jq("#dealSelectorContainer").addClass("display-none");
-            }
-        }
+    var chooseDeal = function (item) {
+        Teamlab.addCrmDealForContact({}, ASC.CRM.DealTabView.contactID, item.id, callback_add_deal);
     };
 
     return {
@@ -2926,25 +2904,9 @@ ASC.CRM.DealTabView = (function () {
                     jq("#dealsInContactPanel").show();
                 });
 
-                jq("#dealsInContactPanel .createNewDeal>div").click(function () {
-                    location.href = "deals.aspx?action=manage&contactID=" + ASC.CRM.DealTabView.contactID;
-                });
                 _getDealTabViewData();
             }
         }
-
-        //addDealToList : function (deal) {
-        //    if (jq.browser.mobile === true) {
-        //        jq.tmpl("dealSelectorOptionTmpl", deal).appendTo("#dealsInContactPanel select");
-        //        //jq("#projectsInContactPanel select").val(0).tlCombobox();
-        //    } else {
-        //        jq.tmpl("dealSelectorItemTmpl", deal).appendTo("#dealSelectorContainer>.dropdown-content");
-        //        jq("#dealsInContactPanel .selectDeal .menuAction:not(.unlockAction)").addClass("unlockAction");
-        //        jq("#dealSelectorContainer.display-none").hide();
-        //        jq("#dealSelectorContainer.display-none").removeClass("display-none");
-        //    }
-        //},
-
     };
 })();
 
@@ -2956,3 +2918,188 @@ jq(document).ready(function() {
         fixWinSize: false
     });
 });
+
+
+ASC.CRM.DealSelector = new function () {
+
+    var getSourceAutocompleteCallback = function (selector, items) {
+        if (!items.length) {
+            selector.DomObjects.empty.outerWidth(selector.DomObjects.table.width()).show();
+        } else {
+            selector.DomObjects.empty.hide();
+        }
+        
+        return items;
+    };
+
+    var initAutocomplete = function (selector) {
+        selector.DomObjects.input.autocomplete({
+            minLength: 0,
+            delay: 300,
+            focus: function (event, ui) {
+                event.preventDefault ? event.preventDefault() : (event.returnValue = false);
+
+                var autocomplete = jq(this).data("ui-autocomplete"),
+                    menu = autocomplete.menu,
+                    scroll = menu.element.scrollTop(),
+                    offset = menu.active.offset().top - menu.element.offset().top,
+                    elementHeight = menu.element.height();
+                
+                if (offset < 0) {
+                    menu.element.scrollTop(scroll + offset);
+                } else if (offset + menu.active.height() > elementHeight) {
+                    menu.element.scrollTop(scroll + offset - elementHeight + menu.active.height());
+                }
+            },
+            select: function (event, ui) {
+                selector.Cache = {};
+                selector.SelectItemEvent(ui.item);
+                jq(this).val("");
+                return false;
+            },
+            selectFirst: false,
+            search: function () {
+                return selector.DomObjects.parent.is(":visible");
+            },
+            source: function (request, response) {
+                var term = request.term;
+
+                if (term in selector.Cache) {
+                    response(getSourceAutocompleteCallback(selector, selector.Cache[term]));
+                    return;
+                } else {
+                    for (var cacheterm in selector.Cache) {
+                        if (selector.Cache[cacheterm].length == 0 && term.indexOf(cacheterm) == 0) {
+                            response(getSourceAutocompleteCallback(selector, []));
+                            return;
+                        }
+                    }
+                }
+
+                var data = { prefix: term, contactID: selector.ContactID, internalSearch: selector.InternalSearch };
+
+                Teamlab.getCrmOpportunitiesByPrefix({},
+                {
+                    filter: data,
+                    success: function (parameters, items) {
+                        selector.DomObjects.loader.hide();
+                        selector.DomObjects.search.show();
+                        selector.Cache[term] = items;
+                        response(getSourceAutocompleteCallback(selector, items));
+                    },
+                    before: function () {
+                        selector.DomObjects.search.hide();
+                        selector.DomObjects.loader.show();
+                    }
+                });
+            }
+        });
+
+        selector.DomObjects.input.data("ui-autocomplete")._renderMenu = function (ul, items) {
+            var autocomplete = this;
+            jq.each(items, function (index, item) {
+                autocomplete._renderItemData(ul, item);
+            });
+        };
+
+        selector.DomObjects.input.data("ui-autocomplete")._renderItem = function (ul, item) {
+            return jq("<li></li>").data("item.autocomplete", item)
+                        .append(jq("<a></a>").html(jq.htmlEncodeLight(item.title)))
+                        .appendTo(ul);
+        };
+
+        selector.DomObjects.input.data("ui-autocomplete")._resizeMenu = function () {
+            var autocomplete = this;
+            autocomplete.menu.element.outerWidth(selector.DomObjects.table.width());
+        };
+
+        selector.DomObjects.input.data("ui-autocomplete")._suggest = function (items) {
+            var autocomplete = this;
+            var ul = autocomplete.menu.element.empty().zIndex(autocomplete.element.zIndex() + 1);
+            autocomplete._renderMenu(ul, items);
+            autocomplete.menu.refresh();
+            ul.show();
+            autocomplete._resizeMenu();
+            ul.position(jq.extend({ of: selector.DomObjects.table }, autocomplete.options.position));
+        };
+    };
+
+    var initEvents = function (selector) {
+
+        function search () {
+            selector.DomObjects.input.autocomplete("search", jq.trim(selector.DomObjects.input.val()));
+        }
+
+        selector.DomObjects.search.bind("click", search);
+
+        selector.DomObjects.input.bind("click", search);
+        
+        selector.DomObjects.input.bind("keyup", function () {
+            if (jq.trim(selector.DomObjects.input.val()) == "") {
+                selector.DomObjects.cross.hide();
+            } else {
+                selector.DomObjects.cross.show();
+            }
+        });
+
+        selector.DomObjects.cross.bind("click", function () {
+            selector.DomObjects.cross.hide();
+            selector.DomObjects.input.val("").blur();
+            selector.DomObjects.empty.hide();
+        });
+
+        selector.DomObjects.link.click(function () {
+            location.href = "Deals.aspx?action=manage&contactID=" + selector.ContactID;
+        });
+
+        jq(document).click(function (event) {
+            if (selector.DomObjects.empty.is(":visible")) {
+                console.log("document.click");
+                var target = jq(event.target);
+                if (!target.is(selector.DomObjects.input) &&
+                    !target.is(selector.DomObjects.empty) &&
+                    !target.parents(".noMatches").is(selector.DomObjects.empty)) {
+                    selector.DomObjects.empty.hide();
+                }
+            }
+        });
+    };
+
+
+    this.DealSelector = function (params) {
+
+        if (!params || !params.ObjName || !params.ParentSelector)
+            return null;
+
+        var parentObj = jq(params.ParentSelector);
+
+        if (!parentObj.length)
+            return null;
+
+        this.ObjName = params.ObjName;
+        this.Description = params.Description || "";
+        this.ContactID = params.ContactID || 0;
+        this.InternalSearch = Boolean(params.InternalSearch);
+        this.ParentSelector = params.ParentSelector;
+        this.SelectItemEvent = params.SelectItemEvent;
+        this.Cache = {};
+
+        jq.tmpl("dealSelectorContainerTmpl", this).appendTo(this.ParentSelector);
+
+        this.DomObjects = {
+            parent: parentObj,
+            table: parentObj.find("table"),
+            search: parentObj.find(".searchButton"),
+            loader: parentObj.find(".loaderImg"),
+            input: parentObj.find("input[type=text].textEdit"),
+            cross: parentObj.find(".crossButton"),
+            empty: parentObj.find(".noMatches"),
+            link: parentObj.find(".noMatches .link")
+        };
+
+        initAutocomplete(this);
+        initEvents(this);
+
+        return this;
+    };
+};

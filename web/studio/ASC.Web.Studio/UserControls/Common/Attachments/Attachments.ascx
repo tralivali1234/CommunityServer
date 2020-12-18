@@ -29,18 +29,15 @@
         </li>
     </ul>
 </div>
-         
+
 <div id="actionPanel" runat="server" class="containerAction">
     <span id="showDocumentPanel" >
-        <a class="baseLinkAction"><%=MenuNewDocument %></a>
+        <a class="baseLinkAction"><%= MenuNewDocument %></a>
         <span class="sort-down-black newDocComb"></span>
     </span>
-    <span id="linkNewDocumentUpload"><a class="baseLinkAction"><%=MenuUploadFile %></a></span>
-        
-    <%if (PortalDocUploaderVisible)
-        {%>
-    <span id="portalDocUploader" class="linkAttachFile" onclick="ProjectDocumentsPopup.showPortalDocUploader()" href="javascript: false;"><a class="baseLinkAction"><%=MenuProjectDocuments %></a></span>
-    <% } %>
+    <span id="linkNewDocumentUpload"><a class="baseLinkAction"><%= MenuUploadFile %></a></span>
+
+    <asp:PlaceHolder id="DocUploaderHolder" runat="server"></asp:PlaceHolder>
 </div>
 
 <% if (EnableAsUploaded)
@@ -56,6 +53,8 @@
 <% } %>
 
 <asp:PlaceHolder runat="server" ID="TariffDocsEditionPlaceHolder"></asp:PlaceHolder>
+
+<asp:PlaceHolder runat="server" ID="MediaViewersPlaceHolder"></asp:PlaceHolder>
 
 <% if (EmptyScreenVisible)
    { %>
@@ -80,7 +79,7 @@
     <%= string.Format(UserControlsCommonResource.TooltipEdit, ExtsWebEdited) %>
 </div>
 <% } %>
-<div class="wrapperFilesContainer" moduleName="<%= ModuleName %>" projectId=<%= ProjectId %> entityType=<%= EntityType %>>
+<div class="wrapperFilesContainer" moduleName="<%= ModuleName %>" entityType="<%= EntityType %>" >
     <% if (EmptyScreenVisible)
        { %>
     <div id="emptyDocumentPanel" class="display-none">
@@ -91,7 +90,4 @@
         <tbody>
         </tbody>
     </table>
-</div>
-<div id="popupDocumentUploader">
-    <asp:PlaceHolder id="_phDocUploader" runat="server"></asp:PlaceHolder>
 </div>

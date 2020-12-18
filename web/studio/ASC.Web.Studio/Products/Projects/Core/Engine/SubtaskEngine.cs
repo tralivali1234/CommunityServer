@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -30,37 +21,29 @@ using System.Linq;
 
 using ASC.Core;
 using ASC.Core.Tenants;
-
+using ASC.ElasticSearch;
 using ASC.Projects.Core.DataInterfaces;
 using ASC.Projects.Core.Domain;
 using ASC.Projects.Core.Services.NotifyService;
-using IDaoFactory = ASC.Projects.Core.DataInterfaces.IDaoFactory;
+using ASC.Web.Projects.Core.Search;
 
 namespace ASC.Projects.Engine
 {
     public class SubtaskEngine : ProjectEntityEngine
     {
-        private readonly EngineFactory factory;
-        private readonly ISubtaskDao subtaskDao;
-        private readonly ITaskDao taskDao;
-        private readonly TaskEngine taskEngine;
+        public IDaoFactory DaoFactory { get; set; }
 
-        public SubtaskEngine(IDaoFactory daoFactory, EngineFactory factory)
-            : base(NotifyConstants.Event_NewCommentForTask, factory)
+        public SubtaskEngine(bool disableNotifications): base(NotifyConstants.Event_NewCommentForTask, disableNotifications)
         {
-            this.factory = factory;
-            subtaskDao = daoFactory.GetSubtaskDao();
-            taskDao = daoFactory.GetTaskDao();
-            taskEngine = factory.TaskEngine;
         }
 
         #region get 
 
         public List<Task> GetByDate(DateTime from, DateTime to)
         {
-            var subtasks = subtaskDao.GetUpdates(from, to).ToDictionary(x => x.Task, x => x);
+            var subtasks = DaoFactory.SubtaskDao.GetUpdates(from, to).ToDictionary(x => x.Task, x => x);
             var ids = subtasks.Select(x => x.Value.Task).Distinct().ToList();
-            var tasks = taskDao.GetById(ids);
+            var tasks = DaoFactory.TaskDao.GetById(ids);
             foreach (var task in tasks)
             {
                 Subtask subtask;
@@ -70,19 +53,31 @@ namespace ASC.Projects.Engine
             return tasks;
         }
 
+        public List<Task> GetByResponsible(Guid id, TaskStatus? status = null)
+        {
+            var subtasks = DaoFactory.SubtaskDao.GetByResponsible(id, status);
+            var ids = subtasks.Select(x => x.Task).Distinct().ToList();
+            var tasks = DaoFactory.TaskDao.GetById(ids);
+            foreach (var task in tasks)
+            {
+                task.SubTasks.AddRange(subtasks.FindAll(r=> r.Task == task.ID));
+            }
+            return tasks;
+        }
+
         public int GetSubtaskCount(int taskid, params TaskStatus[] statuses)
         {
-            return subtaskDao.GetSubtaskCount(taskid, statuses);
+            return DaoFactory.SubtaskDao.GetSubtaskCount(taskid, statuses);
         }
 
         public int GetSubtaskCount(int taskid)
         {
-            return subtaskDao.GetSubtaskCount(taskid, null);
+            return DaoFactory.SubtaskDao.GetSubtaskCount(taskid, null);
         }
 
         public Subtask GetById(int id)
         {
-            return subtaskDao.GetById(id);
+            return DaoFactory.SubtaskDao.GetById(id);
         }
 
         #endregion
@@ -109,13 +104,13 @@ namespace ASC.Projects.Engine
 
             var senders = GetSubscribers(task);
 
-            if (task.Status != TaskStatus.Closed && newStatus == TaskStatus.Closed && !factory.DisableNotifications && senders.Count != 0)
+            if (task.Status != TaskStatus.Closed && newStatus == TaskStatus.Closed && !DisableNotifications && senders.Count != 0)
                 NotifyClient.Instance.SendAboutSubTaskClosing(senders, task, subtask);
 
-            if (task.Status != TaskStatus.Closed && newStatus == TaskStatus.Open && !factory.DisableNotifications && senders.Count != 0)
+            if (task.Status != TaskStatus.Closed && newStatus == TaskStatus.Open && !DisableNotifications && senders.Count != 0)
                 NotifyClient.Instance.SendAboutSubTaskResumed(senders, task, subtask);
 
-            return subtaskDao.Save(subtask);
+            return DaoFactory.SubtaskDao.Save(subtask);
         }
 
         public Subtask SaveOrUpdate(Subtask subtask, Task task)
@@ -142,11 +137,11 @@ namespace ASC.Projects.Engine
                 if (subtask.CreateOn == default(DateTime)) subtask.CreateOn = TenantUtil.DateTimeNow();
 
                 ProjectSecurity.DemandEdit(task);
-                subtask = subtaskDao.Save(subtask);
+                subtask = DaoFactory.SubtaskDao.Save(subtask);
             }
             else
             {
-                var oldSubtask = subtaskDao.GetById(new[] { subtask.ID }).First();
+                var oldSubtask = DaoFactory.SubtaskDao.GetById(new[] { subtask.ID }).First();
 
                 if (oldSubtask == null) throw new ArgumentNullException("subtask");
 
@@ -154,7 +149,7 @@ namespace ASC.Projects.Engine
 
                 //changed task
                 ProjectSecurity.DemandEdit(task, oldSubtask);
-                subtask = subtaskDao.Save(subtask);
+                subtask = DaoFactory.SubtaskDao.Save(subtask);
             }
 
             NotifySubtask(task, subtask, isNew, oldResponsible);
@@ -164,16 +159,38 @@ namespace ASC.Projects.Engine
 
             foreach (var sender in senders)
             {
-                taskEngine.Subscribe(task, sender);
+                Subscribe(task, sender);
             }
 
+            FactoryIndexer<SubtasksWrapper>.IndexAsync(subtask);
+
             return subtask;
+        }
+
+        public Subtask Copy(Subtask from, Task task, IEnumerable<Participant> team)
+        {
+            var subtask = new Subtask
+            {
+                ID = default(int),
+                CreateBy = SecurityContext.CurrentAccount.ID,
+                CreateOn = TenantUtil.DateTimeNow(),
+                Task = task.ID,
+                Title = from.Title,
+                Status = from.Status
+            };
+
+            if (team.Any(r => r.ID == from.Responsible))
+            {
+                subtask.Responsible = from.Responsible;
+            }
+
+            return SaveOrUpdate(subtask, task);
         }
 
         private void NotifySubtask(Task task, Subtask subtask, bool isNew, Guid oldResponsible)
         {
             //Don't send anything if notifications are disabled
-            if (factory.DisableNotifications) return;
+            if (DisableNotifications) return;
 
             var recipients = GetSubscribers(task);
 
@@ -199,7 +216,7 @@ namespace ASC.Projects.Engine
             if (task == null) throw new ArgumentNullException("task");
 
             ProjectSecurity.DemandEdit(task, subtask);
-            subtaskDao.Delete(subtask.ID);
+            DaoFactory.SubtaskDao.Delete(subtask.ID);
 
             var recipients = GetSubscribers(task);
 

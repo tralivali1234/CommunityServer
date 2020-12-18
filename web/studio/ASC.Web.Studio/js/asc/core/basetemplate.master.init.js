@@ -1,27 +1,20 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
+
+
 var defineBodyMediaClass = function () {
     var $body = jq("body"),
                list = [
@@ -70,6 +63,10 @@ var defineBodyMediaClass = function () {
 
         width = jq("#studioPageContent").width() - jq(".mainPageTableSidePanel").width() + 240;
 
+    if ($body.hasClass("sailfish")) {
+        return;
+    }
+
 
     for (var i = 0, n = list.length; i < n; i++) {
         if (width >= list[i].min && (list[i].max == 0 || width < list[i].max)) {
@@ -103,14 +100,14 @@ var defineBodyMediaClass = function () {
     }
 
     // init API Manager
-    ServiceManager.init(ASC.Resources.Master.ApiPath);
+    ServiceHelper.init(ASC.Resources.Master.ApiPath);
     ServiceFactory.init({
         responses: {
             isme: ASC.Resources.Master.ApiResponsesMyProfile
         },
         portaldatetime: {
-            utcoffsettotalminutes: ASC.Resources.Master.TimezoneOffsetMinutes,
-            displayname: ASC.Resources.Master.TimezoneDisplayName
+            utcoffsettotalminutes: ASC.Resources.Master.CurrentTenantTimeZone.UtcOffset,
+            displayname: ASC.Resources.Master.CurrentTenantTimeZone.DisplayName
         },
         names: {
             months: ASC.Resources.Master.MonthNamesFull,
@@ -165,60 +162,50 @@ var defineBodyMediaClass = function () {
     // init page-menu actions
     LeftMenuManager.bindEvents();
 
+    var isDesktop = jq("body").hasClass("desktop");
+
     // init RenderPromoBar
     if (ASC.Resources.Master.SetupInfoNotifyAddress &&
         ASC.Resources.Master.IsAuthenticated == true &&
-        ASC.Resources.Master.ApiResponsesMyProfile.response) {
+        ASC.Resources.Master.ApiResponsesMyProfile.response && 
+        ASC.Resources.Master.ShowPromotions) {
 
-        jq.getScript(
-            [
-                ASC.Resources.Master.SetupInfoNotifyAddress + 'promotions/get?',
-                "userId=",
-                ASC.Resources.Master.ApiResponsesMyProfile.response.id,
-                "&language=",
-                ASC.Resources.Master.CurrentCultureName,
-                "&version=",
-                ASC.Resources.Master.CurrentTenantVersion,
-                "&tariff=",
-                ASC.Resources.Master.TenantTariff,
-                "&admin=",
-                ASC.Resources.Master.IsAdmin,
-                "&userCreated=",
-                ASC.Resources.Master.ApiResponsesMyProfile.response.created,
-                "&promo=",
-                ASC.Resources.Master.ShowPromotions
-            ].join(""));
+        Teamlab.getBarPromotions({}, isDesktop, {
+            success: function(params, content) {
+                try {
+                    if (content) {
+                        eval(content);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        });
     }
 
+    var tipsWasClosed = false;
+    if (window.sessionStorage)
+        tipsWasClosed = !!window.sessionStorage.getItem("tipsWasClosed");
+
     // init Tips
-    if (ASC.Resources.Master.SetupInfoTipsAddress &&
+    if (!tipsWasClosed &&
+        ASC.Resources.Master.SetupInfoTipsAddress &&
         ASC.Resources.Master.IsAuthenticated == true &&
         ASC.Resources.Master.ApiResponsesMyProfile.response &&
         !ASC.Resources.Master.ApiResponsesMyProfile.response.isOutsider &&
         ASC.Resources.Master.ShowTips) {
 
-        jq.getScript(
-            [
-                ASC.Resources.Master.SetupInfoTipsAddress + 'tips/get?',
-                "userId=",
-                ASC.Resources.Master.ApiResponsesMyProfile.response.id,
-                "&tenantId=",
-                ASC.Resources.Master.CurrentTenantId,
-                "&page=",
-                encodeURIComponent(window.location.pathname + window.location.search + window.location.hash),
-                "&language=",
-                ASC.Resources.Master.CurrentCultureName,
-                "&admin=",
-                ASC.Resources.Master.IsAdmin,
-                "&productAdmin=",
-                ASC.Resources.Master.IsProductAdmin,
-                "&visitor=",
-                ASC.Resources.Master.IsVisitor,
-                "&userCreatedDate=",
-                ASC.Resources.Master.ApiResponsesMyProfile.response.created,
-                "&tenantCreatedDate=",
-                ASC.Resources.Master.CurrentTenantCreatedDate
-            ].join(""));
+        Teamlab.getBarTips({}, isDesktop, {
+            success: function (params, content) {
+                try {
+                    if (content) {
+                        eval(content);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        });
     }
 
     var studioUserProfileInfo = new PopupBox("pb_StudioUserProfileInfo", 320, 140, "tintLight", "borderBaseShadow", "",
@@ -298,6 +285,11 @@ var defineBodyMediaClass = function () {
             resize: function (event, ui) {
                 jq("#studio_sidePanel").css("width", ui.size.width);
 
+                if (jq('body').hasClass('desktop')){
+                    var columnWidth = jq("#studio_sidePanel").outerWidth();
+                    jq("#studioPageContent").css("grid-template-columns", columnWidth + "px 1px 1fr");
+                }
+
                 jq(window).trigger("resizeSidePanel", [event, ui]);
             },
             create: function () {
@@ -354,6 +346,33 @@ var defineBodyMediaClass = function () {
         }, 91));
     });
 
+    var navContent = jq("#studioPageContent nav > .nav-content");
+    var navContentScrollPosition = navContent.scrollTop();
+    var pageContent = jq("#studioPageContent main > .page-content");
+    var pageContentScrollPosition = pageContent.scrollTop();
+
+    var hideContextMenu = function() {
+        pageContent.find(".studio-action-panel, .popup_helper, .advanced-selector-container").hide();
+        jq("#studioPageContent main .menu-small.active").removeClass("active");
+        jq("#studioPageContent main .entity-menu.active").removeClass("active");
+        jq('#ui-datepicker-div, .asc-popupmenu').hide();
+    };
+
+    navContent.on("scroll", function() {
+        var newPosition = navContent.scrollTop();
+        if (navContentScrollPosition != newPosition) {
+            navContentScrollPosition = newPosition;
+            hideContextMenu();
+        }
+    });
+
+    pageContent.on("scroll", function () {
+        var newPosition = pageContent.scrollTop();
+        if (pageContentScrollPosition != newPosition) {
+            pageContentScrollPosition = newPosition;
+            hideContextMenu();
+        }
+    });
 
 })();
 

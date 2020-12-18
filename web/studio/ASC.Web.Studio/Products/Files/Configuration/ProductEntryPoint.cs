@@ -1,29 +1,21 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using ASC.Core;
 using ASC.Web.Core;
 using ASC.Web.Core.Files;
 using ASC.Web.Core.Utility;
@@ -37,6 +29,8 @@ using System.Reflection;
 using System.Web;
 using System.Web.Http;
 using System.Xml;
+using ASC.Web.Studio.PublicResources;
+using SubscriptionManager = ASC.Web.Files.Classes.SubscriptionManager;
 
 namespace ASC.Web.Files.Configuration
 {
@@ -51,20 +45,32 @@ namespace ASC.Web.Files.Configuration
 
         #endregion
 
+        public override bool Visible { get { return true; } }
+
         public override void Init()
         {
+            Global.Init();
+
+            Func<List<string>> adminOpportunities = () => (CoreContext.Configuration.CustomMode
+                                                               ? CustomModeResource.ProductAdminOpportunitiesCustomMode
+                                                               : FilesCommonResource.ProductAdminOpportunities).Split('|').ToList();
+
+            Func<List<string>> userOpportunities = () => (CoreContext.Configuration.CustomMode
+                                         ? CustomModeResource.ProductUserOpportunitiesCustomMode
+                                         : FilesCommonResource.ProductUserOpportunities).Split('|').ToList();
+
             _productContext =
                 new ProductContext
                     {
-                        MasterPageFile = FilesLinkUtility.FilesBaseVirtualPath + "masters/basictemplate.master",
+                        MasterPageFile = FilesLinkUtility.FilesBaseVirtualPath + "Masters/BasicTemplate.master",
                         DisabledIconFileName = "product_disabled_logo.png",
                         IconFileName = "product_logo.png",
-                        LargeIconFileName = "product_logolarge.png",
+                        LargeIconFileName = "product_logolarge.svg",
                         DefaultSortOrder = 10,
                         SubscriptionManager = new SubscriptionManager(),
                         SpaceUsageStatManager = new FilesSpaceUsageStatManager(),
-                        AdminOpportunities = () => FilesCommonResource.ProductAdminOpportunities.Split('|').ToList(),
-                        UserOpportunities = () => FilesCommonResource.ProductUserOpportunities.Split('|').ToList(),
+                        AdminOpportunities = adminOpportunities,
+                        UserOpportunities = userOpportunities,
                         CanNotBeDisabled = true,
                     };
             SearchHandlerManager.Registry(new SearchHandler());
@@ -158,25 +164,37 @@ namespace ASC.Web.Files.Configuration
             get { return FilesCommonResource.ProductName; }
         }
 
-
-        public override string ExtendedDescription
-        {
-            get { return FilesCommonResource.ProductDescriptionEx; }
-        }
-
         public override string Description
         {
-            get { return FilesCommonResource.ProductDescription; }
+            get
+            {
+                var id = SecurityContext.CurrentAccount.ID;
+
+                if (CoreContext.UserManager.IsUserInGroup(id, ASC.Core.Users.Constants.GroupVisitor.ID))
+                    return FilesCommonResource.ProductDescriptionShort;
+
+                if (CoreContext.UserManager.IsUserInGroup(id, ASC.Core.Users.Constants.GroupAdmin.ID) || CoreContext.UserManager.IsUserInGroup(id, ID))
+                    return FilesCommonResource.ProductDescriptionEx;
+
+                return FilesCommonResource.ProductDescription;
+            }
         }
 
         public override string StartURL
         {
             get { return PathProvider.StartURL; }
         }
+
+        public override string HelpURL
+        {
+            get { return PathProvider.StartURL; }
+        }
+
         public override string ProductClassName
         {
             get { return "documents"; }
         }
+
         public override ProductContext Context
         {
             get { return _productContext; }

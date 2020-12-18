@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -30,8 +21,10 @@ using ASC.Core.Tenants;
 using ASC.Files.Core;
 using ASC.MessagingSystem;
 using ASC.Security.Cryptography;
+using ASC.Web.Core.Files;
 using ASC.Web.Files.Classes;
 using ASC.Web.Files.Helpers;
+using ASC.Web.Files.Resources;
 using ASC.Web.Files.Utils;
 using ASC.Web.Studio.Core;
 using Newtonsoft.Json;
@@ -52,6 +45,13 @@ namespace ASC.Web.Files.HttpHandlers
     {
         public override void OnProcessRequest(HttpContext context)
         {
+            if (context.Request.HttpMethod == "OPTIONS")
+            {
+                context.Response.StatusCode = 200;
+                context.Response.End();
+                return;
+            }
+
             try
             {
                 var request = new ChunkedRequestHelper(context.Request);
@@ -76,13 +76,13 @@ namespace ASC.Web.Files.HttpHandlers
                         return;
 
                     case ChunkedRequestType.Initiate:
-                        var createdSession = FileUploader.InitiateUpload(request.FolderId, request.FileId, request.FileName, request.FileSize);
+                        var createdSession = FileUploader.InitiateUpload(request.FolderId, request.FileId, request.FileName, request.FileSize, request.Encrypted);
                         WriteSuccess(context, ToResponseObject(createdSession, true));
                         return;
 
                     case ChunkedRequestType.Upload:
                         var resumedSession = FileUploader.UploadChunk(request.UploadId, request.ChunkStream, request.ChunkSize);
-
+                        
                         if (resumedSession.BytesUploaded == resumedSession.BytesTotal)
                         {
                             WriteSuccess(context, ToResponseObject(resumedSession.File), (int) HttpStatusCode.Created);
@@ -99,6 +99,11 @@ namespace ASC.Web.Files.HttpHandlers
                         return;
                 }
             }
+            catch (FileNotFoundException error)
+            {
+                Global.Logger.Error(error);
+                WriteError(context, FilesCommonResource.ErrorMassage_FileNotFound);
+            }
             catch (Exception error)
             {
                 Global.Logger.Error(error);
@@ -112,7 +117,8 @@ namespace ASC.Web.Files.HttpHandlers
             {
                 CoreContext.TenantManager.SetCurrentTenant(request.TenantId);
                 SecurityContext.AuthenticateMe(CoreContext.Authentication.GetAccountByID(request.AuthKey));
-                Thread.CurrentThread.CurrentUICulture = request.CultureInfo;
+                if (request.CultureInfo != null)
+                    Thread.CurrentThread.CurrentUICulture = request.CultureInfo;
                 return true;
             }
 
@@ -123,7 +129,9 @@ namespace ASC.Web.Files.HttpHandlers
                 {
                     CoreContext.TenantManager.SetCurrentTenant(uploadSession.TenantId);
                     SecurityContext.AuthenticateMe(CoreContext.Authentication.GetAccountByID(uploadSession.UserId));
-                    Thread.CurrentThread.CurrentUICulture = SetupInfo.EnabledCulturesPersonal.Find(c => String.Equals(c.Name, uploadSession.CultureName, StringComparison.InvariantCultureIgnoreCase));
+                    var culture = SetupInfo.EnabledCulturesPersonal.Find(c => String.Equals(c.Name, uploadSession.CultureName, StringComparison.InvariantCultureIgnoreCase));
+                    if (culture != null)
+                        Thread.CurrentThread.CurrentUICulture = culture;
                     return true;
                 }
             }
@@ -145,6 +153,7 @@ namespace ASC.Web.Files.HttpHandlers
         {
             context.Response.StatusCode = statusCode;
             context.Response.Write(JsonConvert.SerializeObject(new {success, data, message}));
+            context.Response.ContentType = "application/json";
         }
 
         public static object ToResponseObject(ChunkedUploadSession session, bool appendBreadCrumbs = false)
@@ -258,17 +267,17 @@ namespace ASC.Web.Files.HttpHandlers
 
             public string FolderId
             {
-                get { return _request["folderid"]; }
+                get { return _request[FilesLinkUtility.FolderId]; }
             }
 
             public string FileId
             {
-                get { return _request["fileid"]; }
+                get { return _request[FilesLinkUtility.FileId]; }
             }
 
             public string FileName
             {
-                get { return _request["name"]; }
+                get { return _request[FilesLinkUtility.FileTitle]; }
             }
 
             public long FileSize
@@ -307,6 +316,11 @@ namespace ASC.Web.Files.HttpHandlers
 
                     return _cultureInfo = SetupInfo.EnabledCulturesPersonal.Find(c => String.Equals(c.Name, culture, StringComparison.InvariantCultureIgnoreCase));
                 }
+            }
+
+            public bool Encrypted
+            {
+                get { return _request["encrypted"] == "true"; }
             }
 
             private HttpPostedFileBase File

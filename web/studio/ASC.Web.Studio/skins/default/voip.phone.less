@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -32,6 +23,10 @@
     }
 
     #service-unavailable-box {
+        display: none;
+    }
+
+    #service-already-running-box {
         display: none;
     }
 
@@ -90,18 +85,24 @@
         border-bottom: 1px solid @borderColor;
 
         #call-type-selector {
-            width: 228px;
+            width: 185px;
             height: 24px;
             line-height: 24px;
             float: left;
             .borderRadius(3px);
 
-            .browser-type-call {
-                background: url('imagescss/ip_browser.png') no-repeat;
-            }
+            option {
+                padding-left: 20px;
+                height: 16px;
+                font-size: 12px;
 
-            .phone-type-call {
-                background: url('imagescss/ip_phone.png') no-repeat;
+                &.browser-type-call {
+                    background: url('imagescss/ip_browser.png') no-repeat;
+                }
+
+                &.phone-type-call {
+                    background: url('imagescss/ip_phone.png') no-repeat;
+                }
             }
         }
 
@@ -121,6 +122,42 @@
                 height: 16px;
                 top: 4px;
                 left: 9px;
+            }
+
+            &.active {
+                background-color: #f5f5f5;
+            }
+
+            &.disable {
+                background-color: #f7f7f7;
+            }
+        }
+
+        #toggle-missed-box-btn {
+            float: left;
+            width: 35px;
+            height: 24px;
+            margin-left: 8px;
+            .bg-button-default();
+            .borderRadius(3px);
+            cursor: pointer;
+            position: relative;
+
+            .voip-missed{
+                position: absolute;
+                background: url('imagescss/ip_missed_call_icon.png') no-repeat;
+                width: 17px;
+                height: 16px;
+                top: 4px;
+                left: 9px;
+            }
+
+            &.active {
+                background-color: #f5f5f5;
+            }
+
+            &.disable {
+                background-color: #f7f7f7;
             }
         }
     }
@@ -225,7 +262,7 @@
                         display: block;
                         line-height: 18px;
                         font-weight: bold;
-                        max-width: 140px;
+                        max-width: 130px;
                         color: @textColor;
                         text-decoration: none;
                         .text-overflow();
@@ -426,11 +463,10 @@
 
         .panel-btn {
             float: left;
-            width: 80px;
+            width: 82px;
             height: 42px;
-            margin-right: 12px;
+            margin-right: 10px;
             line-height: 42px;
-            border: 1px solid @bg-default;
             .bg-button-default();
             .borderRadius(3px);
             font-weight: bold;

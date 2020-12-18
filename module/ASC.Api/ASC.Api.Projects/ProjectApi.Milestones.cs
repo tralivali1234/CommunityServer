@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,7 +19,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ASC.Api.Attributes;
-using ASC.Api.Collections;
 using ASC.Api.Exceptions;
 using ASC.Api.Projects.Wrappers;
 using ASC.Api.Utils;
@@ -49,12 +39,12 @@ namespace ASC.Api.Projects
         ///<short>
         ///Upcoming milestones
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<returns>List of milestones</returns>
         [Read(@"milestone")]
         public IEnumerable<MilestoneWrapper> GetMilestones()
         {
-            return EngineFactory.MilestoneEngine.GetUpcomingMilestones((int)Count).Select(x => new MilestoneWrapper(x));
+            return EngineFactory.MilestoneEngine.GetUpcomingMilestones((int)Count).Select(MilestoneWrapperSelector).ToList();
         }
 
         ///<summary>
@@ -63,7 +53,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Milestones by filter
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<param name="projectid" optional="true">Project ID</param>
         ///<param name="tag" optional="true">Project tag</param>
         ///<param name="status" optional="true">Milstone status/ Can be open or closed</param>
@@ -88,7 +78,7 @@ namespace ASC.Api.Projects
         {
             var milestoneEngine = EngineFactory.MilestoneEngine;
 
-            var filter = CreateFilter();
+            var filter = CreateFilter(EntityType.Milestone);
             filter.UserId = milestoneResponsible;
             filter.ParticipantId = taskResponsible;
             filter.TagId = tag;
@@ -109,7 +99,7 @@ namespace ASC.Api.Projects
 
             SetTotalCount(milestoneEngine.GetByFilterCount(filter));
 
-            return milestoneEngine.GetByFilter(filter).NotFoundIfNull().Select(r => new MilestoneWrapper(r));
+            return milestoneEngine.GetByFilter(filter).NotFoundIfNull().Select(MilestoneWrapperSelector).ToList();
         }
 
         ///<summary>
@@ -118,12 +108,12 @@ namespace ASC.Api.Projects
         ///<short>
         ///Overdue milestones
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<returns>List of milestones</returns>
         [Read(@"milestone/late")]
         public IEnumerable<MilestoneWrapper> GetLateMilestones()
         {
-            return EngineFactory.MilestoneEngine.GetLateMilestones((int)Count).ConvertAll(x => new MilestoneWrapper(x));
+            return EngineFactory.MilestoneEngine.GetLateMilestones((int)Count).Select(MilestoneWrapperSelector).ToList();
         }
 
         ///<summary>
@@ -132,7 +122,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Milestones by full date
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<param name="year">Deadline year</param>
         ///<param name="month">Deadline month</param>
         ///<param name="day">Deadline day</param>
@@ -141,7 +131,7 @@ namespace ASC.Api.Projects
         public IEnumerable<MilestoneWrapper> GetMilestonesByDeadLineFull(int year, int month, int day)
         {
             var milestones = EngineFactory.MilestoneEngine.GetByDeadLine(new DateTime(year, month, day));
-            return milestones.Select(x => new MilestoneWrapper(x));
+            return milestones.Select(MilestoneWrapperSelector).ToList();
         }
 
         ///<summary>
@@ -150,7 +140,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Milestones by month
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<param name="year">Deadline year</param>
         ///<param name="month">Deadline month</param>
         ///<returns>List of milestones</returns>
@@ -158,7 +148,7 @@ namespace ASC.Api.Projects
         public IEnumerable<MilestoneWrapper> GetMilestonesByDeadLineMonth(int year, int month)
         {
             var milestones = EngineFactory.MilestoneEngine.GetByDeadLine(new DateTime(year, month, DateTime.DaysInMonth(year, month)));
-            return milestones.Select(x => new MilestoneWrapper(x));
+            return milestones.Select(MilestoneWrapperSelector).ToList();
         }
 
         ///<summary>
@@ -167,7 +157,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Get milestone
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<param name="id">Milestone ID</param>
         ///<returns>Milestone</returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -176,7 +166,7 @@ namespace ASC.Api.Projects
         {
             var milestoneEngine = EngineFactory.MilestoneEngine;
             if (!milestoneEngine.IsExists(id)) throw new ItemNotFoundException();
-            return new MilestoneWrapper(milestoneEngine.GetByID(id));
+            return MilestoneWrapperSelector(milestoneEngine.GetByID(id));
         }
 
         ///<summary>
@@ -185,7 +175,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Get milestone tasks 
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<param name="id">Milestone ID </param>
         ///<returns>Tasks list</returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -193,7 +183,7 @@ namespace ASC.Api.Projects
         public IEnumerable<TaskWrapper> GetMilestoneTasks(int id)
         {
             if (!EngineFactory.MilestoneEngine.IsExists(id)) throw new ItemNotFoundException();
-            return EngineFactory.TaskEngine.GetMilestoneTasks(id).Select(x => new TaskWrapper(x));
+            return EngineFactory.TaskEngine.GetMilestoneTasks(id).Select(TaskWrapperSelector).ToList();
         }
 
         ///<summary>
@@ -202,7 +192,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Update milestone
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<param name="id">Milestone ID</param>
         ///<param name="title">Title</param>
         ///<param name="deadline">Deadline</param>
@@ -217,17 +207,17 @@ namespace ASC.Api.Projects
         ///<exception cref="ArgumentNullException"></exception>
         ///<exception cref="ItemNotFoundException"></exception>
         ///<example>
-        /// <![CDATA[
-        /// Sending data in application/json:
-        /// 
-        /// {
-        ///     title:"New title",
-        ///     deadline:"2011-03-23T14:27:14",
-        ///     isKey:false,
-        ///     status:"Open"
-        /// }
-        /// ]]>
-        /// </example>
+        ///<![CDATA[
+        ///Sending data in application/json:
+        ///
+        ///{
+        ///    title:"New title",
+        ///    deadline:"2011-03-23T14:27:14",
+        ///    isKey:false,
+        ///    status:"Open"
+        ///}
+        ///]]>
+        ///</example>
         [Update(@"milestone/{id:[0-9]+}")]
         public MilestoneWrapper UpdateMilestone(int id, string title, ApiDateTime deadline, bool? isKey, MilestoneStatus status, bool? isNotify, string description, int projectID, Guid responsible, bool notifyResponsible)
         {
@@ -254,9 +244,9 @@ namespace ASC.Api.Projects
             }
 
             milestoneEngine.SaveOrUpdate(milestone, notifyResponsible);
-            MessageService.Send(Request, MessageAction.MilestoneUpdated, milestone.Project.Title, milestone.Title);
+            MessageService.Send(Request, MessageAction.MilestoneUpdated, MessageTarget.Create(milestone.ID), milestone.Project.Title, milestone.Title);
 
-            return new MilestoneWrapper(milestone);
+            return MilestoneWrapperSelector(milestone);
         }
 
         ///<summary>
@@ -265,21 +255,21 @@ namespace ASC.Api.Projects
         ///<short>
         ///Update milestone status
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<param name="id">Milestone ID</param>
         ///<param name="status">Status</param>
         ///<returns>Updated milestone</returns>
         ///<exception cref="ArgumentNullException"></exception>
         ///<exception cref="ItemNotFoundException"></exception>
         ///<example>
-        /// <![CDATA[
-        /// Sending data in application/json:
-        /// 
-        /// {
-        ///     status:"Open"
-        /// }
-        /// ]]>
-        /// </example>
+        ///<![CDATA[
+        ///Sending data in application/json:
+        ///
+        ///{
+        ///    status:"Open"
+        ///}
+        ///]]>
+        ///</example>
         [Update(@"milestone/{id:[0-9]+}/status")]
         public MilestoneWrapper UpdateMilestone(int id, MilestoneStatus status)
         {
@@ -288,9 +278,9 @@ namespace ASC.Api.Projects
             var milestone = milestoneEngine.GetByID(id).NotFoundIfNull();
 
             milestoneEngine.ChangeStatus(milestone, status);
-            MessageService.Send(Request, MessageAction.MilestoneUpdatedStatus, milestone.Project.Title, milestone.Title, LocalizedEnumConverter.ConvertToString(milestone.Status));
+            MessageService.Send(Request, MessageAction.MilestoneUpdatedStatus, MessageTarget.Create(milestone.ID), milestone.Project.Title, milestone.Title, LocalizedEnumConverter.ConvertToString(milestone.Status));
 
-            return new MilestoneWrapper(milestone);
+            return MilestoneWrapperSelector(milestone);
         }
 
         ///<summary>
@@ -299,7 +289,7 @@ namespace ASC.Api.Projects
         ///<short>
         ///Delete milestone
         ///</short>
-        /// <category>Milestones</category>
+        ///<category>Milestones</category>
         ///<param name="id">Milestone ID</param>
         ///<returns>Deleted milestone</returns>
         ///<exception cref="ItemNotFoundException"></exception>
@@ -311,9 +301,39 @@ namespace ASC.Api.Projects
             var milestone = milestoneEngine.GetByID(id).NotFoundIfNull();
 
             milestoneEngine.Delete(milestone);
-            MessageService.Send(Request, MessageAction.MilestoneDeleted, milestone.Project.Title, milestone.Title);
+            MessageService.Send(Request, MessageAction.MilestoneDeleted, MessageTarget.Create(milestone.ID), milestone.Project.Title, milestone.Title);
 
-            return new MilestoneWrapper(milestone);
+            return MilestoneWrapperSelector(milestone);
+        }
+
+        ///<summary>
+        ///Deletes milestones with the IDs specified in the request
+        ///</summary>
+        ///<short>
+        ///Delete milestones
+        ///</short>
+        ///<category>Milestones</category>
+        ///<param name="ids">Milestones ID</param>
+        ///<returns>Deleted milestones</returns>
+        ///<exception cref="ItemNotFoundException"></exception>
+        [Delete(@"milestone")]
+        public IEnumerable<MilestoneWrapper> DeleteMilestones(int[] ids)
+        {
+            var result = new List<MilestoneWrapper>(ids.Length);
+
+            foreach (var id in ids)
+            {
+                try
+                {
+                    result.Add(DeleteMilestone(id));
+                }
+                catch (Exception)
+                {
+                    
+                }
+            }
+
+            return result;
         }
 
         #endregion

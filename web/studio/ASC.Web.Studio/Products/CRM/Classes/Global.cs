@@ -1,61 +1,40 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-#region Import
-
 using System;
-using System.Collections.Generic;
+using System.Configuration;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Globalization;
+using System.IO;
 using System.Text;
-using System.Linq;
 using System.Web;
-using ASC.Core;
-using ASC.Core.Users;
+
 using ASC.CRM.Core;
 using ASC.CRM.Core.Dao;
 using ASC.Data.Storage;
-using ASC.Thrdparty.Configuration;
-using ASC.VoipService;
-using ASC.VoipService.Dao;
-using ASC.VoipService.Twilio;
-using ASC.Web.Core.Utility.Settings;
+using ASC.Web.Core;
+using ASC.Web.Core.Files;
 using ASC.Web.CRM.Resources;
 using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Utility;
-using System.Web.Configuration;
-using Newtonsoft.Json.Linq;
-using System.IO;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
-using ASC.Web.Core.Files;
-using ASC.Web.Core;
-using Newtonsoft.Json;
 
-#endregion
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ASC.Web.CRM.Classes
 {
@@ -73,20 +52,21 @@ namespace ASC.Web.CRM.Classes
         public static readonly int DefaultCustomFieldCols = 40;
 
         public static readonly int MaxHistoryEventCharacters = 65000;
-
-        public static DaoFactory DaoFactory
-        {
-            get { return new DaoFactory(TenantProvider.CurrentTenantID, CRMConstants.DatabaseId); }
-        }
+        public static readonly decimal MaxInvoiceItemPrice = (decimal)99999999.99;
 
         public static CRMSettings TenantSettings
         {
-            get { return SettingsManager.Instance.LoadSettings<CRMSettings>(TenantProvider.CurrentTenantID); }
+            get { return CRMSettings.Load(); }
         }
 
         public static IDataStore GetStore()
         {
             return StorageFactory.GetStorage(TenantProvider.CurrentTenantID.ToString(), "crm");
+        }
+
+        public static IDataStore GetStoreTemplate()
+        {
+            return StorageFactory.GetStorage(String.Empty, "crm_template");
         }
 
         public static bool CanCreateProjects()
@@ -117,7 +97,7 @@ namespace ASC.Web.CRM.Classes
                 return canCreateProject;
 
             }
-            catch 
+            catch
             {
                 return false;
             }
@@ -130,12 +110,12 @@ namespace ASC.Web.CRM.Classes
             {
                 var canDownloadFiles = false;
 
-                var value = WebConfigurationManager.AppSettings["crm.invoice.download.enable"];
+                var value = ConfigurationManagerExtension.AppSettings["crm.invoice.download.enable"];
                 if (string.IsNullOrEmpty(value)) return false;
 
                 canDownloadFiles = Convert.ToBoolean(value);
 
-                if (canDownloadFiles && (string.IsNullOrEmpty(FilesLinkUtility.DocServiceStorageUrl) || string.IsNullOrEmpty(FilesLinkUtility.DocServiceConverterUrl)))
+                if (canDownloadFiles && string.IsNullOrEmpty(FilesLinkUtility.DocServiceConverterUrl))
                 {
                     canDownloadFiles = false;
                 }
@@ -144,52 +124,40 @@ namespace ASC.Web.CRM.Classes
             }
         }
 
-        #region CRM Settings
-
-        public static void SaveSMTPSettings(string host, int port, bool authentication, string hostLogin, string hostPassword, string senderDisplayName, string senderEmailAddress, bool enableSSL)
+        public static bool CanCreateReports
         {
-            var crmSettings = Global.TenantSettings;
-
-            crmSettings.SMTPServerSetting = new SMTPServerSetting
+            get
             {
-                Host = host,
-                Port = port,
-                RequiredHostAuthentication = authentication,
-                HostLogin = hostLogin,
-                HostPassword = hostPassword,
-                SenderDisplayName = senderDisplayName,
-                SenderEmailAddress = senderEmailAddress,
-                EnableSSL = enableSSL
-            };
-
-            SettingsManager.Instance.SaveSettings(crmSettings, TenantProvider.CurrentTenantID);
+                return !string.IsNullOrEmpty(FilesLinkUtility.DocServiceDocbuilderUrl) && CRMSecurity.IsAdmin;
+            }
         }
+
+        #region CRM Settings
 
         public static void SaveDefaultCurrencySettings(CurrencyInfo currency)
         {
-            var tenantSettings = Global.TenantSettings;
+            var tenantSettings = TenantSettings;
             tenantSettings.DefaultCurrency = currency;
-
-            SettingsManager.Instance.SaveSettings(tenantSettings, TenantProvider.CurrentTenantID);
+            tenantSettings.Save();
         }
 
         #endregion
 
         #region Invoice PDF
 
-        public static ASC.Files.Core.File GetInvoicePdfExistingOrCreate(ASC.CRM.Core.Entities.Invoice invoice)
+        public static ASC.Files.Core.File GetInvoicePdfExistingOrCreate(ASC.CRM.Core.Entities.Invoice invoice, DaoFactory factory)
         {
-            var existingFile = invoice.GetInvoiceFile();
+            var existingFile = invoice.GetInvoiceFile(factory);
             if (existingFile != null)
             {
                 return existingFile;
             }
             else
             {
-                var newFile = PdfCreator.CreateFile(invoice);
+                var newFile = PdfCreator.CreateFile(invoice, factory);
                 invoice.FileID = Int32.Parse(newFile.ID.ToString());
-                Global.DaoFactory.GetInvoiceDao().UpdateInvoiceFileID(invoice.ID, invoice.FileID);
-                Global.DaoFactory.GetRelationshipEventDao().AttachFiles(invoice.ContactID, invoice.EntityType, invoice.EntityID, new[] { invoice.FileID });
+                factory.InvoiceDao.UpdateInvoiceFileID(invoice.ID, invoice.FileID);
+                factory.RelationshipEventDao.AttachFiles(invoice.ContactID, invoice.EntityType, invoice.EntityID, new[] { invoice.FileID });
                 return newFile;
             }
         }
@@ -197,64 +165,6 @@ namespace ASC.Web.CRM.Classes
         #endregion
 
         //Code snippet
-
-        /// <summary>
-        /// method for generating a country list, say for populating
-        /// a ComboBox, with country options. We return the
-        /// values in a Generic List<T>
-        /// </summary>
-        /// <returns></returns>
-        public static List<KeyValuePair<int, string>> GetCountryListBase()
-        {
-            var cultureList = CultureInfo.GetCultures(CultureTypes.AllCultures)
-                            .Where(culture => !culture.IsNeutralCulture && culture.LCID != 127)
-                            .Select(culture => new KeyValuePair<int,string>(culture.LCID, new RegionInfo(culture.Name).EnglishName))
-                            .ToList();
-
-            return cultureList;
-        }
-
-        public static List<String> GetCountryListExt() { 
-            var country = new List<string> ();
-            
-            var enUs = CultureInfo.GetCultureInfo("en-US");
-            var additionalCountries = new List<KeyValuePair<int,string>>
-                                        {
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_Gambia", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_Ghana", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_RepublicOfCyprus", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_SierraLeone", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_Tanzania", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_Zambia", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_RepublicOfMadagascar", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_SolomonIslands", enUs)),
-                                            new KeyValuePair<int,string>(2072,CRMCommonResource.ResourceManager.GetString("Country_RepublicOfMoldova", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_RepublicOfMauritius", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_BurkinaFaso", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_RepublicOfMozambique", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_RepublicOfMalawi", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_Benin", enUs)),
-                                            new KeyValuePair<int,string>(12300,CRMCommonResource.ResourceManager.GetString("Country_IvoryCoast", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_Bahamas", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_Andorra", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_BritishVirginIslands", enUs)),
-                                            new KeyValuePair<int,string>(9228,CRMCommonResource.ResourceManager.GetString("Country_RepublicOfCongo", enUs)),
-                                            new KeyValuePair<int,string>(0,CRMCommonResource.ResourceManager.GetString("Country_RepublicOfCuba", enUs))
-                                        };//https://msdn.microsoft.com/en-us/goglobal/bb964664
-
-            var additionalCountriesCodes = additionalCountries.Select(s => s.Key).Where(s => s != 0).ToList();
-
-
-            var standardCountries = Global.GetCountryListBase()
-                                .Where(s => !additionalCountriesCodes.Contains(s.Key)).ToList();
-
-            country.AddRange(additionalCountries.Select(s => s.Value).ToList());
-            country.AddRange(standardCountries.Select(s => s.Value).Distinct().ToList());
-            country = country.Distinct().OrderBy(c => c).ToList();
-
-            return country;
-        }
-
 
         public static String GetUpButtonHTML(Uri requestUrlReferrer)
         {

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -27,20 +18,20 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web.Caching;
+using System.Text.RegularExpressions;
+using System.Globalization;
+
 using ASC.Collections;
-using ASC.Common.Data;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
 using ASC.Core;
 using ASC.Core.Tenants;
 using ASC.CRM.Core.Entities;
+using ASC.ElasticSearch;
 using ASC.Files.Core;
-using ASC.FullTextIndex;
 using ASC.Web.Files.Api;
+using ASC.Web.CRM.Core.Search;
 using OrderBy = ASC.CRM.Core.Entities.OrderBy;
-using System.Text.RegularExpressions;
-using System.Globalization;
 
 namespace ASC.CRM.Core.Dao
 {
@@ -48,8 +39,8 @@ namespace ASC.CRM.Core.Dao
     {
         private readonly HttpRequestDictionary<Deal> _dealCache = new HttpRequestDictionary<Deal>("crm_deal");
 
-        public CachedDealDao(int tenantID, string storageKey)
-            : base(tenantID, storageKey)
+        public CachedDealDao(int tenantID)
+            : base(tenantID)
         {
         }
 
@@ -92,8 +83,8 @@ namespace ASC.CRM.Core.Dao
     {
         #region Constructor
 
-        public DealDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public DealDao(int tenantID)
+            : base(tenantID)
         {
         }
 
@@ -103,10 +94,7 @@ namespace ASC.CRM.Core.Dao
 
         public void AddMember(int dealID, int memberID)
         {
-            using (var db = GetDb())
-            {
-                SetRelative(memberID, EntityType.Opportunity, dealID, db);
-            }
+            SetRelative(memberID, EntityType.Opportunity, dealID);
         }
 
         public Dictionary<int, int[]> GetMembers(int[] dealID)
@@ -126,21 +114,15 @@ namespace ASC.CRM.Core.Dao
 
         public void RemoveMember(int dealID, int memberID)
         {
-            using (var db = GetDb())
-            {
-                RemoveRelative(memberID, EntityType.Opportunity, dealID, db);
-            }
+            RemoveRelative(memberID, EntityType.Opportunity, dealID);
         }
 
         public virtual List<Deal> GetDeals(int[] id)
         {
             if (id == null || !id.Any()) return new List<Deal>();
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetDealSqlQuery(Exp.In("tblDeal.id", id)))
-                   .ConvertAll(ToDeal).FindAll(CRMSecurity.CanAccessTo).ToList();
-            }
+            return Db.ExecuteList(GetDealSqlQuery(Exp.In("tblDeal.id", id)))
+                .ConvertAll(ToDeal).FindAll(CRMSecurity.CanAccessTo).ToList();
         }
 
         public virtual Deal GetByID(int dealID)
@@ -154,15 +136,17 @@ namespace ASC.CRM.Core.Dao
 
         public virtual int CreateNewDeal(Deal deal)
         {
-            using (var db = GetDb())
-            {
-                return CreateNewDeal(deal, db);
-            }
+            var result = CreateNewDealInDb(deal);
+
+            deal.ID = result;
+
+            FactoryIndexer<DealsWrapper>.IndexAsync(deal);
+
+            return result;
         }
 
-        private int CreateNewDeal(Deal deal, DbManager db)
+        private int CreateNewDealInDb(Deal deal)
         {
-
             if (String.IsNullOrEmpty(deal.Title) || deal.ResponsibleID == Guid.Empty || deal.DealMilestoneID <= 0)
                 throw new ArgumentException();
 
@@ -170,7 +154,7 @@ namespace ASC.CRM.Core.Dao
             _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "deals.*"));
 
 
-            var dealID = db.ExecuteScalar<int>(
+            var dealID = Db.ExecuteScalar<int>(
                 Insert("crm_deal")
                 .InColumnValue("id", 0)
                 .InColumnValue("title", deal.Title)
@@ -185,9 +169,9 @@ namespace ASC.CRM.Core.Dao
                 .InColumnValue("expected_close_date", TenantUtil.DateTimeToUtc(deal.ExpectedCloseDate))
                 .InColumnValue("actual_close_date", TenantUtil.DateTimeToUtc(deal.ActualCloseDate))
                 .InColumnValue("per_period_value", deal.PerPeriodValue)
-                .InColumnValue("create_on", TenantUtil.DateTimeToUtc(TenantUtil.DateTimeNow()))
+                .InColumnValue("create_on", TenantUtil.DateTimeToUtc(deal.CreateOn == DateTime.MinValue ? TenantUtil.DateTimeNow() : deal.CreateOn))
                 .InColumnValue("create_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                .InColumnValue("last_modifed_on", TenantUtil.DateTimeToUtc(TenantUtil.DateTimeNow()))
+                .InColumnValue("last_modifed_on", TenantUtil.DateTimeToUtc(deal.CreateOn == DateTime.MinValue ? TenantUtil.DateTimeNow() : deal.CreateOn))
                 .InColumnValue("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
                 .Identity(1, 0, true));
 
@@ -199,11 +183,15 @@ namespace ASC.CRM.Core.Dao
 
         public virtual int[] SaveDealList(List<Deal> items)
         {
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction())
+            using (var tx = Db.BeginTransaction())
             {
+                var result = items.Select(item => CreateNewDealInDb(item)).ToArray();
                 tx.Commit();
-                return items.Select(item => CreateNewDeal(item, db)).ToArray();
+                foreach (var item in items)
+                {
+                    FactoryIndexer<DealsWrapper>.IndexAsync(item);
+                }
+                return result;
             }
         }
 
@@ -218,27 +206,26 @@ namespace ASC.CRM.Core.Dao
 
             //    AddMember(deal.ID, deal.ContactID);
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(
-                    Update("crm_deal")
-                    .Set("title", deal.Title)
-                    .Set("description", deal.Description)
-                    .Set("responsible_id", deal.ResponsibleID)
-                    .Set("contact_id", deal.ContactID)
-                    .Set("bid_currency", deal.BidCurrency)
-                    .Set("bid_value", deal.BidValue)
-                    .Set("bid_type", deal.BidType)
-                    .Set("deal_milestone_id", deal.DealMilestoneID)
-                    .Set("deal_milestone_probability", deal.DealMilestoneProbability)
-                    .Set("expected_close_date", TenantUtil.DateTimeToUtc(deal.ExpectedCloseDate))
-                    .Set("per_period_value", deal.PerPeriodValue)
-                    .Set("actual_close_date", TenantUtil.DateTimeToUtc(deal.ActualCloseDate))
-                    .Set("last_modifed_on", TenantUtil.DateTimeToUtc(TenantUtil.DateTimeNow()))
-                    .Set("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
-                    .Where(Exp.Eq("id", deal.ID))
-                    );
-            }
+            Db.ExecuteNonQuery(
+                Update("crm_deal")
+                .Set("title", deal.Title)
+                .Set("description", deal.Description)
+                .Set("responsible_id", deal.ResponsibleID)
+                .Set("contact_id", deal.ContactID)
+                .Set("bid_currency", deal.BidCurrency)
+                .Set("bid_value", deal.BidValue)
+                .Set("bid_type", deal.BidType)
+                .Set("deal_milestone_id", deal.DealMilestoneID)
+                .Set("deal_milestone_probability", deal.DealMilestoneProbability)
+                .Set("expected_close_date", TenantUtil.DateTimeToUtc(deal.ExpectedCloseDate))
+                .Set("per_period_value", deal.PerPeriodValue)
+                .Set("actual_close_date", TenantUtil.DateTimeToUtc(deal.ActualCloseDate))
+                .Set("last_modifed_on", TenantUtil.DateTimeToUtc(TenantUtil.DateTimeNow()))
+                .Set("last_modifed_by", ASC.Core.SecurityContext.CurrentAccount.ID)
+                .Where(Exp.Eq("id", deal.ID))
+                );
+
+            FactoryIndexer<DealsWrapper>.IndexAsync(deal);
         }
 
 
@@ -282,18 +269,16 @@ namespace ASC.CRM.Core.Dao
                 searchText = searchText.Trim();
 
                 var keywords = searchText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
-                var modules = SearchDao.GetFullTextSearchModule(EntityType.Opportunity, searchText);
 
                 if (keywords.Length > 0)
-                    if (FullTextSearch.SupportModule(modules))
+                {
+                    if (!BundleSearch.TrySelectOpportunity(searchText, out ids))
                     {
-                        ids = FullTextSearch.Search(modules);
-
-                        if (ids.Count == 0) return null;
-
+                        conditions.Add(BuildLike(new[] {"tblDeal.title", "tblDeal.description"}, keywords));
                     }
-                    else
-                        conditions.Add(BuildLike(new[] { "tblDeal.title", "tblDeal.description" }, keywords));
+                    else if (ids.Count == 0) return null;
+                }
+
             }
 
             if (tags != null && tags.Any())
@@ -419,50 +404,45 @@ namespace ASC.CRM.Core.Dao
 
             int result;
 
-            using (var db = GetDb())
+            if (withParams)
             {
-                if (withParams)
+                var whereConditional = WhereConditional(exceptIDs, searchText, responsibleID, milestoneID, tags,
+                                                        contactID, stageType, contactAlsoIsParticipant);
+
+
+                var sqlQuery = GetDealSqlQuery(whereConditional);
+
+                if (fromDate != DateTime.MinValue && toDate != DateTime.MinValue)
                 {
+                    sqlQuery.Having(Exp.Between("close_date", TenantUtil.DateTimeToUtc(fromDate), TenantUtil.DateTimeToUtc(toDate)));
 
+                    result = Db.ExecuteList(sqlQuery).Count;
 
-                    var whereConditional = WhereConditional(exceptIDs, searchText, responsibleID, milestoneID, tags,
-                                                            contactID, stageType, contactAlsoIsParticipant);
-
-
-                    var sqlQuery = GetDealSqlQuery(whereConditional);
-
-                    if (fromDate != DateTime.MinValue && toDate != DateTime.MinValue)
-                    {
-                        sqlQuery.Having(Exp.Between("close_date", TenantUtil.DateTimeToUtc(fromDate), TenantUtil.DateTimeToUtc(toDate)));
-
-                        result = db.ExecuteList(sqlQuery).Count;
-
-                    }
-                    else if (whereConditional == null)
-                    {
-                        result = 0;
-                    }
-                    else
-                    {
-                        result = db.ExecuteList(sqlQuery).Count;
-                    }
-
+                }
+                else if (whereConditional == null)
+                {
+                    result = 0;
                 }
                 else
                 {
-
-                    var countWithoutPrivate = db.ExecuteScalar<int>(Query("crm_deal").SelectCount());
-                    var privateCount = exceptIDs.Count;
-
-                    if (privateCount > countWithoutPrivate)
-                    {
-                        _log.Error("Private deals count more than all deals");
-
-                        privateCount = 0;
-                    }
-
-                    result = countWithoutPrivate - privateCount;
+                    result = Db.ExecuteList(sqlQuery).Count;
                 }
+
+            }
+            else
+            {
+
+                var countWithoutPrivate = Db.ExecuteScalar<int>(Query("crm_deal").SelectCount());
+                var privateCount = exceptIDs.Count;
+
+                if (privateCount > countWithoutPrivate)
+                {
+                    _log.Error("Private deals count more than all deals");
+
+                    privateCount = 0;
+                }
+
+                result = countWithoutPrivate - privateCount;
             }
             if (result > 0)
             {
@@ -641,10 +621,7 @@ namespace ASC.CRM.Core.Dao
                     .OrderBy("tblDeal.contact_id", true)
                     .OrderBy("tblDeal.title", true);
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery).ConvertAll(ToDeal);
-            }
+            return Db.ExecuteList(sqlQuery).ConvertAll(ToDeal);
         }
 
         public List<Deal> GetDealsByContactID(int contactID)
@@ -655,7 +632,7 @@ namespace ASC.CRM.Core.Dao
 
         }
 
-        public List<Deal> GetDealsByPrefix(String prefix, int from, int count)
+        public List<Deal> GetDealsByPrefix(String prefix, int from, int count, int contactId = 0, bool internalSearch = true)
         {
             if (count == 0)
                 throw new ArgumentException();
@@ -681,11 +658,19 @@ namespace ASC.CRM.Core.Dao
             if (0 < from && from < int.MaxValue) q.SetFirstResult(from);
             if (0 < count && count < int.MaxValue) q.SetMaxResults(count);
 
-            using (var db = GetDb())
+            if (contactId > 0)
             {
-                var sqlResult = db.ExecuteList(q).ConvertAll(row => ToDeal(row)).FindAll(CRMSecurity.CanAccessTo);
-                return sqlResult.OrderBy(deal => deal.Title).ToList();
+                var ids = GetRelativeToEntity(contactId, EntityType.Opportunity, null);
+
+                if (internalSearch)
+                    q.Where(Exp.Eq("tblDeal.contact_id", contactId) | Exp.In("tblDeal.id", ids));
+                else
+                    q.Where(!Exp.Eq("tblDeal.contact_id", contactId) & !Exp.In("tblDeal.id", ids));
             }
+
+            var sqlResult = Db.ExecuteList(q).ConvertAll(ToDeal).FindAll(CRMSecurity.CanAccessTo);
+
+            return sqlResult.OrderBy(deal => deal.Title).ToList();
         }
 
         public virtual Deal DeleteDeal(int dealID)
@@ -701,6 +686,9 @@ namespace ASC.CRM.Core.Dao
             _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "deals.*"));
 
             DeleteBatchDealsExecute(new List<Deal>() { deal });
+
+            FactoryIndexer<DealsWrapper>.DeleteAsync(deal);
+
             return deal;
         }
 
@@ -735,23 +723,22 @@ namespace ASC.CRM.Core.Dao
             var dealID = deals.Select(x => x.ID).ToArray();
             object[] filesIDs;
 
-            using (var db = GetDb())
             using (var tagdao = FilesIntegration.GetTagDao())
             {
-                var tagNames = db.ExecuteList(Query("crm_relationship_event").Select("id")
+                var tagNames = Db.ExecuteList(Query("crm_relationship_event").Select("id")
                                     .Where(Exp.Eq("have_files", true) & Exp.In("entity_id", dealID) & Exp.Eq("entity_type", (int)EntityType.Opportunity)))
                                     .Select(row => String.Format("RelationshipEvent_{0}", row[0])).ToArray();
                 filesIDs = tagdao.GetTags(tagNames, TagType.System).Where(t => t.EntryType == FileEntryType.File).Select(t => t.EntryId).ToArray();
 
-                using (var tx = db.BeginTransaction(true))
+                using (var tx = Db.BeginTransaction(true))
                 {
 
-                    db.ExecuteNonQuery(Delete("crm_field_value").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", (int)EntityType.Opportunity)));
-                    db.ExecuteNonQuery(new SqlDelete("crm_entity_contact").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", EntityType.Opportunity)));
-                    db.ExecuteNonQuery(Delete("crm_relationship_event").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", EntityType.Opportunity)));
-                    db.ExecuteNonQuery(Delete("crm_task").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", EntityType.Opportunity)));
-                    db.ExecuteNonQuery(new SqlDelete("crm_entity_tag").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", EntityType.Opportunity)));
-                    db.ExecuteNonQuery(Delete("crm_deal").Where(Exp.In("id", dealID)));
+                    Db.ExecuteNonQuery(Delete("crm_field_value").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", (int)EntityType.Opportunity)));
+                    Db.ExecuteNonQuery(new SqlDelete("crm_entity_contact").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", EntityType.Opportunity)));
+                    Db.ExecuteNonQuery(Delete("crm_relationship_event").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", EntityType.Opportunity)));
+                    Db.ExecuteNonQuery(Delete("crm_task").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", EntityType.Opportunity)));
+                    Db.ExecuteNonQuery(new SqlDelete("crm_entity_tag").Where(Exp.In("entity_id", dealID) & Exp.Eq("entity_type", EntityType.Opportunity)));
+                    Db.ExecuteNonQuery(Delete("crm_deal").Where(Exp.In("id", dealID)));
 
                     tx.Commit();
                 }
@@ -763,7 +750,6 @@ namespace ASC.CRM.Core.Dao
             {
                 foreach (var filesID in filesIDs)
                 {
-                    filedao.DeleteFolder(filesID);
                     filedao.DeleteFile(filesID);
                 }
             }
@@ -831,6 +817,70 @@ namespace ASC.CRM.Core.Dao
 
         #endregion
 
+
+        public void ReassignDealsResponsible(Guid fromUserId, Guid toUserId)
+        {
+            var deals = GetDeals(String.Empty,
+                            fromUserId,
+                            0,
+                            null,
+                            0,
+                            DealMilestoneStatus.Open, 
+                            null,
+                            DateTime.MinValue,
+                            DateTime.MinValue,
+                            0,
+                            0,
+                            null);
+
+            foreach (var deal in deals)
+            {
+                deal.ResponsibleID = toUserId;
+
+                EditDeal(deal);
+
+                var responsibles = CRMSecurity.GetAccessSubjectGuidsTo(deal);
+
+                if (!responsibles.Any()) continue;
+
+                responsibles.Remove(fromUserId);
+                responsibles.Add(toUserId);
+
+                CRMSecurity.SetAccessTo(deal, responsibles.Distinct().ToList());
+            }
+        }
+
         #endregion
+
+
+        /// <summary>
+        /// Test method
+        /// </summary>
+        /// <param name="opportunityid"></param>
+        /// <param name="creationDate"></param>
+        public void SetDealCreationDate(int opportunityid, DateTime creationDate)
+        {
+            Db.ExecuteNonQuery(
+                Update("crm_deal")
+                    .Set("create_on", TenantUtil.DateTimeToUtc(creationDate))
+                    .Where(Exp.Eq("id", opportunityid)));
+            // Delete relative keys
+            _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "deals.*"));
+        }
+
+        /// <summary>
+        /// Test method
+        /// </summary>
+        /// <param name="opportunityid"></param>
+        /// <param name="lastModifedDate"></param>
+        public void SetDealLastModifedDate(int opportunityid, DateTime lastModifedDate)
+        {
+            Db.ExecuteNonQuery(
+                Update("crm_deal")
+                    .Set("last_modifed_on", TenantUtil.DateTimeToUtc(lastModifedDate))
+                    .Where(Exp.Eq("id", opportunityid)));
+            // Delete relative keys
+            _cache.Remove(new Regex(TenantID.ToString(CultureInfo.InvariantCulture) + "deals.*"));
+        }
     }
 }

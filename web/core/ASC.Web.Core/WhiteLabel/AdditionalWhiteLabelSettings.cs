@@ -1,41 +1,32 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.Core.Tenants;
-using ASC.Web.Core.Utility.Settings;
 using System;
+using System.Configuration;
 using System.Globalization;
 using System.Runtime.Serialization;
-using System.Web.Configuration;
+
+using ASC.Core.Common.Settings;
 
 namespace ASC.Web.Core.WhiteLabel
 {
     [Serializable]
     [DataContract]
-    public class AdditionalWhiteLabelSettings : ISettings
+    public class AdditionalWhiteLabelSettings : BaseSettings<AdditionalWhiteLabelSettings>
     {
         [DataMember(Name = "StartDocsEnabled")]
         public bool StartDocsEnabled { get; set; }
@@ -64,8 +55,8 @@ namespace ASC.Web.Core.WhiteLabel
         [DataMember(Name = "SalesEmail")]
         public string SalesEmail { get; set; }
 
-        [DataMember(Name = "PricingUrl")]
-        public string PricingUrl { get; set; }
+        [DataMember(Name = "BuyUrl")]
+        public string BuyUrl { get; set; }
 
         [DataMember(Name = "LicenseAgreementsEnabled")]
         public bool LicenseAgreementsEnabled { get; set; }
@@ -90,7 +81,7 @@ namespace ASC.Web.Core.WhiteLabel
                        VideoGuidesEnabled == defaultSettings.VideoGuidesEnabled &&
                        VideoGuidesUrl == defaultSettings.VideoGuidesUrl &&
                        SalesEmail == defaultSettings.SalesEmail &&
-                       PricingUrl == defaultSettings.PricingUrl &&
+                       BuyUrl == defaultSettings.BuyUrl &&
                        LicenseAgreementsEnabled == defaultSettings.LicenseAgreementsEnabled &&
                        LicenseAgreementsUrl == defaultSettings.LicenseAgreementsUrl;
             }
@@ -98,28 +89,28 @@ namespace ASC.Web.Core.WhiteLabel
 
         #region ISettings Members
 
-        public Guid ID
+        public override Guid ID
         {
             get { return new Guid("{0108422F-C05D-488E-B271-30C4032494DA}"); }
         }
 
-        public ISettings GetDefault()
+        public override ISettings GetDefault()
         {
             return new AdditionalWhiteLabelSettings
-                {
-                    StartDocsEnabled = true,
-                    HelpCenterEnabled = DefaultHelpCenterUrl != null,
-                    FeedbackAndSupportEnabled = DefaultFeedbackAndSupportUrl != null,
-                    FeedbackAndSupportUrl = DefaultFeedbackAndSupportUrl,
-                    UserForumEnabled = DefaultUserForumUrl != null,
-                    UserForumUrl = DefaultUserForumUrl,
-                    VideoGuidesEnabled = DefaultVideoGuidesUrl != null,
-                    VideoGuidesUrl = DefaultVideoGuidesUrl,
-                    SalesEmail = DefaultMailSalesEmail,
-                    PricingUrl = DefaultPricingUrl,
-                    LicenseAgreementsEnabled = true,
-                    LicenseAgreementsUrl = DefaultLicenseAgreements
-                };
+            {
+                StartDocsEnabled = true,
+                HelpCenterEnabled = DefaultHelpCenterUrl != null,
+                FeedbackAndSupportEnabled = DefaultFeedbackAndSupportUrl != null,
+                FeedbackAndSupportUrl = DefaultFeedbackAndSupportUrl,
+                UserForumEnabled = DefaultUserForumUrl != null,
+                UserForumUrl = DefaultUserForumUrl,
+                VideoGuidesEnabled = DefaultVideoGuidesUrl != null,
+                VideoGuidesUrl = DefaultVideoGuidesUrl,
+                SalesEmail = DefaultMailSalesEmail,
+                BuyUrl = DefaultBuyUrl,
+                LicenseAgreementsEnabled = true,
+                LicenseAgreementsUrl = DefaultLicenseAgreements
+            };
         }
 
         #endregion
@@ -130,7 +121,7 @@ namespace ASC.Web.Core.WhiteLabel
         {
             get
             {
-                var url = WebConfigurationManager.AppSettings["web.help-center"];
+                var url = ConfigurationManagerExtension.AppSettings["web.help-center"];
                 return string.IsNullOrEmpty(url) ? null : url;
             }
         }
@@ -139,7 +130,7 @@ namespace ASC.Web.Core.WhiteLabel
         {
             get
             {
-                var url = WebConfigurationManager.AppSettings["web.support-feedback"];
+                var url = ConfigurationManagerExtension.AppSettings["web.support-feedback"];
                 return string.IsNullOrEmpty(url) ? null : url;
             }
         }
@@ -148,7 +139,7 @@ namespace ASC.Web.Core.WhiteLabel
         {
             get
             {
-                var url = WebConfigurationManager.AppSettings["web.user-forum"];
+                var url = ConfigurationManagerExtension.AppSettings["web.user-forum"];
                 return string.IsNullOrEmpty(url) ? null : url;
             }
         }
@@ -166,17 +157,17 @@ namespace ASC.Web.Core.WhiteLabel
         {
             get
             {
-                var email = WebConfigurationManager.AppSettings["web.payment.email"];
+                var email = ConfigurationManagerExtension.AppSettings["web.payment.email"];
                 return !string.IsNullOrEmpty(email) ? email : "sales@onlyoffice.com";
             }
         }
 
-        public static string DefaultPricingUrl
+        public static string DefaultBuyUrl
         {
             get
             {
-                var email = WebConfigurationManager.AppSettings["web.teamlab-site"];
-                return !string.IsNullOrEmpty(email) ? email + "/enterprise-edition.aspx" : "http://www.onlyoffice.com/enterprise-edition.aspx";
+                var site = ConfigurationManagerExtension.AppSettings["web.teamlab-site"];
+                return !string.IsNullOrEmpty(site) ? site + "/post.ashx?type=buyenterprise" : "";
             }
         }
 
@@ -184,7 +175,7 @@ namespace ASC.Web.Core.WhiteLabel
         {
             get
             {
-                return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru" ? "http://onlyo.co/1l7Hkx9" : "http://onlyo.co/1HRBEvK";
+                return "https://help.onlyoffice.com/Products/Files/doceditor.aspx?fileid=6795868&doc=RG5GaVN6azdUQW5kLzZQNzBXbHZ4Rm9QWVZuNjZKUmgya0prWnpCd2dGcz0_IjY3OTU4Njgi0";
             }
         }
 
@@ -194,7 +185,7 @@ namespace ASC.Web.Core.WhiteLabel
         {
             get
             {
-                return SettingsManager.Instance.LoadSettings<AdditionalWhiteLabelSettings>(Tenant.DEFAULT_TENANT);
+                return LoadForDefaultTenant();
             }
         }
     }

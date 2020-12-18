@@ -1,54 +1,43 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
+using ASC.Common.Logging;
+using ASC.Core.Common.Settings;
 using ASC.Core.Tenants;
 using ASC.Data.Storage;
-using ASC.Web.Core.Client;
-using ASC.Web.Core.Utility.Settings;
-using ASC.Web.Core.Utility.Skins;
 using ASC.Web.Core.Users;
+using ASC.Web.Core.Utility.Skins;
 using ASC.Web.Studio.Utility;
 using TMResourceData;
-
 
 namespace ASC.Web.Core.WhiteLabel
 {
     [Serializable]
     [DataContract]
-    public class TenantWhiteLabelSettings : ISettings
+    public class TenantWhiteLabelSettings : BaseSettings<TenantWhiteLabelSettings>
     {
-        public const string DefaultLogo = "ONLYOFFICE";
+        public const string DefaultLogoText = "ONLYOFFICE";
 
         #region Logos information: extension, isDefault, text for img auto generating
 
@@ -80,11 +69,11 @@ namespace ASC.Web.Core.WhiteLabel
         {
             get
             {
-                if (!String.IsNullOrEmpty(_logoText) && _logoText != DefaultLogo)
+                if (!String.IsNullOrEmpty(_logoText) && _logoText != DefaultLogoText)
                     return _logoText;
 
-                var partnerSettings = SettingsManager.Instance.LoadSettings<TenantWhiteLabelSettings>(Tenant.DEFAULT_TENANT);
-                return String.IsNullOrEmpty(partnerSettings._logoText) ? DefaultLogo : partnerSettings._logoText;
+                var partnerSettings = LoadForDefaultTenant();
+                return String.IsNullOrEmpty(partnerSettings._logoText) ? DefaultLogoText : partnerSettings._logoText;
             }
             set { _logoText = value; }
         }
@@ -104,7 +93,7 @@ namespace ASC.Web.Core.WhiteLabel
 
         #region ISettings Members
 
-        public ISettings GetDefault()
+        public override ISettings GetDefault()
         {
             return new TenantWhiteLabelSettings
                 {
@@ -125,7 +114,7 @@ namespace ASC.Web.Core.WhiteLabel
 
         #region Restore default
 
-        public void RestoreDefault()
+        public void RestoreDefault(int tenantId, IDataStore storage = null)
         {
             _logoLightSmallExt = null;
             _logoDarkExt = null;
@@ -139,15 +128,14 @@ namespace ASC.Web.Core.WhiteLabel
 
             LogoText = null;
 
-            var tenantId = TenantProvider.CurrentTenantID;
-            var store = StorageFactory.GetStorage(tenantId.ToString(), moduleName);
+            var store = storage ?? StorageFactory.GetStorage(tenantId.ToString(), moduleName);
             try
             {
                 store.DeleteFiles("", "*", false);
             }
             catch (Exception e)
             {
-                log4net.LogManager.GetLogger("ASC").Error(e);
+                LogManager.GetLogger("ASC").Error(e);
             }
 
             Save(tenantId, true);
@@ -165,7 +153,7 @@ namespace ASC.Web.Core.WhiteLabel
                 }
                 catch (Exception e)
                 {
-                    log4net.LogManager.GetLogger("ASC").Error(e);
+                    LogManager.GetLogger("ASC").Error(e);
                 }
             }
         }
@@ -174,9 +162,9 @@ namespace ASC.Web.Core.WhiteLabel
 
         #region Set logo
 
-        public void SetLogo(WhiteLabelLogoTypeEnum type, string logoFileExt, byte[] data)
+        public void SetLogo(WhiteLabelLogoTypeEnum type, string logoFileExt, byte[] data, IDataStore storage = null)
         {
-            var store = StorageFactory.GetStorage(TenantProvider.CurrentTenantID.ToString(), moduleName);
+            var store = storage ?? StorageFactory.GetStorage(TenantProvider.CurrentTenantID.ToString(), moduleName);
 
             #region delete from storage if already exists
 
@@ -190,7 +178,7 @@ namespace ASC.Web.Core.WhiteLabel
                 }
                 catch (Exception e)
                 {
-                    log4net.LogManager.GetLogger("ASC").Error(e);
+                    LogManager.GetLogger("ASC").Error(e);
                 }
             }
             #endregion
@@ -213,7 +201,7 @@ namespace ASC.Web.Core.WhiteLabel
             ResizeLogo(type, generalFileName, data, -1, generalSize, store);
         }
 
-        public void SetLogo(Dictionary<int, string> logo)
+        public void SetLogo(Dictionary<int, string> logo, IDataStore storage = null)
         {
             var xStart = @"data:image/png;base64,";
 
@@ -238,7 +226,7 @@ namespace ASC.Web.Core.WhiteLabel
                         }
                         catch (Exception ex)
                         {
-                            log4net.LogManager.GetLogger("ASC").Error(ex);
+                            LogManager.GetLogger("ASC").Error(ex);
                         }
                     }
                     else
@@ -249,13 +237,13 @@ namespace ASC.Web.Core.WhiteLabel
 
                     if (data != null)
                     {
-                        SetLogo(currentLogoType, fileExt, data);
+                        SetLogo(currentLogoType, fileExt, data, storage);
                     }
                 }
             }
         }
 
-        public void SetLogoFromStream(WhiteLabelLogoTypeEnum type, string fileExt, Stream fileStream)
+        public void SetLogoFromStream(WhiteLabelLogoTypeEnum type, string fileExt, Stream fileStream, IDataStore storage = null)
         {
             byte[] data = null;
             using(var memoryStream = new MemoryStream())
@@ -266,7 +254,7 @@ namespace ASC.Web.Core.WhiteLabel
 
             if (data != null)
             {
-                SetLogo(type, fileExt, data);
+                SetLogo(type, fileExt, data, storage);
             }
         }
 
@@ -379,7 +367,7 @@ namespace ASC.Web.Core.WhiteLabel
             switch (type)
             {
                 case WhiteLabelLogoTypeEnum.LightSmall:
-                    return general ? WebImageSupplier.GetAbsoluteWebPath("onlyoffice_logo/light_small_general.png") : WebImageSupplier.GetAbsoluteWebPath("onlyoffice_logo/light_small.png");
+                    return general ? WebImageSupplier.GetAbsoluteWebPath("onlyoffice_logo/light_small_general.svg") : WebImageSupplier.GetAbsoluteWebPath("onlyoffice_logo/light_small.svg");
                 case WhiteLabelLogoTypeEnum.Dark:
                     return general ? WebImageSupplier.GetAbsoluteWebPath("onlyoffice_logo/dark_general.png") : WebImageSupplier.GetAbsoluteWebPath("onlyoffice_logo/dark.png");
                 case WhiteLabelLogoTypeEnum.DocsEditor:
@@ -392,17 +380,58 @@ namespace ASC.Web.Core.WhiteLabel
 
         private static string GetPartnerStorageLogoPath(WhiteLabelLogoTypeEnum type, bool general)
         {
-            var partnerSettings = SettingsManager.Instance.LoadSettings<TenantWhiteLabelSettings>(Tenant.DEFAULT_TENANT);
+            var partnerSettings = LoadForDefaultTenant();
 
             if (partnerSettings.GetIsDefault(type)) return null;
 
-            var partnerStorage = StorageFactory.GetStorage(Tenant.DEFAULT_TENANT.ToString(CultureInfo.InvariantCulture), "static_partnerdata");
+            var partnerStorage = StorageFactory.GetStorage(string.Empty, "static_partnerdata");
 
             if (partnerStorage == null) return null;
 
             var logoPath = BuildLogoFileName(type, partnerSettings.GetExt(type), general);
 
             return partnerStorage.IsFile(logoPath) ? partnerStorage.GetUri(logoPath).ToString() : null;
+        }
+
+        #endregion
+
+        #region Get Whitelabel Logo Stream
+
+        /// <summary>
+        /// Get logo stream or null in case of default whitelabel
+        /// </summary>
+        public Stream GetWhitelabelLogoData(WhiteLabelLogoTypeEnum type, bool general)
+        {
+            if (GetIsDefault(type))
+                return GetPartnerStorageLogoData(type, general);
+
+            return GetStorageLogoData(type, general);
+        }
+
+        private Stream GetStorageLogoData(WhiteLabelLogoTypeEnum type, bool general)
+        {
+            var storage = StorageFactory.GetStorage(TenantProvider.CurrentTenantID.ToString(CultureInfo.InvariantCulture), moduleName);
+
+            if (storage == null) return null;
+
+            var fileName = BuildLogoFileName(type, GetExt(type), general);
+
+            return storage.IsFile(fileName) ? storage.GetReadStream(fileName) : null;
+        }
+
+        private Stream GetPartnerStorageLogoData(WhiteLabelLogoTypeEnum type, bool general)
+        {
+            var partnerSettings = LoadForDefaultTenant();
+
+            if (partnerSettings.GetIsDefault(type)) return null;
+
+            var partnerStorage = StorageFactory.GetStorage(string.Empty, "static_partnerdata");
+
+            if (partnerStorage == null) return null;
+
+            var fileName = BuildLogoFileName(type, partnerSettings.GetExt(type), general);
+
+            return partnerStorage.IsFile(fileName) ? partnerStorage.GetReadStream(fileName) : null;
         }
 
         #endregion
@@ -478,35 +507,53 @@ namespace ASC.Web.Core.WhiteLabel
             }
         }
 
-        public Guid ID
+        public override Guid ID
         {
             get { return new Guid("{05d35540-c80b-4b17-9277-abd9e543bf93}"); }
         }
 
         #region Save for Resource replacement
 
+        private static readonly List<int> AppliedTenants = new List<int>();
+
         public static void Apply(int tenantId)
         {
-            if (ConfigurationManager.AppSettings["resources.from-db"] != "true") return;
+            if (!DBResourceManager.ResourcesFromDataBase) return;
 
-            var whiteLabelSettings = SettingsManager.Instance.LoadSettings<TenantWhiteLabelSettings>(tenantId);
+            if (AppliedTenants.Contains(tenantId)) return;
+
+            var whiteLabelSettings = LoadForTenant(tenantId);
             whiteLabelSettings.SetNewLogoText(tenantId);
+
+            if (!AppliedTenants.Contains(tenantId)) AppliedTenants.Add(tenantId);
         }
 
         public void Save(int tenantId, bool restore = false)
         {
-            SettingsManager.Instance.SaveSettings(this, tenantId);
-            SetNewLogoText(tenantId, restore);
+            SaveForTenant(tenantId);
+
+            if (tenantId == Tenant.DEFAULT_TENANT)
+            {
+                AppliedTenants.Clear();
+            }
+            else
+            {
+                SetNewLogoText(tenantId, restore);
+                TenantLogoManager.RemoveMailLogoDataFromCache();
+            }
         }
 
         private void SetNewLogoText(int tenantId, bool restore = false)
         {
-            WhiteLabelHelper.DefaultLogo = DefaultLogo;
-            if (restore)
+            WhiteLabelHelper.DefaultLogoText = DefaultLogoText;
+
+            var partnerSettings = LoadForDefaultTenant();
+
+            if (restore && String.IsNullOrEmpty(partnerSettings._logoText))
             {
                 WhiteLabelHelper.RestoreOldText(tenantId);
             }
-            else if(!string.IsNullOrEmpty(LogoText))
+            else
             {
                 WhiteLabelHelper.SetNewText(tenantId, LogoText);
             }

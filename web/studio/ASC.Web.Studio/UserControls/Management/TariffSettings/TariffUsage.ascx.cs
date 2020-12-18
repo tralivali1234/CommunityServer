@@ -1,55 +1,45 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Globalization;
+using System.Linq;
+using System.Threading;
+using System.Web;
+using System.Web.UI;
+
 using AjaxPro;
+
+using ASC.Common.Logging;
 using ASC.Core;
 using ASC.Core.Billing;
 using ASC.Core.Tenants;
 using ASC.Geolocation;
 using ASC.Web.Core;
-using ASC.Web.Core.Utility.Settings;
-using ASC.Web.Core.Utility.Skins;
 using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Core.Notify;
-using ASC.Web.Studio.Core.SMS;
-using ASC.Web.Studio.Core.Voip;
 using ASC.Web.Studio.UserControls.Statistics;
 using ASC.Web.Studio.Utility;
-using log4net;
+
 using PhoneNumbers;
+
 using Resources;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Web;
-using System.Web.Configuration;
-using System.Web.UI;
-using Constants = ASC.Core.Users.Constants;
 
 namespace ASC.Web.Studio.UserControls.Management
 {
@@ -61,15 +51,10 @@ namespace ASC.Web.Studio.UserControls.Management
             get { return "~/UserControls/Management/TariffSettings/TariffUsage.ascx"; }
         }
 
-        protected Partner Partner;
-
-        protected bool HideBuyRecommendation;
         protected Dictionary<string, bool> ListStarRemark = new Dictionary<string, bool>();
 
         protected int UsersCount;
         protected long UsedSize;
-        protected bool SmsEnable;
-        protected bool VoipEnable;
 
         protected Tariff CurrentTariff;
         protected TenantQuota CurrentQuota;
@@ -80,12 +65,38 @@ namespace ASC.Web.Studio.UserControls.Management
 
         protected RegionInfo RegionDefault = new RegionInfo("US");
         protected RegionInfo CurrentRegion;
+        protected string PhoneCountry = "US";
 
         protected List<RegionInfo> Regions = new List<RegionInfo>();
 
         protected bool InRuble
         {
             get { return "RU".Equals(CurrentRegion.Name); }
+        }
+
+        protected bool InEuro
+        {
+            get { return "EUR".Equals(CurrentRegion.ISOCurrencySymbol); }
+        }
+
+        protected decimal[] PricesPerUser
+        {
+            get
+            {
+                return InEuro
+                           ? new[] { 4.25m, 2.40m, 1.60m }
+                           : new[] { 5.0m, 3.0m, 2.0m };
+            }
+        }
+
+        protected decimal[] FakePrices
+        {
+            get
+            {
+                return InEuro
+                           ? new[] { 9.0m, 18.0m }
+                           : new[] { 10.0m, 20.0m };
+            }
         }
 
         private string _currencyFormat = "{currency}{price}";
@@ -125,14 +136,15 @@ namespace ASC.Web.Studio.UserControls.Management
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            Page.RegisterBodyScripts("~/usercontrols/management/tariffsettings/js/tariffusage.js",
-                "~/js/asc/plugins/countries.js",
-                "~/js/asc/plugins/phonecontroller.js");
-            Page.RegisterStyle("~/skins/default/phonecontroller.css");
-            Page.RegisterStyle("~/usercontrols/management/tariffsettings/css/tariff.less");
-            Page.RegisterStyle("~/usercontrols/management/tariffsettings/css/tariffusage.less");
-
-            Page.RegisterClientLocalizationScript(typeof(CountriesResources));
+            Page
+                .RegisterBodyScripts("~/UserControls/Management/TariffSettings/js/tariffusage.js",
+                    "~/js/asc/plugins/countries.js",
+                    "~/js/asc/plugins/phonecontroller.js")
+                .RegisterStyle(
+                    "~/skins/default/phonecontroller.css",
+                    "~/UserControls/Management/TariffSettings/css/tariff.less",
+                    "~/UserControls/Management/TariffSettings/css/tariffusage.less")
+                .RegisterClientScript(new CountriesResources());
 
             CurrentRegion = RegionDefault;
             Regions.Add(CurrentRegion);
@@ -141,25 +153,6 @@ namespace ASC.Web.Studio.UserControls.Management
             UsedSize = TenantStatisticsProvider.GetUsedSize();
             CurrentTariff = TenantExtra.GetCurrentTariff();
             CurrentQuota = TenantExtra.GetTenantQuota();
-
-            var partner = CoreContext.PaymentManager.GetApprovedPartner();
-            if (partner != null)
-            {
-                Partner = partner;
-
-                _quotaList = CoreContext.PaymentManager.GetPartnerTariffs(Partner.Id);
-
-                if (!string.IsNullOrEmpty(Partner.Currency))
-                {
-                    CurrentRegion = new RegionInfo(Partner.Currency);
-                }
-
-                var control = (TariffPartner) LoadControl(TariffPartner.Location);
-                control.CurPartner = Partner;
-                control.TariffNotPaid = CurrentTariff.State >= TariffState.NotPaid;
-                control.TariffProlongable = CurrentTariff.Prolongable;
-                PaymentsCodeHolder.Controls.Add(control);
-            }
 
             if (_quotaList == null || !_quotaList.Any())
             {
@@ -178,42 +171,18 @@ namespace ASC.Web.Studio.UserControls.Management
             var minYearQuota = QuotasYear.FirstOrDefault(q => q.ActiveUsers >= UsersCount && q.MaxTotalSize >= UsedSize);
             MinActiveUser = minYearQuota != null ? minYearQuota.ActiveUsers : (QuotasYear.Count > 0 ? QuotasYear.Last().ActiveUsers : 0 + 1);
 
-            HideBuyRecommendation = CurrentTariff.Autorenewal || TariffSettings.HideRecommendation || Partner != null;
-
             downgradeInfoContainer.Options.IsPopup = true;
-            buyRecommendationContainer.Options.IsPopup = true;
             AjaxPro.Utility.RegisterTypeForAjax(GetType());
 
-            if (StudioSmsNotificationSettings.IsVisibleSettings
-                && (SettingsManager.Instance.LoadSettings<StudioSmsNotificationSettings>(TenantProvider.CurrentTenantID).EnableSetting
-                    || CoreContext.UserManager.IsUserInGroup(SecurityContext.CurrentAccount.ID, Constants.GroupAdmin.ID))
-                && Partner == null)
-            {
-                SmsEnable = true;
-                var smsBuy = (SmsBuy) LoadControl(SmsBuy.Location);
-                smsBuy.ShowLink = !SettingsManager.Instance.LoadSettings<StudioSmsNotificationSettings>(TenantProvider.CurrentTenantID).EnableSetting;
-                SmsBuyHolder.Controls.Add(smsBuy);
-            }
-
-            if (VoipPaymentSettings.IsVisibleSettings
-                && CoreContext.UserManager.IsUserInGroup(SecurityContext.CurrentAccount.ID, Constants.GroupAdmin.ID)
-                && Partner == null)
-            {
-                VoipEnable = true;
-                var voipBuy = (VoipBuy) LoadControl(VoipBuy.Location);
-                VoipBuyHolder.Controls.Add(voipBuy);
-            }
-
-            if (Partner == null)
-            {
-                RegisterScript();
-                CurrencyCheck();
-            }
+            CurrencyCheck();
         }
 
         private void CurrencyCheck()
         {
-            CurrentRegion = FindRegionInfo() ?? CurrentRegion;
+            var findRegion = FindRegionInfo();
+
+            CurrentRegion = findRegion ?? CurrentRegion;
+            PhoneCountry = (findRegion ?? new RegionInfo(Thread.CurrentThread.CurrentCulture.LCID)).TwoLetterISORegionName;
 
             if (!CurrentRegion.Equals(RegionDefault))
             {
@@ -236,7 +205,7 @@ namespace ASC.Web.Studio.UserControls.Management
                 }
             }
 
-            _priceInfo = CoreContext.TenantManager.GetProductPriceInfo();
+            _priceInfo = CoreContext.TenantManager.GetProductPriceInfo(false);
             if (!_priceInfo.Values.Any(value => value.Any(item => item.Item1 == CurrentRegion.ISOCurrencySymbol)))
             {
                 Regions.Remove(CurrentRegion);
@@ -251,7 +220,7 @@ namespace ASC.Web.Studio.UserControls.Management
             }
         }
 
-        private RegionInfo FindRegionInfo()
+        private static RegionInfo FindRegionInfo()
         {
             RegionInfo ri = null;
 
@@ -271,7 +240,7 @@ namespace ASC.Web.Studio.UserControls.Management
                 }
                 catch (Exception err)
                 {
-                    LogManager.GetLogger("ASC.Web.Tariff").ErrorFormat("Can not find country by phone {0}: {1}", owner.MobilePhone, err);
+                    LogManager.GetLogger("ASC.Web.Tariff").WarnFormat("Can not find country by phone {0}: {1}", owner.MobilePhone, err);
                 }
             }
 
@@ -394,6 +363,13 @@ namespace ASC.Web.Studio.UserControls.Management
                 {
                     text = Resource.TariffButtonBuy + SetStar(Resource.TariffRemarkProlongDisable);
                 }
+                else if (CurrentTariff.State == TariffState.Paid
+                    && quota.ActiveUsers < CurrentQuota.ActiveUsers)
+                {
+                    cssList.Add("disable");
+                    getHref = false;
+                    text = Resource.TariffButtonBuy + SetStar(CurrentQuota.Year3 ? Resource.TariffRemarkDisabledYear : Resource.TariffRemarkDisabledMonth);
+                }
 
                 if (!quota.Year3)
                 {
@@ -422,27 +398,15 @@ namespace ASC.Web.Studio.UserControls.Management
             var uri = string.Empty;
             if (quota != null)
             {
-                if (Partner == null)
+                var ownerId = CoreContext.TenantManager.GetCurrentTenant().OwnerId.ToString();
+                var link = CoreContext.PaymentManager.GetShoppingUri(quota.Id, true, null, CurrentRegion.ISOCurrencySymbol, Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName, ownerId);
+                if (link == null)
                 {
-                    var link = CoreContext.PaymentManager.GetShoppingUri(quota.Id);
-                    if (link == null)
-                    {
-                        LogManager.GetLogger("ASC.Web.Billing").Error(string.Format("GetShoppingUri return null for tenant {0} and quota {1}", TenantProvider.CurrentTenantID, quota == null ? 0 : quota.Id));
-                    }
-                    else
-                    {
-                        uri = link.ToString();
-                    }
+                    LogManager.GetLogger("ASC.Web.Billing").Error(string.Format("GetShoppingUri return null for tenant {0} and quota {1}", TenantProvider.CurrentTenantID, quota.Id));
                 }
-                else if (Partner.PaymentMethod == PartnerPaymentMethod.External)
+                else
                 {
-                    uri = (Partner.PaymentUrl ?? "")
-                        .ToLower()
-                        .Replace("{partnerid}", Partner.Id)
-                        .Replace("{tariffid}", quota.ActiveUsers + (quota.Year ? "year" : "month"))
-                        .Replace("{portal}", CoreContext.TenantManager.GetCurrentTenant().TenantAlias)
-                        .Replace("{currency}", CurrentRegion.ISOCurrencySymbol)
-                        .Replace("{price}", ((int)quota.Price).ToString());
+                    uri = link.ToString();
                 }
             }
             return uri;
@@ -450,7 +414,6 @@ namespace ASC.Web.Studio.UserControls.Management
 
         protected string SetStar(string starType, bool withHighlight = false)
         {
-            if (Partner != null) return string.Empty;
             if (!ListStarRemark.Keys.Contains(starType))
             {
                 ListStarRemark.Add(starType, withHighlight);
@@ -478,6 +441,7 @@ namespace ASC.Web.Studio.UserControls.Management
         protected string GetRemarks()
         {
             var result = string.Empty;
+            if (QuotasYear.Count == 0) return result;
 
             foreach (var starType in ListStarRemark)
             {
@@ -495,24 +459,10 @@ namespace ASC.Web.Studio.UserControls.Management
             return result;
         }
 
-        protected string GetChatBannerPath()
-        {
-            var lng = Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName.ToLower();
-            var cult = string.Empty;
-            var cultArray = new[] { "de", "es", "fr", "it", "lv", "ru" };
-            if (cultArray.Contains(lng))
-            {
-                cult = "_" + lng;
-            }
-            var imgName = "support/live_support_banner" + cult + ".png";
-
-            return WebImageSupplier.GetAbsoluteWebPath(imgName);
-        }
-
         protected string GetSaleDate()
         {
             DateTime date;
-            if (!DateTime.TryParse(WebConfigurationManager.AppSettings["web.payment-sale"], out date))
+            if (!DateTime.TryParse(ConfigurationManagerExtension.AppSettings["web.payment-sale"], out date))
             {
                 date = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(1).AddDays(-1);
             }
@@ -526,33 +476,58 @@ namespace ASC.Web.Studio.UserControls.Management
             {
                 price = price * SetupInfo.ExchangeRateRuble;
             }
+
+            var priceString = InEuro && Math.Truncate(price) != price
+                                  ? price.ToString(CultureInfo.InvariantCulture)
+                                  : ((int)price).ToString(CultureInfo.InvariantCulture);
+
             return _currencyFormat
                 .Replace("{currency}", "<span class='tariff-price-cur'>" + (currencySymbol ?? CurrentRegion.CurrencySymbol) + "</span>")
-                .Replace("{price}", ((int)price).ToString());
+                .Replace("{price}", priceString);
         }
 
         protected string GetPriceString(TenantQuota quota)
         {
-            if (Partner == null)
+            if (!string.IsNullOrEmpty(quota.AvangateId) && _priceInfo.ContainsKey(quota.AvangateId))
             {
-                if (!string.IsNullOrEmpty(quota.AvangateId) && _priceInfo.ContainsKey(quota.AvangateId))
+                var prices = _priceInfo[quota.AvangateId];
+                var price = prices.FirstOrDefault(p => p.Item1 == CurrentRegion.ISOCurrencySymbol);
+                if (price != null)
                 {
-                    var prices = _priceInfo[quota.AvangateId];
-                    var price = prices.FirstOrDefault(p => p.Item1 == CurrentRegion.ISOCurrencySymbol);
-                    if (price != null)
-                    {
-                        return GetPriceString(price.Item2, false);
-                    }
-                    return GetPriceString(quota.Price, false, RegionDefault.CurrencySymbol);
+                    return GetPriceString(price.Item2, false);
                 }
+                return GetPriceString(quota.Price, false, RegionDefault.CurrencySymbol);
             }
             return GetPriceString(quota.Price);
         }
 
-        [AjaxMethod]
-        public void SaveHideRecommendation(bool hide)
+        protected decimal GetPrice(TenantQuota quota)
         {
-            TariffSettings.HideRecommendation = hide;
+            if (!string.IsNullOrEmpty(quota.AvangateId) && _priceInfo.ContainsKey(quota.AvangateId))
+            {
+                var prices = _priceInfo[quota.AvangateId];
+                var price = prices.FirstOrDefault(p => p.Item1 == CurrentRegion.ISOCurrencySymbol);
+                if (price != null)
+                {
+                    return price.Item2;
+                }
+                return quota.Price;
+            }
+            return quota.Price;
+        }
+
+        protected decimal GetSaleValue(decimal priceMonth, TenantQuota quota)
+        {
+            var price = GetPrice(quota);
+
+            var period = quota.Year ? 12 : 36;
+            return priceMonth * period - price;
+        }
+
+        protected string GetPerUserPrice(TenantQuota quota)
+        {
+            var price = PricesPerUser[quota == null ? 0 : quota.Year ? 1 : quota.Year3 ? 2 : 0];
+            return GetPriceString(price, InRuble);
         }
 
         [AjaxMethod]
@@ -567,34 +542,6 @@ namespace ASC.Web.Studio.UserControls.Management
             HttpContext.Current.Cache.Insert(key, ++count, null, System.Web.Caching.Cache.NoAbsoluteExpiration, TimeSpan.FromMinutes(2));
 
             StudioNotifyService.Instance.SendRequestTariff(false, fname, lname, title, email, phone, ctitle, csize, site, message);
-        }
-
-        private void RegisterScript()
-        {
-            Page.RegisterInlineScript(@"
-                var __lc = {};
-                __lc.license = 2673891;
-
-                (function () {
-                    var lc = document.createElement('script'); lc.type = 'text/javascript'; lc.async = true;
-                    lc.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'cdn.livechatinc.com/tracking.js';
-                    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(lc, s);
-
-                    (function loopForCorrectLoading(i) {
-                        setTimeout(function () {
-                            if (--i && typeof(window.LC_API) === 'undefined') {
-                                loopForCorrectLoading(i);
-                            }
-                            if (typeof(window.LC_API) === 'object') {
-                                window.LC_API.on_after_load = function () {
-                                    if (window.LC_API.agents_are_available()) {
-                                        jq('.support-chat-btn').show();
-                                    }
-                                };
-                            }
-                        }, 100);
-                    })(500);
-                })();", onReady: false);
         }
     }
 }

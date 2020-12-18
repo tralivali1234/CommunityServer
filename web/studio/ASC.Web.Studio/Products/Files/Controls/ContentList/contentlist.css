@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -29,47 +20,71 @@
     padding-top: 20px;
     text-align: center;
 }
-.file-row.checkloading .checkbox {
-    background: url("images/throbber.gif") no-repeat 0 4px transparent;
-    margin-bottom: 2px;
-    margin-top: 6px;
-}
 
 /*************************************************************
-   To Parent Folder
+   BreadCrumbs
 *************************************************************/
-.folder-row-toparent {
-    border-bottom: 1px solid #D1D1D1;
+#filesBreadCrumbs {
+    border-top: 1px solid #D1D1D1;
     display: none;
-    margin-bottom: -1px;
-    height: 32px;
+    height: 33px;
 }
 .to-parent-folder {
+    display: inline-block;
     cursor: pointer;
-    margin-left: 1px;
-    margin-top: 1px;
-    padding-left: 7px;
+    margin: 0 4px 0 0;
+    outline: none;
+    padding-left: 6px;
     width: 70px;
 }
-.to-parent-folder a {
-    font-weight: bold;
+.to-parent-folder .up {
     line-height: 32px;
+    text-decoration: none;
+}
+.to-parent-folder .link-blank,
+.with-search-crumbs .to-parent-folder .link-dots {
+    display: none;
+}
+#searchBreadCrumbs {
+    cursor: pointer;
+}
+.search-bread-crumbs {
+    display: none;
+    line-height: 32px;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+    white-space: nowrap;
+}
+.with-search-crumbs .to-parent-folder {
+    width: 22px;
+}
+.with-search-crumbs .search-bread-crumbs {
+    display: inline-block;
+}
+.with-search-crumbs .to-parent-folder .link-blank {
+    display: inline-block;
 }
 /*************************************************************
    Main Content
 *************************************************************/
+.contentMenu {
+    border-bottom: none;
+    margin-bottom: 0;
+}
 #mainContent {
-    border: 1px solid transparent;
-    min-height: 450px;
+    /*min-height: 450px;*/
     min-width: 660px;
     overflow: hidden;
+    border: 1px solid transparent;
 }
 #mainContent.selected {
     border: 1px dashed #bbb;
 }
 #filesMainContent {
     display: none;
-    margin: 0 0 20px;
+    margin: 0;
     padding: 0;
 }
 .file-row {
@@ -77,7 +92,10 @@
     height: 36px;
     list-style: none outside none;
     padding: 6px 0 5px;
-    z-index: 100;
+    z-index: 98;
+}
+.file-row:first-child {
+    border-top: 1px solid #d1d1d1;
 }
 .file-row div {
     float: left;
@@ -99,14 +117,32 @@
 .file-row .thumb-folder {
     cursor: pointer;
     margin: 2px 16px 0 0;
-    overflow: hidden;
     position: relative;
 }
-.file-row .checkbox {
-    margin: 8px 8px 0 4px;
-    height: 28px;
-    width: 28px;
+.thumb-encrypted {
+    background: url("images/encrypted.png") no-repeat 0 0 / 16px 16px transparent;
+    bottom: -1px;
+    height: 16px;
+    position: absolute;
+    right: -1px;
+    width: 16px;
 }
+.file-row .checkbox {
+    cursor: pointer;
+    height: 19px;
+    margin-top: -6px;
+    margin-right: 4px;
+    padding: 14px 0 14px 4px;
+    width: 25px;
+}
+.file-row .checkbox:hover {
+    background-color: rgba(0, 0, 0, .05);
+}
+
+.file-row.checkloading .checkbox {
+    background: url("images/throbber.gif") no-repeat 7px 16px transparent;
+}
+
 .file-row.new-folder .checkbox,
 .file-row.new-file .checkbox,
 .file-row.row-rename .checkbox,
@@ -119,6 +155,7 @@
 .file-row.checkloading .checkbox input,
 .file-row.checkloading .menu-small,
 .file-row.checkloading .btn-row,
+.file-row.checkloading .template-action,
 .file-row.checkloading .pencil {
     visibility: hidden;
 }
@@ -126,6 +163,10 @@
 .file-row.checkloading.new-file .entry-title,
 .file-row.checkloading.row-rename .entry-title {
     margin: 6px 0 8px;
+}
+
+.file-row .checkbox input {
+    cursor: pointer;
 }
 .file-row .checkbox input[type=radio] {
     display: none;
@@ -172,13 +213,16 @@
     font-size: 16px;
     font-weight: 600;
     text-decoration: none;
+    line-height: 22px;
     outline: none;
+    white-space: pre;
 }
 .file-row .entry-title .name a .file-extension {
     color: #A2A2A2;
     display: inline;
     font-size: 14px;
     font-weight: normal;
+    line-height: 19px;
 }
 .file-row.row-hover:hover .entry-title .name a {
     text-decoration: underline;
@@ -211,7 +255,9 @@
 
 .row-rename .entry-title .name a,
 .row-rename .entry-descr,
+.row-rename .template-action,
 .row-rename .pencil,
+.row-rename .favorite,
 .row-rename .version,
 .row-rename .is-new,
 .row-rename .btn-row,
@@ -219,7 +265,9 @@
 .row-rename .file-lock,
 .file-row.new-folder .entry-descr,
 .file-row.new-file .entry-descr,
+.file-row.new-file .template-action,
 .file-row.new-file .pencil,
+.file-row.new-file .favorite,
 .file-row.new-file .btn-row,
 .file-row.new-file .file-lock {
     display: none !important;
@@ -230,7 +278,7 @@
     cursor: pointer;
     font-size: 10px;
     padding: 2px 5px;
-    margin: 2px 0 0 8px;
+    margin: 0 0 0 8px;
     max-width: 60px;
     overflow: hidden;
     border-radius: 2px;
@@ -294,25 +342,36 @@
 
 .file-row .pencil {
     float: left;
-    margin: 3px 0 0 8px;
+    margin: 2px 0 0 8px;
 }
 .pencil.convert-action {
     display: none;
 }
 .row-hover:hover .pencil,
 .file-row .pencil.file-editing {
-    background-position: 0 -19px;
+    background: url('../../../../skins/default/images/svg/documents/pencilblue.svg');
+}
+.row-hover:hover .pencil.convert-action {
+    background: url('../../../../skins/default/images/svg/documents/rotateblue.svg');
 }
 .file-row.can-coauthoring .pencil.file-editing {
-    background-position: 0 -38px;
+    background: url('../../../../skins/default/images/svg/documents/pencil_add.svg');
+}
+.is-template .pencil,
+.template-action {
+    display: none;
+}
+.is-template .template-action {
+    display: block;
+    float: left;
+    margin: 2px 0 0 8px;
+}
+.row-hover:hover .template-action {
+    background: url('../../../../skins/default/images/svg/documents/templateblue.svg');
 }
 .file-lock {
-    background: url("images/lock.png") no-repeat 0 0 transparent;
-    cursor: pointer;
     display: none;
-    height: 16px;
-    margin: 4px 0 0 8px;
-    width: 16px;
+    margin: 2px 0 0 8px;
 }
 .file-row.file-locked .file-lock {
     display: block;
@@ -320,8 +379,18 @@
 .file-row.file-locked-by .file-lock {
     cursor: default;
 }
+.file-row.file-locked-by.file-can-unlock .file-lock {
+    cursor: pointer;
+}
 .file-row.file-locked-by .pencil {
     display: none;
+}
+.file-row .favorite {
+    display: none;
+    margin-left: 8px;
+}
+.file-row.on-favorite .favorite {
+    display: block;
 }
 
 li.without-share .btn-row {
@@ -332,7 +401,7 @@ ul.without-share .btn-row {
 }
 .file-row .btn-row {
     margin: 5px 0 0 8px;
-    max-width: 84px;
+    max-width: 83px;
     overflow: hidden;
     white-space: nowrap;
 }
@@ -354,16 +423,20 @@ ul.without-share .btn-row {
    compact view
 *******************************************************************************/
 #filesMainContent.compact .file-row.checkloading .checkbox {
-    margin-bottom: 0;
-    margin-top: 2px;
+    background-position-y: 7px;
 }
 #filesMainContent.compact .file-row {
     height: 28px;
     padding: 2px 0 1px;
 }
+#filesMainContent.compact .thumb-encrypted {
+    bottom: -5px;
+    right: -5px;
+}
 #filesMainContent.compact .checkbox {
-    height: 24px;
-    margin-top: 4px;
+    margin-top: -2px;
+    padding-bottom: 6px;
+    padding-top: 6px;
 }
 #filesMainContent.compact .file-row .entry-title .name {
     max-width: 74px;
@@ -388,9 +461,11 @@ ul.without-share .btn-row {
 }
 #filesMainContent.compact .file-row .entry-title .name a {
     font-size: 12px;
+    line-height: 17px;
 }
 #filesMainContent.compact .file-row .entry-title .name a .file-extension {
     font-size: 11px;
+    line-height: 15px;
 }
 #filesMainContent.compact .thumb-file
 #filesMainContent.compact .thumb-folder {
@@ -405,6 +480,7 @@ ul.without-share .btn-row {
     margin-top: 2px;
 }
 #filesMainContent.compact .pencil,
+#filesMainContent.compact .template-action,
 #filesMainContent.compact .file-lock {
     margin-top: 6px;
 }
@@ -414,6 +490,7 @@ ul.without-share .btn-row {
 #filesMainContent.compact #contentVersions {
     margin: 1px 0 0;
 }
+#filesMainContent.compact .favorite,
 #filesMainContent.compact .file-row .version,
 #filesMainContent.compact .file-row .is-new {
     margin-top: 4px;
@@ -443,6 +520,7 @@ ul.without-share .btn-row {
     color: #aa2c2c;
 }
 .file-row.error-entry .btn-row,
+.file-row.error-entry .template-action,
 .file-row.error-entry .pencil,
 .file-row.error-entry .menu-small {
     display: none !important;
@@ -450,23 +528,24 @@ ul.without-share .btn-row {
 /*******************************************************************************
     Mouse moving
 *******************************************************************************/
-.file-mouse-move {
+.file-mouse-move,
+.file-mouse-move * {
     cursor: alias !important;
 }
-.file-mouse-copy {
+.file-mouse-copy,
+.file-mouse-copy * {
     cursor: copy !important;
 }
 #filesMovingTooltip {
-    background-color: #FFFFE1;
-    border: 1px solid #333;
-    color: #333;
     cursor: move;
     display: block;
-    font-size: 10px;
+    font-size: 12px;
     height: auto;
-    margin-left: 5px;
+    line-height: 24px;
+    margin-left: 13px;
+    margin-top: 6px;
     max-width: 500px;
-    padding: 5px 10px;
+    padding: 4px 16px;
     position: absolute;
     word-wrap: break-word;
     z-index: 301;
@@ -485,7 +564,7 @@ ul.without-share .btn-row {
     background-color: #fff;
     border-top: 1px solid #e5e5e5;
     width: 100%;
-    margin-top: 5px;
+    padding-bottom: 5px;
 }
 .row-hover:hover #contentVersions,
 .row-selected #contentVersions {
@@ -516,7 +595,7 @@ ul.without-share .btn-row {
     padding: 5px;
     width: 100%;
 }
-.version-row:hover {
+.version-highlight .version-row:hover {
     background-color: #e5e5e5;
 }
 .version-group-head {
@@ -534,7 +613,7 @@ ul.without-share .btn-row {
     text-align: left;
     width: 27px;
 }
-.version-edit .version-row:hover .version-num span {
+.version-edit.version-highlight  .version-row:hover .version-num span {
     display: none;
 }
 .version-row .version-continue,
@@ -548,33 +627,33 @@ ul.without-share .btn-row {
 .version-row .version-complete {
     background-position: center -60px;
 }
-.version-row:hover .version-complete,
-.version-row:hover .version-continue,
-.version-edit .version-row:hover span.display-num {
+.version-highlight .version-row:hover .version-complete,
+.version-highlight .version-row:hover .version-continue,
+.version-edit.version-highlight  .version-row:hover span.display-num {
     display: block;
 }
 .version-row .version-date {
     padding-left: 7px;
-    width: 65px;
-}
-.version-row .version-time {
-    padding-left: 12px;
     padding-right: 4px;
-    width: 45px;
+    width: 110px;
 }
 .version-sublist {
     width: 80px;
 }
-.version-row:hover .version-sublist-toggle {
+.version-highlight .version-row:hover .version-sublist-toggle {
     border-bottom: 1px dotted;
     cursor: pointer;
 }
 .version-row .version-author {
-    width: 120px;
+    width: 115px;
 }
 .version-row .version-author .userLink {
     color: #787878;
-    white-space: normal;
+    cursor: default;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 115px;
+    white-space: nowrap;
 }
 .version-row .version-comment {
     overflow: hidden;
@@ -620,7 +699,7 @@ ul.without-share .btn-row {
     font-size: 11px;
     margin-left: 7px;
 }
-.version-row:hover .version-restore span {
+.version-highlight .version-row:hover .version-restore span {
     border-bottom: 1px dotted;
 }
 .version-operation .version-download,
@@ -641,12 +720,12 @@ ul.without-share .btn-row {
 .version-operation .version-comment-edit {
     background-position: center -40px;
 }
-.version-row:hover .version-download,
-.version-row:hover .version-preview,
-.version-row:hover .version-comment-edit {
+.version-highlight .version-row:hover .version-download,
+.version-highlight .version-row:hover .version-preview,
+.version-highlight .version-row:hover .version-comment-edit {
     display: block;
 }
-.not-preview:hover .version-preview {
+#contentVersions .not-preview:hover .version-preview {
     display: none;
 }
 /*******************************************************************************
@@ -729,7 +808,7 @@ body.media-width-0-1140 .file-row .entry-title,
 body.media-width-0-1140 .file-row .entry-descr { width: 420px; }
 body.media-width-0-1140 .file-row .entry-title .name { max-width: 236px; }
 body.media-width-0-1140 .file-row.folder-row .entry-title .name { max-width: 362px; }
-body.media-width-0-1140 #filesMainContent.compact .file-row .entry-title { width: 314px; }
+body.media-width-0-1140 #filesMainContent.compact .file-row .entry-title { width: 283px; }
 body.media-width-0-1140 #filesMainContent.compact .file-row .entry-title .name { max-width: 130px; }
 body.media-width-0-1140 #filesMainContent.compact .file-row.folder-row .entry-title .name { max-width: 256px; }
 
@@ -748,4 +827,20 @@ body[class*='media-width'] .file-row.row-rename .entry-descr {
 
 body[class*='media-width'] #filesMainContent.compact .file-row.row-rename .entry-title .name {
     max-width: 280px;
+}
+
+
+/*******************************************************************************
+   For Retina
+*******************************************************************************/
+@media only screen and (-webkit-min-device-pixel-ratio: 2),
+only screen and (   min--moz-device-pixel-ratio: 2),
+only screen and (     -o-min-device-pixel-ratio: 2/1),
+only screen and (        min-device-pixel-ratio: 2),
+only screen and (                min-resolution: 192dpi),
+only screen and (                min-resolution: 2dppx)
+{
+    .thumb-encrypted {
+        background-image: url("images/retina/encrypted.png");
+    }
 }

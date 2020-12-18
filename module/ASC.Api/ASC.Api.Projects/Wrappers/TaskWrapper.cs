@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -30,7 +21,6 @@ using System.Linq;
 using System.Runtime.Serialization;
 using ASC.Api.Employee;
 using ASC.Projects.Core.Domain;
-using ASC.Projects.Engine;
 using ASC.Specific;
 
 namespace ASC.Api.Projects.Wrappers
@@ -49,6 +39,9 @@ namespace ASC.Api.Projects.Wrappers
 
         [DataMember]
         public bool CanDelete { get; set; }
+
+        [DataMember]
+        public bool CanReadFiles { get; set; }
 
         [DataMember(Order = 12, EmitDefaultValue = false)]
         public ApiDateTime Deadline { get; set; }
@@ -77,44 +70,44 @@ namespace ASC.Api.Projects.Wrappers
         [DataMember(Order = 53)]
         public List<EmployeeWraper> Responsibles { get; set; }
 
+        [DataMember(Order = 53, EmitDefaultValue=false)]
+        public List<Guid> ResponsibleIds { get; set; }
+
         [DataMember(Order = 54, EmitDefaultValue = false)]
         public SimpleMilestoneWrapper Milestone { get; set; }
 
+        [DataMember(Order = 55, EmitDefaultValue = false)]
+        public int? CustomTaskStatus { get; set; }
 
         private TaskWrapper()
         {
         }
 
-        public TaskWrapper(Task task)
+        public TaskWrapper(ProjectApiBase projectApiBase, Task task)
         {
             Id = task.ID;
             Title = task.Title;
             Description = task.Description;
             Status = (int)task.Status;
 
-            if (task.Responsibles != null)
+            if (Status > 2)
             {
-                Responsibles = task.Responsibles.Select(EmployeeWraper.Get).OrderBy(r => r.DisplayName).ToList();
+                Status = 1;
             }
 
+            CustomTaskStatus = task.CustomTaskStatus;
 
             Deadline = (task.Deadline == DateTime.MinValue ? null : new ApiDateTime(task.Deadline, TimeZoneInfo.Local));
             Priority = task.Priority;
             ProjectOwner = new SimpleProjectWrapper(task.Project);
             MilestoneId = task.Milestone;
             Created = (ApiDateTime)task.CreateOn;
-            CreatedBy = EmployeeWraper.Get(task.CreateBy);
             Updated = (ApiDateTime)task.LastModifiedOn;
             StartDate = task.StartDate.Equals(DateTime.MinValue) ? null : (ApiDateTime)task.StartDate;
 
-            if (task.CreateBy != task.LastModifiedBy)
-            {
-                UpdatedBy = EmployeeWraper.Get(task.LastModifiedBy);
-            }
-
             if (task.SubTasks != null)
             {
-                Subtasks = task.SubTasks.Select(x => new SubtaskWrapper(x, task)).ToList();
+                Subtasks = task.SubTasks.Select(x => new SubtaskWrapper(projectApiBase, x, task)).ToList();
             }
 
             Progress = task.Progress;
@@ -129,15 +122,44 @@ namespace ASC.Api.Projects.Wrappers
                 Links = task.Links.Select(r => new TaskLinkWrapper(r));
             }
 
-            CanEdit = ProjectSecurity.CanEdit(task);
-            CanCreateSubtask = ProjectSecurity.CanCreateSubtask(task);
-            CanCreateTimeSpend = ProjectSecurity.CanCreateTimeSpend(task);
-            CanDelete = ProjectSecurity.CanDelete(task);
+            if (task.Security == null)
+            {
+                projectApiBase.ProjectSecurity.GetTaskSecurityInfo(task);
+            }
+
+            if (projectApiBase.Context.GetRequestValue("simple") != null)
+            {
+                CreatedById = task.CreateBy;
+                UpdatedById = task.LastModifiedBy;
+                if (task.Responsibles != null)
+                {
+                    ResponsibleIds = task.Responsibles;
+                }
+            }
+            else
+            {
+                CreatedBy = projectApiBase.GetEmployeeWraper(task.CreateBy);
+                if (task.CreateBy != task.LastModifiedBy)
+                {
+                    UpdatedBy = projectApiBase.GetEmployeeWraper(task.LastModifiedBy);
+                }
+                if (task.Responsibles != null)
+                {
+                    Responsibles = task.Responsibles.Select(projectApiBase.GetEmployeeWraper).OrderBy(r => r.DisplayName).ToList();
+                }
+            }
+
+            CanEdit = task.Security.CanEdit;
+            CanCreateSubtask = task.Security.CanCreateSubtask;
+            CanCreateTimeSpend = task.Security.CanCreateTimeSpend;
+            CanDelete = task.Security.CanDelete;
+            CanReadFiles = task.Security.CanReadFiles;
         }
 
-        public TaskWrapper(Task task, Milestone milestone) : this(task)
+        public TaskWrapper(ProjectApiBase projectApiBase, Task task, Milestone milestone)
+            : this(projectApiBase, task)
         {
-            if (task.Milestone != 0)
+            if (milestone != null && task.Milestone != 0)
                 Milestone = new SimpleMilestoneWrapper(milestone);
         }
 

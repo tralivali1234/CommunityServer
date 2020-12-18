@@ -1,13 +1,18 @@
-﻿<%@ Page Language="C#" MasterPageFile="~/Masters/basetemplate.master" AutoEventWireup="true" EnableViewState="false" CodeBehind="Auth.aspx.cs" Inherits="ASC.Web.Studio.Auth" %>
+﻿<%@ Page Language="C#" MasterPageFile="~/Masters/BaseTemplate.master" AutoEventWireup="true" EnableViewState="false" CodeBehind="Auth.aspx.cs" Inherits="ASC.Web.Studio.Auth" %>
+<%@ Import Namespace="ASC.Core.Billing" %>
 <%@ Import Namespace="ASC.Web.Studio.Core" %>
 <%@ MasterType TypeName="ASC.Web.Studio.Masters.BaseTemplate" %>
 <%@ Import Namespace="ASC.Core" %>
-<%@ Import Namespace="Resources" %>
 
 <asp:Content ContentPlaceHolderID="PageContent" runat="server">
+    <% if (CoreContext.Configuration.Standalone)
+       { %>
+    <input type="hidden" id="customerId" value="<%= HttpUtility.HtmlEncode(LicenseReader.CustomerId ?? "") %>" />
+    <% } %>
+
     <% if (CoreContext.Configuration.Personal)
        { %>
-    <asp:PlaceHolder runat="server" ID="AutorizeDocuments"></asp:PlaceHolder>
+    <asp:PlaceHolder runat="server" ID="AutorizeDocuments"/>
     <% }
        else
        { %>
@@ -19,10 +24,10 @@
                 <h1 class="header-base big blue-text"><%= TenantName.HtmlEncode() %></h1>
             </div>
 
-            <asp:PlaceHolder runat="server" ID="AuthorizeHolder"></asp:PlaceHolder>
+            <asp:PlaceHolder runat="server" ID="AuthorizeHolder"/>
 
             <div class="help-block-signin">
-                <asp:PlaceHolder runat="server" ID="CommunitationsHolder"></asp:PlaceHolder>
+                <asp:PlaceHolder runat="server" ID="CommunitationsHolder"/>
             </div>
         </div>
     </div>
@@ -39,11 +44,6 @@
     <div class="footerAuth">
         <%= Resource.PoweredBy %>
         <a href="http://www.onlyoffice.com/" title="www.onlyoffice.com" class="link underline" target="_blank">www.onlyoffice.com</a>
-         <%if (IsAutorizePartner.HasValue && Partner != null) { %>
-            <span class="float-right">
-                <%= IsAutorizePartner.Value ? (Partner.DisplayName ?? Partner.CompanyName).HtmlEncode() + " • <a class=\"link\" href=\"" + (Partner.Url.StartsWith("http:") || Partner.Url.StartsWith("https:") ? Partner.Url : string.Concat("http://", Partner.Url)) +"\" target=\"_blank\">" + Partner.Url + "</a>" 
-            : Resource.HostedNonAuthorizedVersion%></span>
-         <% } %>
     </div>
     <% } %>
 </asp:Content>--%>

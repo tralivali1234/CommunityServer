@@ -11,23 +11,17 @@
     <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{07AD1522-D100-4CE6-94FA-95CBE5822363}</ProjectGuid>
-    <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ASC.Web.Talk</RootNamespace>
     <AssemblyName>ASC.Web.Talk</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <UpgradeBackupLocation>
     </UpgradeBackupLocation>
     <OldToolsVersion>4.0</OldToolsVersion>
     <TargetFrameworkProfile />
-    <UseIISExpress>false</UseIISExpress>
-    <IISExpressSSLPort />
-    <IISExpressAnonymousAuthentication />
-    <IISExpressWindowsAuthentication />
-    <IISExpressUseClassicPipelineMode />
     <OutputPath>..\..\..\..\..\web\studio\ASC.Web.Studio\bin\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -40,7 +34,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
+    <DebugType>none</DebugType>
     <Optimize>true</Optimize>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -48,20 +42,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="AjaxPro.2">
-      <HintPath>..\..\..\..\..\packages\AjaxPro.2.2.9.17.2\lib\net20\AjaxPro.2.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="log4net">
-      <HintPath>..\..\..\..\..\packages\log4net.2.0.3\lib\net40-client\log4net.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
     <Reference Include="System.Web" />
-    <Reference Include="System.Xml" />
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Xml.Linq" />
-  </ItemGroup>
-  <ItemGroup>
     <Content Include="css\default\talk.style.css" />
     <Content Include="css\default\talk.overview.css" />
     <Content Include="css\default\talk.messagearea.css" />
@@ -79,12 +60,15 @@
     <Content Include="js\jlib\strophe\base64.js" />
     <Content Include="js\jlib\strophe\core.js" />
     <Content Include="js\jlib\strophe\md5.js" />
+    <Content Include="js\talk.init.js" />
     <Content Include="swf\expressinstall.swf" />
     <Content Include="swf\sounds.swf" />
     <Content Include="swf\uploader.swf" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Addon\TalkAddon.cs" />
+    <Compile Include="Addon\TalkSpaceUsageStatManager.cs" />
+    <Compile Include="ClientScript\TalkClientScript.cs" />
     <Compile Include="Default.aspx.cs">
       <DependentUpon>Default.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -103,6 +87,7 @@
     <Compile Include="JabberClient.aspx.designer.cs">
       <DependentUpon>JabberClient.aspx</DependentUpon>
     </Compile>
+    <Compile Include="JabberWrapper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resources\TalkOverviewResource.Designer.cs">
       <AutoGen>True</AutoGen>
@@ -122,6 +107,13 @@
     <Compile Include="UserControls\ContactsContainer.ascx.designer.cs">
       <DependentUpon>ContactsContainer.ascx</DependentUpon>
     </Compile>
+    <Compile Include="UserControls\TabsContainerPart.ascx.cs">
+      <DependentUpon>TabsContainerPart.ascx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="UserControls\TabsContainerPart.ascx.designer.cs">
+      <DependentUpon>TabsContainerPart.ascx</DependentUpon>
+    </Compile>
     <Compile Include="UserControls\MeseditorContainer.ascx.cs">
       <DependentUpon>MeseditorContainer.ascx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -136,13 +128,6 @@
     <Compile Include="UserControls\RoomsContainer.ascx.designer.cs">
       <DependentUpon>RoomsContainer.ascx</DependentUpon>
     </Compile>
-    <Compile Include="UserControls\TabsContainer.ascx.cs">
-      <DependentUpon>TabsContainer.ascx</DependentUpon>
-      <SubType>ASPXCodeBehind</SubType>
-    </Compile>
-    <Compile Include="UserControls\TabsContainer.ascx.designer.cs">
-      <DependentUpon>TabsContainer.ascx</DependentUpon>
-    </Compile>
     <Compile Include="UserControls\TalkNavigationItem.ascx.cs">
       <DependentUpon>TalkNavigationItem.ascx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -152,7 +137,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="App_Themes\Default\Images\product_logolarge.png" />
+    <Content Include="App_Themes\default\images\product_logolarge.png" />
     <Content Include="css\default\talk.style.de-de.css" />
     <Content Include="css\default\talk.style.en-gb.css" />
     <Content Include="css\default\talk.style.en-us.css" />
@@ -181,9 +166,9 @@
     <Content Include="js\talk.contactscontainer.js" />
     <Content Include="notification.html" />
     <Content Include="UserControls\ContactsContainer.ascx" />
+    <Content Include="UserControls\TabsContainerPart.ascx" />
     <Content Include="UserControls\MeseditorContainer.ascx" />
     <Content Include="UserControls\RoomsContainer.ascx" />
-    <Content Include="UserControls\TabsContainer.ascx" />
     <Content Include="UserControls\TalkNavigationItem.ascx" />
   </ItemGroup>
   <ItemGroup>
@@ -199,8 +184,8 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="App_Themes\Default\Images\product_logo.png" />
-    <Content Include="App_Themes\Default\Images\product_logo_disabled.png" />
+    <Content Include="App_Themes\default\images\product_logo.png" />
+    <Content Include="App_Themes\default\images\product_logo_disabled.png" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="css\default\imagescss\" />
@@ -220,6 +205,10 @@
       <Project>{3f6b420f-abd3-4b5a-9f4c-5d61ffbb01de}</Project>
       <Name>ASC.Data.Storage</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\..\..\module\ASC.ElasticSearch\ASC.ElasticSearch.csproj">
+      <Project>{ae1a0e06-6cd4-4e1d-8209-22bbbd6d5652}</Project>
+      <Name>ASC.ElasticSearch</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\..\..\core\ASC.Web.Core\ASC.Web.Core.csproj">
       <Project>{02c40a64-fe22-41d0-9037-69f0d6f787a9}</Project>
       <Name>ASC.Web.Core</Name>
@@ -229,25 +218,28 @@
       <Name>ASC.Web.Studio</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="talk.notification.js" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="web.config" />
+    <None Include="web.Debug.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+    <None Include="web.Release.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AjaxPro.2">
+      <Version>2.9.17.2</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Web" />
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <ProjectExtensions>
-    <VisualStudio>
-      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
-        <WebProjectProperties>
-          <UseIIS>False</UseIIS>
-          <AutoAssignPort>True</AutoAssignPort>
-          <DevelopmentServerPort>2759</DevelopmentServerPort>
-          <DevelopmentServerVPath>/</DevelopmentServerVPath>
-          <IISUrl>http://localhost/ASC.Web.Talk</IISUrl>
-          <NTLMAuthentication>False</NTLMAuthentication>
-          <UseCustomServer>False</UseCustomServer>
-          <CustomServerUrl>
-          </CustomServerUrl>
-          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
-        </WebProjectProperties>
-      </FlavorProperties>
-    </VisualStudio>
-  </ProjectExtensions>
   <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="Exists('$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets')" />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" Condition="false" />
 </Project>

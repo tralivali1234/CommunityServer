@@ -1,25 +1,16 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -35,16 +26,8 @@ namespace ASC.Projects.Engine
 {
     public class TimeTrackingEngine
     {
-        private readonly ITimeSpendDao timeSpendDao;
-        private readonly ITaskDao taskDao;
-
-
-        public TimeTrackingEngine(IDaoFactory daoFactory)
-        {
-            timeSpendDao = daoFactory.GetTimeSpendDao();
-            daoFactory.GetProjectDao();
-            taskDao = daoFactory.GetTaskDao();
-        }
+        public IDaoFactory DaoFactory { get; set; }
+        public ProjectSecurity ProjectSecurity { get; set; }
 
         public List<TimeSpend> GetByFilter(TaskFilter filter)
         {
@@ -54,7 +37,7 @@ namespace ASC.Projects.Engine
 
             while (true)
             {
-                var timeSpend = timeSpendDao.GetByFilter(filter, isAdmin, anyOne);
+                var timeSpend = DaoFactory.TimeSpendDao.GetByFilter(filter, isAdmin, anyOne);
                 timeSpend = GetTasks(timeSpend).Where(r=> r.Task != null).ToList();
 
                 if (filter.LastId != 0)
@@ -86,31 +69,44 @@ namespace ASC.Projects.Engine
 
         public int GetByFilterCount(TaskFilter filter)
         {
-            return timeSpendDao.GetByFilterCount(filter, ProjectSecurity.CurrentUserAdministrator, ProjectSecurity.IsPrivateDisabled);
+            return DaoFactory.TimeSpendDao.GetByFilterCount(filter, ProjectSecurity.CurrentUserAdministrator, ProjectSecurity.IsPrivateDisabled);
         }
 
         public float GetByFilterTotal(TaskFilter filter)
         {
-            return timeSpendDao.GetByFilterTotal(filter, ProjectSecurity.CurrentUserAdministrator, ProjectSecurity.IsPrivateDisabled);
+            return DaoFactory.TimeSpendDao.GetByFilterTotal(filter, ProjectSecurity.CurrentUserAdministrator, ProjectSecurity.IsPrivateDisabled);
         }
 
 
         public List<TimeSpend> GetByTask(int taskId)
         {
-            var timeSpend = timeSpendDao.GetByTask(taskId);
+            var timeSpend = DaoFactory.TimeSpendDao.GetByTask(taskId);
             return GetTasks(timeSpend).FindAll(r => ProjectSecurity.CanRead(r.Task));
         }
 
         public List<TimeSpend> GetByProject(int projectId)
         {
-            var timeSpend = timeSpendDao.GetByProject(projectId);
+            var timeSpend = DaoFactory.TimeSpendDao.GetByProject(projectId);
             return GetTasks(timeSpend).FindAll(r => ProjectSecurity.CanRead(r.Task));
+        }
+
+        public string GetTotalByProject(int projectId)
+        {
+            var time = GetByFilterTotal(new TaskFilter { ProjectIds = new List<int> { projectId } });
+            var hours = (int)time;
+            var minutes = (int)(Math.Round((time - hours) * 60));
+            var result = hours + ":" + minutes.ToString("D2");
+
+            return !result.Equals("0:00", StringComparison.InvariantCulture) ? result : "";
         }
 
         public TimeSpend GetByID(int id)
         {
-            var timeSpend = timeSpendDao.GetById(id);
-            timeSpend.Task = taskDao.GetById(timeSpend.Task.ID);
+            var timeSpend = DaoFactory.TimeSpendDao.GetById(id);
+            if (timeSpend != null)
+            {
+                timeSpend.Task = DaoFactory.TaskDao.GetById(timeSpend.Task.ID);
+            }
             return timeSpend;
         }
 
@@ -124,8 +120,12 @@ namespace ASC.Projects.Engine
                 ProjectSecurity.CreateGuestSecurityException();
             }
 
-            timeSpend.CreateOn = DateTime.UtcNow;
-            return timeSpendDao.Save(timeSpend);
+            if (timeSpend.ID == 0)
+            {
+                timeSpend.CreateOn = DateTime.UtcNow;
+            }
+
+            return DaoFactory.TimeSpendDao.Save(timeSpend);
         }
 
         public TimeSpend ChangePaymentStatus(TimeSpend timeSpend, PaymentStatus newStatus)
@@ -134,7 +134,7 @@ namespace ASC.Projects.Engine
 
             if (timeSpend == null) throw new ArgumentNullException("timeSpend");
 
-            var task = taskDao.GetById(timeSpend.Task.ID);
+            var task = DaoFactory.TaskDao.GetById(timeSpend.Task.ID);
 
             if (task == null) throw new Exception("Task can't be null.");
 
@@ -144,18 +144,20 @@ namespace ASC.Projects.Engine
 
             timeSpend.PaymentStatus = newStatus;
 
-            return timeSpendDao.Save(timeSpend);
+            timeSpend.StatusChangedOn = DateTime.UtcNow;
+
+            return DaoFactory.TimeSpendDao.Save(timeSpend);
         }
 
         public void Delete(TimeSpend timeSpend)
         {
-            ProjectSecurity.DemandDeleteTimeSpend(timeSpend);
-            timeSpendDao.Delete(timeSpend.ID);
+            ProjectSecurity.DemandDelete(timeSpend);
+            DaoFactory.TimeSpendDao.Delete(timeSpend.ID);
         }
 
         private List<TimeSpend> GetTasks(List<TimeSpend> listTimeSpend)
         {
-            var listTasks = taskDao.GetById(listTimeSpend.Select(r => r.Task.ID).ToList());
+            var listTasks = DaoFactory.TaskDao.GetById(listTimeSpend.Select(r => r.Task.ID).ToList());
 
             listTimeSpend.ForEach(t => t.Task = listTasks.Find(task => task.ID == t.Task.ID));
 

@@ -1,11 +1,12 @@
 <%@ Control Language="C#" AutoEventWireup="true" CodeBehind="PasswordSettings.ascx.cs" Inherits="ASC.Web.Studio.UserControls.Management.PasswordSettings" %>
+<%@ Import Namespace="ASC.Web.Core.Utility" %>
 <%@ Import Namespace="Resources" %>
 
 <% if (Enabled)
    { %>
 <div class="clearFix">
      <div id="studio_passwordSettings" class="settings-block">
-         <div class="header-base clearFix" id="mailDomainSettingsTitle">
+         <div class="header-base clearFix">
              <%= Resource.StudioPasswordSettings %>
          </div>
 
@@ -14,8 +15,7 @@
                 <%= Resource.PasswordMinLength %></div>
             <div class="clearFix passwordLengthBox">
                 <div class="sliderPassword">
-                    <div id="slider">
-                    </div>
+                    <div id="slider" data-min="<%= ((PasswordSettings)new PasswordSettings().GetDefault()).MinLength %>" data-max="<%= PasswordSettings.MaxLength %>"></div>
                 </div>
                 <div class="float-left" id="count">
                 </div>

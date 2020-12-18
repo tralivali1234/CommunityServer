@@ -1,59 +1,50 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
 using System;
 using System.Collections.Specialized;
-using System.Configuration;
+using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Web;
-using System.Web.UI;
 
+using AjaxPro;
+
+using ASC.Common.Logging;
 using ASC.Core;
-using ASC.Core.Billing;
 using ASC.Core.Users;
-using ASC.FederatedLogin.Profile;
 using ASC.Geolocation;
 using ASC.Web.Core;
 using ASC.Web.Core.Utility.Settings;
 using ASC.Web.Studio.Core;
 using ASC.Web.Studio.Core.SMS;
 using ASC.Web.Studio.Core.Statistic;
+using ASC.Web.Studio.Core.TFA;
+using ASC.Web.Studio.UserControls.Management;
 using ASC.Web.Studio.UserControls.Statistics;
 using ASC.Web.Studio.Utility;
-
-using AjaxPro;
-using log4net;
 
 namespace ASC.Web.Studio
 {
     /// <summary>
     /// Base page for all pages in projects
     /// </summary>
-    public class MainPage : Page
+    public class MainPage : BasePage
     {
         protected virtual bool MayNotAuth { get; set; }
 
@@ -69,15 +60,6 @@ namespace ASC.Web.Studio
             }
         }
 
-        protected virtual bool RedirectToStartup
-        {
-            get
-            {
-                if (!CoreContext.Configuration.Standalone) return false;
-                return !(WarmUp.Instance.CheckCompleted() || WarmUpSettings.GetCompleted() || Request.QueryString["warmup"] == "true");
-            }
-        }
-
         protected static ILog Log
         {
             get { return LogManager.GetLogger("ASC.Web"); }
@@ -85,17 +67,12 @@ namespace ASC.Web.Studio
 
         protected void Page_PreInit(object sender, EventArgs e)
         {
-            if (RedirectToStartup)
-            {
-                Response.Redirect("~/Startup.aspx");
-            }
-
             if (CheckWizardCompleted)
             {
-                var s = SettingsManager.Instance.LoadSettings<WizardSettings>(TenantProvider.CurrentTenantID);
+                var s = WizardSettings.Load();
                 if (!s.Completed)
                 {
-                    Response.Redirect("~/wizard.aspx");
+                    Response.Redirect("~/Wizard.aspx");
                 }
             }
 
@@ -104,7 +81,7 @@ namespace ASC.Web.Studio
                 && !AuthByCookies()
                 && !MayNotAuth)
             {
-                if (SettingsManager.Instance.LoadSettings<TenantAccessSettings>(TenantProvider.CurrentTenantID).Anyone)
+                if (TenantAccessSettings.Load().Anyone)
                 {
                     OutsideAuth();
                 }
@@ -112,27 +89,46 @@ namespace ASC.Web.Studio
                 {
                     var refererURL = GetRefererUrl();
                     Session["refererURL"] = refererURL;
-                    Response.Redirect("~/auth.aspx", true);
+                    var authUrl = "~/Auth.aspx";
+                    if (Request.DesktopApp())
+                    {
+                        authUrl += "?desktop=" + Request["desktop"];
+                    }
+                    Response.Redirect(authUrl, true);
                 }
             }
 
-            if (!MayNotPaid && TenantStatisticsProvider.IsNotPaid())
+            var user = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
+
+            if (!MayNotPaid
+                && TenantExtra.EnableTarrifSettings
+                && (TenantStatisticsProvider.IsNotPaid() || TenantExtra.UpdatedWithoutLicense)
+                && WarmUp.Instance.CheckCompleted() && Request.QueryString["warmup"] != "true")
             {
-                Response.Redirect(TenantExtra.GetTariffPageLink(), true);
+                if (TariffSettings.HidePricingPage && !user.IsAdmin())
+                {
+                    Response.StatusCode = (int)HttpStatusCode.PaymentRequired;
+                    Response.End();
+                }
+                else
+                {
+                    Response.Redirect(TenantExtra.GetTariffPageLink() + (Request.DesktopApp() ? "?desktop=true" : ""), true);
+                }
             }
 
-            if (SecurityContext.IsAuthenticated
-                && StudioSmsNotificationSettings.IsVisibleSettings
-                && StudioSmsNotificationSettings.Enable
-                && !MayPhoneNotActivate)
+            if (!MayPhoneNotActivate
+                && SecurityContext.IsAuthenticated)
             {
-                var user = CoreContext.UserManager.GetUsers(SecurityContext.CurrentAccount.ID);
-
-                if (!CoreContext.UserManager.IsUserInGroup(SecurityContext.CurrentAccount.ID, Constants.GroupAdmin.ID)
-                    && (string.IsNullOrEmpty(user.MobilePhone)
-                        || user.MobilePhoneActivationStatus == MobilePhoneActivationStatus.NotActivated))
+                if (StudioSmsNotificationSettings.IsVisibleSettings && StudioSmsNotificationSettings.Enable
+                    && (string.IsNullOrEmpty(user.MobilePhone) || user.MobilePhoneActivationStatus == MobilePhoneActivationStatus.NotActivated))
                 {
                     Response.Redirect(CommonLinkUtility.GetConfirmationUrl(user.Email, ConfirmType.PhoneActivation), true);
+                }
+
+                if (TfaAppAuthSettings.IsVisibleSettings && TfaAppAuthSettings.Enable
+                    && !TfaAppUserSettings.EnableForUser(user.ID))
+                {
+                    Response.Redirect(CommonLinkUtility.GetConfirmationUrl(user.Email, ConfirmType.TfaActivation), true);
                 }
             }
 
@@ -150,13 +146,13 @@ namespace ASC.Web.Studio
                 if (webitem.ID == WebItemManager.PeopleProductID
                     && string.Equals(GetType().BaseType.FullName, "ASC.Web.People.Profile"))
                 {
-                    Response.Redirect("~/my.aspx", true);
+                    Response.Redirect("~/My.aspx", true);
                 }
 
                 Response.Redirect("~/", true);
             }
 
-            if (SecurityContext.IsAuthenticated)
+            if (SecurityContext.IsAuthenticated && !CoreContext.Configuration.Personal)
             {
                 try
                 {
@@ -194,12 +190,16 @@ namespace ASC.Web.Studio
         private string GetRefererUrl()
         {
             var refererURL = Request.GetUrlRewriter().AbsoluteUri;
-            if (String.IsNullOrEmpty(refererURL)
-                || refererURL.IndexOf("Subgurim_FileUploader", StringComparison.InvariantCultureIgnoreCase) != -1
-                || (this is _Default)
-                || (this is ServerError)
-                )
+            if (this is _Default)
+            {
+                refererURL = "/";
+            }
+            else if (String.IsNullOrEmpty(refererURL)
+                        || refererURL.IndexOf("Subgurim_FileUploader", StringComparison.InvariantCultureIgnoreCase) != -1
+                        || (this is ServerError))
+            {
                 refererURL = (string)Session["refererURL"];
+            }
 
             return refererURL;
         }
@@ -220,11 +220,8 @@ namespace ASC.Web.Studio
             this.RegisterInlineScript(sb.ToString(), onReady: false);
         }
 
-        protected void SetLanguage(bool checkIp = true, bool abTesting = false)
+        protected void SetLanguage(bool checkIp = true)
         {
-            var abTestingQuery = string.Empty;
-            if (abTesting) abTesting = AbTestingQuery(out abTestingQuery);
-
             if (Request.QueryString.Count == 0)
             {
                 var ipGeolocationInfo = new GeolocationHelper("teamlabsite").GetIPGeolocationFromHttpContext();
@@ -236,66 +233,46 @@ namespace ASC.Web.Studio
 
                         var redirectUrl = String.Format("/{0}/{1}", cultureInfo.TwoLetterISOLanguageName, Request.Path);
 
-                        if (redirectUrl.EndsWith("auth.aspx", StringComparison.InvariantCulture))
-                            redirectUrl = redirectUrl.Remove(redirectUrl.IndexOf("auth.aspx", StringComparison.Ordinal));
-
-                        if (abTesting)
-                            redirectUrl += (redirectUrl.Contains("?") ? "&" : "?") + abTestingQuery;
+                        if (redirectUrl.EndsWith("Auth.aspx", StringComparison.InvariantCultureIgnoreCase))
+                            redirectUrl = redirectUrl.Remove(redirectUrl.IndexOf("Auth.aspx", StringComparison.OrdinalIgnoreCase));
 
                         Response.Redirect(redirectUrl, true);
 
                     }
                 }
             }
-            else
+            else if (!String.IsNullOrEmpty(Request["lang"]))
             {
-                var lang = Request["lang"];
-
-                if (!string.IsNullOrEmpty(lang))
+                var lang = Request["lang"].Split(',')[0];
+                var cultureInfo = SetupInfo.EnabledCulturesPersonal.Find(c => String.Equals(c.TwoLetterISOLanguageName, lang, StringComparison.InvariantCultureIgnoreCase));
+                if (cultureInfo != null)
                 {
-                    lang = lang.Split(',')[0];
-                    var cultureInfo = SetupInfo.EnabledCulturesPersonal.Find(c => String.Equals(c.TwoLetterISOLanguageName, lang, StringComparison.InvariantCultureIgnoreCase));
-                    if (cultureInfo != null)
-                    {
-                        Thread.CurrentThread.CurrentUICulture = cultureInfo;
-                    }
-                    else
-                    {
-                        Log.WarnFormat("Lang {0} not supported", lang);
-                    }
+                    Thread.CurrentThread.CurrentUICulture = cultureInfo;
+                    Thread.CurrentThread.CurrentCulture = cultureInfo;
+                }
+                else
+                {
+                    Log.WarnFormat("Lang {0} not supported", lang);
                 }
             }
-
-            if (abTesting)
+            else if (!String.IsNullOrEmpty(Request["email"]))
             {
-                var redirectUrl = Request.Path;
+                var user = CoreContext.UserManager.GetUserByEmail(Request["email"]);
 
-                redirectUrl += (redirectUrl.Contains("?") ? "&" : "?") + abTestingQuery;
+                if (user.ID.Equals(Constants.LostUser.ID))
+                {
+                    return;
+                }
 
-                Response.Redirect(redirectUrl, true);
+                if (user.CultureName != null)
+                {
+                    Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo(user.CultureName);
+                    Thread.CurrentThread.CurrentCulture = CultureInfo.GetCultureInfo(user.CultureName);
+                }
             }
         }
 
-        protected bool AbTestingQuery(out string query)
-        {
-            query = string.Empty;
-            
-            const string q = "ab";
-
-            if (!string.IsNullOrEmpty(ConfigurationManager.AppSettings[q])
-                || !string.IsNullOrEmpty((string) Session[q])
-                || !string.IsNullOrEmpty(Request[q])
-                || Request.Url.HasProfile())
-                return false;
-
-            Session[q] = "1";
-            if (new Random((int)DateTime.Now.Ticks & 0x0000FFFF).Next(2) == 0) return false;
-
-            query = q + "=1";
-            return true;
-        }
-
-        private void OutsideAuth()
+        private static void OutsideAuth()
         {
             var cookie = SecurityContext.AuthenticateMe(Constants.OutsideUser.ID);
             if (HttpContext.Current != null)

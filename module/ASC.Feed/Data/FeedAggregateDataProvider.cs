@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -82,25 +73,18 @@ namespace ASC.Feed.Data
             using (var db = new DbManager(Constants.FeedDbId))
             using (var tx = db.BeginTransaction())
             {
+                var i = new SqlInsert("feed_aggregate", true)
+                    .InColumns("id", "tenant", "product", "module", "author", "modified_by", "group_id", "created_date",
+                        "modified_date", "json", "keywords", "aggregated_date");
+                var i2 = new SqlInsert("feed_users", true).InColumns("feed_id", "user_id");
+
                 foreach (var f in feeds)
                 {
                     if (0 >= f.Users.Count) continue;
 
-                    var i = new SqlInsert("feed_aggregate", true)
-                        .InColumnValue("id", f.Id)
-                        .InColumnValue("tenant", f.Tenant)
-                        .InColumnValue("product", f.ProductId)
-                        .InColumnValue("module", f.ModuleId)
-                        .InColumnValue("author", f.AuthorId)
-                        .InColumnValue("modified_by", f.ModifiedById)
-                        .InColumnValue("group_id", f.GroupId)
-                        .InColumnValue("created_date", f.CreatedDate)
-                        .InColumnValue("modified_date", f.ModifiedDate)
-                        .InColumnValue("json", f.Json)
-                        .InColumnValue("keywords", f.Keywords)
-                        .InColumnValue("aggregated_date", aggregatedDate);
+                   i.Values(f.Id, f.Tenant, f.ProductId, f.ModuleId, f.AuthorId, f.ModifiedById, f.GroupId, f.CreatedDate, f.ModifiedDate, f.Json, f.Keywords, aggregatedDate);
 
-                    db.ExecuteNonQuery(i);
+
 
                     if (f.ClearRightsBeforeInsert)
                     {
@@ -112,13 +96,12 @@ namespace ASC.Feed.Data
 
                     foreach (var u in f.Users)
                     {
-                        db.ExecuteNonQuery(
-                            new SqlInsert("feed_users", true)
-                                .InColumnValue("feed_id", f.Id)
-                                .InColumnValue("user_id", u.ToString())
-                            );
+                        i2.Values(f.Id, u.ToString());
                     }
                 }
+
+                db.ExecuteNonQuery(i);
+                db.ExecuteNonQuery(i2);
 
                 tx.Commit();
             }

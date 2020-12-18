@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -30,7 +21,8 @@ window.folderFilter = (function($) {
         skipTagsHide = false, // skip tags filter hide, if user removed all tags from filter control
         events = $({}),
         prevSearch = '',
-        options = {};
+        options = {},
+        defaultTagIdReplacement = -1000000000;
 
     var init = function() {
         if (!isInit) {
@@ -40,6 +32,7 @@ window.folderFilter = (function($) {
                 anykey: true,
                 anykeytimeout: 1000,
                 maxfilters: -1,
+                hintDefaultDisable: true,
                 colcount: 2,
                 sorters: [
                     { id: 'date', title: MailScriptResource.FilterByDate, sortOrder: 'descending', def: true }
@@ -181,7 +174,7 @@ window.folderFilter = (function($) {
     function onShowFilters() {
         var withTagsFilterLink = filter.find('li.filter-item[data-id="tag"]');
         if (withTagsFilterLink) {
-            if ($('#id_tags_panel_content .tag').length > 0) {
+            if (tagsManager.getAllTags().length > 0) {
                 withTagsFilterLink.show();
             } else {
                 withTagsFilterLink.hide();
@@ -261,7 +254,8 @@ window.folderFilter = (function($) {
                     break;
                 }
 
-                $.each(value.value, function(i, vNew) {
+                $.each(value.value, function (i, vNew) {
+                    vNew.id = vNew.id === defaultTagIdReplacement ? -1 : vNew.id;
                     MailFilter.addTag(vNew);
                 });
 
@@ -288,16 +282,17 @@ window.folderFilter = (function($) {
                 }
                 MailFilter.setSort(value.id);
                 MailFilter.setSortOrder(value.sortOrder);
-                //reset paging
-                MailFilter.setFromDate(undefined);
-                MailFilter.setFromMessage(undefined);
-                MailFilter.setPrevFlag(false);
                 break;
             default:
                 return;
         }
 
         window.ASC.Mail.ga_track(ga_Categories.folder, ga_Actions.filterClick, filterItem.id);
+
+        //reset paging
+        MailFilter.setFromDate(undefined);
+        MailFilter.setFromMessage(undefined);
+        MailFilter.setPrevFlag(false);
 
         mailBox.updateAnchor();
     };
@@ -343,6 +338,12 @@ window.folderFilter = (function($) {
             default:
                 return;
         }
+
+        //reset paging
+        MailFilter.setFromDate(undefined);
+        MailFilter.setFromMessage(undefined);
+        MailFilter.setPrevFlag(false);
+
         mailBox.updateAnchor();
     };
 
@@ -501,17 +502,18 @@ window.folderFilter = (function($) {
 
     var setTags = function(tags) {
         if (tags.length) {
-            filter.advansedFilter({ filters: [{ type: 'combobox', id: 'tag', params: { value: tags } }] });
+            var listTags = tags.map(function(id) {
+                id = +id === -1 ? defaultTagIdReplacement : id;
+                return id;
+            });
+            filter.advansedFilter({ filters: [{ type: 'combobox', id: 'tag', params: { value: listTags } }] });
         } else {
             if (true === skipTagsHide) {
                 skipTagsHide = false;
                 return;
             }
-            $.each(filter.advansedFilter(), function(index, value) {
-                if ('tag' == value.id) {
-                    hideItem('tag');
-                }
-            });
+
+            hideItem('tag');
         }
     };
 
@@ -528,9 +530,7 @@ window.folderFilter = (function($) {
 
         var tags = [];
         $.each(tagsManager.getAllTags(), function(index, value) {
-            if (value.lettersCount > 0) {
-                tags.push({ value: value.id, classname: 'to', title: value.name });
-            }
+            tags.push({ value: value.id === -1 ? defaultTagIdReplacement : value.id, classname: 'to', title: value.name });
         });
         filter.advansedFilter({ filters: [{ type: 'combobox', id: 'tag', options: tags }] });
 

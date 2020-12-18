@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -141,6 +132,17 @@
         }
     }
 
+    &.white {
+        background-color: #fff;
+        color: #333333;
+        .border-button-default ();
+
+        &:hover {
+            background-color: #fff;
+        color: #333333;
+        }
+    }
+
     &.btn-icon {
         position: relative;
         height: 23px;
@@ -251,22 +253,166 @@
 }
 
 .on_off_button {
-    background: url("@{img-change-url}bnt-onoff.png") no-repeat top center transparent;
+    //background: url("@{img-change-url}btn-onoff.png") no-repeat top center transparent;
     height: 16px;
     width: 41px;
     display: inline-block;
     cursor: pointer;
+    position: relative;
 
     &.disable {
         .opacityStyle();
     }
 
     &.on {
-        background-position: top center;
+        &:before {
+            content: "";
+            height: 16px;
+            left: 0;
+            position: absolute;
+            width: 41px;
+            color: white;
+            font-size: 10px;
+            border-radius: 3px;
+            line-height: 14px;
+            border-top-right-radius: 3px;
+            border-bottom-right-radius: 3px;
+            top: 0px;
+            content: "on";
+            background-color: #3b72a7;
+            box-sizing: border-box;
+            padding: 0 7px;
+            text-align: left;
+            border-top-right-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+
+        &:after {
+            height: 16px;
+            width: 16px;
+            background-color: #f0f0f0;
+            border: 1px solid #cecece;
+            border-radius: 3px;
+            content: "";
+            position: absolute;
+            left: 25px;
+            box-sizing: border-box;
+            top: 0px;
+        }
     }
 
     &.off {
-        background-position: bottom center;
+        &:before {
+            content: "";
+            height: 16px;
+            left: 0;
+            position: absolute;
+            width: 41px;
+            content: "off";
+            color: white;
+            font-size: 10px;
+            border-radius: 3px;
+            background-color: #aeaeae;
+            box-sizing: border-box;
+            padding: 0 7px;
+            text-align: right;
+            line-height: 14px;
+            border-top-right-radius: 3px;
+            border-bottom-right-radius: 3px;
+            top: 0px;
+        }
+
+        &:after {
+            height: 16px;
+            width: 16px;
+            background-color: #f0f0f0;
+            border: 1px solid #cecece;
+            border-radius: 3px;
+            content: "";
+            position: absolute;
+            left: 0px;
+            box-sizing: border-box;
+            top: 0px;
+        }
+    }
+}
+
+.on-off-checkbox {
+    left: -9999px;
+    position: absolute;
+}
+.on-off-checkbox + label {
+    cursor: pointer;
+    padding-left: 52px;
+    position: relative;
+
+    span {
+        margin-left: 52px;
+    }
+}
+    .on-off-checkbox + label:before {
+        //background: url("@{img-change-url}btn-onoff.png") no-repeat bottom center transparent;
+        content: "";
+        height: 16px;
+        left: 0;
+        position: absolute;
+        width: 41px;
+        content: "off";
+        color: white;
+        font-size: 10px;
+        border-radius: 3px;
+        background-color: #aeaeae;
+        box-sizing: border-box;
+        padding: 0 7px;
+        text-align: right;
+        line-height: 14px;
+        border-top-right-radius: 3px;
+        border-bottom-right-radius: 3px;
+        top:0px;
+    }
+
+    .on-off-checkbox + label:after {
+        height: 16px;
+        width: 16px;
+        background-color: #f0f0f0;
+        border: 1px solid #cecece;
+        border-radius: 3px;
+        content: "";
+        position: absolute;
+        left: 0px;
+        box-sizing: border-box;
+        top:0px;
+    }
+
+
+    .on-off-checkbox:checked + label:before {
+        content: "on";
+        background-color: #3b72a7;
+        box-sizing: border-box;
+        padding: 0 6px;
+        text-align: left;
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+    }
+    .on-off-checkbox:checked + label:after {
+        left: 25px;
+    }
+
+    .on-off-checkbox:disabled + label:before {
+        .opacityStyle();
+    }
+
+body.custom-mode {
+    .on-off-checkbox + label:before {
+        content: "";
+    }
+
+    .on-off-checkbox:checked + label:before {
+        content: "";
+    }
+
+    .on_off_button.on:before, .on_off_button.off:before {
+         content: "";
     }
 }
 
@@ -305,36 +451,37 @@
         background: transparent;
 
         &:after {
-            background: url('@{imagesBaseUrl}btn_row_icons.png') no-repeat scroll 0 0 transparent;
+          //  background: url('@{imagesBaseUrl}btn_row_icons.png') no-repeat scroll 0 0 transparent;
             content: "";
             height: 15px;
             left: 12px;
-            margin-top: -8px;
+            margin-top: -7px;
             position: absolute;
             top: 50%;
             width: 15px;
         }
 
         &.__share:after {
-            background-position: 0 0;
+            background-image: url('images/svg/documents/feed.svg');
         }
 
         &.__lock:after {
-            background-position: -19px 0;
+            background-image: url('images/svg/documents/security.svg');
         }
 
         &.__list:after {
-            background-position: -37px 0;
+            background-image: url('images/svg/documents/documents.svg');
         }
     }
 
     &.row-hover:hover .btn-row {
+
         color: @grayButtonTextColor;
         .borderButtons(@border-button-default);
         background-color: @bg-button-default;
 
         &:after {
-            background-image: url('@{img-change-url}/btn_row_icons.png');
+            //background-image: url('@{img-change-url}/btn_row_icons.png');
         }
 
         &:hover {
@@ -342,57 +489,84 @@
         }
 
         &.__share:after {
-            background-position: 0 -19px;
+            background-image: url('images/svg/documents/feedblack.svg');
         }
 
         &.__lock:after {
-            background-position: -19px -19px;
+            background-image: url('images/svg/documents/securityblack.svg');
         }
 
         &.__list:after {
-            background-position: -37px -19px;
+            background-image: url('images/svg/documents/documentsblack.svg');
         }
     }
 
     &.__active {
         .btn-row {
             &.__share:after {
-                background-position: 0 -19px;
+                background-image: url('images/svg/documents/feedblack.svg');
             }
 
             &.__lock:after {
-                background-position: -19px -19px;
+                background-image: url('images/svg/documents/securityblack.svg');
             }
 
             &.__list:after {
-                background-position: -37px -19px;
+                background-image: url('images/svg/documents/documentsblack.svg');
             }
         }
     }
 }
 
+/*******************************************************************************
+   Toggle switch buttons
+*******************************************************************************/
+@border-color: #C4C4C4;
+@active-color: #999999;
+@text-active-color: #FFFFFF;
+@default-color: #EBEBEB;
+@text-default-color: #666666;
 
-.try-button {
-        &,
-        &:hover,
-        &:visited{
-            background: url("@{imagesBaseUrl}btn_64.png") no-repeat -8px -8px transparent;
-            color: #fff;
-            font-size: 7px;
-            height: 24px;
-            padding-top: 40px;
-            text-transform: uppercase;
-            text-decoration: none;
-            text-align: center;
-            width: 64px;
+.buttonGroup {
+    position: relative;
+    display: inline-block;
+    background: @default-color;
+    border: 1px solid @border-color;
+    border-radius: 3px;
+
+    span {
+        float: left;
+        line-height: 21px;
+        padding: 0 10px;
+        cursor: pointer;
+        color: @text-default-color;
+        border: 1px solid @border-color;
+        border-width: 0 1px 0 0;
+
+        &:last-child {
+            border-width: 0;
         }
-        &.document {
-             background-position: -8px -8px;
+
+        &.active {
+            padding: 0 10px;
+            height: 21px;
+            margin: -1px;
+            background: @active-color;
+            color: @text-active-color;
+            border: 1px solid @active-color;
+
+            &:first-of-type {
+                border-radius: 3px 0 0 3px;
+                padding: 0 10.5px;
+            }
+
+            &:last-of-type {
+                border-radius: 0 3px 3px 0;
+            }
         }
-        &.spreadsheet {
-             background-position: -8px -80px;
-        }
-        &.presentation {
-            background-position: -8px -152px;
+
+        &.disabled {
+            opacity: .5;
         }
     }
+}

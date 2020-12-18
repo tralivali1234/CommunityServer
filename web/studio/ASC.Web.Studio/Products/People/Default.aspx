@@ -1,8 +1,6 @@
 ﻿<%@ Assembly Name="ASC.Web.People" %>
-<%@ Page Title="" Language="C#" MasterPageFile="~/products/people/Masters/PeopleBaseTemplate.Master" AutoEventWireup="true" CodeBehind="Default.aspx.cs" Inherits="ASC.Web.People.Default" EnableViewState="false" %>
 
-<%@ Register Assembly="ASC.Web.Studio" Namespace=" ASC.Web.Studio.Controls.Common" TagPrefix="sc" %>
-
+<%@ Page Language="C#" MasterPageFile="~/Products/People/Masters/PeopleBaseTemplate.Master" AutoEventWireup="true" CodeBehind="Default.aspx.cs" Inherits="ASC.Web.People.Default" EnableViewState="false" %>
 
 <%@ Import Namespace="ASC.Web.Studio.Core.Users" %>
 <%@ Import Namespace="ASC.Core.Users" %>
@@ -10,11 +8,9 @@
 <%@ Import Namespace="ASC.Web.Studio.Utility" %>
 <%@ Import Namespace="Resources" %>
 
-<asp:Content ID="_peopleContent" runat="server" ContentPlaceHolderID="PeoplePageContent">
-    
-    <asp:PlaceHolder ID="loaderHolder" runat="server"></asp:PlaceHolder>
-    <div class="clearFix default-title profile-title header-with-menu">
-        <span class="header text-overflow"><%= Resources.Resource.People %></span>
+<asp:Content runat="server" ContentPlaceHolderID="TitleContent">
+    <div class="clearFix default-title profile-title header-with-menu display-none">
+        <span class="header text-overflow"><%= Resource.People %></span>
         <% if (IsAdmin) { %>
         <span class="menu-small" style="display:none;"></span>
         <% } %>
@@ -23,19 +19,20 @@
     <% if (IsAdmin) { %>
     <div id="actionGroupMenu" class="studio-action-panel">
         <ul class="dropdown-content">
-            <li><a class="dropdown-item update-group"><%=ASC.Web.Studio.Core.Users.CustomNamingPeople.Substitute<Resources.Resource>("DepEditHeader").HtmlEncode()%></a></li>
+            <li><a class="dropdown-item update-group"><%= CustomNamingPeople.Substitute<Resource>("DepEditHeader").HtmlEncode()%></a></li>
             <li><a class="dropdown-item delete-group"><%= PeopleResource.DeleteButton %></a></li>
         </ul>
     </div>
     <% } %>
+</asp:Content>
 
-    
-    <div id="filterContainer">
+<asp:Content runat="server" ContentPlaceHolderID="FilterContent">
+    <div id="filterContainer" class="display-none">
         <div id="peopleFilter"></div>
     </div>
 
-    <div id="peopleContent">
-        <% if (IsAdmin) { %>
+    <% if (IsAdmin) { %>
+    <div class="people-content">
         <ul id="peopleHeaderMenu" class="clearFix contentMenu contentMenuDisplayAll">
             <li class="menuAction menuActionSelectAll menuActionSelectLonely">
                 <div class="menuActionSelect">
@@ -91,58 +88,42 @@
             </li>
         </ul>
         <div class="header-menu-spacer" style="display: none;"></div>
-        <% } %>
+    </div>
+    <% } %>
 
-        <table id="peopleData" class="table-list height48" cellpadding="7" cellspacing="0">
-            <tbody>
-            </tbody>
-        </table>
+</asp:Content>
 
+<asp:Content runat="server" ContentPlaceHolderID="PeoplePageContent">
 
-        <table id="tableForPeopleNavigation" cellpadding="0" cellspacing="0" border="0">
-            <tbody>
-                <tr>
-                    <td>
-                        <sc:PageNavigator ID="peoplePageNavigator" EntryCount="0" CurrentPageNumber="1" EntryCountOnPage="25" VisibleOnePage="false" runat="server" />
-                    </td>
-                    <td style="text-align:right;">
-                        <span class="gray-text"><%= PeopleResource.TotalCount %>:&nbsp;</span>
-                        <span class="gray-text" id="totalUsers"></span>
-                        <span class="page-nav-info">
-                            <span class="gray-text"><%= PeopleResource.ShowOnPage %>:&nbsp;</span>
-                            <select id="countOfRows" class="top-align">
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                                <option value="75">75</option>
-                                <option value="100">100</option>
-                            </select>
-                        </span>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <asp:PlaceHolder ID="loaderHolder" runat="server"/>
 
+    <div id="peopleContent" class="people-content">
+        <div class="content-list_scrollable webkit-scrollbar">
+            <table id="peopleData" class="table-list height48" cellpadding="7" cellspacing="0">
+                <tbody>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div id="peopleActionMenu" class="studio-action-panel" data-canedit="<%=Actions.AllowEdit %>" data-candel="<%=Actions.AllowAddOrDelete %>">        
-    </div>
+    <div id="peopleActionMenu" class="studio-action-panel" data-canedit="<%= Actions.AllowEdit %>" data-candel="<%= Actions.AllowAddOrDelete %>"></div>
 
-
-    <asp:PlaceHolder ID="userEmailChange" runat="server"></asp:PlaceHolder>
-    <asp:PlaceHolder ID="userPwdChange" runat="server"></asp:PlaceHolder>
-    <asp:PlaceHolder ID="userConfirmationDelete" runat="server"></asp:PlaceHolder>
+    <asp:PlaceHolder ID="userEmailChange" runat="server"/>
+    <asp:PlaceHolder ID="userPwdChange" runat="server"/>
+    <asp:PlaceHolder ID="userConfirmationDelete" runat="server"/>
 
     <% if (IsAdmin) { %>
+
     <div id="changeTypePanel" class="studio-action-panel group-actions">
         <ul class="dropdown-content">
             <li>
                 <a class="dropdown-item" data-type="<%= (int)EmployeeType.User %>">
-                    <%= CustomNamingPeople.Substitute<Resources.Resource>("User").HtmlEncode() %>
+                    <%= CustomNamingPeople.Substitute<Resource>("User").HtmlEncode() %>
                 </a>
             </li>
             <li>
                 <a class="dropdown-item" data-type="<%= (int)EmployeeType.Visitor %>">
-                    <%= CustomNamingPeople.Substitute<Resources.Resource>("Guest").HtmlEncode() %>
+                    <%= CustomNamingPeople.Substitute<Resource>("Guest").HtmlEncode() %>
                 </a>
             </li>
         </ul>
@@ -155,9 +136,9 @@
             <div class="block-cnt-splitter">
                 <span class="tariff-limit"></span>
                 <%= PeopleResource.ChangeTypeDialogConstraint %>&nbsp;
-                <%= IsFreeTariff ? string.Format(PeopleResource.ReadAboutNonProfit,
-                                                 "<a class='link underline' href='http://helpcenter.onlyoffice.com/gettingstarted/configuration.aspx#PublicPortals' target='_blank'>",
-                                                 "</a>") : string.Empty %>
+                <% if (IsFreeTariff && !string.IsNullOrEmpty(HelpLink)) { %>
+                <%= String.Format(PeopleResource.ReadAboutNonProfit, "<a class='link underline' href='" + HelpLink + "/gettingstarted/configuration.aspx#PublicPortals' target='_blank'>", "</a>") %>
+                <% } %>
             </div>
             <% } %>
             <div class="block-cnt-splitter action-info">
@@ -185,14 +166,25 @@
         </div>
         <div class="error-popup display-none"></div>
         <div class="middle-button-container">
-            <% if (DisplayPayments && TenantExtra.EnableTarrifSettings)
+            <% if (!DisplayPaymentsFirst)
                { %>
-            <a id="changeTypeDialogTariff" class="button blue middle" href="<%= TenantExtra.GetTariffPageLink() %>">
-                <%= UserControlsCommonResource.UpgradeButton %></a>
+            <a id="changeTypeDialogOk" class="button blue middle"><%= PeopleResource.ChangeType %></a>
             <span class="splitter-buttons"></span>
             <% } %>
-            <a id="changeTypeDialogOk" class="button <%= DisplayPayments && TenantExtra.EnableTarrifSettings ? "gray" : "blue" %> middle"><%= PeopleResource.ChangeType %></a>
+
+            <% if (DisplayPayments)
+               { %>
+            <a id="changeTypeDialogTariff" class="button <%= DisplayPaymentsFirst ? "blue" : "gray" %> middle" href="<%= TenantExtra.GetTariffPageLink() %>">
+                <%= UserControlsCommonResource.UpgradeButton %></a>
             <span class="splitter-buttons"></span>
+
+            <% if (DisplayPaymentsFirst)
+               { %>
+            <a id="changeTypeDialogOk" class="button gray middle"><%= PeopleResource.ChangeType %></a>
+            <span class="splitter-buttons"></span>
+            <% } %>
+
+            <% } %>
             <a id="changeTypeDialogCancel" class="button gray middle"><%= PeopleResource.LblCancelButton%></a>
         </div>
     </div>
@@ -219,9 +211,9 @@
             <div class="block-cnt-splitter">
                 <span class="tariff-limit"></span>
                 <%= PeopleResource.ChangeStatusDialogConstraint %>&nbsp;
-                <%= IsFreeTariff ? string.Format(PeopleResource.ReadAboutNonProfit,
-                                                 "<a class='link underline' href='http://helpcenter.onlyoffice.com/gettingstarted/configuration.aspx#PublicPortals' target='_blank'>",
-                                                 "</a>") : string.Empty %>
+                <% if (IsFreeTariff && !string.IsNullOrEmpty(HelpLink)) { %>
+                <%= String.Format(PeopleResource.ReadAboutNonProfit, "<a class='link underline' href='" + HelpLink + "/gettingstarted/configuration.aspx#PublicPortals' target='_blank'>", "</a>") %>
+                <% } %>
             </div>
             <% } %>
             <div class="block-cnt-splitter action-info">
@@ -249,14 +241,25 @@
         </div>
         <div class="error-popup display-none"></div>
         <div class="middle-button-container">
-            <% if (DisplayPayments && TenantExtra.EnableTarrifSettings)
+            <% if (!DisplayPaymentsFirst)
                { %>
-            <a id="changeStatusTariff" class="button blue middle" href="<%= TenantExtra.GetTariffPageLink() %>">
-                <%= UserControlsCommonResource.UpgradeButton %></a>
+            <a id="changeStatusOkBtn" class="button blue middle"><%= PeopleResource.ChangeStatusButton %></a>
             <span class="splitter-buttons"></span>
             <% } %>
-            <a id="changeStatusOkBtn" class="button <%= DisplayPayments && TenantExtra.EnableTarrifSettings ? "gray" : "blue" %> middle"><%= PeopleResource.ChangeStatusButton %></a>
+
+            <% if (DisplayPayments)
+               { %>
+            <a id="changeStatusTariff" class="button <%= DisplayPaymentsFirst ? "blue" : "gray" %> middle" href="<%= TenantExtra.GetTariffPageLink() %>">
+                <%= UserControlsCommonResource.UpgradeButton %></a>
             <span class="splitter-buttons"></span>
+
+            <% if (DisplayPaymentsFirst)
+               { %>
+            <a id="changeStatusOkBtn" class="button gray middle"><%= PeopleResource.ChangeStatusButton %></a>
+            <span class="splitter-buttons"></span>
+            <% } %>
+
+            <% } %>
             <a id="changeStatusCancelBtn" class="button gray middle"><%= PeopleResource.LblCancelButton%></a>
         </div>
     </div>
@@ -275,4 +278,29 @@
         </div>
     </div>
 
+</asp:Content>
+
+<asp:Content runat="server" ContentPlaceHolderID="PagingContent">
+    <table id="tableForPeopleNavigation" cellpadding="0" cellspacing="0" border="0" class="people-content display-none">
+        <tbody>
+            <tr>
+                <td>
+                    <div id="peoplePageNavigator"></div>
+                </td>
+                <td style="text-align:right;">
+                    <span class="gray-text"><%= PeopleResource.TotalCount %>:&nbsp;</span>
+                    <span class="gray-text" id="totalUsers"></span>
+                    <span class="page-nav-info">
+                        <span class="gray-text"><%= PeopleResource.ShowOnPage %>:&nbsp;</span>
+                        <select id="countOfRows" class="top-align">
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="75">75</option>
+                            <option value="100">100</option>
+                        </select>
+                    </span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 </asp:Content>

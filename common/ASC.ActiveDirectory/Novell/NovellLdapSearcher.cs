@@ -1,327 +1,605 @@
-﻿/*
+/*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
 
-using ASC.ActiveDirectory.Expressions;
-using ASC.Common.Caching;
-using ASC.Core;
-using ASC.Data.Storage;
-using ASC.Web.Studio.Utility;
-using log4net;
-using Mono.Security.Cryptography;
-using Mono.Security.X509;
-using Novell.Directory.Ldap;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.IO;
 using System.Linq;
-using Syscert = System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using ASC.ActiveDirectory.Base;
+using ASC.ActiveDirectory.Base.Data;
+using ASC.ActiveDirectory.Novell.Exceptions;
+using ASC.ActiveDirectory.Novell.Extensions;
+using ASC.Common.Logging;
+using Novell.Directory.Ldap;
+using Novell.Directory.Ldap.Controls;
+using Novell.Directory.Ldap.Utilclass;
 
 namespace ASC.ActiveDirectory.Novell
 {
-    public class NovellLdapSearcher
+    public class NovellLdapSearcher: IDisposable
     {
-        private readonly ILog log = LogManager.GetLogger(typeof(LdapSettingsChecker));
-        private readonly int currentTenantID = TenantProvider.CurrentTenantID;
-        private readonly NovellLdapCertificateConfirmRequest certificateConfirmRequest = new NovellLdapCertificateConfirmRequest();
-        private static readonly ICache cache = AscCache.Default;
-        private static readonly object rootSync = new object();
+        private readonly ILog _log = LogManager.GetLogger("ASC");
+        private LdapCertificateConfirmRequest _certificateConfirmRequest;
+        private static readonly object RootSync = new object();
 
-        public NovellLdapSearcher(bool acceptCertificate)
-        {
-            if (acceptCertificate)
-            {
-                certificateConfirmRequest.Approved = true;
-                certificateConfirmRequest.Requested = false;
-            }
+        private LdapConnection _ldapConnection;
+
+        public string Login { get; private set; }
+        public string Password { get; private set; }
+        public string Server { get; private set; }
+        public int PortNumber { get; private set; }
+        public bool StartTls { get; private set; }
+        public bool Ssl { get; private set; }
+        public bool AcceptCertificate { get; private set; }
+        public string AcceptCertificateHash { get; private set; }
+
+        public string LdapUniqueIdAttribute { get; set; }
+
+        private Dictionary<string, string[]> _capabilities;
+
+        public bool IsConnected {
+            get { return _ldapConnection != null && _ldapConnection.Connected; }
         }
 
-        public List<LDAPObject> Search(string login, string password, string server, int portNumber,
-            int scope, bool startTls, Criteria criteria, string userFilter = null, string disnguishedName = null, string[] attributes = null)
+        public NovellLdapSearcher(string login, string password, string server, int portNumber, bool startTls, bool ssl,
+            bool acceptCertificate, string acceptCertificateHash = null)
         {
-            if (!string.IsNullOrEmpty(userFilter) && !userFilter.StartsWith("(") && !userFilter.EndsWith(")"))
-            {
-                userFilter = "(" + userFilter + ")";
-            }
-            string searchFilter = criteria != null ? "(&" + criteria.ToString() + userFilter + ")" : userFilter;
-            return Search(login, password, server, portNumber, scope, startTls, searchFilter, disnguishedName, attributes);
+            Login = login;
+            Password = password;
+            Server = server;
+            PortNumber = portNumber;
+            StartTls = startTls;
+            Ssl = ssl;
+            AcceptCertificate = acceptCertificate;
+            AcceptCertificateHash = acceptCertificateHash;
+
+            LdapUniqueIdAttribute = ConfigurationManagerExtension.AppSettings["ldap.unique.id"];
         }
 
-        public List<LDAPObject> Search(string login, string password, string server, int portNumber,
-            int scope, bool startTls, string searchFilter = null, string disnguishedName = null, string[] attributes = null)
+        public void Connect()
         {
-            if (portNumber != LdapConnection.DEFAULT_PORT && portNumber != LdapConnection.DEFAULT_SSL_PORT)
-            {
-                throw new SystemException("Wrong port");
-            }
-            if (server.StartsWith("LDAP://"))
-            {
-                server = server.Substring("LDAP://".Length);
-            }
-            var factory = new LDAPObjectFactory();
-            var entries = new List<LdapEntry>();
+            if (Server.StartsWith("LDAP://"))
+                Server = Server.Substring("LDAP://".Length);
+
             var ldapConnection = new LdapConnection();
-            if (startTls || portNumber == LdapConnection.DEFAULT_SSL_PORT)
-            {
-                ldapConnection.UserDefinedServerCertValidationDelegate += ServerCertValidationHandler;
-            }
-            
-            ldapConnection.Connect(server, portNumber);
-            if (portNumber == LdapConnection.DEFAULT_SSL_PORT)
-            {
-                ldapConnection.SecureSocketLayer = true;
-            }
-            if (startTls)
-            {
-                // does not call stopTLS because it does not work
-                ldapConnection.startTLS();
-            }
-            ldapConnection.Bind(LdapConnection.Ldap_V3, login, password);
 
-            if (startTls)
+            if (StartTls || Ssl)
+                ldapConnection.UserDefinedServerCertValidationDelegate += ServerCertValidationHandler;
+
+            if (Ssl)
+                ldapConnection.SecureSocketLayer = true;
+
+            try
             {
-                string errorMessage = ServerCertValidate();
-                // error in ServerCertValidationHandler
-                if (!String.IsNullOrEmpty(errorMessage))
+                ldapConnection.ConnectionTimeout = 30000; // 30 seconds
+
+                _log.DebugFormat("ldapConnection.Connect(Server='{0}', PortNumber='{1}');", Server, PortNumber);
+
+                ldapConnection.Connect(Server, PortNumber);
+
+                if (StartTls)
                 {
-                    ldapConnection.Disconnect();
-                    throw new Exception(errorMessage);
+                    _log.Debug("ldapConnection.StartTls();");
+                    ldapConnection.StartTls();
                 }
             }
-
-            // certificate confirmation requested
-            if ((startTls && certificateConfirmRequest != null &&
-                certificateConfirmRequest.Requested && !certificateConfirmRequest.Approved))
+            catch (Exception ex)
             {
-                log.Debug("LDAP certificate confirmation requested.");
+                if (_certificateConfirmRequest == null)
+                {
+                    if (ex.Message.StartsWith("Connect Error"))
+                    {
+                        throw new SocketException();
+                    }
+
+                    if (ex.Message.StartsWith("Unavailable"))
+                    {
+                        throw new NotSupportedException(ex.Message);
+                    }
+
+                    throw;
+                }
+
+                _log.Debug("LDAP certificate confirmation requested.");
+
                 ldapConnection.Disconnect();
+
                 var exception = new NovellLdapTlsCertificateRequestedException
                 {
-                    CertificateConfirmRequest = certificateConfirmRequest
+                    CertificateConfirmRequest = _certificateConfirmRequest
                 };
+
                 throw exception;
             }
 
-            if (searchFilter == null)
+            if (string.IsNullOrEmpty(Login) || string.IsNullOrEmpty(Password))
             {
-                ldapConnection.Disconnect();
-                return null;
+                _log.Debug("ldapConnection.Bind(Anonymous)");
+
+                ldapConnection.Bind(null, null); 
             }
+            else
+            {
+                _log.DebugFormat("ldapConnection.Bind(Login: '{0}')", Login);
+
+                ldapConnection.Bind(Login, Password);
+            }
+
+            if (!ldapConnection.Bound)
+            {
+                throw new Exception("Bind operation wasn't completed successfully.");
+            }
+
+            _ldapConnection = ldapConnection;
+        }
+
+        private bool ServerCertValidationHandler(object sender, X509Certificate certificate,
+            X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            if (sslPolicyErrors == SslPolicyErrors.None)
+                return true;
+
+            lock (RootSync)
+            {
+                var certHash = certificate.GetCertHashString();
+
+                if (LdapUtils.IsCertInstalled(certificate, _log))
+                {
+                    AcceptCertificate = true;
+                    AcceptCertificateHash = certHash;
+                    return true;
+                }
+
+                if (AcceptCertificate)
+                {
+                    if (AcceptCertificateHash == null || AcceptCertificateHash.Equals(certHash))
+                    {
+                        if (LdapUtils.TryInstallCert(certificate, _log))
+                        {
+                            AcceptCertificateHash = certHash;
+                        }
+
+                        return true;
+                    }
+
+                    AcceptCertificate = false;
+                    AcceptCertificateHash = null;
+                }
+
+                _log.WarnFormat("ServerCertValidationHandler: sslPolicyErrors = {0}", sslPolicyErrors);
+
+                _certificateConfirmRequest = LdapCertificateConfirmRequest.FromCert(certificate, chain, sslPolicyErrors, false, true, _log);
+            }
+
+            return false;
+        }
+
+        public enum LdapScope
+        {
+            Base = LdapConnection.SCOPE_BASE,
+            One = LdapConnection.SCOPE_ONE,
+            Sub = LdapConnection.SCOPE_SUB
+        }
+
+        public List<LdapObject> Search(LdapScope scope, string searchFilter,
+            string[] attributes = null, int limit = -1, LdapSearchConstraints searchConstraints = null)
+        {
+            return Search("", scope, searchFilter, attributes, limit, searchConstraints);
+        }
+
+        public List<LdapObject> Search(string searchBase, LdapScope scope, string searchFilter,
+            string[] attributes = null, int limit = -1, LdapSearchConstraints searchConstraints = null)
+        {
+            if (!IsConnected)
+                Connect();
+
+            if (searchBase == null)
+                searchBase = "";
+
+            var entries = new List<LdapEntry>();
+
+            if (string.IsNullOrEmpty(searchFilter))
+                return new List<LdapObject>();
+
             if (attributes == null)
             {
-                string ldapUniqueIdAttribute = ConfigurationManager.AppSettings["ldap.unique.id"];
-                if (ldapUniqueIdAttribute == null)
+                if (string.IsNullOrEmpty(LdapUniqueIdAttribute))
                 {
-                    attributes = new [] { "*", Constants.RFCLDAPAttributes.EntryDN, Constants.RFCLDAPAttributes.EntryUUID,
-                        Constants.RFCLDAPAttributes.NSUniqueId, Constants.RFCLDAPAttributes.GUID };
+                    attributes = new[]
+                    {
+                        "*", LdapConstants.RfcLDAPAttributes.ENTRY_DN, LdapConstants.RfcLDAPAttributes.ENTRY_UUID,
+                        LdapConstants.RfcLDAPAttributes.NS_UNIQUE_ID, LdapConstants.RfcLDAPAttributes.GUID
+                    };
                 }
                 else
                 {
-                    attributes = new [] { "*", ldapUniqueIdAttribute };
+                    attributes = new[] { "*", LdapUniqueIdAttribute };
                 }
             }
-            LdapSearchConstraints ldapSearchConstraints = new LdapSearchConstraints
+
+            var ldapSearchConstraints = searchConstraints ?? new LdapSearchConstraints
             {
-                MaxResults = int.MaxValue,
-                HopLimit = 0
+                // Maximum number of search results to return.
+                // The value 0 means no limit. The default is 1000.
+                MaxResults = limit == -1 ? 0 : limit,
+                // Returns the number of results to block on during receipt of search results. 
+                // This should be 0 if intermediate results are not needed, and 1 if results are to be processed as they come in.
+                //BatchSize = 0,
+                // The maximum number of referrals to follow in a sequence during automatic referral following. 
+                // The default value is 10. A value of 0 means no limit.
+                HopLimit = 0,
+                // Specifies whether referrals are followed automatically
+                // Referrals of any type other than to an LDAP server (for example, a referral URL other than ldap://something) are ignored on automatic referral following.
+                // The default is false.
+                ReferralFollowing = true,
+                // The number of seconds to wait for search results.
+                // Sets the maximum number of seconds that the server is to wait when returning search results.
+                //ServerTimeLimit = 600000, // 10 minutes
+                // Sets the maximum number of milliseconds the client waits for any operation under these constraints to complete.
+                // If the value is 0, there is no maximum time limit enforced by the API on waiting for the operation results.
+                //TimeLimit = 600000 // 10 minutes
             };
-            LdapSearchResults ldapSearchResults = ldapConnection.Search(disnguishedName,
-                scope, searchFilter, attributes, false, ldapSearchConstraints);
-            while (ldapSearchResults.hasMore())
+
+            var queue = _ldapConnection.Search(searchBase,
+                (int)scope, searchFilter, attributes, false, ldapSearchConstraints);
+
+            while (queue.hasMore())
             {
                 LdapEntry nextEntry;
                 try
                 {
-                    nextEntry = ldapSearchResults.next();
+                    nextEntry = queue.next();
+
+                    if (nextEntry == null)
+                        continue;
                 }
-                catch (LdapException)
+                catch (LdapException ex)
                 {
+                    if (!string.IsNullOrEmpty(ex.Message) && ex.Message.Contains("Sizelimit Exceeded"))
+                    {
+                        if (!string.IsNullOrEmpty(Login) && !string.IsNullOrEmpty(Password) && limit == -1)
+                        {
+                            _log.Warn("The size of the search results is limited. Start TrySearchSimple()");
+
+                            List<LdapObject> simpleResults;
+
+                            if (TrySearchSimple(searchBase, scope, searchFilter, out simpleResults, attributes, limit,
+                                searchConstraints))
+                            {
+                                if (entries.Count >= simpleResults.Count)
+                                    break;
+
+                                return simpleResults;
+                            }
+                        }
+
+                        break;
+                    }
+
+                    _log.ErrorFormat("Search({0}) error: {1}", searchFilter, ex);
                     continue;
                 }
-                if (nextEntry != null)
+
+                entries.Add(nextEntry);
+
+                if (string.IsNullOrEmpty(LdapUniqueIdAttribute))
                 {
-                    entries.Add(nextEntry);
+                    LdapUniqueIdAttribute = GetLdapUniqueId(nextEntry);
                 }
             }
-            var result = factory.CreateObjects(entries);
-            ldapConnection.Disconnect();
+
+            var result = entries.ToLdapObjects(LdapUniqueIdAttribute);
+
             return result;
         }
 
-        private bool ServerCertValidationHandler(Syscert.X509Certificate certificate, int[] certificateErrors)
+        private bool TrySearchSimple(string searchBase, LdapScope scope, string searchFilter, out List<LdapObject> results,
+            string[] attributes = null, int limit = -1, LdapSearchConstraints searchConstraints = null)
         {
-            foreach (int error in certificateErrors)
-            {
-                log.DebugFormat("ServerCertValidationHandler CertificateError: {0}", error);
-            }
-            lock (rootSync)
-            {
-                cache.Insert("ldapCertificate", certificate, DateTime.MaxValue);
-                cache.Insert("ldapCertificateErrors", certificateErrors, DateTime.MaxValue);
-                certificateConfirmRequest.CertificateErrors = certificateErrors;
-            }
-            return true;
-        }
 
-        private string ServerCertValidate()
-        {
-            string errorMessage = String.Empty;
-            X509Store store = WorkContext.IsMono ? X509StoreManager.CurrentUser.TrustedRoot :
-                X509StoreManager.LocalMachine.TrustedRoot;
-            var storage = StorageFactory.GetStorage("-1", "certs");
             try
             {
-                CoreContext.TenantManager.SetCurrentTenant(currentTenantID);
+                results = SearchSimple(searchBase, scope, searchFilter, attributes, limit, searchConstraints);
 
-                // Import the details of the certificate from the server.
-                lock (rootSync)
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _log.ErrorFormat("TrySearchSimple() failed. Error: {0}", ex);
+            }
+
+            results = null;
+            return false;
+        }
+
+        public List<LdapObject> SearchSimple(string searchBase, LdapScope scope, string searchFilter,
+            string[] attributes = null, int limit = -1, LdapSearchConstraints searchConstraints = null)
+        {
+            if (!IsConnected)
+                Connect();
+
+            if (searchBase == null)
+                searchBase = "";
+
+            var entries = new List<LdapEntry>();
+
+            if (string.IsNullOrEmpty(searchFilter))
+                return new List<LdapObject>();
+
+            if (attributes == null)
+            {
+                if (string.IsNullOrEmpty(LdapUniqueIdAttribute))
                 {
-                    var certificate = cache.Get<Syscert.X509Certificate>("ldapCertificate");
-                    if (certificate != null)
+                    attributes = new[]
                     {
-                        byte[] data = certificate.GetRawCertData();
-                        var x509 = new X509Certificate(data);
-                        // Check for ceritficate in store.
-                        if (!store.Certificates.Contains(x509))
-                        {
-                            if (storage.IsFile("ldap/ldap.cer"))
-                            {
-                                var storageData = GetCertificateFromStorage(storage);
-                                var storageX509 = new X509Certificate(storageData);
-                                if (CompareHash(storageX509.Hash, x509.Hash))
-                                {
-                                    // Add the certificate to the store.
-                                    store.Import(storageX509);
-                                    store.Certificates.Add(storageX509);
-                                    return String.Empty;
-                                }
-                            }
-                            if (certificateConfirmRequest.Approved)
-                            {
-                                AddCertificateToStorage(storage, x509);
-                                // Add the certificate to the store.
-                                store.Import(x509);
-                                store.Certificates.Add(x509);
-                                return String.Empty;
-                            }
-                            if (!certificateConfirmRequest.Requested)
-                            {
-                                certificateConfirmRequest.SerialNumber = CryptoConvert.ToHex(x509.SerialNumber);
-                                certificateConfirmRequest.IssuerName = x509.IssuerName;
-                                certificateConfirmRequest.SubjectName = x509.SubjectName;
-                                certificateConfirmRequest.ValidFrom = x509.ValidFrom;
-                                certificateConfirmRequest.ValidUntil = x509.ValidUntil;
-                                certificateConfirmRequest.Hash = CryptoConvert.ToHex(x509.Hash);
-                                var certificateErrors = cache.Get<int[]>("ldapCertificateErrors");
-                                certificateConfirmRequest.CertificateErrors = certificateErrors.ToArray();
-                                certificateConfirmRequest.Requested = true;
-                            }
-                        }
+                        "*", LdapConstants.RfcLDAPAttributes.ENTRY_DN, LdapConstants.RfcLDAPAttributes.ENTRY_UUID,
+                        LdapConstants.RfcLDAPAttributes.NS_UNIQUE_ID, LdapConstants.RfcLDAPAttributes.GUID
+                    };
+                }
+                else
+                {
+                    attributes = new[] {"*", LdapUniqueIdAttribute};
+                }
+            }
+
+            var ldapSearchConstraints = searchConstraints ?? new LdapSearchConstraints
+            {
+                // Maximum number of search results to return.
+                // The value 0 means no limit. The default is 1000.
+                MaxResults = limit == -1 ? 0 : limit,
+                // Returns the number of results to block on during receipt of search results. 
+                // This should be 0 if intermediate results are not needed, and 1 if results are to be processed as they come in.
+                //BatchSize = 0,
+                // The maximum number of referrals to follow in a sequence during automatic referral following. 
+                // The default value is 10. A value of 0 means no limit.
+                HopLimit = 0,
+                // Specifies whether referrals are followed automatically
+                // Referrals of any type other than to an LDAP server (for example, a referral URL other than ldap://something) are ignored on automatic referral following.
+                // The default is false.
+                ReferralFollowing = true,
+                // The number of seconds to wait for search results.
+                // Sets the maximum number of seconds that the server is to wait when returning search results.
+                //ServerTimeLimit = 600000, // 10 minutes
+                // Sets the maximum number of milliseconds the client waits for any operation under these constraints to complete.
+                // If the value is 0, there is no maximum time limit enforced by the API on waiting for the operation results.
+                //TimeLimit = 600000 // 10 minutes
+            };
+
+            // initially, cookie must be set to an empty string
+            var pageSize = 2;
+            sbyte[] cookie = Array.ConvertAll(Encoding.ASCII.GetBytes(""), b => unchecked((sbyte)b));
+            var i = 0;
+
+            do
+            {
+                var requestControls = new LdapControl[1];
+                requestControls[0] = new LdapPagedResultsControl(pageSize, cookie);
+                ldapSearchConstraints.setControls(requestControls);
+                _ldapConnection.Constraints = ldapSearchConstraints;
+
+                var res = _ldapConnection.Search(searchBase,
+                    (int)scope, searchFilter, attributes, false, (LdapSearchConstraints)null);
+
+                while (res.hasMore())
+                {
+                    LdapEntry nextEntry;
+                    try
+                    {
+                        nextEntry = res.next();
+
+                        if (nextEntry == null)
+                            continue;
                     }
-                    else
+                    catch (LdapException ex)
                     {
-                        // for AD
-                        if (storage.IsFile("ldap/ldap.cer"))
-                        {
-                            var storageData = GetCertificateFromStorage(storage);
-                            var storageX509 = new X509Certificate(storageData);
-                            // Add the certificate to the store.
-                            store.Import(storageX509);
-                            store.Certificates.Add(storageX509);
-                            return String.Empty;
-                        }
-                        else
-                        {
-                            errorMessage = "LDAP TlsHandler. Certificate not found in certificate store.";
-                            log.Error(errorMessage);
-                            return errorMessage;
-                        }
+                        if (ex is LdapReferralException)
+                            continue;
+
+                        if (!string.IsNullOrEmpty(ex.Message) && ex.Message.Contains("Sizelimit Exceeded"))
+                            break;
+
+                        _log.ErrorFormat("SearchSimple({0}) error: {1}", searchFilter, ex);
+                        continue;
+                    }
+
+                    _log.DebugFormat("{0}. DN: {1}", ++i, nextEntry.DN);
+
+                    entries.Add(nextEntry);
+
+                    if (string.IsNullOrEmpty(LdapUniqueIdAttribute))
+                    {
+                        LdapUniqueIdAttribute = GetLdapUniqueId(nextEntry);
+                    }
+                }
+
+                // Server should send back a control irrespective of the 
+                // status of the search request
+                var controls = res.ResponseControls;
+                if (controls == null)
+                {
+                    _log.Debug("No controls returned");
+                    cookie = null;
+                }
+                else
+                {
+                    // Multiple controls could have been returned
+                    foreach (LdapControl control in controls)
+                    {
+                        /* Is this the LdapPagedResultsResponse control? */
+                        if (!(control is LdapPagedResultsResponse)) 
+                            continue;
+
+                        var response = new LdapPagedResultsResponse(control.ID,
+                            control.Critical, control.getValue());
+
+                        cookie = response.Cookie;
+                    }
+                }
+                // if cookie is empty, we are done.
+            } while (cookie != null && cookie.Length > 0);
+
+            var result = entries.ToLdapObjects(LdapUniqueIdAttribute);
+
+            return result;
+        }
+
+        public Dictionary<string, string[]> GetCapabilities()
+        {
+            if (_capabilities != null)
+                return _capabilities;
+
+            _capabilities = new Dictionary<string, string[]>();
+
+            try
+            {
+                var ldapSearchConstraints = new LdapSearchConstraints
+                {
+                    MaxResults = int.MaxValue,
+                    HopLimit = 0,
+                    ReferralFollowing = true
+                };
+
+                var ldapSearchResults = _ldapConnection.Search("", LdapConnection.SCOPE_BASE, LdapConstants.OBJECT_FILTER,
+                    new[] {"*", "supportedControls", "supportedCapabilities"}, false, ldapSearchConstraints);
+
+                while (ldapSearchResults.hasMore())
+                {
+                    LdapEntry nextEntry;
+                    try
+                    {
+                        nextEntry = ldapSearchResults.next();
+
+                        if (nextEntry == null)
+                            continue;
+                    }
+                    catch (LdapException ex)
+                    {
+                        _log.ErrorFormat("GetCapabilities()->LoopResults failed. Error: {0}", ex);
+                        continue;
+                    }
+
+                    var attributeSet = nextEntry.getAttributeSet();
+
+                    var ienum = attributeSet.GetEnumerator();
+
+                    while (ienum.MoveNext())
+                    {
+                        var attribute = (LdapAttribute) ienum.Current;
+                        if (attribute == null) 
+                            continue;
+
+                        var attributeName = attribute.Name;
+                        var attributeVals = attribute.StringValueArray
+                            .ToList()
+                            .Select(s =>
+                            {
+                                if (Base64.isLDIFSafe(s)) return s;
+                                var tbyte = SupportClass.ToByteArray(s);
+                                s = Base64.encode(SupportClass.ToSByteArray(tbyte));
+
+                                return s;
+                            }).ToArray();
+
+                        _capabilities.Add(attributeName, attributeVals);
                     }
                 }
             }
             catch (Exception ex)
             {
-                errorMessage = String.Format("LDAP TlsHandler error: {0}. {1}. store path = {2}",
-                    ex.ToString(), ex.InnerException != null ? ex.InnerException.ToString() : string.Empty, store.Name);
-                log.ErrorFormat(errorMessage);
+                _log.ErrorFormat("GetCapabilities() failed. Error: {0}", ex);
             }
-            return errorMessage;
+
+            return _capabilities;
         }
 
-        private byte[] GetCertificateFromStorage(IDataStore storage)
+        private string GetLdapUniqueId(LdapEntry ldapEntry)
         {
-            using (var stream = storage.GetReadStream("ldap/ldap.cer"))
+            try
             {
-                return ReadFully(stream);
-            }
-        }
+                var ldapUniqueIdAttribute = ConfigurationManagerExtension.AppSettings["ldap.unique.id"];
 
-        private void AddCertificateToStorage(IDataStore storage, X509Certificate x509)
-        {
-            var stream = new MemoryStream(x509.RawData);
-            storage.DeleteDirectory("ldap");
-            storage.Save("ldap/ldap.cer", stream);
-        }
+                if (ldapUniqueIdAttribute != null)
+                    return ldapUniqueIdAttribute;
 
-        private byte[] ReadFully(Stream input)
-        {
-            byte[] buffer = new byte[4 * 1024];
-            using (MemoryStream ms = new MemoryStream())
-            {
-                int read;
-                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                if (!string.IsNullOrEmpty(
+                    ldapEntry.GetAttributeValue(LdapConstants.ADSchemaAttributes.OBJECT_SID) as string))
                 {
-                    ms.Write(buffer, 0, read);
+                    ldapUniqueIdAttribute = LdapConstants.ADSchemaAttributes.OBJECT_SID;
                 }
-                return ms.ToArray();
+                else if (!string.IsNullOrEmpty(
+                    ldapEntry.GetAttributeValue(LdapConstants.RfcLDAPAttributes.ENTRY_UUID) as string))
+                {
+                    ldapUniqueIdAttribute = LdapConstants.RfcLDAPAttributes.ENTRY_UUID;
+                }
+                else if(!string.IsNullOrEmpty(
+                    ldapEntry.GetAttributeValue(LdapConstants.RfcLDAPAttributes.NS_UNIQUE_ID) as string))
+                {
+                    ldapUniqueIdAttribute = LdapConstants.RfcLDAPAttributes.NS_UNIQUE_ID;
+                }
+                else if (!string.IsNullOrEmpty(
+                    ldapEntry.GetAttributeValue(LdapConstants.RfcLDAPAttributes.GUID) as string))
+                {
+                    ldapUniqueIdAttribute = LdapConstants.RfcLDAPAttributes.GUID;
+                }
+
+                return ldapUniqueIdAttribute;
             }
+            catch (Exception ex)
+            {
+                _log.Error("GetLdapUniqueId()", ex);
+            }
+
+            return null;
         }
 
-        private bool CompareHash(byte[] hash1, byte[] hash2)
+        public void Dispose()
         {
-            if ((hash1 == null) && (hash2 == null))
+            if (!IsConnected)
+                return;
+
+            try
             {
-                return true;
-            }
-            if ((hash1 == null) || (hash2 == null))
-            {
-                return false;
-            }
-            if (hash1.Length != hash2.Length)
-            {
-                return false;
-            }
-            for (int i = 0; i < hash1.Length; i++)
-            {
-                if (hash1[i] != hash2[i])
+                _ldapConnection.Constraints.TimeLimit = 10000;
+                _ldapConnection.SearchConstraints.ServerTimeLimit = 10000;
+                _ldapConnection.SearchConstraints.TimeLimit = 10000;
+                _ldapConnection.ConnectionTimeout = 10000;
+
+                if (_ldapConnection.TLS)
                 {
-                    return false;
+                    _log.Debug("ldapConnection.StopTls();");
+                    _ldapConnection.StopTls();
                 }
+
+                _log.Debug("ldapConnection.Disconnect();");
+                _ldapConnection.Disconnect();
+
+                _log.Debug("ldapConnection.Dispose();");
+                _ldapConnection.Dispose();
+
+                _ldapConnection = null;
             }
-            return true;
+            catch (Exception ex)
+            {
+                _log.ErrorFormat("LDAP->Dispose() failed. Error: {0}", ex);
+            }
         }
     }
 }

@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -53,8 +44,8 @@ namespace ASC.CRM.Core.Dao
 
         #region Constructor
 
-        public CachedListItem(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public CachedListItem(int tenantID)
+            : base(tenantID)
         {
 
 
@@ -123,8 +114,8 @@ namespace ASC.CRM.Core.Dao
     {
         #region Constructor
 
-        public ListItemDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public ListItemDao(int tenantID)
+            : base(tenantID)
         {
 
 
@@ -143,31 +134,28 @@ namespace ASC.CRM.Core.Dao
                 .Where("title", title)
                 .SetMaxResults(1);
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<bool>(q);
-            }
+            return Db.ExecuteScalar<bool>(q);
         }
 
         public bool IsExist(int id)
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<bool>("select exists(select 1 from crm_list_item where tenant_id = @tid and id = @id)",
-                                new { tid = TenantID, id = id });
-            }
+            return Db.ExecuteScalar<bool>("select exists(select 1 from crm_list_item where tenant_id = @tid and id = @id)",
+                            new { tid = TenantID, id = id });
+        }
+
+        public List<ListItem> GetItems()
+        {
+            var sqlQuery = GetListItemSqlQuery(null).OrderBy("sort_order", true);
+
+            return Db.ExecuteList(sqlQuery).ConvertAll(ToListItem);
         }
 
         public List<ListItem> GetItems(ListType listType)
         {
-            SqlQuery sqlQuery = GetListItemSqlQuery(Exp.Eq("list_type", (int)listType))
+            var sqlQuery = GetListItemSqlQuery(Exp.Eq("list_type", (int)listType))
                                .OrderBy("sort_order", true);
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery)
-                     .ConvertAll(row => ToListItem(row));
-            }
+            return Db.ExecuteList(sqlQuery).ConvertAll(ToListItem);
         }
 
         public int GetItemsCount(ListType listType)
@@ -175,10 +163,7 @@ namespace ASC.CRM.Core.Dao
             SqlQuery sqlQuery = Query("crm_list_item").SelectCount().Where(Exp.Eq("list_type", (int)listType))
                                .OrderBy("sort_order", true);
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(sqlQuery);
-            }
+            return Db.ExecuteScalar<int>(sqlQuery);
         }
 
         public ListItem GetSystemListItem(int id)
@@ -214,7 +199,7 @@ namespace ASC.CRM.Core.Dao
 
         public List<ListItem> GetSystemItems()
         {
-            return new List<ListItem>()
+            return new List<ListItem>
             {
                 new ListItem
                         {
@@ -241,71 +226,51 @@ namespace ASC.CRM.Core.Dao
         {
             if (id < 0) return GetSystemListItem(id);
 
-            using (var db = GetDb())
-            {
-                var result = db.ExecuteList(GetListItemSqlQuery(Exp.Eq("id", id))).ConvertAll(row => ToListItem(row));
+            var result = Db.ExecuteList(GetListItemSqlQuery(Exp.Eq("id", id))).ConvertAll(ToListItem);
 
-                return result.Count > 0 ? result[0] : null;
-            }
+            return result.Count > 0 ? result[0] : null;
         }
 
         public virtual List<ListItem> GetItems(int[] id)
         {
-            using (var db = GetDb())
-            {
-                var sqlResult = db.ExecuteList(GetListItemSqlQuery(Exp.In("id", id))).ConvertAll(row => ToListItem(row));
+            var sqlResult = Db.ExecuteList(GetListItemSqlQuery(Exp.In("id", id))).ConvertAll(ToListItem);
 
-                var systemItem = id.Where(item => item < 0).Select(x => GetSystemListItem(x));
+            var systemItem = id.Where(item => item < 0).Select(GetSystemListItem);
 
-                return systemItem.Any() ? sqlResult.Union(systemItem).ToList() : sqlResult;
-            }
+            return systemItem.Any() ? sqlResult.Union(systemItem).ToList() : sqlResult;
         }
 
         public virtual List<ListItem> GetAll()
         {
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(GetListItemSqlQuery(null)).ConvertAll(row => ToListItem(row));
-            }
+            return Db.ExecuteList(GetListItemSqlQuery(null)).ConvertAll(ToListItem);
         }
 
-        public virtual void ChangeColor(int id, String newColor)
+        public virtual void ChangeColor(int id, string newColor)
         {
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Update("crm_list_item")
-                                          .Set("color", newColor)
-                                          .Where(Exp.Eq("id", id)));
-            }
+            Db.ExecuteNonQuery(Update("crm_list_item")
+                                        .Set("color", newColor)
+                                        .Where(Exp.Eq("id", id)));
         }
 
         public NameValueCollection GetColors(ListType listType)
         {
-
-            Exp where = Exp.Eq("list_type", (int)listType);
+            var where = Exp.Eq("list_type", (int)listType);
 
             var result = new NameValueCollection();
 
-            using (var db = GetDb())
-            {
-                db.ExecuteList(Query("crm_list_item")
-                                         .Select("id", "color")
-                                         .Where(where))
-                                     .ForEach(row => result.Add(row[0].ToString(), row[1].ToString()));
-            }
+            Db.ExecuteList(Query("crm_list_item")
+                                        .Select("id", "color")
+                                        .Where(where))
+                                    .ForEach(row => result.Add(row[0].ToString(), row[1].ToString()));
             return result;
 
         }
 
-        public ListItem GetByTitle(ListType listType, String title)
+        public ListItem GetByTitle(ListType listType, string title)
         {
+            var result = Db.ExecuteList(GetListItemSqlQuery(Exp.Eq("title", title) & Exp.Eq("list_type", (int)listType))).ConvertAll(ToListItem);
 
-            using (var db = GetDb())
-            {
-                var result = db.ExecuteList(GetListItemSqlQuery(Exp.Eq("title", title) & Exp.Eq("list_type", (int)listType))).ConvertAll(row => ToListItem(row));
-
-                return result.Count > 0 ? result[0] : null;
-            }
+            return result.Count > 0 ? result[0] : null;
         }
 
         public int GetRelativeItemsCount(ListType listType, int id)
@@ -342,10 +307,7 @@ namespace ASC.CRM.Core.Dao
                   
             }
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(sqlQuery);
-            }
+            return Db.ExecuteScalar<int>(sqlQuery);
         }
 
         public Dictionary<int, int> GetRelativeItemsCount(ListType listType)
@@ -387,12 +349,9 @@ namespace ASC.CRM.Core.Dao
                     throw new ArgumentException();
             }
 
-            using (var db = GetDb())
-            {
-                var queryResult = db.ExecuteList(sqlQuery);
+            var queryResult = Db.ExecuteList(sqlQuery);
 
-                return queryResult.ToDictionary(x => Convert.ToInt32(x[0]), y => Convert.ToInt32(y[1]));
-            }
+            return queryResult.ToDictionary(x => Convert.ToInt32(x[0]), y => Convert.ToInt32(y[1]));
         }
 
         public virtual int CreateItem(ListType listType, ListItem enumItem)
@@ -401,39 +360,36 @@ namespace ASC.CRM.Core.Dao
             if (IsExist(listType, enumItem.Title))
                 return GetByTitle(listType, enumItem.Title).ID;
 
-            if (String.IsNullOrEmpty(enumItem.Title))
+            if (string.IsNullOrEmpty(enumItem.Title))
                 throw new ArgumentException();
 
             if (listType == ListType.TaskCategory || listType == ListType.HistoryCategory)
-                if (String.IsNullOrEmpty(enumItem.AdditionalParams))
+                if (string.IsNullOrEmpty(enumItem.AdditionalParams))
                     throw new ArgumentException();
                 else
                    enumItem.AdditionalParams = System.IO.Path.GetFileName(enumItem.AdditionalParams);
                 
             if (listType == ListType.ContactStatus)
-                if (String.IsNullOrEmpty(enumItem.Color))
+                if (string.IsNullOrEmpty(enumItem.Color))
                     throw new ArgumentException();
 
             var sortOrder = enumItem.SortOrder;
 
-            using (var db = GetDb())
-            {
-                if (sortOrder == 0)
-                    sortOrder = db.ExecuteScalar<int>(Query("crm_list_item")
-                                                            .Where(Exp.Eq("list_type", (int)listType))
-                                                            .SelectMax("sort_order")) + 1;
+            if (sortOrder == 0)
+                sortOrder = Db.ExecuteScalar<int>(Query("crm_list_item")
+                                                        .Where(Exp.Eq("list_type", (int)listType))
+                                                        .SelectMax("sort_order")) + 1;
 
-                return db.ExecuteScalar<int>(
-                                                  Insert("crm_list_item")
-                                                  .InColumnValue("id", 0)
-                                                  .InColumnValue("list_type", (int)listType)
-                                                  .InColumnValue("description", enumItem.Description)
-                                                  .InColumnValue("title", enumItem.Title)
-                                                  .InColumnValue("additional_params", enumItem.AdditionalParams)
-                                                  .InColumnValue("color", enumItem.Color)
-                                                  .InColumnValue("sort_order", sortOrder)
-                                                  .Identity(1, 0, true));
-            }
+            return Db.ExecuteScalar<int>(
+                                                Insert("crm_list_item")
+                                                .InColumnValue("id", 0)
+                                                .InColumnValue("list_type", (int)listType)
+                                                .InColumnValue("description", enumItem.Description)
+                                                .InColumnValue("title", enumItem.Title)
+                                                .InColumnValue("additional_params", enumItem.AdditionalParams)
+                                                .InColumnValue("color", enumItem.Color)
+                                                .InColumnValue("sort_order", sortOrder)
+                                                .Identity(1, 0, true));
         }
 
         public virtual void EditItem(ListType listType, ListItem enumItem)
@@ -444,36 +400,28 @@ namespace ASC.CRM.Core.Dao
             {
                 case ListType.ContactStatus:
                 case ListType.ContactType:
-                    throw new ArgumentException(String.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeEdited, CRMErrorsResource.HasRelatedContacts));
+                    throw new ArgumentException(string.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeEdited, CRMErrorsResource.HasRelatedContacts));
                 case ListType.TaskCategory:
-                    throw new ArgumentException(String.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeEdited, CRMErrorsResource.TaskCategoryHasRelatedTasks));
+                    throw new ArgumentException(string.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeEdited, CRMErrorsResource.TaskCategoryHasRelatedTasks));
                 case ListType.HistoryCategory:
-                    throw new ArgumentException(String.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeEdited, CRMErrorsResource.HistoryCategoryHasRelatedEvents));
+                    throw new ArgumentException(string.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeEdited, CRMErrorsResource.HistoryCategoryHasRelatedEvents));
                 default:
-                    throw new ArgumentException(String.Format("{0}.", CRMErrorsResource.BasicCannotBeEdited));
+                    throw new ArgumentException(string.Format("{0}.", CRMErrorsResource.BasicCannotBeEdited));
             }
 
-
-
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Update("crm_list_item")
-                                         .Set("description", enumItem.Description)
-                                         .Set("title", enumItem.Title)
-                                         .Set("additional_params", enumItem.AdditionalParams)
-                                         .Set("color", enumItem.Color)
-                                         .Where(Exp.Eq("id", enumItem.ID)));
-            }
+            Db.ExecuteNonQuery(Update("crm_list_item")
+                                        .Set("description", enumItem.Description)
+                                        .Set("title", enumItem.Title)
+                                        .Set("additional_params", enumItem.AdditionalParams)
+                                        .Set("color", enumItem.Color)
+                                        .Where(Exp.Eq("id", enumItem.ID)));
         }
 
         public virtual void ChangePicture(int id, String newPicture)
         {
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Update("crm_list_item")
-                                     .Set("additional_params", newPicture)
-                                     .Where(Exp.Eq("id", id)));
-            }
+            Db.ExecuteNonQuery(Update("crm_list_item")
+                                    .Set("additional_params", newPicture)
+                                    .Where(Exp.Eq("id", id)));
         }
 
         private bool HaveRelativeItemsLink(ListType listType, int itemID)
@@ -504,10 +452,7 @@ namespace ASC.CRM.Core.Dao
                     throw new ArgumentException();
             }
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteScalar<int>(sqlQuery.SelectCount()) > 0;
-            }
+            return Db.ExecuteScalar<int>(sqlQuery.SelectCount()) > 0;
         }
 
         public void ChangeRelativeItemsLink(ListType listType, int fromItemID, int toItemID)
@@ -536,7 +481,7 @@ namespace ASC.CRM.Core.Dao
                     break;
                 case ListType.TaskCategory:
                     sqlUpdate = Update("crm_task")
-                               .Set("category_id", toItemID)       
+                               .Set("category_id", toItemID)
                                .Where(Exp.Eq("category_id", fromItemID));
                     break;
                 case ListType.HistoryCategory:
@@ -548,10 +493,7 @@ namespace ASC.CRM.Core.Dao
                     throw new ArgumentException();
             }
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(sqlUpdate);
-            }
+            Db.ExecuteNonQuery(sqlUpdate);
         }
 
         public virtual void DeleteItem(ListType listType, int itemID, int toItemID)
@@ -562,32 +504,28 @@ namespace ASC.CRM.Core.Dao
                 {
                     case ListType.ContactStatus:
                     case ListType.ContactType:
-                        throw new ArgumentException(String.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeDeleted, CRMErrorsResource.HasRelatedContacts));
+                        throw new ArgumentException(string.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeDeleted, CRMErrorsResource.HasRelatedContacts));
                     case ListType.TaskCategory:
-                        var exMsg = String.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeDeleted, CRMErrorsResource.TaskCategoryHasRelatedTasks);
+                        var exMsg = string.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeDeleted, CRMErrorsResource.TaskCategoryHasRelatedTasks);
                         if (itemID == toItemID) throw new ArgumentException(exMsg);
                         ChangeRelativeItemsLink(listType, itemID, toItemID);
                         break;
                     case ListType.HistoryCategory:
-                        throw new ArgumentException(String.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeDeleted, CRMErrorsResource.HistoryCategoryHasRelatedEvents));
+                        throw new ArgumentException(string.Format("{0}. {1}.", CRMErrorsResource.BasicCannotBeDeleted, CRMErrorsResource.HistoryCategoryHasRelatedEvents));
                     default:
-                        throw new ArgumentException(String.Format("{0}.", CRMErrorsResource.BasicCannotBeDeleted));
+                        throw new ArgumentException(string.Format("{0}.", CRMErrorsResource.BasicCannotBeDeleted));
                 }
             }
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_list_item").Where(Exp.Eq("id", itemID) & Exp.Eq("list_type", (int)listType)));
-            }
+            Db.ExecuteNonQuery(Delete("crm_list_item").Where(Exp.Eq("id", itemID) & Exp.Eq("list_type", (int)listType)));
         }
 
         public virtual void ReorderItems(ListType listType, String[] titles)
         {
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction())
+            using (var tx = Db.BeginTransaction())
             {
                 for (int index = 0; index < titles.Length; index++)
-                    db.ExecuteNonQuery(Update("crm_list_item")
+                    Db.ExecuteNonQuery(Update("crm_list_item")
                                              .Set("sort_order", index)
                                              .Where(Exp.Eq("title", titles[index]) & Exp.Eq("list_type", (int)listType)));
 
@@ -617,7 +555,7 @@ namespace ASC.CRM.Core.Dao
 
         public static ListItem ToListItem(object[] row)
         {
-            return new ListItem
+            var result = new ListItem
                        {
                            ID = Convert.ToInt32(row[0]),
                            Title = Convert.ToString(row[1]),
@@ -626,6 +564,14 @@ namespace ASC.CRM.Core.Dao
                            SortOrder = Convert.ToInt32(row[4]),
                            AdditionalParams = Convert.ToString(row[5])
                        };
+
+            ListType listType;
+            if (Enum.TryParse(Convert.ToString(row[6]), out listType))
+            {
+                result.ListType = listType;
+            }
+
+            return result;
         }
     }
 }

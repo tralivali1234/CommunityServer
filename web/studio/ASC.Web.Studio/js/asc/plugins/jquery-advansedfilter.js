@@ -1,3 +1,20 @@
+/*
+ *
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+
 (function ($, win, doc, body) {
     var
       defaultAnykeyTimeout = 500,
@@ -83,6 +100,9 @@
 
         for (var i = 0, n = filtervalues ? filtervalues.length : 0; i < n; i++) {
             filtervalue = filtervalues[i];
+            
+            if (!filtervalue.params) continue;
+
             switch (filtervalue.type) {
                 case 'sorter':
                     filtervaluehash = {
@@ -124,7 +144,7 @@
 
     function getkey() {
         var key = location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + location.pathname + location.search;
-        return encodeURIComponent(key.charAt(key.length - 1) === '/' ? key + 'default.aspx' : key);
+        return encodeURIComponent(key.charAt(key.length - 1) === '/' ? key + 'Default.aspx' : key);
     }
 
     function toggleHasFilters(selectedfilters, $container) {
@@ -154,8 +174,6 @@
         // quota exceeded error workaround
         var key = getkey();
         localStorageManager.setItem(key, newhash);
-
-        $.cookies.set(key, newhash, { path: path });
     }
 
     function getLocalStorageFilters(opts) {
@@ -213,6 +231,11 @@
 
     function getContainerHash($container) {
         return getFiltersHash($container.data('filtervalues') || []);
+    }
+
+    function getStorageHash($container) {
+        var key = getkey();
+        return localStorageManager.getItem(key) || getContainerHash($container);
     }
 
     function getContainerFilters($container) {
@@ -308,13 +331,22 @@
         var groupsInd = 0;
         groupsInd = groups ? groups.length : 0;
         while (groupsInd--) {
+            if (filtervalue.groupid) {
+                if (groups[groupsInd].id === filtervalue.groupid) {
+                    groups[groupsInd].items.push(filtervalue);
+                    break;
+                } else {
+                    continue;
+                }
+            }
+
             if (groups[groupsInd].title === filtervalue.group) {
                 groups[groupsInd].items.push(filtervalue);
                 break;
             }
         }
         if (groupsInd === -1) {
-            groups.push({ title: filtervalue.group || '', items: [filtervalue] });
+            groups.push({ title: filtervalue.group || '', items: [filtervalue], id: filtervalue.groupid || '' });
         }
     }
 
@@ -368,7 +400,7 @@
 
         colcount = opts && typeof opts === 'object' && opts.hasOwnProperty('colcount') && isFinite(+opts.colcount) ? +opts.colcount : colcount;
         for (itemgroupsInd = 0, itemgroupsLen = itemgroups.length; itemgroupsInd < itemgroupsLen; itemgroupsInd++) {
-            if (type === 'filter' && colcount > 1) {
+            if (type === 'filter' && colcount >= 1) {
                 if (itemgroupsInd < colcount) {
                     html.push('<li class="item-group-col"><ul class="group-items">');
                     for (var i = itemgroupsInd; i < itemgroupsLen; i += colcount) {
@@ -382,7 +414,7 @@
                         html = html.concat([
                           '<li',
                             ' class="item-group ' + type + '-group',
-                              itemgroups[i].title ? '' : ' none-title',
+                              //itemgroups[i].title ? '' : ' none-title',
                             '"',
                           '>',
                             '<span class="title" title="' + title + '">',
@@ -423,7 +455,7 @@
                   '<li',
                     ' class="item-group ' + type + '-group',
                       //itemgroupsInd === 0 ? ' first-group' : '',
-                      itemgroups[itemgroupsInd].title ? '' : ' none-title',
+                      type === 'sorter' && !itemgroups[itemgroupsInd].title ? ' none-title' : '',
                     '"',
                   '>',
                     '<span class="title" title="' + title + '">',
@@ -525,7 +557,7 @@
 
         o = $container.find('ul.filter-list:first').removeClass('multi-column').empty()[0] || null;
         if (o) {
-            if (opts.colcount > 1) {
+            if (opts.colcount >= 1) {
                 o.className += ' multi-column multi-column-' + opts.colcount;
             }
             o.innerHTML = createAdvansedFilterGroup(opts, groups, 'filter');
@@ -694,32 +726,16 @@
         }
     }
 
-    function updateFiltersList($items) {
-        var
-          hasitems = false,
-          itemsInd = 0,
-          $item = null,
-          $group = null;
+    function updateFiltersList($container) {
+        var $groups = $container.find("li.item-group.filter-group");
 
-        if ($items.filter('.item-group').length === 0) {
-            return undefined;
-        }
+        for (var i = 0, j = $groups.length; i < j; i++) {
+            var $group = $($groups[i]);
+            $group.removeClass('hidden-item');
 
-        itemsInd = $items.length;
-        while (itemsInd--) {
-            $item = $($items[itemsInd]);
-            if ($item.hasClass('item-group')) {
-                $item.removeClass('hidden-item');
-                if (hasitems === false) {
-                    $item.addClass('hidden-item');
-                }
-                hasitems = false;
-                continue;
+            if ($group.find('.item-item:not(.hidden-item)').length === 0) {
+                $group.addClass('hidden-item');
             }
-            if ($item.hasClass('hidden-item')) {
-                continue;
-            }
-            hasitems = true;
         }
 
         //$items.filter('.item-group').removeClass('first-group').not('.disabled-item').filter(':first').addClass('first-group');
@@ -764,6 +780,33 @@
         }
     }
 
+    function resetTextFilter($container) {
+        var
+            $this = $container.find('input.advansed-filter-input:first'),
+            filtervalue = null,
+            filtervalues = $container.data('filtervalues'),
+            filtervaluesInd = 0;
+
+        if (!filtervalues || filtervalues.length === 0) {
+            return undefined;
+        }
+
+        filtervaluesInd = filtervalues.length;
+        while (filtervaluesInd--) {
+            if (filtervalues[filtervaluesInd].id === 'text') {
+                break;
+            }
+        }
+
+        $this.val('');
+
+        if (filtervaluesInd !== -1) {
+            filtervalue = filtervalues[filtervaluesInd];
+            filtervalue.params = null;
+            filtervalue.isset = false; 
+        }
+        $container.data('filtervalues', filtervalues);
+    }
     /* <flag> */
 
     function onUserFilterFlagSelectValue($container, $filteritem, filtervalue, nonetrigger) {
@@ -814,7 +857,7 @@
             } catch (err) { }
         }
 
-        onBodyClick();
+        //onBodyClick();
         jQuery(document.body).unbind('click', onBodyClick);
 
         resizeControlContainer($container, $filteritem, $container.find('div.advansed-filter-groupselector-container:first'));
@@ -852,6 +895,15 @@
                             }
                         })($container, $filteritem, filtervalue, onUserFilterGroupSelectValue)
                     );
+
+                if (!filtervalue.isset && !filtervalue.bydefault) {
+                    setTimeout(function() {
+                        if ($filteritem.hasClass("default-value")) {
+                            $filteritem.find(".selector-wrapper").click();
+                        }
+                    }, 0);
+                }
+
             } catch (err) { }
         }
     }
@@ -882,13 +934,16 @@
     function customizeUserFilterPerson($container, $filteritem, filtervalue) {
         if (jQuery($filteritem).children(".advansed-filter-userselector").length == 0) {
             try {
+                var showme = filtervalue.hasOwnProperty('showme') ? Boolean(filtervalue.showme) : true;
                 $container.addClass("showed-userselector");
                 $filteritem.children(".selector-wrapper:first").useradvancedSelector(
                 {
-                    showme: true,
+                    showme: showme,
                     inPopup: true,
                     onechosen: true,
-                    showGroups: true
+                    showGroups: true,
+                    itemsDisabledIds: showme ? [] : [window.Teamlab.profile.id],
+                    showDisabled: window.Teamlab.profile.isAdmin
                 });
             } catch (err) { }
             
@@ -901,6 +956,15 @@
                             }
                         })($container, $filteritem, filtervalue, onUserFilterPersonSelectValue)
                     );
+
+                if (!filtervalue.isset && !filtervalue.bydefault) {
+                    setTimeout(function() {
+                        if ($filteritem.hasClass("default-value")) {
+                            $filteritem.find(".selector-wrapper").click();
+                        }
+                    }, 0);
+                }
+
             } catch (err) { }
         }
     }
@@ -916,7 +980,7 @@
             } catch (err) { }
         }
 
-        onBodyClick();
+        //onBodyClick();
         jQuery(document.body).unbind('click', onBodyClick);
 
         resizeControlContainer($container, $filteritem, $container.find('div.advansed-filter-userselector-container:first'));
@@ -992,7 +1056,7 @@
             return undefined;
         }
 
-        onBodyClick(evt);
+        //onBodyClick(evt);
         jQuery(document.body).unbind('click', onBodyClick);
 
         var $datepicker = $dateselector.addClass('showed-datepicker').find('span.advansed-filter-datepicker-container:first').css('display', 'block');
@@ -1034,6 +1098,9 @@
                 }
                 value = values;
             }
+
+            $filteritem.removeClass('default-value');
+
             setFilterItem($container, $filteritem, filtervalue, { value: value, title: $target.find('option[value="' + ("" + value).replace(/\"/g, '\\"') + '"]:first').text() }, nonetrigger);
         }
     }
@@ -1077,6 +1144,14 @@
                   callback(this, $container, $filteritem, filtervalue);
               }
           })($container, $filteritem, filtervalue, onUserFilterComboboxSelectValue));
+
+        if (!filtervalue.isset && value === null) {
+            setTimeout(function () {
+                if ($filteritem.hasClass("default-value")) {
+                    $filteritem.find(".selector-wrapper .combobox-selector .combobox-title").click();
+                }
+            }, 0);
+        }
 
         // d'ohhh
         return !value ? null : { value: value, title: $select.find('option[value="' + ("" + value).replace(/\"/g, '\\"') + '"]:first').text() };
@@ -1184,62 +1259,43 @@
         }
     }
 
-    function showUserFilterByOption($container, filterid, nonetrigger) {
-        var
-          $selectedfilters = $container.find('div.advansed-filter-filters:first div.filter-item'),
-          $filteritems = $container.find('li.item-item.filter-item'),
-          $filter = null;
+    function showUserFilterByOption($filterItem) {
+        if (!$filterItem.hasClass('hidden-item')) return;
 
-        $filteritems.filter('[data-id="' + filterid + '"]').removeClass('hidden-item');
-        updateFiltersList($container.find('ul.filter-list:first li'));
+        $filterItem.removeClass('hidden-item');
     }
 
-    function hideUserFilterByOption($container, filterid, nonetrigger) {
-        var
-          $selectedfilters = $container.find('div.advansed-filter-filters:first div.filter-item'),
-          $filteritems = $container.find('li.item-item.filter-item'),
-          $filter = null;
+    function hideUserFilterByOption($container, $selectedfilterItem, $filterItem, nonetrigger) {
+        if ($filterItem.hasClass('hidden-item')) return false;
 
-        $filteritems.filter('[data-id="' + filterid + '"]').addClass('hidden-item');
-        updateFiltersList($container.find('ul.filter-list:first li'));
+        $filterItem.addClass('hidden-item');
 
-        if (($filter = $selectedfilters.filter('[data-id="' + filterid + '"]')).length > 0) {
-            removeUserFilterByObject($container, $filter, nonetrigger);
+        if ($selectedfilterItem.length > 0) {
+            removeUserFilterByObject($container, $selectedfilterItem, nonetrigger);
             return true;
         }
     }
 
-    function enableUserFilterByOption($container, filterid, nonetrigger) {
-        var
-          $selectedfilters = $container.find('div.advansed-filter-filters:first div.filter-item'),
-          $filteritems = $container.find('li.item-item.filter-item'),
-          $filter = null;
+    function enableUserFilterByOption($filterItem) {
+        if (!$filterItem.hasClass('disabled-item')) return;
 
-        $filteritems.filter('[data-id="' + filterid + '"]').removeClass('disabled-item');
-        updateFiltersList($container.find('ul.filter-list:first li'));
+        $filterItem.removeClass('disabled-item');
     }
 
-    function disableUserFilterByOption($container, filterid, nonetrigger) {
-        var
-          $selectedfilters = $container.find('div.advansed-filter-filters:first div.filter-item'),
-          $filteritems = $container.find('li.item-item.filter-item'),
-          $filter = null;
+    function disableUserFilterByOption($container, $selectedfilterItem, $filterItem, nonetrigger) {
+        if ($filterItem.hasClass('disabled-item')) return false;
 
-        $filteritems.filter('[data-id="' + filterid + '"]').addClass('disabled-item');
-        updateFiltersList($container.find('ul.filter-list:first li'));
+        $filterItem.addClass('disabled-item');
 
-        if (($filter = $selectedfilters.filter('[data-id="' + filterid + '"]')).length > 0) {
-            removeUserFilterByObject($container, $filter, nonetrigger);
+        if ($selectedfilterItem.length > 0) {
+            removeUserFilterByObject($container, $selectedfilterItem, nonetrigger);
             return true;
         }
     }
 
-    function resetUserFilterByOption($container, filterid, nonetrigger) {
-        var
-          $selectedfilters = $container.find('div.advansed-filter-filters:first div.filter-item'),
-          $filter = null;
-        if (($filter = $selectedfilters.filter('[data-id="' + filterid + '"]')).length > 0) {
-            removeUserFilterByObject($container, $filter, nonetrigger);
+    function resetUserFilterByOption($container, $selectedfilterItem, nonetrigger) {
+        if ($selectedfilterItem.length > 0) {
+            removeUserFilterByObject($container, $selectedfilterItem, nonetrigger);
             return true;
         }
     }
@@ -1489,7 +1545,7 @@
         if ($sortercontainer.length > 0) {
             $sortercontainer.addClass('sorter-isset');
             if (title) {
-                $sortercontainer.find('span.value:first').text(title);
+                $sortercontainer.find('span.value:first').text(title).attr("title", title);
             }
             sortercontainerWidth = $container.hasClass('disable-sorter-block') ? 0 : $sortercontainer.width();
             $filtercontainer.css('margin-right', (sortercontainerWidth > 0 ? sortercontainerWidth + 38 : 0) + 22 + 'px');
@@ -1508,7 +1564,7 @@
           $input = $container.find('div.advansed-filter-input:first'),
           $button = $container.find('div.advansed-filter-button:first'),
           $filters = $container.find('div.advansed-filter-filters:first'),
-          $hiddenfilterscontainer = $filters.find('div.hidden-filters-container:first')
+          $hiddenfilterscontainer = $filters.find('div.hidden-filters-container:first'),
           $hiddenfilteritems = $hiddenfilterscontainer.find('div.filter-item');
 
         if ($input.length === 0 || $filters.length === 0 || containerWidth === 0) {
@@ -1593,7 +1649,7 @@
                 $advansedfilterlist.width('auto')
                 var $advansedfilterlistcolsInd = $advansedfilterlistcols.length;
                 while ($advansedfilterlistcolsInd--) {
-                    colwidth = $advansedfilterlistcols[$advansedfilterlistcolsInd].offsetWidth;
+                    colwidth = getClientWidth($advansedfilterlistcols[$advansedfilterlistcolsInd]);
                     $advansedfilterlistcols[$advansedfilterlistcolsInd].style.width = colwidth + 'px';
                     colswidth += colwidth;
                 }
@@ -1612,6 +1668,11 @@
         $button.css('left', offsetLeft + 'px');
         $container.find('div.advansed-filter-list:first').css('left', offsetLeft + 'px');
         $input[0].style.marginLeft = $button[0].offsetWidth + offsetLeft + 'px';
+    }
+
+    function getClientWidth(elem) {
+        var rect = elem.getBoundingClientRect();
+        return Math.ceil(rect.width);
     }
 
     function resizeControlContainer($container, $filteritem, $control) {
@@ -1726,13 +1787,11 @@
         jQuery('div.advansed-filter').find('span.advansed-filter-dateselector-date').removeClass('showed-datepicker').find('span.advansed-filter-datepicker-container').hide();
     }
 
-    function onKeyUp(evt) {
-        if (this.value === '') {
-            this.parentNode.className = this.parentNode.className.replace(' has-value', '');
+    function onKeyUp() {
+        if (this.value) {
+            this.parentNode.classList.add('has-value');
         } else {
-            if (this.parentNode.className.indexOf(' has-value') === -1) {
-                this.parentNode.className = this.parentNode.className + ' has-value';
-            }
+            this.parentNode.classList.remove('has-value');
         }
     }
 
@@ -1930,51 +1989,83 @@
     }
 
     function onFilterInputKeyup(evt) {
+        if (!checkKeyCode(evt.keyCode)) {
+            return;
+        }
+
         var
-          $this = evt && typeof evt === 'object' ? jQuery(evt.target) : filterInputKeyupObject ? jQuery(filterInputKeyupObject) : jQuery(),
+          $this = jQuery(this),
           value = $this.val(),
           $container = $this.parents('div.advansed-filter:first'),
           filtervalues = $container.data('filtervalues'),
-          filtervaluesInd = 0;
+          filtervaluesInd;
 
         if (!filtervalues || filtervalues.length === 0) {
-            return undefined;
+            return;
         }
 
         filtervaluesInd = filtervalues.length;
+
         while (filtervaluesInd--) {
             if (filtervalues[filtervaluesInd].id === 'text') {
                 break;
             }
         }
 
-        if (filtervaluesInd !== -1) {
-            wasUpdated = true;
-            //wasUpdated = filtervalues[filtervaluesInd].params && value == filtervalues[filtervaluesInd].params.value ? false : wasUpdated;
-            wasUpdated = !filtervalues[filtervaluesInd].params && value == '' ? false : wasUpdated;
-            if (wasUpdated) {
-                if (typeof value === 'string' && value.length > 0) {
-                    setFilterItem($container, null, filtervalues[filtervaluesInd], { value: value });
-                } else {
-                    unsetFilterItem($container, null, filtervalues[filtervaluesInd]);
-                }
-            }
+        if (filtervaluesInd === -1 || (!filtervalues[filtervaluesInd].params && !value)) {
+            return;
+        }
+
+        if (value) {
+            setFilterItem($container, null, filtervalues[filtervaluesInd], { value: value });
+        } else {
+            unsetFilterItem($container, null, filtervalues[filtervaluesInd]);
         }
     }
 
     function onFilterInputKeyupHelper(evt) {
         clearTimeout(filterInputKeyupHandler);
-        if (filterInputKeyupTimeout > 0) {
-            filterInputKeyupObject = evt.target;
-            filterInputKeyupHandler = setTimeout(onFilterInputKeyup, filterInputKeyupTimeout);
-        }
+
+        filterInputKeyupHandler = setTimeout(function() {
+            onFilterInputKeyup.call(evt.target, evt);
+        }, filterInputKeyupTimeout);
     }
 
     function onFilterInputEnter(evt) {
         switch (evt.keyCode) {
             case 13:
-                return onFilterInputKeyup(evt);
+                onFilterInputKeyup.call(evt.target, evt);
         }
+    }
+
+    function checkKeyCode(keyCode) {
+        var excluded = [
+            9, //tab,
+            16, //shift
+            17, //ctrl	
+            18, //alt
+            19, //pause/break
+            20, //caps lock
+            27, //escape
+            33, //page up
+            34, //page down
+            35, //end
+            36, //home
+            37, //left arrow
+            38, //up arrow
+            39, //right arrow
+            40, //down arrow
+            44, //print
+            45, //insert
+            91, //left window key
+            92, //right window key
+            93, //select key
+            112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, //f1-f12
+            144, //num lock
+            145 //scroll lock
+        ];
+
+        return !excluded.includes(keyCode);
     }
 
     function onStartFilter(evt) {
@@ -2133,6 +2224,7 @@
         wasCallTrigger = false;
 
         changeSorter = false;
+        var selItem = sortervalues.find(function(item) { return item.selected });
         for (var i = 0, n = sortervalues.length; i < n; i++) {
             sortervalue = sortervalues[i];
             if (sortervalue.visible === true) {
@@ -2155,11 +2247,12 @@
                 //}
                 if (setUserSorter($container, sortervalue.id, { dsc: sortervalue.dsc === true || sortervalue.sortOrder === 'descending' }, true)) {
                     changeSorter = true;
+                    break;
                 }
             }
-            if (sortervalue.def === true) {
+            if (!selItem && sortervalue.def === true) {
                 setUserSorter($container, sortervalue.id, { dsc: sortervalue.dsc === true || sortervalue.sortOrder === 'descending' }, true);
-                break;
+                //break;
             }
         }
 
@@ -2169,28 +2262,39 @@
         }
 
         wasAdded = false;
+        
+        var $filterItems = $container.find('li.item-item.filter-item');
+        var $selectedFilters = $container.find('div.advansed-filter-filters:first div.filter-item');
         for (var i = 0, n = filtervalues.length; i < n; i++) {
             filtervalue = filtervalues[i];
+
+            var $filterItem, $selectedfilterItem;
+            if (filtervalue.hasOwnProperty("visible") || filtervalue.hasOwnProperty("enable") ||
+                filtervalue.hasOwnProperty("reset") || filtervalue.hasOwnProperty('params')) {
+                $filterItem = $filterItems.filter('[data-id="' + filtervalue.id + '"]');
+                $selectedfilterItem = $selectedFilters.filter('[data-id="' + filtervalue.id + '"]');
+            }
+
             if (filtervalue.visible === true) {
-                showUserFilterByOption($container, filtervalue.id, true);
-            }
-            if (filtervalue.visible === false) {
-                if (hideUserFilterByOption($container, filtervalue.id, true)) {
+                showUserFilterByOption($filterItem);
+            } else if (filtervalue.visible === false) {
+                if (hideUserFilterByOption($container, $selectedfilterItem, $filterItem, true)) {
                     wasAdded = true;
                 }
             }
+
             if (filtervalue.enable === true) {
-                enableUserFilterByOption($container, filtervalue.id, true);
-            }
-            if (filtervalue.enable === false) {
-                if (disableUserFilterByOption($container, filtervalue.id, true)) {
+                enableUserFilterByOption($filterItem);
+            } else if (filtervalue.enable === false) {
+                if (disableUserFilterByOption($container, $selectedfilterItem, $filterItem, true)) {
                     wasAdded = true;
                 }
             }
+
             if (filtervalue.type === 'combobox' && filtervalue.hasOwnProperty('options')) {
                 containerfiltervaluesInd = containerfiltervalues.length;
                 while (containerfiltervaluesInd--) {
-                    if (filtervalue.id == containerfiltervalues[containerfiltervaluesInd].id) {
+                    if (filtervalue.id === containerfiltervalues[containerfiltervaluesInd].id) {
                         break;
                     }
                 }
@@ -2209,6 +2313,7 @@
                     }
                 }
             }
+
             if (filtervalue.visible !== false && filtervalue.hasOwnProperty('params') && filtervalue.params) {
                 containerfiltervaluesInd = containerfiltervalues.length;
                 while (containerfiltervaluesInd--) {
@@ -2222,12 +2327,18 @@
                     }
                 }
             }
+
             if (filtervalue.reset === true || (filtervalue.hasOwnProperty('params') && filtervalue.params === null)) {
-                if (resetUserFilterByOption($container, filtervalue.id, true)) {
+                if (resetUserFilterByOption($container, $selectedfilterItem, true)) {
                     wasAdded = true;
                 }
             }
         }
+
+        if (filtervalue.hasOwnProperty("visible") || filtervalue.hasOwnProperty("enable")) {
+            updateFiltersList($container);
+        }
+
         if (opts.store === true) {
             if (!$container.hasClass('is-init')) {
                 readLastState(opts, $container, true);
@@ -2253,6 +2364,7 @@
                 wasCallTrigger = true;
             }
         }
+
         if (changeOptions == true) {
             onBodyClick(true);
             resizeUserFilterContainer($container);
@@ -2492,8 +2604,12 @@
                     return undefined;
                 case 'filters':
                     return getContainerFilters($container);
+                case 'hash':
+                    return getStorageHash($container);
                 case 'storage':
                     return getLocalStorageFilters();
+                case 'resetText':
+                    return resetTextFilter($container);
                 case 'resize':
                     if ($container.is(":visible")) {
                         onBodyClick();

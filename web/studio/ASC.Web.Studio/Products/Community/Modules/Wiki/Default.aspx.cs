@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -30,26 +21,26 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
-using ASC.Web.Core.Mobile;
-using ASC.Web.Studio.Core;
-using ASC.Web.Studio.UserControls.Common.Comments;
-using ASC.Web.Studio.Utility.HtmlUtility;
 using AjaxPro;
+using ASC.Common.Security.Authorizing;
 using ASC.Core;
-using ASC.Core.Tenants;
+using ASC.ElasticSearch;
 using ASC.Notify.Recipients;
 using ASC.Web.Community.Product;
+using ASC.Web.Community.Search;
 using ASC.Web.Community.Wiki.Common;
+using ASC.Web.Core.Mobile;
 using ASC.Web.Core.Users;
 using ASC.Web.Core.Utility.Skins;
+using ASC.Web.Studio.Core;
+using ASC.Web.Studio.UserControls.Common.Comments;
 using ASC.Web.Studio.Utility;
+using ASC.Web.Studio.Utility.HtmlUtility;
 using ASC.Web.UserControls.Wiki;
 using ASC.Web.UserControls.Wiki.Data;
 using ASC.Web.UserControls.Wiki.Handlers;
 using ASC.Web.UserControls.Wiki.Resources;
 using ASC.Web.UserControls.Wiki.UC;
-using ASC.Common.Security.Authorizing;
-using Newtonsoft.Json;
 
 namespace ASC.Web.Community.Wiki
 {
@@ -196,7 +187,7 @@ namespace ASC.Web.Community.Wiki
 
         protected void wikiEditPage_SetNewFCKMode(bool isWysiwygDefault)
         {
-            WikiModuleSettings.SetIsWysiwygDefault(isWysiwygDefault, SecurityContext.CurrentAccount.ID);
+            WikiModuleSettings.SetIsWysiwygDefault(isWysiwygDefault);
         }
 
         protected string wikiEditPage_GetUserFriendlySizeFormat(long size)
@@ -229,6 +220,8 @@ namespace ASC.Web.Community.Wiki
                 }
                 Wiki.RemovePage(pageName);
 
+                FactoryIndexer<WikiWrapper>.DeleteAsync(page);
+
                 Response.RedirectLC("Default.aspx", this);
             }
             catch (Exception err)
@@ -243,6 +236,7 @@ namespace ASC.Web.Community.Wiki
             (Master as WikiMaster).GetDelUniqId += new WikiMaster.GetDelUniqIdHandle(_Default_GetDelUniqId);
 
             Utility.RegisterTypeForAjax(typeof(_Default), Page);
+            RegisterInlineScript();
             LoadViews();
 
             if (IsPostBack) return;
@@ -261,15 +255,17 @@ namespace ASC.Web.Community.Wiki
 
             var mainStudioCss = WebSkin.BaseCSSFileAbsoluteWebPath;
 
-            wikiEditPage.CanUploadFiles = CommunitySecurity.CheckPermissions(Common.Constants.Action_UploadFile) && !MobileDetector.IsMobile;
+            wikiEditPage.CanUploadFiles = CommunitySecurity.CheckPermissions(Common.Constants.Action_UploadFile);
             wikiEditPage.MainCssFile = mainStudioCss;
 
             if (Action == ActionOnPage.CategoryView)
             {
                 BindPagesByCategory();
             }
+        }
 
-
+        private void RegisterInlineScript()
+        {
             var script = @"
                     window.scrollPreview = function() {
                         jq.scrollTo(jq('#_PrevContainer').position().top, { speed: 500 });
@@ -279,9 +275,13 @@ namespace ASC.Web.Community.Wiki
                         jq.scrollTo(jq('#edit_container').position().top, { speed: 500 });
                     }
                     window.WikiEditBtns = function() {
+                        window.checkUnload=false;
                         LoadingBanner.showLoaderBtn('#actionWikiPage');
                     }
-
+                    window.checkUnload=true;
+                    window.checkUnloadFunc = function() {
+                        return checkUnload;
+                    }
                     window.panelEditBtnsID = '" + pEditButtons.ClientID + @"';
                     jq.dropdownToggle({
                         dropdownID: 'WikiActionsMenuPanel',
@@ -299,10 +299,13 @@ namespace ASC.Web.Community.Wiki
                     });
                     if (jq('#WikiActionsMenuPanel .dropdown-content a').length == 0) {
                         jq('span.menu-small').hide();
-                    }";
+                    }
+                    jq('input[id$=txtPageName]').focus();";
+
+            if (Action == ActionOnPage.AddNew || Action == ActionOnPage.Edit)
+                script += "jq.confirmBeforeUnload(window.checkUnloadFunc);";
 
             Page.RegisterInlineScript(script);
-
         }
 
         private IWikiObjectOwner _wikiObjOwner;
@@ -360,7 +363,7 @@ namespace ASC.Web.Community.Wiki
 
             if (canEdit)
                 sb.AppendFormat("<li><a class=\"dropdown-item\" href=\"{0}\">{1}</a></li>",
-                                ActionHelper.GetEditPagePath(this.ResolveUrlLC("default.aspx"), WikiPage),
+                                ActionHelper.GetEditPagePath(this.ResolveUrlLC("Default.aspx"), WikiPage),
                                 WikiResource.menu_EditThePage);
 
             if (canDelete)
@@ -371,27 +374,14 @@ namespace ASC.Web.Community.Wiki
 
             ActionPanel.Text = sb.ToString();
 
-            sb = new StringBuilder();
+            var script = String.Format("ASC.Community.Wiki.BindSubscribeEvent({0}, \"{1}\", \"{2}\", \"{3}\")",
+                subscribed.ToString().ToLower(CultureInfo.CurrentCulture),
+                HttpUtility.HtmlEncode((Page as WikiBasePage).WikiPage).EscapeString(),
+                WikiResource.NotifyOnEditPage,
+                WikiResource.UnNotifyOnEditPage
+                );
 
-            sb.AppendLine("var notyfy = " + subscribed.ToString().ToLower(CultureInfo.CurrentCulture) + ";");
-            sb.AppendLine("var pageId = \"" + HttpUtility.HtmlEncode((Page as WikiBasePage).WikiPage).EscapeString() + "\";");
-            sb.AppendLine("jq(\"#statusSubscribe\").on(\"click\", function(){");
-            sb.AppendLine("AjaxPro.onLoading = function(b) {");
-            sb.AppendLine("if(b) LoadingBanner.displayLoading();");
-            sb.AppendLine("else LoadingBanner.hideLoading();");
-            sb.AppendLine("}");
-            sb.AppendLine("MainWikiAjaxMaster.SubscribeOnEditPage(notyfy, pageId, callbackNotifyWikiPage);");
-            sb.AppendLine("});");
-            sb.AppendLine("function callbackNotifyWikiPage(result){notyfy = result.value;");
-            sb.AppendLine("if(!notyfy){");
-            sb.AppendLine("jq(\"#statusSubscribe\").removeClass(\"subscribed\").addClass(\"unsubscribed\");");
-            sb.AppendFormat("jq(\"#statusSubscribe\").attr(\"title\", \"{0}\");", WikiResource.NotifyOnEditPage);
-            sb.AppendLine("} else {");
-            sb.AppendLine("jq(\"#statusSubscribe\").removeClass(\"unsubscribed\").addClass(\"subscribed\");");
-            sb.AppendFormat("jq(\"#statusSubscribe\").attr(\"title\", \"{0}\");", WikiResource.UnNotifyOnEditPage);
-            sb.AppendLine("}};");
-
-            Page.RegisterInlineScript(sb.ToString());
+            Page.RegisterInlineScript(script);
         }
 
         protected void InitCategoryActionPanel()
@@ -402,7 +392,7 @@ namespace ASC.Web.Community.Wiki
             sb.Append("<ul class=\"dropdown-content\">");
 
             sb.AppendFormat("<li><a class=\"dropdown-item\" href=\"{0}\">{1}</a></li>",
-                            ActionHelper.GetEditPagePath(this.ResolveUrlLC("default.aspx"), WikiPage),
+                            ActionHelper.GetEditPagePath(this.ResolveUrlLC("Default.aspx"), WikiPage),
                             WikiResource.cmdEdit);
 
             sb.Append("</ul>");
@@ -506,7 +496,7 @@ namespace ASC.Web.Community.Wiki
             {
                 if (isFile)
                 {
-                    if (CommunitySecurity.CheckPermissions(Common.Constants.Action_UploadFile) && !MobileDetector.IsMobile)
+                    if (CommunitySecurity.CheckPermissions(Common.Constants.Action_UploadFile))
                     {
                         result = result.Replace(match.Value, string.Format(@"<a href=""{0}"">{1}</a>", ActionHelper.GetEditFilePath(this.ResolveUrlLC("Default.aspx"), PageNameUtil.Decode(WikiPage)), match.Groups[1].Value));
                     }
@@ -589,7 +579,7 @@ namespace ASC.Web.Community.Wiki
             {
                 case ActionOnPage.AddNew:
                     pageName = WikiResource.MainWikiAddNewPage;
-                    wikiEditPage.IsWysiwygDefault = !_mobileVer && WikiModuleSettings.GetIsWysiwygDefault(SecurityContext.CurrentAccount.ID);
+                    wikiEditPage.IsWysiwygDefault = !_mobileVer && WikiModuleSettings.GetIsWysiwygDefault();
                     wikiEditPage.Visible = true;
                     wikiEditPage.IsNew = true;
                     WikiPageName = pageName;
@@ -610,7 +600,7 @@ namespace ASC.Web.Community.Wiki
                     else
                     {
                         wikiEditPage.PageName = WikiPage;
-                        wikiEditPage.IsWysiwygDefault = !_mobileVer && WikiModuleSettings.GetIsWysiwygDefault(SecurityContext.CurrentAccount.ID);
+                        wikiEditPage.IsWysiwygDefault = !_mobileVer && WikiModuleSettings.GetIsWysiwygDefault();
                         wikiEditPage.Visible = true;
                         if (m_IsCategory)
                             wikiEditPage.IsSpecialName = true;
@@ -863,6 +853,9 @@ namespace ASC.Web.Community.Wiki
                 case SaveResult.Error:
                     PrintInfoMessage(WikiResource.msgMarkupError, InfoType.Alert);
                     break;
+                case SaveResult.PageTextIsEmpty:
+                    PrintInfoMessage(WikiResource.msgPageTextEmpty, infoType);
+                    break;
             }
         }
 
@@ -933,7 +926,7 @@ namespace ASC.Web.Community.Wiki
             commentList.Visible = true;
 
             commentList.Items = GetCommentsList(pageName, out totalCount);
-            ConfigureComments(commentList, pageName);
+            ConfigureComments(commentList);
             commentList.TotalCount = totalCount;
         }
 
@@ -967,18 +960,15 @@ namespace ASC.Web.Community.Wiki
             return from.FindAll(comm => comm.ParentId == forParentId);
         }
 
-        private static void ConfigureComments(CommentsList commentList, string pageName)
+        private static void ConfigureComments(CommentsList commentList)
         {
             CommonControlsConfigurer.CommentsConfigure(commentList);
 
             commentList.BehaviorID = "_commentsWikiObj";
-
             commentList.IsShowAddCommentBtn = CommunitySecurity.CheckPermissions(Common.Constants.Action_AddComment);
-
             commentList.ModuleName = "wiki";
             commentList.FckDomainName = "wiki_comments";
-
-            commentList.ObjectID = pageName.HtmlEncode();
+            commentList.ObjectID = "wiki_page";
         }
 
         public CommentInfo GetCommentInfo(Comment comment)
@@ -991,7 +981,7 @@ namespace ASC.Web.Community.Wiki
                     TimeStampStr = comment.Date.Ago(),
                     IsRead = true,
                     Inactive = comment.Inactive,
-                    CommentBody = comment.Body,
+                    CommentBody = HtmlUtility.GetFull(comment.Body),
                     UserFullName = DisplayUserSettings.GetFullUserName(comment.UserId),
                     UserProfileLink = CommonLinkUtility.GetUserProfile(comment.UserId),
                     UserAvatarPath = UserPhotoManager.GetBigPhotoURL(comment.UserId),

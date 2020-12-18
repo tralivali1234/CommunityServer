@@ -5,13 +5,11 @@
 <%@ Assembly Name="ASC.Data.Storage" %>
 <%@ Control Language="C#" AutoEventWireup="true" CodeBehind="ContactDetailsView.ascx.cs" Inherits="ASC.Web.CRM.Controls.Contacts.ContactDetailsView" %>
 
+<%@ Import Namespace="ASC.CRM.Core" %>
 <%@ Import Namespace="ASC.CRM.Core.Entities" %>
 <%@ Import Namespace="ASC.Web.CRM.Classes" %>
 <%@ Import Namespace="ASC.Web.CRM.Resources" %>
 
-
-<!-- -->
-<div id="ContactTabs"></div>
 
 <div id="profileTab" class="display-none">
     <asp:PlaceHolder runat="server" ID="_phProfileView"></asp:PlaceHolder>
@@ -25,44 +23,29 @@
         <div class="bold" style="margin-bottom:5px;"><%= CRMContactResource.AssignPersonFromExisting%>:</div>
     </div>
     <div id="contactListBox">
-        <table id="contactTable" class="table-list" cellpadding="4" cellspacing="0">
+        <table id="contactTable" class="table-list padding4" cellpadding="0" cellspacing="0">
             <tbody>
             </tbody>
         </table>
     </div>
 </div>
 <div id="dealsTab" class="display-none">
-    <table id="dealsInContactPanel">
-        <tr>
-            <td class="selectDeal">
-                <% if (!MobileVer) %>
-                <% { %>
-                <div class="menuAction">
-                    <span><%= CRMJSResource.LinkWithDeal %></span>
-                    <div class="down_arrow"></div>
-                </div>
-                <% } else { %>
-                <select></select>
-                <% } %>
-            </td>
-
-            <td class="createNewDeal">
-                <div class="menuAction unlockAction">
-                    <%= CRMDealResource.CreateDeal %>
-                </div>
-            </td>
-        </tr>
-    </table>
-
-    <div id="dealList" class="clearFix" style="min-height: 200px;margin-top: 11px;">
+    <div id="dealsInContactPanel">
+        <div class="bold" style="margin-bottom:5px;"><%= CRMDealResource.LinkDealsFromExisting %>:</div>
+    </div>
+    <div id="dealList" class="clearFix" style="min-height: 200px;">
     </div>
     <div id="files_hintStagesPanel" class="hintDescriptionPanel">
         <%=CRMDealResource.TooltipStages%>
-        <a href="http://www.onlyoffice.com/help/tipstricks/opportunity-stages.aspx" target="_blank"><%=CRMCommonResource.ButtonLearnMore%></a>
+        <% if (!string.IsNullOrEmpty(HelpLink)) { %>
+        <a href="<%= HelpLink + "/tipstricks/opportunity-stages.aspx" %>" target="_blank">
+            <%=CRMCommonResource.ButtonLearnMore%>
+        </a>
+        <% } %>
     </div>
 </div>
 <div id="invoicesTab" class="display-none">
-    <table id="invoiceTable" class="table-list" cellpadding="4" cellspacing="0">
+    <table id="invoiceTable" class="table-list padding4" cellpadding="0" cellspacing="0">
         <colgroup>
             <col style="width: 1%;"/>
             <col/>
@@ -75,18 +58,20 @@
     </table>
     <div id="invoiceActionMenu" class="studio-action-panel">
         <ul class="dropdown-content">
-            <li><a class="showProfileLink dropdown-item"><%= CRMInvoiceResource.ShowInvoiceProfile %></a></li>
-            <li><a class="showProfileLinkNewTab dropdown-item"><%= CRMInvoiceResource.ShowInvoiceProfileNewTab %></a></li>
+            <li><a class="showProfileLink dropdown-item with-icon user"><%= CRMInvoiceResource.ShowInvoiceProfile %></a></li>
+            <li><a class="showProfileLinkNewTab dropdown-item with-icon new-tab"><%= CRMInvoiceResource.ShowInvoiceProfileNewTab %></a></li>
+            <li class="dropdown-item-seporator"></li>
             <% if (Global.CanDownloadInvoices) { %>
-            <li><a class="downloadLink dropdown-item"><%= CRMInvoiceResource.Download %></a></li>
+            <li><a class="downloadLink dropdown-item with-icon download"><%= CRMInvoiceResource.Download %></a></li>
             <% } %>
-            <li><a class="printLink dropdown-item"><%= CRMInvoiceResource.Print %></a></li>
+            <li><a class="printLink dropdown-item with-icon print"><%= CRMInvoiceResource.Print %></a></li>
             <% if (Global.CanDownloadInvoices) { %>
-            <li><a class="sendLink dropdown-item"><%= CRMInvoiceResource.SendByEmail %></a></li>
+            <li><a class="sendLink dropdown-item with-icon email"><%= CRMInvoiceResource.SendByEmail %></a></li>
             <% } %>
-            <li><a class="editInvoiceLink dropdown-item"><%= CRMInvoiceResource.EditInvoice %></a></li>
-            <li><a class="duplicateInvoiceLink dropdown-item"><%= CRMInvoiceResource.DuplicateInvoice %></a></li>
-            <li><a class="deleteInvoiceLink dropdown-item"><%= CRMInvoiceResource.DeleteThisInvoice %></a></li>
+            <li><a class="duplicateInvoiceLink dropdown-item with-icon move-or-copy"><%= CRMInvoiceResource.DuplicateInvoice %></a></li>
+            <li class="dropdown-item-seporator"></li>
+            <li><a class="editInvoiceLink dropdown-item with-icon edit"><%= CRMInvoiceResource.EditInvoice %></a></li>
+            <li><a class="deleteInvoiceLink dropdown-item with-icon delete"><%= CRMInvoiceResource.DeleteThisInvoice %></a></li>
         </ul>
     </div>
 </div>
@@ -150,10 +135,12 @@
     </div>
 </div>
 
+<% if (CRMSecurity.CanEdit(TargetContact)) %>
+<% { %>
 <div id="contactDetailsMenuPanel" class="studio-action-panel">
     <ul class="dropdown-content">
         <li>
-            <a class="dropdown-item" href="<%= String.Format("default.aspx?id={0}&action=manage{1}",
+            <a class="dropdown-item" href="<%= String.Format("Default.aspx?id={0}&action=manage{1}",
                 TargetContact.ID, (TargetContact is Company) ? string.Empty : "&type=people") %>">
                 <%= (TargetContact is Company) ? CRMContactResource.EditProfileCompany : CRMContactResource.EditProfilePerson %>
             </a>
@@ -165,13 +152,10 @@
         </li>
     </ul>
 </div>
+<% } %>
 
 <% if (!MobileVer) %>
 <% { %>
-<div id="dealSelectorContainer" class="studio-action-panel display-none">
-    <ul class="dropdown-content"></ul>
-</div>
-
 <div id="projectSelectorContainer" class="studio-action-panel display-none">
     <ul class="dropdown-content"></ul>
 </div>

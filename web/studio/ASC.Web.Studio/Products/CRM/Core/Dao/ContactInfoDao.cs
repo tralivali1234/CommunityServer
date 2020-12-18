@@ -1,25 +1,16 @@
 /*
  *
- * (c) Copyright Ascensio System Limited 2010-2016
- *
- * This program is freeware. You can redistribute it and/or modify it under the terms of the GNU 
- * General Public License (GPL) version 3 as published by the Free Software Foundation (https://www.gnu.org/copyleft/gpl.html). 
- * In accordance with Section 7(a) of the GNU GPL its Section 15 shall be amended to the effect that 
- * Ascensio System SIA expressly excludes the warranty of non-infringement of any third-party rights.
- *
- * THIS PROGRAM IS DISTRIBUTED WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR
- * FITNESS FOR A PARTICULAR PURPOSE. For more details, see GNU GPL at https://www.gnu.org/copyleft/gpl.html
- *
- * You can contact Ascensio System SIA by email at sales@onlyoffice.com
- *
- * The interactive user interfaces in modified source and object code versions of ONLYOFFICE must display 
- * Appropriate Legal Notices, as required under Section 5 of the GNU GPL version 3.
- *
- * Pursuant to Section 7 § 3(b) of the GNU GPL you must retain the original ONLYOFFICE logo which contains 
- * relevant author attributions when distributing the software. If the display of the logo in its graphic 
- * form is not reasonably feasible for technical reasons, you must include the words "Powered by ONLYOFFICE" 
- * in every copy of the program you distribute. 
- * Pursuant to Section 7 § 3(e) we decline to grant you any rights under trademark law for use of our trademarks.
+ * (c) Copyright Ascensio System Limited 2010-2020
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
 */
 
@@ -28,11 +19,15 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ASC.Collections;
 using ASC.Common.Data.Sql;
 using ASC.Common.Data.Sql.Expressions;
 using ASC.Core.Tenants;
 using ASC.Common.Data;
+using ASC.CRM.Core.Entities;
+using ASC.ElasticSearch;
+using ASC.Web.CRM.Core.Search;
 
 #endregion
 
@@ -42,8 +37,8 @@ namespace ASC.CRM.Core.Dao
     {
         private readonly HttpRequestDictionary<ContactInfo> _contactInfoCache = new HttpRequestDictionary<ContactInfo>("crm_contact_info");
 
-        public CachedContactInfo(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public CachedContactInfo(int tenantID)
+            : base(tenantID)
         {
 
         }
@@ -91,8 +86,8 @@ namespace ASC.CRM.Core.Dao
     {
         #region Constructor
 
-        public ContactInfoDao(int tenantID, String storageKey)
-            : base(tenantID, storageKey)
+        public ContactInfoDao(int tenantID)
+            : base(tenantID)
         {
         }
 
@@ -100,48 +95,51 @@ namespace ASC.CRM.Core.Dao
 
         public virtual ContactInfo GetByID(int id)
         {
-            using (var db = GetDb())
-            {
-                var sqlResult = db.ExecuteList(GetSqlQuery(Exp.Eq("id", id))).ConvertAll(row => ToContactInfo(row));
+            var sqlResult = Db.ExecuteList(GetSqlQuery(Exp.Eq("id", id))).ConvertAll(row => ToContactInfo(row));
 
-                if (sqlResult.Count == 0) return null;
+            if (sqlResult.Count == 0) return null;
 
-                return sqlResult[0];
-            }
+            return sqlResult[0];
         }
 
         public virtual void Delete(int id)
         {
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_contact_info").Where(Exp.Eq("id", id)));
-            }
+            Db.ExecuteNonQuery(Delete("crm_contact_info").Where(Exp.Eq("id", id)));
+            FactoryIndexer<InfoWrapper>.DeleteAsync(r => r.Where(a => a.Id, id));
         }
 
         public virtual void DeleteByContact(int contactID)
         {
             if (contactID <= 0) return;
+            Db.ExecuteNonQuery(Delete("crm_contact_info").Where(Exp.Eq("contact_id", contactID)));
+            FactoryIndexer<InfoWrapper>.DeleteAsync(r => r.Where(a => a.ContactId, contactID));
 
-            using (var db = GetDb())
-            {
-                db.ExecuteNonQuery(Delete("crm_contact_info").Where(Exp.Eq("contact_id", contactID)));
-            }
+            var infos = GetList(contactID, ContactInfoType.Email, null, null);
+            FactoryIndexer<EmailWrapper>.Update(new EmailWrapper { Id = contactID, EmailInfoWrapper = infos.Select(r => (EmailInfoWrapper)r).ToList() }, UpdateAction.Replace, r => r.EmailInfoWrapper);
         }
 
         public virtual int Update(ContactInfo contactInfo)
         {
-            using (var db = GetDb())
+            var result = UpdateInDb(contactInfo);
+            
+            if (contactInfo.InfoType == ContactInfoType.Email)
             {
-                return Update(contactInfo, db);
+                var infos = GetList(contactInfo.ContactID, ContactInfoType.Email, null, null);
+
+                FactoryIndexer<EmailWrapper>.Update(new EmailWrapper { Id = contactInfo.ContactID, EmailInfoWrapper = infos.Select(r => (EmailInfoWrapper)r).ToList() }, UpdateAction.Replace, r => r.EmailInfoWrapper);
             }
+
+            FactoryIndexer<InfoWrapper>.UpdateAsync(contactInfo);
+
+            return result;
         }
 
-        private int Update(ContactInfo contactInfo, DbManager db)
+        private int UpdateInDb(ContactInfo contactInfo)
         {
             if (contactInfo == null || contactInfo.ID == 0 || contactInfo.ContactID == 0)
                 throw new ArgumentException();
 
-            db.ExecuteNonQuery(Update("crm_contact_info")
+            Db.ExecuteNonQuery(Update("crm_contact_info")
                                               .Where("id", contactInfo.ID)
                                               .Set("data", contactInfo.Data)
                                               .Set("category", contactInfo.Category)
@@ -157,15 +155,31 @@ namespace ASC.CRM.Core.Dao
 
         public int Save(ContactInfo contactInfo)
         {
-            using (var db = GetDb())
+            var id = SaveInDb(contactInfo);
+
+            contactInfo.ID = id;
+
+            FactoryIndexer<InfoWrapper>.IndexAsync(contactInfo);
+
+            if (contactInfo.InfoType == ContactInfoType.Email)
             {
-                return Save(contactInfo, db);        
+                FactoryIndexer<EmailWrapper>.Index(new EmailWrapper
+                {
+                    Id = contactInfo.ContactID, 
+                    TenantId = TenantID, 
+                    EmailInfoWrapper = new List<EmailInfoWrapper>
+                    {
+                        contactInfo
+                    }
+                });
             }
+
+            return id;
         }
 
-        private int Save(ContactInfo contactInfo, DbManager db)
+        private int SaveInDb(ContactInfo contactInfo)
         {
-            return db.ExecuteScalar<int>(Insert("crm_contact_info")
+            return Db.ExecuteScalar<int>(Insert("crm_contact_info")
                                                                .InColumnValue("id", 0)
                                                                .InColumnValue("data", contactInfo.Data)
                                                                .InColumnValue("category", contactInfo.Category)
@@ -196,10 +210,7 @@ namespace ASC.CRM.Core.Dao
 
             sqlQuery.Where(Exp.In("contact_id", contactID));
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery).ConvertAll(row => ToContactInfo(row));
-            }
+            return Db.ExecuteList(sqlQuery).ConvertAll(row => ToContactInfo(row));
         }
 
         public virtual List<ContactInfo> GetList(int contactID, ContactInfoType? infoType, int? categoryID, bool? isPrimary)
@@ -223,28 +234,33 @@ namespace ASC.CRM.Core.Dao
             //  sqlQuery.OrderBy("is_primary", true);
 
 
-            using (var db = GetDb())
-            {
-                return db.ExecuteList(sqlQuery).ConvertAll(row => ToContactInfo(row));
-            }
+            return Db.ExecuteList(sqlQuery).ConvertAll(row => ToContactInfo(row));
         }
 
 
-        public int[] UpdateList(List<ContactInfo> items)
+        public int[] UpdateList(List<ContactInfo> items, Contact contact = null)
         {
 
             if (items == null || items.Count == 0) return null;
 
             var result = new List<int>();
 
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction(true))
+            using (var tx = Db.BeginTransaction(true))
             {
                 foreach (var contactInfo in items)
-                    result.Add(Update(contactInfo, db));
+                    result.Add(UpdateInDb(contactInfo));
 
 
                 tx.Commit();
+            }
+
+            if (contact != null)
+            {
+                FactoryIndexer<EmailWrapper>.IndexAsync(EmailWrapper.ToEmailWrapper(contact, items.Where(r => r.InfoType == ContactInfoType.Email).ToList()));
+                foreach (var item in items.Where(r => r.InfoType != ContactInfoType.Email))
+                {
+                    FactoryIndexer<InfoWrapper>.IndexAsync(item);
+                }
             }
 
             return result.ToArray();
@@ -253,20 +269,32 @@ namespace ASC.CRM.Core.Dao
 
 
 
-        public int[] SaveList(List<ContactInfo> items)
+        public int[] SaveList(List<ContactInfo> items, Contact contact = null)
         {
             if (items == null || items.Count == 0) return null;
 
             var result = new List<int>();
 
-            using (var db = GetDb())
-            using (var tx = db.BeginTransaction(true))
+            using (var tx = Db.BeginTransaction(true))
             {
                 foreach (var contactInfo in items)
-                    result.Add(Save(contactInfo, db));
+                {
+                    var contactInfoId = SaveInDb(contactInfo);
+                    contactInfo.ID = contactInfoId;
+                    result.Add(contactInfoId);
+                }
 
 
                 tx.Commit();
+            }
+
+            if (contact != null)
+            {
+                FactoryIndexer<EmailWrapper>.IndexAsync(EmailWrapper.ToEmailWrapper(contact, items.Where(r => r.InfoType == ContactInfoType.Email).ToList()));
+                foreach (var item in items.Where(r => r.InfoType != ContactInfoType.Email))
+                {
+                    FactoryIndexer<InfoWrapper>.IndexAsync(item);
+                }
             }
 
             return result.ToArray();

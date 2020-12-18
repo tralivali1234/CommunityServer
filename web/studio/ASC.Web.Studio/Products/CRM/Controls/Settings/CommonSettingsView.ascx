@@ -6,63 +6,7 @@
 <%@ Import Namespace="ASC.Web.CRM.Configuration" %>
 <%@ Import Namespace="ASC.Web.Core.Utility.Skins" %>
 <%@ Import Namespace="ASC.Web.CRM.Resources" %>
-<%@ Import Namespace="ASC.Web.Studio.Utility" %>
 
-<div class="header-base settingsHeader" style="margin-top:5px;"><%= CRMSettingResource.SMTPSettings%></div>
-<div id="smtpSettingsContent">
-    <p><%: CRMSettingResource.SMTPSettingsDescription%></p>
-    <div class="clearFix">
-        <div id="SMTPSettingsPannel" class="float-left">
-        </div>
-        <div class="settings-help-block">
-            <p><%= String.Format(CRMSettingResource.SMTPSettingsHelp.HtmlEncode(), "<br/><br/>")%></p>
-            <!--<a href="<%= CommonLinkUtility.GetHelpLink(true) + "administratorguides/mass-mailing.aspx" %>" target="_blank">
-                <%=CRMSettingResource.LearnMore%>
-            </a>-->
-        </div>
-    </div>
-    <div style="margin: 23px 0 0 1px;">
-        <a href="javascript:void(0);" onclick="ASC.CRM.SettingsPage.saveSMTPSettings();" class="button blue middle">
-            <%=CRMCommonResource.Save%>
-        </a>
-        <span class="splitter-buttons"></span>
-        <a id="showSendTestMailPanelBtn" href="javascript:void(0);" onclick="ASC.CRM.SettingsPage.showSendTestMailPanel();" class="button gray middle disable">
-            <%=CRMSettingResource.SendTestMail%>
-        </a>
-    </div>
-</div>
-
-<div class="header-base settingsHeader"><%=CRMSettingResource.CurrencySettings%></div>
-<div>
-    <p><%: CRMSettingResource.CurrencySettingsDescription%></p>
-    <p><%: CRMSettingResource.CurrencySettingsInvoiceDescription%></p>
-    <div class="header-base-small headerTitle">
-        <%= CRMSettingResource.DefaultCurrency%>:
-    </div>
-    <div>
-        <select id="defaultCurrency" name="defaultCurrency" onchange="ASC.CRM.SettingsPage.changeDefaultCurrency()" class="comboBox">
-            <optgroup label="<%= CRMCommonResource.Currency_Basic %>">
-                <% foreach (var keyValuePair in BasicCurrencyRates)%>
-                <% { %>
-                <option value="<%=keyValuePair.Abbreviation%>" <%=IsSelectedBidCurrency(keyValuePair.Abbreviation) ? "selected=selected" : String.Empty%>>
-                    <%=String.Format("{0} - {1}", keyValuePair.Abbreviation, keyValuePair.Title)%></option>
-                <% } %>
-            </optgroup>
-            <optgroup label="<%= CRMCommonResource.Currency_Other %>">
-                <% foreach (var keyValuePair in OtherCurrencyRates)%>
-                <% { %>
-                <option value="<%=keyValuePair.Abbreviation%>" <%=IsSelectedBidCurrency(keyValuePair.Abbreviation) ? "selected=selected" : String.Empty%>>
-                    <%=String.Format("{0} - {1}", keyValuePair.Abbreviation, keyValuePair.Title)%></option>
-                <% } %>
-            </optgroup>
-        </select>
-        <img style="display:none;" src="<%= WebImageSupplier.GetAbsoluteWebPath("loader_12.gif") %>" width="12px" height="12px"
-            alt="<%= CRMCommonResource.LoadingWait %>"/>
-        <span style="display:none;" class="text-medium-describe"><%= CRMSettingResource.SaveCompleted%></span>
-    </div>
-</div>
-
-<div class="header-base settingsHeader"><%= CRMSettingResource.ExportData %></div>
 <div id="exportDataContent">
     <table width="100%" cellpadding="0" cellspacing="0">
         <colgroup>
